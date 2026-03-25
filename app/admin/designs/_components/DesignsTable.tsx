@@ -74,7 +74,7 @@ export default function DesignsTable({ rows }: { rows: DesignRow[] }) {
                       Settings
                     </Link>
                     <DuplicateButton slug={row.slug} />
-                    <form action={deleteDesign.bind(null, row.slug)}>
+                    <form action={deleteDesign.bind(null, row.slug) as unknown as string}>
                       <button
                         type="submit"
                         className="text-xs font-medium text-gray-400 transition-colors hover:text-red-600"

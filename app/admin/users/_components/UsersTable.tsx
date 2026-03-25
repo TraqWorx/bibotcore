@@ -194,7 +194,7 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
                       </Link>
                     )}
                     {row.role !== 'super_admin' && (
-                      <form action={deleteUser.bind(null, row.id)}>
+                      <form action={deleteUser.bind(null, row.id) as unknown as string}>
                         <button
                           type="submit"
                           className="text-xs font-medium text-gray-400 transition-colors hover:text-red-600"

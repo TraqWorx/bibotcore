@@ -165,7 +165,7 @@ export async function getConversationMessages(
       if (!hasNext || !lastMessageId) break
     }
     const rawMessages = allMessages
-    const messages = (rawMessages as ConversationMessage[])
+    const messages = (rawMessages as unknown as ConversationMessage[])
       .map((m) => ({
         id: m.id,
         body: m.body ?? m.message ?? '',

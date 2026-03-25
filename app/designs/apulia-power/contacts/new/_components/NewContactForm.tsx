@@ -56,7 +56,6 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
       lastName,
       email,
       phone,
-      companyName: companyName.trim() || undefined,
       tags,
       customFields: customFieldValues,
     }, locationId)
