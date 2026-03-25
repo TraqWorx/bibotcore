@@ -1,0 +1,345 @@
+'use server'
+
+import { createAdminClient } from '@/lib/supabase-server'
+import { getGhlClient } from '@/lib/ghl/ghlClient'
+
+const HEX_RE = /^#[0-9a-fA-F]{6}$/
+
+export async function saveThemeOverrides(
+  locationId: string,
+  overrides: { primaryColor?: string; secondaryColor?: string; logoUrl?: string }
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  if (overrides.primaryColor && !HEX_RE.test(overrides.primaryColor))
+    return { error: 'Colore primario non valido' }
+  if (overrides.secondaryColor && !HEX_RE.test(overrides.secondaryColor))
+    return { error: 'Colore secondario non valido' }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('location_design_settings')
+    .upsert(
+      { location_id: locationId, theme_overrides: overrides, updated_at: new Date().toISOString() },
+      { onConflict: 'location_id' }
+    )
+
+  if (error) return { error: error.message }
+  return {}
+}
+
+export async function saveLocationSettings(
+  locationId: string,
+  targetAnnuale: number
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  if (!Number.isFinite(targetAnnuale) || targetAnnuale < 1) return { error: 'Target non valido' }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('location_settings')
+    .upsert(
+      { location_id: locationId, target_annuale: targetAnnuale, updated_at: new Date().toISOString() },
+      { onConflict: 'location_id' }
+    )
+
+  if (error) return { error: error.message }
+  return {}
+}
+
+// ─── Contact Filters ────────────────────────────────────────────────────────
+
+export async function getContactFilters(locationId: string): Promise<string[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('location_settings')
+    .select('contact_filters')
+    .eq('location_id', locationId)
+    .single()
+  const filters = (data as { contact_filters?: string[] } | null)?.contact_filters
+  return Array.isArray(filters) ? filters : []
+}
+
+export async function saveContactFilters(
+  locationId: string,
+  filters: string[]
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('location_settings')
+    .upsert(
+      { location_id: locationId, contact_filters: filters, updated_at: new Date().toISOString() },
+      { onConflict: 'location_id' }
+    )
+  if (error) return { error: error.message }
+  return {}
+}
+
+// ─── Contact Columns ─────────────────────────────────────────────────────────
+
+export interface ContactColumn {
+  key: string    // 'firstName', 'email', or custom field id
+  label: string  // display name
+  type: 'standard' | 'custom'
+}
+
+export async function getContactColumns(locationId: string): Promise<ContactColumn[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('location_settings')
+    .select('contact_columns')
+    .eq('location_id', locationId)
+    .single()
+  const cols = (data as { contact_columns?: ContactColumn[] } | null)?.contact_columns
+  return Array.isArray(cols) && cols.length > 0 ? cols : []
+}
+
+export async function saveContactColumns(
+  locationId: string,
+  columns: ContactColumn[]
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('location_settings')
+    .upsert(
+      { location_id: locationId, contact_columns: columns, updated_at: new Date().toISOString() },
+      { onConflict: 'location_id' }
+    )
+  if (error) return { error: error.message }
+  return {}
+}
+
+// ─── Provvigioni ──────────────────────────────────────────────────────────
+
+export interface ProvvigioneRow {
+  id?: string
+  nome: string
+  tipo: 'fisso' | 'percentuale'
+  valore: number
+  ordine: number
+}
+
+export async function getProvvigioni(locationId: string): Promise<ProvvigioneRow[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('provvigioni')
+    .select('id, nome, tipo, valore, ordine')
+    .eq('location_id', locationId)
+    .order('ordine')
+  return (data ?? []) as ProvvigioneRow[]
+}
+
+export async function saveProvvigioni(
+  locationId: string,
+  rows: ProvvigioneRow[]
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  const supabase = createAdminClient()
+
+  // Delete existing then insert fresh
+  await supabase.from('provvigioni').delete().eq('location_id', locationId)
+
+  if (rows.length === 0) return {}
+
+  const inserts = rows
+    .filter((r) => r.nome.trim())
+    .map((r, i) => ({
+      location_id: locationId,
+      nome: r.nome.trim(),
+      tipo: r.tipo,
+      valore: r.valore,
+      ordine: i,
+    }))
+
+  if (inserts.length > 0) {
+    const { error } = await supabase.from('provvigioni').insert(inserts)
+    if (error) return { error: error.message }
+  }
+  return {}
+}
+
+// ─── User Availability ───────────────────────────────────────────────────────
+
+export interface AvailabilitySlot {
+  ghl_user_id: string
+  day_of_week: number // 0=Mon, 6=Sun
+  start_time: string  // 'HH:MM'
+  end_time: string    // 'HH:MM'
+  enabled: boolean
+}
+
+export async function getUserAvailability(locationId: string): Promise<AvailabilitySlot[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('user_availability')
+    .select('ghl_user_id, day_of_week, start_time, end_time, enabled')
+    .eq('location_id', locationId)
+    .order('ghl_user_id')
+    .order('day_of_week')
+  return (data ?? []) as AvailabilitySlot[]
+}
+
+export async function saveUserAvailability(
+  locationId: string,
+  slots: AvailabilitySlot[]
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  const supabase = createAdminClient()
+
+  // Delete all existing for this location, then insert fresh
+  await supabase.from('user_availability').delete().eq('location_id', locationId)
+
+  if (slots.length === 0) return {}
+
+  const inserts = slots.map((s) => ({
+    location_id: locationId,
+    ghl_user_id: s.ghl_user_id,
+    day_of_week: s.day_of_week,
+    start_time: s.start_time,
+    end_time: s.end_time,
+    enabled: s.enabled,
+  }))
+
+  const { error } = await supabase.from('user_availability').insert(inserts)
+  if (error) return { error: error.message }
+  return {}
+}
+
+// ─── Hidden Tags ────────────────────────────────────────────────────────────
+
+export async function getHiddenTags(locationId: string): Promise<string[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('location_settings')
+    .select('hidden_tags')
+    .eq('location_id', locationId)
+    .single()
+  const tags = (data as { hidden_tags?: string[] } | null)?.hidden_tags
+  return Array.isArray(tags) ? tags : []
+}
+
+export async function saveHiddenTags(
+  locationId: string,
+  tags: string[]
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('location_settings')
+    .upsert(
+      { location_id: locationId, hidden_tags: tags, updated_at: new Date().toISOString() },
+      { onConflict: 'location_id' }
+    )
+  if (error) return { error: error.message }
+  return {}
+}
+
+// ─── Gare Mensili ──────────────────────────────────────────────────────────
+
+export interface GaraRow {
+  id?: string
+  categoria: string
+  obiettivo: number
+  tag: string
+}
+
+export async function getGareMensili(
+  locationId: string,
+  month: string // 'YYYY-MM-01'
+): Promise<GaraRow[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('gare_mensili')
+    .select('id, categoria, obiettivo, tag')
+    .eq('location_id', locationId)
+    .eq('month', month)
+    .order('categoria')
+  return (data ?? []) as GaraRow[]
+}
+
+export async function saveGareMensili(
+  locationId: string,
+  month: string,
+  rows: GaraRow[]
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  if (!month) return { error: 'Mese mancante' }
+
+  const supabase = createAdminClient()
+
+  // Delete existing rows for this location+month, then insert fresh
+  await supabase
+    .from('gare_mensili')
+    .delete()
+    .eq('location_id', locationId)
+    .eq('month', month)
+
+  if (rows.length === 0) return {}
+
+  const inserts = rows
+    .filter((r) => r.categoria.trim() && r.tag.trim())
+    .map((r) => ({
+      location_id: locationId,
+      month,
+      categoria: r.categoria.trim(),
+      obiettivo: Math.max(0, r.obiettivo),
+      tag: r.tag.trim().toLowerCase(),
+    }))
+
+  if (inserts.length > 0) {
+    const { error } = await supabase.from('gare_mensili').insert(inserts)
+    if (error) return { error: error.message }
+  }
+
+  return {}
+}
+
+// ─── GHL Tags Management ───────────────────────────────────────────────────
+
+export interface GhlTag {
+  id: string
+  name: string
+}
+
+export async function getLocationTags(locationId: string): Promise<GhlTag[]> {
+  try {
+    const ghl = await getGhlClient(locationId)
+    const data = await ghl.tags.list()
+    return ((data?.tags ?? []) as GhlTag[]).sort((a, b) => a.name.localeCompare(b.name))
+  } catch {
+    return []
+  }
+}
+
+export async function createLocationTag(
+  locationId: string,
+  name: string
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  if (!name.trim()) return { error: 'Nome tag mancante' }
+  try {
+    const ghl = await getGhlClient(locationId)
+    await ghl.tags.create(name.trim())
+    return {}
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Errore creazione tag'
+    if (msg.includes('already exist')) return { error: 'Questo tag esiste già' }
+    return { error: msg }
+  }
+}
+
+export async function deleteLocationTag(
+  locationId: string,
+  tagId: string
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  if (!tagId) return { error: 'Tag ID mancante' }
+  try {
+    const ghl = await getGhlClient(locationId)
+    await ghl.tags.delete(tagId)
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Errore eliminazione tag' }
+  }
+}

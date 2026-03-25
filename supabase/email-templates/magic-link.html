@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sign in to Bibot Core</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0d0030;font-family:Arial,Helvetica,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0d0030;min-height:100vh;">
+    <tr>
+      <td align="center" style="padding:48px 16px;">
+
+        <!-- Card -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;">
+          <tr>
+            <td style="background-color:#150044;border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:48px 40px;text-align:center;">
+
+              <!-- Logo -->
+              <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 24px auto;">
+                <tr>
+                  <td style="background-color:#2A00CC;border-radius:18px;width:64px;height:64px;text-align:center;vertical-align:middle;">
+                    <span style="font-size:28px;font-weight:900;color:#7FFFFF;letter-spacing:-1px;line-height:64px;">Bi</span>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Heading -->
+              <h1 style="margin:0 0 6px 0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">
+                Sign in to Bibot Core
+              </h1>
+              <p style="margin:0 0 32px 0;font-size:14px;color:rgba(255,255,255,0.4);">
+                Click the button below to securely log in.
+              </p>
+
+              <!-- CTA Button -->
+              <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 32px auto;">
+                <tr>
+                  <td style="background-color:#2A00CC;border-radius:12px;">
+                    <a
+                      href="{{ .ConfirmationURL }}"
+                      style="display:inline-block;padding:14px 40px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.1px;"
+                    >
+                      Log In to Bibot Core
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Divider -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+                <tr>
+                  <td style="border-top:1px solid rgba(255,255,255,0.08);font-size:0;">&nbsp;</td>
+                </tr>
+              </table>
+
+              <!-- Fallback link -->
+              <p style="margin:0 0 8px 0;font-size:12px;color:rgba(255,255,255,0.3);">
+                Or copy and paste this link into your browser:
+              </p>
+              <p style="margin:0;font-size:11px;word-break:break-all;">
+                <a href="{{ .ConfirmationURL }}" style="color:#7FFFFF;text-decoration:none;">
+                  {{ .ConfirmationURL }}
+                </a>
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 0 0 0;text-align:center;">
+              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.2);">
+                This link expires in 1 hour and can only be used once.<br/>
+                If you didn't request this, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
