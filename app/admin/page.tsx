@@ -65,7 +65,7 @@ export default async function AdminPage() {
     supabase.from('ghl_plans').select('ghl_plan_id, name, price_monthly'),
   ])
 
-  const totalLocationsCount = ghlLocations.filter((l) => l.id && locationPlanMap[l.id]).length
+  // totalLocationsCount computed below after locationPlanMap is built
 
   // Build chart dates from GHL location creation timestamps
   // Fall back to install dates if GHL fetch failed
@@ -79,7 +79,7 @@ export default async function AdminPage() {
 
   // New locations this week (from GHL timestamps)
   const sevenDaysAgoISO = sevenDaysAgo.toISOString()
-  const newLocationsThisWeek = ghlLocations.filter((l) => l.dateAdded && l.dateAdded >= sevenDaysAgoISO && locationPlanMap[l.id]).length
+  // newLocationsThisWeek computed below after locationPlanMap is built
 
   // Design distribution
   const designCounts: Record<string, number> = {}
@@ -103,6 +103,9 @@ export default async function AdminPage() {
     const row = c as { location_id: string; ghl_plan_id?: string | null }
     if (row.ghl_plan_id) locationPlanMap[row.location_id] = row.ghl_plan_id
   }
+
+  const totalLocationsCount = ghlLocations.filter((l) => l.id && locationPlanMap[l.id]).length
+  const newLocationsThisWeek = ghlLocations.filter((l) => l.dateAdded && l.dateAdded >= sevenDaysAgoISO && locationPlanMap[l.id]).length
 
   // Count locations per plan
   const planCounts: Record<string, { name: string; price: number | null; count: number }> = {}
