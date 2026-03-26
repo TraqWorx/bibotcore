@@ -18,6 +18,7 @@ interface LocationRow {
   planId: string | null
   planName: string | null
   planPrice: number | null
+  churned: boolean
 }
 
 interface Props {
@@ -254,7 +255,9 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                     ) : <span className="text-xs text-gray-300">—</span>}
                   </td>
                   <td className="px-5 py-3.5 text-xs text-gray-600">
-                    {row.planName ?? <span className="text-gray-300">—</span>}
+                    {row.churned
+                      ? <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600">Churned</span>
+                      : row.planName ?? <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-5 py-3.5 text-xs font-semibold tabular-nums" style={{ color: row.planPrice != null ? '#0e9f6e' : undefined }}>
                     {row.planPrice != null

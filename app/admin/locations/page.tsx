@@ -73,29 +73,32 @@ export default async function LocationsPage() {
     if (retried.length > 0) ghlLocations.push(...retried)
   }
 
-  // Backfill location names + plan from GHL into locations table
+  // Backfill location names + dates from GHL into locations table
+  // Only set ghl_plan_id if GHL reports a plan (don't null it out — churned locations keep their last plan)
   if (ghlLocations.length > 0) {
-    const upsertRows = ghlLocations.map((l) => {
+    for (const l of ghlLocations) {
       const row: Record<string, unknown> = {
         location_id: l.id,
         name: l.name,
       }
-      if (l.planId) row.ghl_plan_id = l.planId
       if (l.dateAdded) row.ghl_date_added = l.dateAdded
-      return row
-    })
-    await supabase.from('locations').upsert(upsertRows, { onConflict: 'location_id' })
+      if (l.planId) row.ghl_plan_id = l.planId
+      await supabase.from('locations').upsert(row, { onConflict: 'location_id' })
+    }
   }
 
   // Read plan assignments back from locations table (covers all locations)
   const { data: locationPlanRows } = await supabase
     .from('locations')
-    .select('location_id, ghl_plan_id')
+    .select('location_id, ghl_plan_id, churned_at')
     .in('location_id', ghlLocations.map((l) => l.id))
 
   const planByLocation: Record<string, string | null> = {}
+  const churnedLocations = new Set<string>()
   for (const row of locationPlanRows ?? []) {
-    planByLocation[row.location_id] = (row as { location_id: string; ghl_plan_id?: string | null }).ghl_plan_id ?? null
+    const r = row as { location_id: string; ghl_plan_id?: string | null; churned_at?: string | null }
+    planByLocation[r.location_id] = r.ghl_plan_id ?? null
+    if (r.churned_at) churnedLocations.add(r.location_id)
   }
 
   const designByLocation: Record<string, string | null> = {}
@@ -120,6 +123,7 @@ export default async function LocationsPage() {
 
   const rows = ghlLocations.map((l) => {
     const planId = planByLocation[l.id] ?? null
+    const churned = churnedLocations.has(l.id)
     const plan = planId ? planById[planId] ?? null : null
     return {
       id: l.id,
@@ -129,9 +133,10 @@ export default async function LocationsPage() {
       design: designByLocation[l.id] ?? null,
       needsOAuth: connectedIds.has(l.id) && !hasOAuthToken.has(l.id),
       dateAdded: l.dateAdded,
-      planId,
-      planName: plan?.name ?? (planId ? `Unknown (…${planId.slice(-6)})` : null),
-      planPrice: plan?.price ?? null,
+      planId: churned ? null : planId,
+      planName: churned ? null : (plan?.name ?? (planId ? `Unknown (…${planId.slice(-6)})` : null)),
+      planPrice: churned ? null : (plan?.price ?? null),
+      churned,
     }
   })
 
