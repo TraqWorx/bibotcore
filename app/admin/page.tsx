@@ -4,6 +4,12 @@ import LocationChart from './_components/LocationChart'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
+function monthsSince(iso: string, until?: string): number {
+  const start = new Date(iso)
+  const end = until ? new Date(until) : new Date()
+  return Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1)
+}
+
 interface GhlLocation {
   id: string
   name: string
@@ -63,7 +69,7 @@ export default async function AdminPage() {
     supabase.from('installs').select('id, location_id, design_slug, installed_at, user_id').order('installed_at', { ascending: false }).limit(7),
     supabase.from('locations').select('location_id, name'),
     supabase.from('installs').select('design_slug, location_id'),
-    supabase.from('locations').select('location_id, ghl_plan_id'),
+    supabase.from('locations').select('location_id, ghl_plan_id, ghl_date_added, subscribed_at, churned_at'),
     supabase.from('ghl_plans').select('ghl_plan_id, name, price_monthly'),
     supabase.from('locations').select('*', { count: 'exact', head: true }).not('churned_at', 'is', null),
     supabase.from('locations').select('*', { count: 'exact', head: true }).not('subscribed_at', 'is', null),
@@ -131,6 +137,20 @@ export default async function AdminPage() {
   }
   const planRows = Object.values(planCounts).sort((a, b) => b.count - a.count)
 
+  // Total revenue: sum (months × price) for every location that ever had a plan
+  let totalRevenue = 0
+  for (const row of locationPlanRows ?? []) {
+    const r = row as { location_id: string; ghl_plan_id?: string | null; ghl_date_added?: string | null; subscribed_at?: string | null; churned_at?: string | null }
+    const planId = r.ghl_plan_id
+    const startDate = r.subscribed_at ?? r.ghl_date_added
+    if (!planId || !startDate) continue
+    const price = planInfoById[planId]?.price
+    if (price == null) continue
+    // If churned, count months until churn date; otherwise until now
+    const months = monthsSince(startDate, r.churned_at ?? undefined)
+    totalRevenue += price * months
+  }
+
   // Revenue per design
   const designRevenue: Record<string, { count: number; mrr: number }> = {}
   for (const r of designStatsRaw ?? []) {
@@ -183,7 +203,7 @@ export default async function AdminPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-6 gap-4">
+      <div className="grid grid-cols-7 gap-4">
         {/* Locations */}
         <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100">
           <div className="flex items-start justify-between">
@@ -295,6 +315,33 @@ export default async function AdminPage() {
               <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
                 <path d="M10.75 10.818v2.614A3.13 3.13 0 0011.888 13c.482-.315.612-.648.612-.875 0-.227-.13-.56-.612-.875a3.13 3.13 0 00-1.138-.432zM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 00-.35.13c-.14.065-.27.143-.386.233-.377.292-.514.627-.514.909 0 .184.058.39.33.615z" />
                 <path fillRule="evenodd" d="M9.99 2a8 8 0 100 16 8 8 0 000-16zM10 5.25a.75.75 0 01.75.75v.316a3.78 3.78 0 011.653.713c.426.33.744.74.925 1.2a.75.75 0 01-1.395.55 1.35 1.35 0 00-.428-.563 2.29 2.29 0 00-.755-.38V9.5c.54.115 1.018.3 1.394.568.377.268.711.68.711 1.307 0 .587-.278 1.04-.705 1.36-.37.277-.843.45-1.4.516V14a.75.75 0 01-1.5 0v-.316a3.78 3.78 0 01-1.653-.713 2.85 2.85 0 01-.925-1.2.75.75 0 011.395-.55c.085.214.22.407.428.563.207.155.487.278.755.38V9.688a6.26 6.26 0 01-1.394-.568C7.278 8.852 6.944 8.44 6.944 7.813c0-.587.278-1.04.705-1.36.37-.277.843-.45 1.4-.516V6a.75.75 0 01.75-.75z" clipRule="evenodd" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Total Revenue */}
+        <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Revenue</p>
+              {totalRevenue > 0 ? (
+                <>
+                  <p className="mt-2 text-4xl font-bold tracking-tight" style={{ color: '#0e9f6e' }}>
+                    €{totalRevenue.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-400">lifetime</p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-2 text-4xl font-bold tracking-tight text-gray-200">—</p>
+                  <p className="mt-0.5 text-xs text-gray-400">no data</p>
+                </>
+              )}
+            </div>
+            <div className="rounded-xl p-2.5" style={{ background: 'rgba(14,159,110,0.07)', color: '#0e9f6e' }}>
+              <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                <path fillRule="evenodd" d="M1 4a1 1 0 011-1h16a1 1 0 011 1v8a1 1 0 01-1 1H2a1 1 0 01-1-1V4zm12 4a3 3 0 11-6 0 3 3 0 016 0zM4 9a1 1 0 100-2 1 1 0 000 2zm13-1a1 1 0 11-2 0 1 1 0 012 0zM1.75 14.5a.75.75 0 000 1.5c4.417 0 8.693.603 12.75 1.73 1.111.309 2.251-.475 2.251-1.632V15.5a.75.75 0 00-.75-.75h-.5a.75.75 0 00-.75.75v.33c-3.85-1.008-7.898-1.58-12.07-1.58H1.75z" clipRule="evenodd" />
               </svg>
             </div>
           </div>
