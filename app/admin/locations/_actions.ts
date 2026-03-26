@@ -155,11 +155,14 @@ export async function syncLocationSubscriptions(): Promise<{ synced: number; err
           }
           const data = await res.json()
           const loc = data?.location ?? data
-          const saasPlanId: string | null = loc?.settings?.saasSettings?.saasPlanId ?? null
+          const saasSettings = loc?.settings?.saasSettings
+          const saasPlanId: string | null = saasSettings?.saasPlanId ?? null
+          const subscriptionStatus: string | null = saasSettings?.planDetails?.subscriptionStatus ?? null
+          const isActive = subscriptionStatus !== 'canceled' && subscriptionStatus !== 'cancelled'
           const name: string = loc?.name ?? ''
           const dateAdded: string | null =
             loc?.dateAdded ?? loc?.date_added ?? loc?.createdAt ?? loc?.created_at ?? null
-          return { id, name, saasPlanId, dateAdded }
+          return { id, name, saasPlanId: isActive ? saasPlanId : null, lastPlanId: saasPlanId, dateAdded, canceled: !isActive }
         } catch {
           return null
         }
@@ -178,11 +181,12 @@ export async function syncLocationSubscriptions(): Promise<{ synced: number; err
       // Check current state to detect subscription changes
       const { data: existing } = await supabase
         .from('locations')
-        .select('ghl_plan_id, subscribed_at')
+        .select('ghl_plan_id, subscribed_at, churned_at')
         .eq('location_id', detail.id)
         .maybeSingle()
 
       if (detail.saasPlanId) {
+        // Active subscription
         const updates: Record<string, unknown> = { ...base, ghl_plan_id: detail.saasPlanId }
         if (!existing?.subscribed_at) {
           updates.subscribed_at = detail.dateAdded ?? new Date().toISOString()
@@ -192,13 +196,19 @@ export async function syncLocationSubscriptions(): Promise<{ synced: number; err
           .from('locations')
           .upsert(updates, { onConflict: 'location_id' })
         if (!error) synced++
-      } else {
-        const updates: Record<string, unknown> = { ...base }
-        // If had a plan before, mark as churned but keep ghl_plan_id for revenue tracking
-        if (existing?.ghl_plan_id) {
+      } else if (detail.canceled && detail.lastPlanId) {
+        // Canceled subscription — keep plan ID for revenue, mark as churned
+        const updates: Record<string, unknown> = { ...base, ghl_plan_id: detail.lastPlanId }
+        if (!existing?.subscribed_at) {
+          updates.subscribed_at = detail.dateAdded ?? new Date().toISOString()
+        }
+        if (!existing?.churned_at) {
           updates.churned_at = new Date().toISOString()
         }
         await supabase.from('locations').upsert(updates, { onConflict: 'location_id' })
+      } else {
+        // No plan at all
+        await supabase.from('locations').upsert(base, { onConflict: 'location_id' })
       }
     }
     revalidatePath('/admin/locations')

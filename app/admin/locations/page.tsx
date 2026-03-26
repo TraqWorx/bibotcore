@@ -73,18 +73,14 @@ export default async function LocationsPage() {
     if (retried.length > 0) ghlLocations.push(...retried)
   }
 
-  // Backfill location names + dates from GHL into locations table
-  // Only set ghl_plan_id if GHL reports a plan (don't null it out — churned locations keep their last plan)
+  // Backfill location names + dates from GHL (never touch ghl_plan_id here — Sync Subscriptions handles that)
   if (ghlLocations.length > 0) {
-    for (const l of ghlLocations) {
-      const row: Record<string, unknown> = {
-        location_id: l.id,
-        name: l.name,
-      }
-      if (l.dateAdded) row.ghl_date_added = l.dateAdded
-      if (l.planId) row.ghl_plan_id = l.planId
-      await supabase.from('locations').upsert(row, { onConflict: 'location_id' })
-    }
+    const upsertRows = ghlLocations.map((l) => ({
+      location_id: l.id,
+      name: l.name,
+      ...(l.dateAdded ? { ghl_date_added: l.dateAdded } : {}),
+    }))
+    await supabase.from('locations').upsert(upsertRows, { onConflict: 'location_id' })
   }
 
   // Read plan assignments back from locations table (covers all locations)
