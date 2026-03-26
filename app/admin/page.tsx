@@ -105,6 +105,8 @@ export default async function AdminPage() {
   }
 
   const totalLocationsCount = ghlLocations.filter((l) => l.id && locationPlanMap[l.id]).length
+  const churnCount = ghlLocations.filter((l) => l.id && !locationPlanMap[l.id]).length
+  const churnPct = ghlLocations.length > 0 ? Math.round((churnCount / ghlLocations.length) * 100) : 0
   const newLocationsThisWeek = ghlLocations.filter((l) => l.dateAdded && l.dateAdded >= sevenDaysAgoISO && locationPlanMap[l.id]).length
 
   // Count locations per plan
@@ -177,7 +179,7 @@ export default async function AdminPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-6 gap-4">
         {/* Locations */}
         <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100">
           <div className="flex items-start justify-between">
@@ -289,6 +291,24 @@ export default async function AdminPage() {
               <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
                 <path d="M10.75 10.818v2.614A3.13 3.13 0 0011.888 13c.482-.315.612-.648.612-.875 0-.227-.13-.56-.612-.875a3.13 3.13 0 00-1.138-.432zM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 00-.35.13c-.14.065-.27.143-.386.233-.377.292-.514.627-.514.909 0 .184.058.39.33.615z" />
                 <path fillRule="evenodd" d="M9.99 2a8 8 0 100 16 8 8 0 000-16zM10 5.25a.75.75 0 01.75.75v.316a3.78 3.78 0 011.653.713c.426.33.744.74.925 1.2a.75.75 0 01-1.395.55 1.35 1.35 0 00-.428-.563 2.29 2.29 0 00-.755-.38V9.5c.54.115 1.018.3 1.394.568.377.268.711.68.711 1.307 0 .587-.278 1.04-.705 1.36-.37.277-.843.45-1.4.516V14a.75.75 0 01-1.5 0v-.316a3.78 3.78 0 01-1.653-.713 2.85 2.85 0 01-.925-1.2.75.75 0 011.395-.55c.085.214.22.407.428.563.207.155.487.278.755.38V9.688a6.26 6.26 0 01-1.394-.568C7.278 8.852 6.944 8.44 6.944 7.813c0-.587.278-1.04.705-1.36.37-.277.843-.45 1.4-.516V6a.75.75 0 01.75-.75z" clipRule="evenodd" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Churn */}
+        <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Churn</p>
+              <p className="mt-2 text-4xl font-bold tracking-tight" style={{ color: '#dc2626' }}>
+                {churnCount}
+              </p>
+              <p className="mt-0.5 text-xs text-gray-400">{churnPct}% of total</p>
+            </div>
+            <div className="rounded-xl p-2.5" style={{ background: 'rgba(220,38,38,0.07)', color: '#dc2626' }}>
+              <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
               </svg>
             </div>
           </div>
