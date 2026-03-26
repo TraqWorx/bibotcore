@@ -185,7 +185,7 @@ export async function syncLocationSubscriptions(): Promise<{ synced: number; err
       if (detail.saasPlanId) {
         const updates: Record<string, unknown> = { ...base, ghl_plan_id: detail.saasPlanId }
         if (!existing?.subscribed_at) {
-          updates.subscribed_at = new Date().toISOString()
+          updates.subscribed_at = detail.dateAdded ?? new Date().toISOString()
         }
         updates.churned_at = null
         const { error } = await supabase
