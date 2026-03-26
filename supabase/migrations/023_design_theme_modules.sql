@@ -9,9 +9,9 @@ CREATE TABLE IF NOT EXISTS location_design_settings (
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
--- Seed gym-modern with Apulia Power defaults
+-- Seed gym-modern with Simfonia defaults
 UPDATE designs SET
-  theme = '{"primaryColor":"#2A00CC","secondaryColor":"#00F0FF","companyName":"Apulia Power","logoText":"AP"}',
+  theme = '{"primaryColor":"#2A00CC","secondaryColor":"#00F0FF","companyName":"Simfonia","logoText":"AP"}',
   modules = '{
     "dashboard":{"enabled":true,"config":{"tagCategories":[
       {"label":"Telefonia","tag":"telefonia","color":"blue"},

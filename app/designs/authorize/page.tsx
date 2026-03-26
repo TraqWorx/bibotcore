@@ -25,7 +25,7 @@ export default async function AuthorizePage({
     .eq('location_id', locationId)
     .maybeSingle()
 
-  const designSlug = install?.design_slug ?? 'gym-modern'
+  const designSlug = install?.design_slug ?? 'simfonia'
 
   // Build the OAuth URL — avoid URLSearchParams for scope to preserve slashes
   const scope =

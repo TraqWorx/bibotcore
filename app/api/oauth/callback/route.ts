@@ -342,7 +342,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (autoInstall) {
-      const dashPath = designSlug ? `/designs/${designSlug}/dashboard` : '/designs/apulia-power/dashboard'
+      const dashPath = designSlug ? `/designs/${designSlug}/dashboard` : '/designs/simfonia/dashboard'
       return NextResponse.redirect(new URL(dashPath, req.url))
     }
 

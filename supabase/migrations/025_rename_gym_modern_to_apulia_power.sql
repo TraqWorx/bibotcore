@@ -1,4 +1,4 @@
--- Rename design slug gym-modern → apulia-power
+-- Rename design slug gym-modern → simfonia
 -- Must drop FK constraints first, update, then re-add them.
 
 -- Drop FK constraints that reference designs(slug)
@@ -8,11 +8,11 @@ ALTER TABLE design_configs   DROP CONSTRAINT IF EXISTS design_configs_design_slu
 ALTER TABLE design_versions  DROP CONSTRAINT IF EXISTS design_versions_design_slug_fkey;
 
 -- Rename the slug everywhere
-UPDATE designs          SET slug        = 'apulia-power' WHERE slug        = 'gym-modern';
-UPDATE installs         SET design_slug = 'apulia-power' WHERE design_slug = 'gym-modern';
-UPDATE plan_design_map  SET design_slug = 'apulia-power' WHERE design_slug = 'gym-modern';
-UPDATE design_configs   SET design_slug = 'apulia-power' WHERE design_slug = 'gym-modern';
-UPDATE design_versions  SET design_slug = 'apulia-power' WHERE design_slug = 'gym-modern';
+UPDATE designs          SET slug        = 'simfonia' WHERE slug        = 'gym-modern';
+UPDATE installs         SET design_slug = 'simfonia' WHERE design_slug = 'gym-modern';
+UPDATE plan_design_map  SET design_slug = 'simfonia' WHERE design_slug = 'gym-modern';
+UPDATE design_configs   SET design_slug = 'simfonia' WHERE design_slug = 'gym-modern';
+UPDATE design_versions  SET design_slug = 'simfonia' WHERE design_slug = 'gym-modern';
 
 -- Re-add FK constraints
 ALTER TABLE installs        ADD CONSTRAINT installs_design_fk                  FOREIGN KEY (design_slug) REFERENCES designs(slug) ON UPDATE CASCADE ON DELETE SET NULL;

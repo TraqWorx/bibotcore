@@ -65,7 +65,7 @@ export default async function AdminPage() {
     supabase.from('ghl_plans').select('ghl_plan_id, name, price_monthly'),
   ])
 
-  const totalLocationsCount = ghlLocations.length
+  const totalLocationsCount = ghlLocations.filter((l) => locationPlanMap[l.id]).length
 
   // Build chart dates from GHL location creation timestamps
   // Fall back to install dates if GHL fetch failed
@@ -79,7 +79,7 @@ export default async function AdminPage() {
 
   // New locations this week (from GHL timestamps)
   const sevenDaysAgoISO = sevenDaysAgo.toISOString()
-  const newLocationsThisWeek = ghlLocations.filter((l) => l.dateAdded && l.dateAdded >= sevenDaysAgoISO).length
+  const newLocationsThisWeek = ghlLocations.filter((l) => l.dateAdded && l.dateAdded >= sevenDaysAgoISO && locationPlanMap[l.id]).length
 
   // Design distribution
   const designCounts: Record<string, number> = {}
@@ -183,7 +183,7 @@ export default async function AdminPage() {
               <p className="mt-2 text-4xl font-bold tracking-tight" style={{ color: '#2A00CC' }}>
                 {totalLocationsCount.toLocaleString()}
               </p>
-              <p className="mt-0.5 text-xs text-gray-400">total in GHL</p>
+              <p className="mt-0.5 text-xs text-gray-400">with paid plan</p>
             </div>
             <div className="rounded-xl p-2.5" style={{ background: 'rgba(42,0,204,0.07)', color: '#2A00CC' }}>
               <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">

@@ -51,7 +51,7 @@ export default function CreateDesignButton() {
                   type="text"
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="e.g. Apulia Power"
+                  placeholder="e.g. Simfonia"
                   required
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[#2A00CC]"
                 />
@@ -62,7 +62,7 @@ export default function CreateDesignButton() {
                   type="text"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
-                  placeholder="e.g. apulia-power"
+                  placeholder="e.g. simfonia"
                   required
                   pattern="[a-z0-9-]+"
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[#2A00CC]"

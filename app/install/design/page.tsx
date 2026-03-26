@@ -22,7 +22,7 @@ export default async function DesignSelectionPage() {
   if (!install) {
     const { data: anyInstall } = await supabase
       .from('installs').select('location_id, design_slug').eq('user_id', user.id).limit(1).single()
-    const slug = anyInstall?.design_slug ?? 'apulia-power'
+    const slug = anyInstall?.design_slug ?? 'simfonia'
     redirect(`/designs/${slug}/dashboard${anyInstall?.location_id ? `?locationId=${anyInstall.location_id}` : ''}`)
   }
 
@@ -40,7 +40,7 @@ export default async function DesignSelectionPage() {
   const { data: designs } = await designQuery
 
   if (!designs || designs.length === 0) {
-    const slug = 'apulia-power'
+    const slug = 'simfonia'
     redirect(`/designs/${slug}/dashboard?locationId=${install.location_id}`)
   }
 

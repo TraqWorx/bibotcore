@@ -64,7 +64,7 @@ export default function DesignDefaultsForm({ slug, name: initialName, theme: ini
           onChange={(e) => setName(e.target.value)}
           required
           className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-          placeholder="Es. Apulia Power"
+          placeholder="Es. Simfonia"
         />
       </div>
 
