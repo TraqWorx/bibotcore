@@ -175,17 +175,30 @@ export async function syncLocationSubscriptions(): Promise<{ synced: number; err
         name: detail.name,
         ...(detail.dateAdded ? { ghl_date_added: detail.dateAdded } : {}),
       }
+      // Check current state to detect subscription changes
+      const { data: existing } = await supabase
+        .from('locations')
+        .select('ghl_plan_id, subscribed_at')
+        .eq('location_id', detail.id)
+        .maybeSingle()
+
       if (detail.saasPlanId) {
+        const updates: Record<string, unknown> = { ...base, ghl_plan_id: detail.saasPlanId }
+        if (!existing?.subscribed_at) {
+          updates.subscribed_at = new Date().toISOString()
+        }
+        updates.churned_at = null
         const { error } = await supabase
           .from('locations')
-          .upsert({ ...base, ghl_plan_id: detail.saasPlanId }, { onConflict: 'location_id' })
-        if (!error) {
-          synced++
-        } else {
-          await supabase.from('locations').upsert(base, { onConflict: 'location_id' })
-        }
+          .upsert(updates, { onConflict: 'location_id' })
+        if (!error) synced++
       } else {
-        await supabase.from('locations').upsert(base, { onConflict: 'location_id' })
+        const updates: Record<string, unknown> = { ...base, ghl_plan_id: null }
+        // If had a plan before, mark as churned
+        if (existing?.ghl_plan_id) {
+          updates.churned_at = new Date().toISOString()
+        }
+        await supabase.from('locations').upsert(updates, { onConflict: 'location_id' })
       }
     }
     revalidatePath('/admin/locations')
@@ -203,14 +216,26 @@ export async function setLocationPlan(
   try {
     await assertSuperAdmin()
     const supabase = createAdminClient()
+    const now = new Date().toISOString()
+    const upsertData: Record<string, unknown> = {
+      location_id: locationId,
+      ghl_plan_id: ghlPlanId,
+      updated_at: now,
+    }
+    if (ghlPlanId) {
+      // Subscribing: set subscribed_at, clear churned_at
+      upsertData.subscribed_at = now
+      upsertData.churned_at = null
+    } else {
+      // Removing plan: set churned_at (only if was previously subscribed)
+      upsertData.churned_at = now
+    }
     const { error } = await supabase
       .from('locations')
-      .upsert(
-        { location_id: locationId, ghl_plan_id: ghlPlanId, updated_at: new Date().toISOString() },
-        { onConflict: 'location_id' }
-      )
+      .upsert(upsertData, { onConflict: 'location_id' })
     if (error) return { error: error.message }
     revalidatePath('/admin/locations')
+    revalidatePath('/admin')
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to update plan' }
   }

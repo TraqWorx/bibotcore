@@ -52,6 +52,8 @@ export default async function AdminPage() {
     { data: designStatsRaw },
     { data: locationPlanRows },
     { data: ghlPlans },
+    { count: churnedCount },
+    { count: everSubscribedCount },
   ] = await Promise.all([
     fetchGhlLocations(),
     supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'super_admin'),
@@ -63,6 +65,8 @@ export default async function AdminPage() {
     supabase.from('installs').select('design_slug, location_id'),
     supabase.from('locations').select('location_id, ghl_plan_id'),
     supabase.from('ghl_plans').select('ghl_plan_id, name, price_monthly'),
+    supabase.from('locations').select('*', { count: 'exact', head: true }).not('churned_at', 'is', null),
+    supabase.from('locations').select('*', { count: 'exact', head: true }).not('subscribed_at', 'is', null),
   ])
 
   // totalLocationsCount computed below after locationPlanMap is built
@@ -105,8 +109,8 @@ export default async function AdminPage() {
   }
 
   const totalLocationsCount = ghlLocations.filter((l) => l.id && locationPlanMap[l.id]).length
-  const churnCount = ghlLocations.filter((l) => l.id && !locationPlanMap[l.id]).length
-  const churnPct = ghlLocations.length > 0 ? Math.round((churnCount / ghlLocations.length) * 100) : 0
+  const churnCount = churnedCount ?? 0
+  const churnPct = (everSubscribedCount ?? 0) > 0 ? Math.round((churnCount / everSubscribedCount!) * 100) : 0
   const newLocationsThisWeek = ghlLocations.filter((l) => l.dateAdded && l.dateAdded >= sevenDaysAgoISO && locationPlanMap[l.id]).length
 
   // Count locations per plan
