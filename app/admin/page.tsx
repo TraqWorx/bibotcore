@@ -65,7 +65,7 @@ export default async function AdminPage() {
     supabase.from('ghl_plans').select('ghl_plan_id, name, price_monthly'),
   ])
 
-  const totalLocationsCount = ghlLocations.filter((l) => locationPlanMap[l.id]).length
+  const totalLocationsCount = ghlLocations.filter((l) => l.id && locationPlanMap[l.id]).length
 
   // Build chart dates from GHL location creation timestamps
   // Fall back to install dates if GHL fetch failed
