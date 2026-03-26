@@ -193,8 +193,8 @@ export async function syncLocationSubscriptions(): Promise<{ synced: number; err
           .upsert(updates, { onConflict: 'location_id' })
         if (!error) synced++
       } else {
-        const updates: Record<string, unknown> = { ...base, ghl_plan_id: null }
-        // If had a plan before, mark as churned
+        const updates: Record<string, unknown> = { ...base }
+        // If had a plan before, mark as churned but keep ghl_plan_id for revenue tracking
         if (existing?.ghl_plan_id) {
           updates.churned_at = new Date().toISOString()
         }
@@ -219,15 +219,15 @@ export async function setLocationPlan(
     const now = new Date().toISOString()
     const upsertData: Record<string, unknown> = {
       location_id: locationId,
-      ghl_plan_id: ghlPlanId,
       updated_at: now,
     }
     if (ghlPlanId) {
-      // Subscribing: set subscribed_at, clear churned_at
+      // Subscribing: set plan, subscribed_at, clear churned_at
+      upsertData.ghl_plan_id = ghlPlanId
       upsertData.subscribed_at = now
       upsertData.churned_at = null
     } else {
-      // Removing plan: set churned_at (only if was previously subscribed)
+      // Removing plan: set churned_at but keep ghl_plan_id for revenue tracking
       upsertData.churned_at = now
     }
     const { error } = await supabase

@@ -107,11 +107,11 @@ export default async function AdminPage() {
     planInfoById[p.ghl_plan_id] = { name: p.name, price: p.price_monthly != null ? Number(p.price_monthly) : null }
   }
 
-  // Build location → planId map
+  // Build location → planId map (active only = has plan + not churned)
   const locationPlanMap: Record<string, string> = {}
   for (const c of locationPlanRows ?? []) {
-    const row = c as { location_id: string; ghl_plan_id?: string | null }
-    if (row.ghl_plan_id) locationPlanMap[row.location_id] = row.ghl_plan_id
+    const row = c as { location_id: string; ghl_plan_id?: string | null; churned_at?: string | null }
+    if (row.ghl_plan_id && !row.churned_at) locationPlanMap[row.location_id] = row.ghl_plan_id
   }
 
   const totalLocationsCount = ghlLocations.filter((l) => l.id && locationPlanMap[l.id]).length
@@ -137,7 +137,7 @@ export default async function AdminPage() {
   }
   const planRows = Object.values(planCounts).sort((a, b) => b.count - a.count)
 
-  // Total revenue: sum (months × price) for every location that ever had a plan
+  // Total revenue: sum (months × price) for every location that ever had a plan (active + churned)
   let totalRevenue = 0
   for (const row of locationPlanRows ?? []) {
     const r = row as { location_id: string; ghl_plan_id?: string | null; ghl_date_added?: string | null; subscribed_at?: string | null; churned_at?: string | null }
@@ -146,7 +146,6 @@ export default async function AdminPage() {
     if (!planId || !startDate) continue
     const price = planInfoById[planId]?.price
     if (price == null) continue
-    // If churned, count months until churn date; otherwise until now
     const months = monthsSince(startDate, r.churned_at ?? undefined)
     totalRevenue += price * months
   }
@@ -203,7 +202,7 @@ export default async function AdminPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-7 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         {/* Locations */}
         <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100">
           <div className="flex items-start justify-between">
@@ -291,7 +290,10 @@ export default async function AdminPage() {
             </div>
           </div>
         </div>
+      </div>
 
+      {/* Financial cards */}
+      <div className="grid grid-cols-3 gap-4">
         {/* MRR */}
         <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100">
           <div className="flex items-start justify-between">
