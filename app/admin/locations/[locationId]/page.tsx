@@ -7,8 +7,8 @@ function monthsSince(iso: string): number {
   const start = new Date(iso)
   const now = new Date()
   return Math.max(
-    0,
-    (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()),
+    1,
+    (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()) + 1,
   )
 }
 
@@ -84,7 +84,7 @@ export default async function LocationDetailPage({
 
   const subscriptionStart = (location as { ghl_date_added?: string | null }).ghl_date_added ?? null
   const months = subscriptionStart ? monthsSince(subscriptionStart) : 0
-  const totalPaid = priceMonthly != null && months > 0 ? priceMonthly * months : null
+  const totalPaid = priceMonthly != null ? priceMonthly * months : null
 
   return (
     <div className="space-y-6">
