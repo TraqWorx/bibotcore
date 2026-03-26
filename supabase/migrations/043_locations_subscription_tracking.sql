@@ -3,5 +3,5 @@ ALTER TABLE locations
   ADD COLUMN IF NOT EXISTS subscribed_at timestamptz,
   ADD COLUMN IF NOT EXISTS churned_at    timestamptz;
 
--- Backfill: locations that currently have a plan are subscribed
-UPDATE locations SET subscribed_at = now() WHERE ghl_plan_id IS NOT NULL AND subscribed_at IS NULL;
+-- Backfill: use actual account creation date as subscription start
+UPDATE locations SET subscribed_at = COALESCE(ghl_date_added, now()) WHERE ghl_plan_id IS NOT NULL AND subscribed_at IS NULL;

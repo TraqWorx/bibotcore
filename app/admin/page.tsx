@@ -138,11 +138,12 @@ export default async function AdminPage() {
   const planRows = Object.values(planCounts).sort((a, b) => b.count - a.count)
 
   // Total revenue: sum (months × price) for every location that ever had a plan (active + churned)
+  // Use ghl_date_added (actual account creation) as primary start date
   let totalRevenue = 0
   for (const row of locationPlanRows ?? []) {
     const r = row as { location_id: string; ghl_plan_id?: string | null; ghl_date_added?: string | null; subscribed_at?: string | null; churned_at?: string | null }
     const planId = r.ghl_plan_id
-    const startDate = r.subscribed_at ?? r.ghl_date_added
+    const startDate = r.ghl_date_added ?? r.subscribed_at
     if (!planId || !startDate) continue
     const price = planInfoById[planId]?.price
     if (price == null) continue
