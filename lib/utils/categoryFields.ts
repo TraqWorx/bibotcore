@@ -197,6 +197,12 @@ export function getScadenzaField(
   })
 }
 
+/** Parse a potentially comma-separated Categoria value into an array of labels */
+export function parseCategoriaValue(raw: string): string[] {
+  if (!raw) return []
+  return raw.split(',').map(s => s.trim()).filter(Boolean)
+}
+
 /** Filter out hidden-category fields for non-admin users */
 export function filterVisibleFields(
   fields: CustomFieldDef[],

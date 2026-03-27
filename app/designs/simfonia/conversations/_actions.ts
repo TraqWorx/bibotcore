@@ -133,6 +133,7 @@ export async function sendMessage(
     await ghl.conversations.send(conversationId, message, { type: msgType, contactId })
     return {}
   } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Invio fallito' }
+    const { translateGhlError } = await import('@/lib/utils/ghlErrors')
+    return { error: translateGhlError(err, 'Invio messaggio fallito') }
   }
 }

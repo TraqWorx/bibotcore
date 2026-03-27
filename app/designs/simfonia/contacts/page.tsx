@@ -12,6 +12,7 @@ import {
   getProviderField,
   getScadenzaField,
   parseFieldCategory,
+  parseCategoriaValue,
   type CustomFieldDef,
 } from '@/lib/utils/categoryFields'
 
@@ -88,7 +89,7 @@ async function fetchAllContacts(
 async function fetchContacts(
   locationId: string,
   token: string,
-  categoryLabel: string | null,
+  categoryLabels: string[],
   categoriaFieldId: string | null,
   activeTag: string | null,
   gestoreFieldId: string | null,
@@ -150,8 +151,12 @@ async function fetchContacts(
   }
 
   // Client-side filter by Categoria custom field (GHL search can't filter by custom field IDs)
-  if (categoryLabel && categoriaFieldId) {
-    contacts = contacts.filter((c) => getContactCfValue(c, categoriaFieldId) === categoryLabel)
+  // A contact's Categoria value can be comma-separated (multi-category). Match if ANY overlap.
+  if (categoryLabels.length > 0 && categoriaFieldId) {
+    contacts = contacts.filter((c) => {
+      const contactCats = parseCategoriaValue(getContactCfValue(c, categoriaFieldId))
+      return categoryLabels.some((label) => contactCats.includes(label))
+    })
   }
 
   // Client-side filter by Gestore custom field
@@ -255,40 +260,48 @@ export default async function ContactsPage({
   const categoriaField = getCategoriaField(customFields)
   const categoriaFieldId = categoriaField?.id ?? null
 
-  // Resolve category label
-  const categoryLabel = activeCategory
-    ? categories.find((c) => c.slug === activeCategory)?.label ?? null
-    : null
+  // Resolve category labels — activeCategory can be comma-separated slugs
+  const activeSlugs = activeCategory ? activeCategory.split(',').map(s => s.trim()).filter(Boolean) : []
+  const categoryLabels = activeSlugs
+    .map((slug) => categories.find((c) => c.slug === slug)?.label)
+    .filter((l): l is string => !!l)
+  // For backward compat: single category label when exactly one is selected
+  const categoryLabel = categoryLabels.length === 1 ? categoryLabels[0] : null
 
-  // Get gestore (provider) field for the active category, or all options for "Tutte"
+  // Get gestore (provider) field for the active category, or all options for "Tutte" / multi
   const gestoreField = categoryLabel
     ? getProviderField(customFields, categoryLabel)
     : null
   const gestoreFieldId = gestoreField?.id ?? null
+  // For multi-category or no category, collect gestore options from ALL selected (or all) categories
   const gestoreOptions = categoryLabel
     ? (gestoreField?.picklistOptions ?? [])
-    : getAllGestoreOptions(customFields, categories)
+    : categoryLabels.length > 0
+      ? getAllGestoreOptions(customFields, categoryLabels.map((l) => ({ label: l })))
+      : getAllGestoreOptions(customFields, categories)
 
-  // Get scadenza field(s) — single field for a category, or all scadenza fields for "Tutte"
+  // Get scadenza field(s) — single field for one category, or all scadenza fields otherwise
   const scadenzaFieldIds: string[] = categoryLabel
     ? [getScadenzaField(customFields, categoryLabel)?.id].filter((id): id is string => !!id)
-    : categories.map((c) => getScadenzaField(customFields, c.label)?.id).filter((id): id is string => !!id)
+    : categoryLabels.length > 0
+      ? categoryLabels.map((l) => getScadenzaField(customFields, l)?.id).filter((id): id is string => !!id)
+      : categories.map((c) => getScadenzaField(customFields, c.label)?.id).filter((id): id is string => !!id)
 
   const contacts = token
     ? await fetchContacts(
-        locationId, token, categoryLabel, categoriaFieldId,
+        locationId, token, categoryLabels, categoriaFieldId,
         activeTag, gestoreFieldId, activeGestore,
         dateFrom, dateTo, scadenzaFieldIds, scadenzaFrom, scadenzaTo, search,
       )
     : []
 
-  // Load per-category saved columns if a category is active
+  // Load per-category saved columns if exactly one category is active
   const savedCategoryColumns = categoryLabel
     ? await getContactColumns(locationId, categoryLabel)
     : []
 
-  // Use saved category columns if available, otherwise generate defaults
-  const columns = activeCategory && categoryLabel
+  // Use saved category columns if available; for multi-category use default columns
+  const columns = categoryLabel
     ? (savedCategoryColumns.length > 0 ? savedCategoryColumns : buildCategoryColumns(customFields, categoryLabel))
     : (savedDefaultColumns.length > 0 ? savedDefaultColumns : DEFAULT_COLUMNS)
 
@@ -296,9 +309,11 @@ export default async function ContactsPage({
   const q = `?locationId=${locationId}`
   const allTagNames = locationTags.map((t) => t.name)
 
-  // Filter tags by category if a category is selected and has associated tags
-  const categoryAssociatedTags = categoryLabel ? (categoryTagsMap[categoryLabel] ?? []) : []
-  const allTags = categoryLabel && categoryAssociatedTags.length > 0
+  // Filter tags by category if categories are selected and have associated tags
+  const categoryAssociatedTags = categoryLabels.length > 0
+    ? Array.from(new Set(categoryLabels.flatMap((l) => categoryTagsMap[l] ?? [])))
+    : []
+  const allTags = categoryAssociatedTags.length > 0
     ? allTagNames.filter((t) => categoryAssociatedTags.includes(t))
     : allTagNames
 
@@ -315,7 +330,7 @@ export default async function ContactsPage({
             <h1 className="text-2xl font-bold text-gray-900">Contatti</h1>
             <p className="mt-0.5 text-sm text-gray-500">
               <span className="font-semibold text-gray-700">{contacts.length}</span> contatti
-              {categoryLabel ? <span className="ml-1 text-[#2A00CC]"> · {categoryLabel}</span> : ''}
+              {categoryLabels.length > 0 ? <span className="ml-1 text-[#2A00CC]"> · {categoryLabels.join(', ')}</span> : ''}
               {activeTag ? ` · ${activeTag}` : ''}
               {activeGestore ? ` · ${activeGestore}` : ''}
             </p>

@@ -19,6 +19,7 @@ import {
   getDropdownFields,
   getFieldsForCategory,
   filterVisibleFields,
+  parseCategoriaValue,
   type CustomFieldDef,
 } from '@/lib/utils/categoryFields'
 
@@ -472,33 +473,51 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     />
                   </div>
 
-                  {/* Categoria + Dropdown fields */}
+                  {/* Categoria (multi-select checkboxes) + Dropdown fields */}
                   {(() => {
                     const categories = discoverCategories(customFieldDefs)
                     const categoriaField = getCategoriaField(customFieldDefs)
-                    const selectedCatLabel = categoriaField ? (editCfValues[categoriaField.id] ?? '') : ''
-                    const ddFields = selectedCatLabel
-                      ? getDropdownFields(customFieldDefs, selectedCatLabel)
+                    const selectedCatLabels = categoriaField
+                      ? parseCategoriaValue(editCfValues[categoriaField.id] ?? '')
                       : []
+                    // Collect dropdown fields from ALL selected categories (union)
+                    const ddFieldIds = new Set<string>()
+                    const ddFields: typeof customFieldDefs = []
+                    for (const label of selectedCatLabels) {
+                      for (const df of getDropdownFields(customFieldDefs, label)) {
+                        if (!ddFieldIds.has(df.id)) {
+                          ddFieldIds.add(df.id)
+                          ddFields.push(df)
+                        }
+                      }
+                    }
 
                     return (
                       <div className="space-y-4 border-t border-gray-100 pt-4">
                         {categoriaField && (
                           <div>
                             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">Categoria</label>
-                            <select
-                              className={inputClass}
-                              value={selectedCatLabel}
-                              onChange={(e) => {
-                                const val = e.target.value
-                                setEditCfValues((p) => ({ ...p, [categoriaField.id]: val }))
-                              }}
-                            >
-                              <option value="">Seleziona categoria...</option>
-                              {categories.map((cat) => (
-                                <option key={cat.slug} value={cat.label}>{cat.label}</option>
-                              ))}
-                            </select>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {categories.map((cat) => {
+                                const isChecked = selectedCatLabels.includes(cat.label)
+                                return (
+                                  <label key={cat.slug} className="flex items-center gap-1.5 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        const next = isChecked
+                                          ? selectedCatLabels.filter((l) => l !== cat.label)
+                                          : [...selectedCatLabels, cat.label]
+                                        setEditCfValues((p) => ({ ...p, [categoriaField.id]: next.join(',') }))
+                                      }}
+                                      className="h-4 w-4 rounded border-gray-300 text-[#2A00CC] focus:ring-[#2A00CC]"
+                                    />
+                                    <span className="text-sm text-gray-700">{cat.label}</span>
+                                  </label>
+                                )
+                              })}
+                            </div>
                           </div>
                         )}
                         {ddFields.map((df) =>
@@ -582,8 +601,8 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     {/* Available tag suggestions — filtered by category */}
                     {(() => {
                       const catField = getCategoriaField(customFieldDefs)
-                      const catLabel = catField ? (editCfValues[catField.id] ?? '') : ''
-                      const associated = catLabel ? (categoryTags[catLabel] ?? []) : []
+                      const catLabels = catField ? parseCategoriaValue(editCfValues[catField.id] ?? '') : []
+                      const associated = Array.from(new Set(catLabels.flatMap((l) => categoryTags[l] ?? [])))
                       const filteredTags = associated.length > 0
                         ? availableTags.filter((t) => associated.includes(t))
                         : []
@@ -611,25 +630,38 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     })()}
                   </div>
 
-                  {/* Custom Fields — filtered by selected category */}
+                  {/* Custom Fields — filtered by selected categories (union) */}
                   {(() => {
                     const catField = getCategoriaField(customFieldDefs)
-                    const selectedCatLabel = catField ? (editCfValues[catField.id] ?? '') : ''
-                    if (!selectedCatLabel) return null
+                    const selectedCatLabels = catField ? parseCategoriaValue(editCfValues[catField.id] ?? '') : []
+                    if (selectedCatLabels.length === 0) return null
 
-                    const ddFieldIds = new Set(
-                      getDropdownFields(customFieldDefs, selectedCatLabel).map((f) => f.id)
-                    )
+                    // Collect dropdown field IDs across all selected categories
+                    const ddFieldIds = new Set<string>()
+                    for (const label of selectedCatLabels) {
+                      for (const f of getDropdownFields(customFieldDefs, label)) {
+                        ddFieldIds.add(f.id)
+                      }
+                    }
                     const filtered = filterVisibleFields(customFieldDefs, false)
-                    const catFields = getFieldsForCategory(filtered, selectedCatLabel)
-                      .filter((f) => !ddFieldIds.has(f.id))
+                    // Union of fields from all selected categories, deduplicated
+                    const seenIds = new Set<string>()
+                    const catFields: typeof filtered = []
+                    for (const label of selectedCatLabels) {
+                      for (const f of getFieldsForCategory(filtered, label)) {
+                        if (!ddFieldIds.has(f.id) && !seenIds.has(f.id)) {
+                          seenIds.add(f.id)
+                          catFields.push(f)
+                        }
+                      }
+                    }
 
                     if (catFields.length === 0) return null
 
                     return (
                       <div className="space-y-4 border-t border-gray-100 pt-4">
                         <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-                          Campi — {selectedCatLabel}
+                          Campi — {selectedCatLabels.join(', ')}
                         </p>
                         {catFields.map((cf) => {
                           const { displayName } = parseFieldCategory(cf.name)

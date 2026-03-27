@@ -122,14 +122,21 @@ function getCellValue(contact: Contact, col: ContactColumn): React.ReactNode {
   // Custom field
   if (col.type === 'custom') {
     const raw = getCustomFieldValue(contact, col.key)
-    // Categoria gets a colored badge
+    // Categoria gets colored badge(s) — supports comma-separated multi-values
     if (col.label === 'Categoria' && raw) {
-      const colors = CATEGORY_COLORS[raw.toLowerCase()] ?? DEFAULT_CAT
+      const catValues = raw.split(',').map(s => s.trim()).filter(Boolean)
       return (
-        <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold tracking-wide ${colors.bg} ${colors.text} ${colors.border}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${colors.border.replace('border-', 'bg-').replace('/80', '')}`} />
-          {raw}
-        </span>
+        <div className="flex flex-wrap gap-1">
+          {catValues.map((cat) => {
+            const colors = CATEGORY_COLORS[cat.toLowerCase()] ?? DEFAULT_CAT
+            return (
+              <span key={cat} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold tracking-wide ${colors.bg} ${colors.text} ${colors.border}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${colors.border.replace('border-', 'bg-').replace('/80', '')}`} />
+                {cat}
+              </span>
+            )
+          })}
+        </div>
       )
     }
     return formatCustomFieldValue(raw)

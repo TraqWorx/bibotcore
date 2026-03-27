@@ -10,6 +10,8 @@ import {
   getFieldsForCategory,
   parseFieldCategory,
   filterVisibleFields,
+  parseCategoriaValue,
+  slugify,
   type CustomFieldDef,
 } from '@/lib/utils/categoryFields'
 
@@ -27,7 +29,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [companyName, setCompanyName] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [tags, setTags] = useState<string[]>([])
   const [newTag, setNewTag] = useState('')
   const [cfValues, setCfValues] = useState<Record<string, string>>({})
@@ -39,34 +41,63 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
   const categories = useMemo(() => discoverCategories(customFields), [customFields])
   const categoriaField = useMemo(() => getCategoriaField(customFields), [customFields])
 
-  // Get ALL dropdown (SINGLE_OPTIONS) fields for the selected category
+  // Resolved selected category labels
+  const selectedCatLabels = useMemo(() =>
+    selectedCategories
+      .map((slug) => categories.find((c) => c.slug === slug)?.label)
+      .filter((l): l is string => !!l),
+    [selectedCategories, categories]
+  )
+
+  // Get ALL dropdown (SINGLE_OPTIONS) fields for all selected categories (union, deduplicated)
   const dropdownFields = useMemo(() => {
-    if (!selectedCategory) return []
-    const cat = categories.find((c) => c.slug === selectedCategory)
-    if (!cat) return []
-    return getDropdownFields(customFields, cat.label)
-  }, [customFields, selectedCategory, categories])
+    if (selectedCategories.length === 0) return []
+    const seen = new Set<string>()
+    const result: CustomFieldDef[] = []
+    for (const slug of selectedCategories) {
+      const cat = categories.find((c) => c.slug === slug)
+      if (!cat) continue
+      for (const df of getDropdownFields(customFields, cat.label)) {
+        if (!seen.has(df.id)) {
+          seen.add(df.id)
+          result.push(df)
+        }
+      }
+    }
+    return result
+  }, [customFields, selectedCategories, categories])
 
-  // Filter tags by category association — only show tags configured for this category
+  // Filter tags by category association — show tags from ALL selected categories
   const visibleTags = useMemo(() => {
-    if (!selectedCategory) return []
-    const cat = categories.find((c) => c.slug === selectedCategory)
-    if (!cat) return []
-    const associated = categoryTags[cat.label] ?? []
-    return ghlTags.filter((t) => associated.includes(t))
-  }, [ghlTags, selectedCategory, categories, categoryTags])
+    if (selectedCategories.length === 0) return []
+    const associated = new Set<string>()
+    for (const slug of selectedCategories) {
+      const cat = categories.find((c) => c.slug === slug)
+      if (!cat) continue
+      for (const t of (categoryTags[cat.label] ?? [])) associated.add(t)
+    }
+    return ghlTags.filter((t) => associated.has(t))
+  }, [ghlTags, selectedCategories, categories, categoryTags])
 
-  // Filter custom fields based on selected category, excluding dropdown fields shown above
+  // Filter custom fields based on selected categories (union), excluding dropdown fields
   const dropdownFieldIds = useMemo(() => new Set(dropdownFields.map((f) => f.id)), [dropdownFields])
   const visibleFields = useMemo(() => {
     const filtered = filterVisibleFields(customFields, false)
-    if (!selectedCategory) return []
-    const cat = categories.find((c) => c.slug === selectedCategory)
-    if (!cat) return []
-    return getFieldsForCategory(filtered, cat.label).filter(
-      (f) => !dropdownFieldIds.has(f.id)
-    )
-  }, [customFields, selectedCategory, categories, dropdownFieldIds])
+    if (selectedCategories.length === 0) return []
+    const seen = new Set<string>()
+    const result: CustomFieldDef[] = []
+    for (const slug of selectedCategories) {
+      const cat = categories.find((c) => c.slug === slug)
+      if (!cat) continue
+      for (const f of getFieldsForCategory(filtered, cat.label)) {
+        if (!dropdownFieldIds.has(f.id) && !seen.has(f.id)) {
+          seen.add(f.id)
+          result.push(f)
+        }
+      }
+    }
+    return result
+  }, [customFields, selectedCategories, categories, dropdownFieldIds])
 
   function toggleTag(tag: string) {
     setTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])
@@ -84,19 +115,25 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
     setCfValues((prev) => ({ ...prev, [fieldKey]: value }))
   }
 
-  function handleCategoryChange(slug: string) {
-    setSelectedCategory(slug)
-    // Set the Categoria custom field value
-    const cat = categories.find((c) => c.slug === slug)
-    if (cat && categoriaField) {
-      setCfValues((prev) => ({ ...prev, [categoriaField.id]: cat.label }))
-    }
+  function toggleCategory(slug: string) {
+    setSelectedCategories((prev) => {
+      const next = prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+      // Update the Categoria custom field value as comma-separated labels
+      if (categoriaField) {
+        const labels = next
+          .map((s) => categories.find((c) => c.slug === s)?.label)
+          .filter((l): l is string => !!l)
+        setCfValues((p) => ({ ...p, [categoriaField.id]: labels.join(',') }))
+      }
+      setFieldErrors((p) => { const { category, ...rest } = p; return rest })
+      return next
+    })
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const errors: Record<string, string> = {}
-    if (!selectedCategory) errors.category = 'Seleziona una categoria'
+    if (selectedCategories.length === 0) errors.category = 'Seleziona almeno una categoria'
     if (!firstName.trim()) errors.firstName = 'Il nome è obbligatorio'
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
@@ -133,21 +170,24 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
 
       <div className="max-w-lg rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-6 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Category selection — first field */}
+          {/* Category selection — multi-select checkboxes */}
           <div>
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">
               Categoria *
             </label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => { handleCategoryChange(e.target.value); setFieldErrors((p) => { const { category, ...rest } = p; return rest }) }}
-              className={`${inputClass} ${fieldErrors.category ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}`}
-            >
-              <option value="">Seleziona categoria...</option>
+            <div className={`flex flex-wrap gap-3 rounded-xl border px-4 py-3 ${fieldErrors.category ? 'border-red-400' : 'border-gray-200'}`}>
               {categories.map((cat) => (
-                <option key={cat.slug} value={cat.slug}>{cat.label}</option>
+                <label key={cat.slug} className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(cat.slug)}
+                    onChange={() => toggleCategory(cat.slug)}
+                    className="h-4 w-4 rounded border-gray-300 text-[#2A00CC] focus:ring-[#2A00CC]"
+                  />
+                  <span className="text-sm text-gray-700">{cat.label}</span>
+                </label>
               ))}
-            </select>
+            </div>
             {fieldErrors.category && <p className="mt-1 text-xs font-medium text-red-500">{fieldErrors.category}</p>}
           </div>
 
@@ -305,11 +345,11 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
             )}
           </div>
 
-          {/* Custom Fields — filtered by category */}
-          {selectedCategory && visibleFields.length > 0 && (
+          {/* Custom Fields — filtered by selected categories */}
+          {selectedCategories.length > 0 && visibleFields.length > 0 && (
             <div className="space-y-4 border-t border-gray-100 pt-4">
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-                Campi — {categories.find((c) => c.slug === selectedCategory)?.label}
+                Campi — {selectedCatLabels.join(', ')}
               </p>
               {visibleFields.map((cf) => {
                 const { displayName } = parseFieldCategory(cf.name)
@@ -369,7 +409,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
-              disabled={saving || !selectedCategory}
+              disabled={saving || selectedCategories.length === 0}
               className="flex-1 rounded-xl py-2.5 text-sm font-bold text-black transition-all hover:opacity-90 disabled:opacity-50"
               style={{ background: '#00F0FF' }}
             >

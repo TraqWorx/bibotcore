@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { assertUserOwnsLocation } from '@/lib/location/getActiveLocation'
 import { trackEvent } from '@/lib/analytics'
+import { translateGhlError } from '@/lib/utils/ghlErrors'
 
 export async function createOpportunity(data: {
   name: string
@@ -25,7 +26,7 @@ export async function createOpportunity(data: {
     await trackEvent(locationId, 'opportunity_created')
   } catch (err) {
     console.error('Create opportunity failed:', err)
-    return { error: err instanceof Error ? err.message : 'Failed to create opportunity' }
+    return { error: translateGhlError(err, 'Errore nella creazione dell\'opportunità') }
   }
 
   redirect('/designs/simfonia/pipeline')

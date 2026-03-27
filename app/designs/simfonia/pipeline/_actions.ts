@@ -130,6 +130,18 @@ export async function completeTask(
   }
 }
 
+// Map GHL conversation type to valid message type
+function resolveMessageType(convType?: string): string {
+  if (!convType) return 'SMS'
+  const t = convType.toUpperCase()
+  if (t.includes('EMAIL')) return 'Email'
+  if (t.includes('WHATSAPP')) return 'WhatsApp'
+  if (t.includes('FB') || t.includes('FACEBOOK')) return 'FB'
+  if (t.includes('IG') || t.includes('INSTAGRAM')) return 'IG'
+  if (t.includes('LIVE_CHAT')) return 'Live_Chat'
+  return 'SMS'
+}
+
 export async function sendMessage(
   conversationId: string,
   body: string,
@@ -140,9 +152,10 @@ export async function sendMessage(
   try {
     await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
-    await ghl.conversations.send(conversationId, body, { type: type ?? 'SMS', contactId })
+    await ghl.conversations.send(conversationId, body, { type: resolveMessageType(type), contactId })
   } catch (err) {
     console.error('sendMessage failed:', err)
-    return { error: err instanceof Error ? err.message : 'Invio fallito' }
+    const { translateGhlError } = await import('@/lib/utils/ghlErrors')
+    return { error: translateGhlError(err, 'Invio messaggio fallito') }
   }
 }

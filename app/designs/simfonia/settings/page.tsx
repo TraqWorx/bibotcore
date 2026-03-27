@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { DEFAULT_THEME, type DesignTheme } from '@/lib/types/design'
-import { getCategoryTags, getGareMensili, getLocationTags, getProvvigioni, getUserAvailability } from './_actions'
+import { getCategoryTags, getClosedDays, getGareMensili, getLocationTags, getProvvigioni, getUserAvailability } from './_actions'
 import {
   discoverCategories,
   getProviderField,
@@ -17,6 +17,7 @@ import AvailabilityForm from './_components/AvailabilityForm'
 import TagsManager from './_components/TagsManager'
 import CategoryTagsForm from './_components/CategoryTagsForm'
 import ThemeForm from './_components/ThemeForm'
+import ClosedDaysForm from './_components/ClosedDaysForm'
 
 const BASE_URL = 'https://services.leadconnectorhq.com'
 
@@ -96,7 +97,7 @@ export default async function SettingsPage({
   const currentMonth = getCurrentMonth()
   const token = await getGhlTokenForLocation(locationId).catch(() => null)
 
-  const [settingsRes, themeRes, gareRows, locationTags, provvigioniRows, availabilitySlots, ghlUsers, customFields, categoryTagsMap] = await Promise.all([
+  const [settingsRes, themeRes, gareRows, locationTags, provvigioniRows, availabilitySlots, ghlUsers, customFields, categoryTagsMap, closedDays] = await Promise.all([
     supabase
       .from('location_settings')
       .select('target_annuale')
@@ -114,6 +115,7 @@ export default async function SettingsPage({
     token ? fetchGhlUsers(token, locationId) : Promise.resolve([]),
     token ? fetchCustomFields(token, locationId) : Promise.resolve([]),
     getCategoryTags(locationId).catch(() => ({} as Record<string, string[]>)),
+    getClosedDays(locationId),
   ])
 
   const ghlTags = locationTags.map((t) => t.name)
@@ -209,6 +211,13 @@ export default async function SettingsPage({
           users={ghlUsers.map((u) => ({ id: u.id, name: u.name }))}
           initialSlots={availabilitySlots}
         />
+      ),
+    },
+    {
+      id: 'chiusure',
+      label: 'Chiusure',
+      content: (
+        <ClosedDaysForm locationId={locationId} initialDays={closedDays} />
       ),
     },
     {

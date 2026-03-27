@@ -364,6 +364,35 @@ export async function saveGareMensili(
   return {}
 }
 
+// ─── Closed Days ────────────────────────────────────────────────────────────
+
+export async function getClosedDays(locationId: string): Promise<string[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('location_settings')
+    .select('closed_days')
+    .eq('location_id', locationId)
+    .single()
+  const days = (data as { closed_days?: string[] } | null)?.closed_days
+  return Array.isArray(days) ? days : []
+}
+
+export async function saveClosedDays(
+  locationId: string,
+  days: string[]
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('location_settings')
+    .upsert(
+      { location_id: locationId, closed_days: days, updated_at: new Date().toISOString() },
+      { onConflict: 'location_id' }
+    )
+  if (error) return { error: error.message }
+  return {}
+}
+
 // ─── GHL Tags Management ───────────────────────────────────────────────────
 
 export interface GhlTag {

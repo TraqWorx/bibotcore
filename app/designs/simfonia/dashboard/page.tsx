@@ -2,10 +2,12 @@ import Link from 'next/link'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
+import { getClosedDays } from '../settings/_actions'
 import {
   discoverCategories,
   getCategoriaField,
   getProviderField,
+  parseCategoriaValue,
   type CustomFieldDef,
 } from '@/lib/utils/categoryFields'
 
@@ -13,7 +15,7 @@ const BASE_URL = 'https://services.leadconnectorhq.com'
 
 // ─── Working days helpers ────────────────────────────────────────────────────
 
-function countWorkingDays(start: Date, end: Date): number {
+function countWorkingDays(start: Date, end: Date, closedDays: Set<string> = new Set()): number {
   let count = 0
   const cur = new Date(start)
   cur.setHours(0, 0, 0, 0)
@@ -21,29 +23,30 @@ function countWorkingDays(start: Date, end: Date): number {
   endDay.setHours(0, 0, 0, 0)
   while (cur <= endDay) {
     const d = cur.getDay()
-    if (d !== 0 && d !== 6) count++
+    const iso = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`
+    if (d !== 0 && d !== 6 && !closedDays.has(iso)) count++
     cur.setDate(cur.getDate() + 1)
   }
   return count
 }
 
-function getWorkingDayStats() {
+function getWorkingDayStats(closedDays: Set<string> = new Set()) {
   const now = new Date()
   const year = now.getFullYear()
   const jan1 = new Date(year, 0, 1)
   const dec31 = new Date(year, 11, 31)
-  const passed = countWorkingDays(jan1, now)
-  const total = countWorkingDays(jan1, dec31)
+  const passed = countWorkingDays(jan1, now, closedDays)
+  const total = countWorkingDays(jan1, dec31, closedDays)
   const remaining = total - passed
   return { passed, remaining, total, pct: Math.round((passed / total) * 100) }
 }
 
-function getMonthWorkingDayStats() {
+function getMonthWorkingDayStats(closedDays: Set<string> = new Set()) {
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  const passed = countWorkingDays(monthStart, now)
-  const total = countWorkingDays(monthStart, monthEnd)
+  const passed = countWorkingDays(monthStart, now, closedDays)
+  const total = countWorkingDays(monthStart, monthEnd, closedDays)
   return { passed, total, pct: total > 0 ? Math.round((passed / total) * 100) : 0 }
 }
 
@@ -216,11 +219,14 @@ export default async function CrmDashboard({
     : { data: null }
   const isSuperAdmin = profile?.role === 'super_admin'
 
-  const [token, settingsRes, { data: gareRows }] = await Promise.all([
+  const [token, settingsRes, { data: gareRows }, closedDaysArr] = await Promise.all([
     getGhlTokenForLocation(locationId).catch(() => null),
     supabase.from('location_settings').select('target_annuale').eq('location_id', locationId).single(),
     supabase.from('gare_mensili').select('categoria, obiettivo, tag').eq('location_id', locationId).eq('month', currentMonth).order('categoria'),
+    getClosedDays(locationId),
   ])
+
+  const closedDays = new Set(closedDaysArr)
 
   const targetAnnuale: number = settingsRes.data?.target_annuale ?? 1900
 
@@ -255,8 +261,9 @@ export default async function CrmDashboard({
 
   const categoryData = categories.map((cat) => {
     // Filter by Categoria custom field value (not tags)
+    // Supports comma-separated multi-category values: contact counts in EACH matching category
     const contacts = categoriaFieldId
-      ? allContacts.filter((c) => getCustomFieldValue(c, categoriaFieldId) === cat.label)
+      ? allContacts.filter((c) => parseCategoriaValue(getCustomFieldValue(c, categoriaFieldId)).includes(cat.label))
       : []
 
     const providerField = getProviderField(customFields, cat.label)
@@ -301,7 +308,7 @@ export default async function CrmDashboard({
       const tagMap: Record<string, number> = {}
       for (const label of categoryLabels) {
         tagMap[label] = categoriaFieldId
-          ? contacts.filter((c) => getCustomFieldValue(c, categoriaFieldId) === label).length
+          ? contacts.filter((c) => parseCategoriaValue(getCustomFieldValue(c, categoriaFieldId)).includes(label)).length
           : 0
       }
       return tagMap
@@ -331,8 +338,8 @@ export default async function CrmDashboard({
   }
 
   // Gare data (admin only)
-  const wd = getWorkingDayStats()
-  const mwd = getMonthWorkingDayStats()
+  const wd = getWorkingDayStats(closedDays)
+  const mwd = getMonthWorkingDayStats(closedDays)
   let gareData: {
     categoria: string; obiettivo: number; attivato: number;
     remaining: number; pctRaggiunta: number; isOnTrack: boolean

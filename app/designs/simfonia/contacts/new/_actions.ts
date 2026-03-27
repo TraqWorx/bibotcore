@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { assertUserOwnsLocation } from '@/lib/location/getActiveLocation'
 import { trackEvent } from '@/lib/analytics'
+import { translateGhlError } from '@/lib/utils/ghlErrors'
 
 export async function createContact(data: {
   firstName: string
@@ -26,18 +27,13 @@ export async function createContact(data: {
     if (data.customFields && data.customFields.length > 0) payload.customFields = data.customFields
     await ghl.contacts.create(payload)
     await trackEvent(locationId, 'contact_created')
-    revalidatePath('/designs/simfonia/contacts')
-    revalidatePath('/designs/simfonia/dashboard')
   } catch (err) {
     console.error('Create contact failed:', err)
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.includes('duplicated contacts') || msg.includes('duplicate')) {
-      const match = msg.match(/"matchingField":"(\w+)"/)
-      const field = match?.[1] ?? 'email'
-      return { error: `Esiste già un contatto con lo stesso ${field}. Modifica il valore o aggiorna il contatto esistente.` }
-    }
-    return { error: msg || 'Errore nella creazione del contatto' }
+    return { error: translateGhlError(err, 'Errore nella creazione del contatto') }
   }
 
+  // Revalidate AFTER the try/catch so redirect (which throws) doesn't race with cache invalidation
+  revalidatePath('/designs/simfonia/contacts', 'page')
+  revalidatePath('/designs/simfonia/dashboard', 'page')
   redirect(`/designs/simfonia/contacts?locationId=${locationId}`)
 }

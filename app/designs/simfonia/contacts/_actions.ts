@@ -121,7 +121,8 @@ export async function sendMessageToContact(
     return {}
   } catch (err) {
     console.error('[sendMessage] FAILED:', err instanceof Error ? err.message : err)
-    return { error: err instanceof Error ? err.message : 'Invio fallito' }
+    const { translateGhlError } = await import('@/lib/utils/ghlErrors')
+    return { error: translateGhlError(err, 'Invio messaggio fallito') }
   }
 }
 
@@ -196,7 +197,8 @@ export async function updateContact(
     return {}
   } catch (err) {
     console.error('[updateContact] FAILED:', err instanceof Error ? err.message : err)
-    return { error: err instanceof Error ? err.message : 'Errore nel salvataggio' }
+    const { translateGhlError } = await import('@/lib/utils/ghlErrors')
+    return { error: translateGhlError(err, 'Errore nel salvataggio') }
   }
 }
 
@@ -212,6 +214,7 @@ export async function deleteContact(
     revalidatePath('/designs/simfonia/dashboard')
     return {}
   } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Errore nella cancellazione' }
+    const { translateGhlError } = await import('@/lib/utils/ghlErrors')
+    return { error: translateGhlError(err, 'Errore nella cancellazione') }
   }
 }

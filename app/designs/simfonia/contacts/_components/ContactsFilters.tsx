@@ -107,39 +107,51 @@ export default function ContactsFilters({
         </div>
       </div>
 
-      {/* Category pills */}
+      {/* Category pills — multi-select */}
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => router.push(buildUrl({ category: null, tag: null, gestore: null, scadenzaFrom: null, scadenzaTo: null }))}
-          className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
-            !activeCategory
-              ? 'border-[#2A00CC] bg-[#2A00CC] text-white shadow-sm'
-              : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
-          }`}
-        >
-          Tutte
-        </button>
-        {categories.map((cat) => {
-          const isActive = activeCategory === cat.slug
-          const s = CATEGORY_STYLES[cat.slug] ?? DEFAULT_CAT_STYLE
+        {(() => {
+          const selectedSlugs = activeCategory ? activeCategory.split(',').filter(Boolean) : []
           return (
-            <button
-              key={cat.slug}
-              onClick={() => router.push(buildUrl({
-                category: isActive ? null : cat.slug,
-                tag: null, gestore: null, scadenzaFrom: null, scadenzaTo: null,
-              }))}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                isActive
-                  ? `${s.activeBg} ${s.activeText} ${s.border} shadow-sm`
-                  : `border-gray-200 bg-white ${s.text} hover:${s.bg}`
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${s.dot}`} />
-              {cat.label}
-            </button>
+            <>
+              <button
+                onClick={() => router.push(buildUrl({ category: null, tag: null, gestore: null, scadenzaFrom: null, scadenzaTo: null }))}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                  selectedSlugs.length === 0
+                    ? 'border-[#2A00CC] bg-[#2A00CC] text-white shadow-sm'
+                    : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                Tutte
+              </button>
+              {categories.map((cat) => {
+                const isActive = selectedSlugs.includes(cat.slug)
+                const s = CATEGORY_STYLES[cat.slug] ?? DEFAULT_CAT_STYLE
+                return (
+                  <button
+                    key={cat.slug}
+                    onClick={() => {
+                      const next = isActive
+                        ? selectedSlugs.filter((s) => s !== cat.slug)
+                        : [...selectedSlugs, cat.slug]
+                      router.push(buildUrl({
+                        category: next.length > 0 ? next.join(',') : null,
+                        tag: null, gestore: null, scadenzaFrom: null, scadenzaTo: null,
+                      }))
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                      isActive
+                        ? `${s.activeBg} ${s.activeText} ${s.border} shadow-sm`
+                        : `border-gray-200 bg-white ${s.text} hover:${s.bg}`
+                    }`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${s.dot}`} />
+                    {cat.label}
+                  </button>
+                )
+              })}
+            </>
           )
-        })}
+        })()}
 
         {/* Separator */}
         {(allTags.length > 0 || gestoreOptions.length > 0) && (
