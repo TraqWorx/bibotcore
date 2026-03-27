@@ -5,6 +5,20 @@ import SyncSubscriptionsButton from './_components/SyncSubscriptionsButton'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
+function paymentsMade(iso: string, until?: string): number {
+  const start = new Date(iso)
+  const end = until ? new Date(until) : new Date()
+  const billingDay = start.getDate()
+  let payments = 0
+  const cursor = new Date(start)
+  while (cursor <= end) {
+    payments++
+    cursor.setMonth(cursor.getMonth() + 1)
+    cursor.setDate(billingDay)
+  }
+  return Math.max(1, payments)
+}
+
 interface GhlLocation {
   id: string
   name: string
@@ -86,14 +100,16 @@ export default async function LocationsPage() {
   // Read plan assignments back from locations table (covers all locations)
   const { data: locationPlanRows } = await supabase
     .from('locations')
-    .select('location_id, ghl_plan_id, churned_at')
+    .select('location_id, ghl_plan_id, ghl_date_added, churned_at')
     .in('location_id', ghlLocations.map((l) => l.id))
 
   const planByLocation: Record<string, string | null> = {}
   const churnedLocations = new Set<string>()
+  const locationMeta: Record<string, { ghl_date_added?: string | null; churned_at?: string | null }> = {}
   for (const row of locationPlanRows ?? []) {
-    const r = row as { location_id: string; ghl_plan_id?: string | null; churned_at?: string | null }
+    const r = row as { location_id: string; ghl_plan_id?: string | null; ghl_date_added?: string | null; churned_at?: string | null }
     planByLocation[r.location_id] = r.ghl_plan_id ?? null
+    locationMeta[r.location_id] = { ghl_date_added: r.ghl_date_added, churned_at: r.churned_at }
     if (r.churned_at) churnedLocations.add(r.location_id)
   }
 
@@ -121,6 +137,14 @@ export default async function LocationsPage() {
     const planId = planByLocation[l.id] ?? null
     const churned = churnedLocations.has(l.id)
     const plan = planId ? planById[planId] ?? null : null
+    const meta = locationMeta[l.id]
+    const startDate = meta?.ghl_date_added ?? l.dateAdded
+    const price = plan?.price ?? null
+    let totalPaid: number | null = null
+    if (planId && price != null && startDate) {
+      const months = paymentsMade(startDate, meta?.churned_at ?? undefined)
+      totalPaid = price * months
+    }
     return {
       id: l.id,
       name: l.name,
@@ -132,6 +156,8 @@ export default async function LocationsPage() {
       planId: churned ? null : planId,
       planName: churned ? null : (plan?.name ?? (planId ? `Unknown (…${planId.slice(-6)})` : null)),
       planPrice: churned ? null : (plan?.price ?? null),
+      totalPaid,
+      totalPaidVat: totalPaid != null ? Math.round(totalPaid * 1.22 * 100) / 100 : null,
       churned,
     }
   })

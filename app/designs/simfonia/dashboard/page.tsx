@@ -2,7 +2,12 @@ import Link from 'next/link'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
-import { getContactFilters } from '../settings/_actions'
+import {
+  discoverCategories,
+  getCategoriaField,
+  getProviderField,
+  type CustomFieldDef,
+} from '@/lib/utils/categoryFields'
 
 const BASE_URL = 'https://services.leadconnectorhq.com'
 
@@ -67,17 +72,16 @@ async function ghlSearch(
   token: string,
   filters: { field: string; operator: string; value: string }[],
   pageLimit = 100,
-): Promise<{ total: number; contacts: { id: string; dateAdded?: string; assignedTo?: string; tags?: string[] }[] }> {
+): Promise<{ total: number; contacts: Record<string, unknown>[] }> {
   try {
     const res = await fetch(`${BASE_URL}/contacts/search`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28', 'Content-Type': 'application/json' },
       body: JSON.stringify({ locationId, pageLimit, filters }),
-      next: { revalidate: 60 },
+      cache: 'no-store',
     })
     if (!res.ok) return { total: 0, contacts: [] }
     const data = await res.json()
-    // GHL search returns total as the full count of matching contacts
     const contacts = data?.contacts ?? []
     const total = data?.total ?? contacts.length
     return { total, contacts }
@@ -86,9 +90,29 @@ async function ghlSearch(
   }
 }
 
-async function getTagCount(locationId: string, token: string, tag: string): Promise<number> {
-  const { total } = await ghlSearch(locationId, token, [{ field: 'tags', operator: 'contains', value: tag }])
-  return total
+/** Fetch ALL contacts matching a filter (paginated up to 500) — returns full contact objects with customFields */
+async function ghlSearchAll(
+  locationId: string,
+  token: string,
+  filters: { field: string; operator: string; value: string }[],
+): Promise<Record<string, unknown>[]> {
+  const allContacts: Record<string, unknown>[] = []
+  for (let page = 1; page <= 5; page++) {
+    try {
+      const res = await fetch(`${BASE_URL}/contacts/search`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locationId, pageLimit: 100, page, ...(filters.length > 0 ? { filters } : {}) }),
+        cache: 'no-store',
+      })
+      if (!res.ok) break
+      const data = await res.json()
+      const contacts: Record<string, unknown>[] = data?.contacts ?? []
+      allContacts.push(...contacts)
+      if (contacts.length < 100) break
+    } catch { break }
+  }
+  return allContacts
 }
 
 async function getContactsCount(locationId: string, token: string): Promise<number> {
@@ -101,59 +125,64 @@ async function getGhlUsers(locationId: string, token: string): Promise<GhlUser[]
   return (data?.users ?? []) as GhlUser[]
 }
 
-/** Count contacts with a tag created in a specific month */
-async function getTagCountForMonth(
-  locationId: string,
-  token: string,
-  tag: string,
-  monthStart: string,
-): Promise<number> {
-  const startDate = new Date(monthStart + 'T00:00:00.000Z')
-  const endDate = new Date(startDate)
-  endDate.setMonth(endDate.getMonth() + 1)
-
-  let count = 0
-  let page = 1
-  while (page <= 5) {
-    try {
-      const res = await fetch(`${BASE_URL}/contacts/search`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          locationId, pageLimit: 100, page,
-          filters: [{ field: 'tags', operator: 'contains', value: tag }],
-        }),
-        next: { revalidate: 60 },
-      })
-      if (!res.ok) break
-      const data = await res.json()
-      const contacts: { id: string; dateAdded?: string }[] = data?.contacts ?? []
-      if (contacts.length === 0) break
-      for (const c of contacts) {
-        if (!c.dateAdded) continue
-        const added = new Date(c.dateAdded)
-        if (added >= startDate && added < endDate) count++
-      }
-      if (contacts.length < 100) break
-      page++
-    } catch { break }
-  }
-  return count
-}
-
-/** Count contacts assigned to a specific user */
 async function getContactsForUser(locationId: string, token: string, userId: string): Promise<number> {
   const { total } = await ghlSearch(locationId, token, [{ field: 'assignedTo', operator: 'eq', value: userId }])
   return total
 }
 
-/** Count contacts with a tag, optionally filtered to a specific user */
-async function getTagCountForUser(locationId: string, token: string, tag: string, userId: string): Promise<number> {
-  const { total } = await ghlSearch(locationId, token, [
-    { field: 'tags', operator: 'contains', value: tag },
-    { field: 'assignedTo', operator: 'eq', value: userId },
-  ])
-  return total
+/** Read a custom field value from a contact's customFields array */
+function getCustomFieldValue(contact: Record<string, unknown>, fieldId: string): string {
+  const cfArray = contact.customFields
+  if (!Array.isArray(cfArray)) return ''
+  const field = cfArray.find((f: Record<string, unknown>) => f.id === fieldId)
+  if (!field) return ''
+  const val = (field as Record<string, unknown>).value ?? (field as Record<string, unknown>).field_value ?? (field as Record<string, unknown>).fieldValue ?? ''
+  return String(val).trim()
+}
+
+/** Count contacts by provider value for a category */
+function countByProvider(
+  contacts: Record<string, unknown>[],
+  providerFieldId: string,
+): { provider: string; count: number }[] {
+  const counts = new Map<string, number>()
+  for (const contact of contacts) {
+    const val = getCustomFieldValue(contact, providerFieldId) || 'Non specificato'
+    counts.set(val, (counts.get(val) ?? 0) + 1)
+  }
+  return Array.from(counts.entries())
+    .map(([provider, count]) => ({ provider, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+async function fetchCustomFields(token: string, locationId: string): Promise<CustomFieldDef[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/locations/${locationId}/customFields`, {
+      headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
+      next: { revalidate: 300 },
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return ((data?.customFields ?? []) as CustomFieldDef[]).map((cf) => ({
+      id: cf.id,
+      name: cf.name,
+      fieldKey: cf.fieldKey ?? cf.id,
+      dataType: cf.dataType ?? 'TEXT',
+      placeholder: cf.placeholder,
+      picklistOptions: cf.picklistOptions,
+    }))
+  } catch {
+    return []
+  }
+}
+
+// ─── Category colors ────────────────────────────────────────────────────────
+
+const CATEGORY_STYLES: Record<string, { border: string; accent: string; bg: string }> = {
+  telefonia:       { border: 'border-blue-200', accent: 'text-blue-700', bg: 'bg-blue-50' },
+  energia:         { border: 'border-amber-200', accent: 'text-amber-700', bg: 'bg-amber-50' },
+  connettivita:    { border: 'border-green-200', accent: 'text-green-700', bg: 'bg-green-50' },
+  intrattenimento: { border: 'border-purple-200', accent: 'text-purple-700', bg: 'bg-purple-50' },
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -179,22 +208,18 @@ export default async function CrmDashboard({
   const now = new Date()
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
 
-  // Get current user
   const { data: { user: authUser } } = await authClient.auth.getUser()
   const userEmail = authUser?.email?.toLowerCase() ?? ''
 
-  // Check if super_admin
   const { data: profile } = authUser
     ? await supabase.from('profiles').select('role').eq('id', authUser.id).single()
     : { data: null }
   const isSuperAdmin = profile?.role === 'super_admin'
 
-  // Fetch token + settings + gare + contact filters in parallel
-  const [token, settingsRes, { data: gareRows }, contactFilters] = await Promise.all([
+  const [token, settingsRes, { data: gareRows }] = await Promise.all([
     getGhlTokenForLocation(locationId).catch(() => null),
     supabase.from('location_settings').select('target_annuale').eq('location_id', locationId).single(),
     supabase.from('gare_mensili').select('categoria, obiettivo, tag').eq('location_id', locationId).eq('month', currentMonth).order('categoria'),
-    getContactFilters(locationId),
   ])
 
   const targetAnnuale: number = settingsRes.data?.target_annuale ?? 1900
@@ -207,50 +232,83 @@ export default async function CrmDashboard({
     )
   }
 
-  // Fetch GHL users and determine current user's role
   const ghlUsers = await getGhlUsers(locationId, token)
   const currentGhlUser = ghlUsers.find((u) => u.email.toLowerCase() === userEmail)
   const isGhlAdmin = currentGhlUser?.roles?.role === 'admin'
   const isAdmin = isSuperAdmin || isGhlAdmin
 
-  // Fetch data — non-admin sees only their own assigned contacts
   const currentGhlUserId = currentGhlUser?.id
-  const [totalContacts, ...filterTagCounts] = await Promise.all([
+  const [totalContacts, customFields] = await Promise.all([
     !isAdmin && currentGhlUserId
       ? getContactsForUser(locationId, token, currentGhlUserId)
       : getContactsCount(locationId, token),
-    ...contactFilters.map((tag) =>
-      !isAdmin && currentGhlUserId
-        ? getTagCountForUser(locationId, token, tag, currentGhlUserId)
-        : getTagCount(locationId, token, tag)
-    ),
+    fetchCustomFields(token, locationId),
   ])
 
-  // Build filter tag count map
-  const filterTagCountMap: Record<string, number> = {}
-  contactFilters.forEach((tag, i) => { filterTagCountMap[tag] = filterTagCounts[i] ?? 0 })
+  // Discover categories from the Categoria dropdown field
+  const categories = discoverCategories(customFields)
+  const categoriaField = getCategoriaField(customFields)
+  const categoriaFieldId = categoriaField?.id ?? null
 
-  // Per-operatore contact counts (admin only) + tag breakdown
-  const operatorCounts: { name: string; initials: string; count: number; isAdmin: boolean; tagCounts: Record<string, number> }[] = []
+  // ─── Fetch ALL contacts once, then group by Categoria custom field ──────
+  const allContacts = await ghlSearchAll(locationId, token, [])
+
+  const categoryData = categories.map((cat) => {
+    // Filter by Categoria custom field value (not tags)
+    const contacts = categoriaFieldId
+      ? allContacts.filter((c) => getCustomFieldValue(c, categoriaFieldId) === cat.label)
+      : []
+
+    const providerField = getProviderField(customFields, cat.label)
+    const providerCounts = providerField
+      ? countByProvider(contacts, providerField.id)
+      : []
+
+    // Build full gestori list from picklist options, merging counts
+    const countMap = new Map(providerCounts.map((p) => [p.provider, p.count]))
+    const gestori = providerField?.picklistOptions
+      ? providerField.picklistOptions.map((opt) => ({
+          provider: opt,
+          count: countMap.get(opt) ?? 0,
+        }))
+      : providerCounts
+
+    return {
+      ...cat,
+      total: contacts.length,
+      providers: gestori,
+    }
+  })
+
+  // Per-operatore contact counts (admin only)
+  const operatorCounts: { name: string; initials: string; count: number; isAdmin: boolean; categoryCounts: Record<string, number> }[] = []
   if (isAdmin && ghlUsers.length > 0) {
     const nonAdminUsers = ghlUsers.filter((u) => u.roles?.role !== 'admin')
     const adminUsers = ghlUsers.filter((u) => u.roles?.role === 'admin')
 
-    // Fetch counts + tag breakdowns for non-admin users
     const nonAdminCounts = await Promise.all(
       nonAdminUsers.map((u) => getContactsForUser(locationId, token, u.id))
     )
-    // Tag breakdown per non-admin user
-    const nonAdminTagCounts = await Promise.all(
+    const categoryLabels = categories.map((c) => c.label)
+    // For per-user category counts, fetch assigned contacts and count by Categoria custom field
+    const nonAdminUserContacts = await Promise.all(
       nonAdminUsers.map(async (u) => {
-        const tagMap: Record<string, number> = {}
-        const counts = await Promise.all(
-          contactFilters.map((tag) => getTagCountForUser(locationId, token, tag, u.id))
-        )
-        contactFilters.forEach((tag, i) => { tagMap[tag] = counts[i] })
-        return tagMap
+        const { contacts } = await ghlSearch(locationId, token, [{ field: 'assignedTo', operator: 'eq', value: u.id }])
+        return contacts
       })
     )
+    const nonAdminTagCounts = nonAdminUserContacts.map((contacts) => {
+      const tagMap: Record<string, number> = {}
+      for (const label of categoryLabels) {
+        tagMap[label] = categoriaFieldId
+          ? contacts.filter((c) => getCustomFieldValue(c, categoriaFieldId) === label).length
+          : 0
+      }
+      return tagMap
+    })
+
+    const adminTagMap: Record<string, number> = {}
+    for (const cd of categoryData) adminTagMap[cd.label] = cd.total
 
     for (const u of adminUsers) {
       operatorCounts.push({
@@ -258,7 +316,7 @@ export default async function CrmDashboard({
         initials: u.name?.charAt(0)?.toUpperCase() ?? '?',
         count: totalContacts,
         isAdmin: true,
-        tagCounts: filterTagCountMap,
+        categoryCounts: adminTagMap,
       })
     }
     nonAdminUsers.forEach((u, i) => {
@@ -267,31 +325,9 @@ export default async function CrmDashboard({
         initials: u.name?.charAt(0)?.toUpperCase() ?? '?',
         count: nonAdminCounts[i],
         isAdmin: false,
-        tagCounts: nonAdminTagCounts[i],
+        categoryCounts: nonAdminTagCounts[i],
       })
     })
-  }
-
-  // Energia section data (admin only)
-  let energiaData: {
-    totaleLuce: number; totaleGas: number; totaleLuceGas: number;
-    expiring30: number; expiring60: number; expiring90: number;
-  } | null = null
-  if (isAdmin) {
-    const [totaleLuce, totaleGas, totaleLuceGas] = await Promise.all([
-      getTagCount(locationId, token, 'Luce'),
-      getTagCount(locationId, token, 'Gas'),
-      getTagCount(locationId, token, 'Energia'),
-    ])
-    // Count contacts with "Scadenza Contratto Energia" within 30/60/90 days
-    // We use tag-based approximation: contacts with 'In Scadenza' tag
-    const [expiring30] = await Promise.all([
-      getTagCount(locationId, token, 'In Scadenza'),
-    ])
-    energiaData = {
-      totaleLuce, totaleGas, totaleLuceGas,
-      expiring30, expiring60: 0, expiring90: 0,
-    }
   }
 
   // Gare data (admin only)
@@ -303,15 +339,35 @@ export default async function CrmDashboard({
   }[] = []
 
   if (isAdmin && gareRows && gareRows.length > 0) {
-    const gareTags = [...new Set(gareRows.map((g: { tag: string }) => g.tag))]
-    const gareMonthCounts = await Promise.all(
-      gareTags.map((tag) => getTagCountForMonth(locationId, token, tag, currentMonth))
-    )
-    const gareCountMap: Record<string, number> = {}
-    gareTags.forEach((tag, i) => { gareCountMap[tag] = gareMonthCounts[i] })
+    // Collect all provider field IDs for gestore-based counting
+    const providerFieldIds = categories
+      .map((cat) => getProviderField(customFields, cat.label)?.id)
+      .filter((id): id is string => !!id)
+
+    // Count contacts per gestore value for the current month
+    // We search ALL contacts created this month, then count per gestore value
+    const monthStart = new Date(currentMonth + 'T00:00:00.000Z')
+    const monthEnd = new Date(monthStart)
+    monthEnd.setMonth(monthEnd.getMonth() + 1)
+
+    const monthContacts = await ghlSearchAll(locationId, token, [
+      { field: 'dateAdded', operator: 'GTE', value: monthStart.toISOString() },
+      { field: 'dateAdded', operator: 'LTE', value: monthEnd.toISOString() },
+    ])
+
+    // Count how many contacts have each gestore value across all provider fields
+    const gestoreCountMap: Record<string, number> = {}
+    for (const contact of monthContacts) {
+      for (const fieldId of providerFieldIds) {
+        const val = getCustomFieldValue(contact, fieldId).toLowerCase()
+        if (val) {
+          gestoreCountMap[val] = (gestoreCountMap[val] ?? 0) + 1
+        }
+      }
+    }
 
     gareData = gareRows.map((g: { categoria: string; obiettivo: number; tag: string }) => {
-      const attivato = gareCountMap[g.tag] ?? 0
+      const attivato = gestoreCountMap[g.tag] ?? 0
       const pctRaggiunta = g.obiettivo > 0 ? (attivato / g.obiettivo) * 100 : 0
       return {
         categoria: g.categoria,
@@ -325,7 +381,7 @@ export default async function CrmDashboard({
   }
 
   // Target annuale performance (admin only)
-  const contratti = totalContacts // using total contacts as proxy for now
+  const contratti = totalContacts
   const pctContratti = targetAnnuale > 0 ? (contratti / targetAnnuale) * 100 : 0
   const pctTempo = wd.pct
   const diff = pctContratti - pctTempo
@@ -370,7 +426,7 @@ export default async function CrmDashboard({
         </div>
         <Link href={`/designs/simfonia/pipeline${q}`} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-all">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Pipeline</p>
-          <p className="mt-2 text-sm font-medium text-gray-600">Vedi opportunità</p>
+          <p className="mt-2 text-sm font-medium text-gray-600">Vedi opportunit&agrave;</p>
         </Link>
         <Link href={`/designs/simfonia/calendar${q}`} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-all">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Calendario</p>
@@ -455,42 +511,55 @@ export default async function CrmDashboard({
         </>
       )}
 
-      {/* ═══ TOTALE PER TAG (from settings filters) ═══ */}
-      {contactFilters.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">Totale per Categoria</h2>
-          <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(contactFilters.length, 4)}, minmax(0, 1fr))` }}>
-            {contactFilters.map((tag) => {
-              const count = filterTagCountMap[tag] ?? 0
-              const pctOfTotal = totalContacts > 0 ? (count / totalContacts) * 100 : 0
-              return (
-                <Link
-                  key={tag}
-                  href={`/designs/simfonia/contacts${q}&filter=${encodeURIComponent(tag)}`}
-                  className="group rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-5 shadow-sm hover:shadow-md transition-all"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 capitalize">{tag}</p>
-                  <div className="mt-3 flex items-baseline gap-1.5">
-                    <span className="text-3xl font-black tabular-nums" style={{ color: '#2A00CC' }}>
-                      {count.toLocaleString('it-IT')}
-                    </span>
-                    <span className="text-sm font-semibold tabular-nums text-gray-300">contatti</span>
+      {/* ═══ CATEGORY SECTIONS (4 cards with provider breakdown) ═══ */}
+      <section>
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">Per Categoria</h2>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {categoryData.map((cat) => {
+            const style = CATEGORY_STYLES[cat.slug] ?? { border: 'border-gray-200', accent: 'text-gray-700', bg: 'bg-gray-50' }
+            const pctOfTotal = totalContacts > 0 ? (cat.total / totalContacts) * 100 : 0
+            return (
+              <Link
+                key={cat.slug}
+                href={`/designs/simfonia/contacts${q}&category=${cat.slug}`}
+                className={`group rounded-2xl border ${style.border} bg-white p-5 shadow-sm hover:shadow-md transition-all`}
+              >
+                <p className={`text-xs font-semibold uppercase tracking-widest ${style.accent}`}>{cat.label}</p>
+                <div className="mt-3 flex items-baseline gap-1.5">
+                  <span className={`text-3xl font-black tabular-nums ${style.accent}`}>
+                    {cat.total.toLocaleString('it-IT')}
+                  </span>
+                  <span className="text-sm font-semibold tabular-nums text-gray-300">contatti</span>
+                </div>
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                  <div
+                    className={`h-full rounded-full transition-all ${style.bg}`}
+                    style={{ width: `${Math.min(pctOfTotal, 100)}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-[11px] tabular-nums text-gray-400">
+                  {pctOfTotal.toFixed(1)}% del totale
+                </p>
+
+                {/* Provider breakdown */}
+                {cat.providers.length > 0 && (
+                  <div className="mt-3 space-y-1 border-t border-gray-100 pt-3">
+                    {cat.providers.slice(0, 6).map((p) => (
+                      <div key={p.provider} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 truncate mr-2">{p.provider}</span>
+                        <span className="font-semibold tabular-nums text-gray-700">{p.count}</span>
+                      </div>
+                    ))}
+                    {cat.providers.length > 6 && (
+                      <p className="text-[10px] text-gray-400">+{cat.providers.length - 6} altri</p>
+                    )}
                   </div>
-                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{ width: `${Math.min(pctOfTotal, 100)}%`, background: '#2A00CC' }}
-                    />
-                  </div>
-                  <p className="mt-2 text-[11px] tabular-nums text-gray-400">
-                    {pctOfTotal.toFixed(1)}% del totale
-                  </p>
-                </Link>
-              )
-            })}
-          </div>
-        </section>
-      )}
+                )}
+              </Link>
+            )
+          })}
+        </div>
+      </section>
 
       {/* ═══ PER OPERATORE (admin only) ═══ */}
       {isAdmin && operatorCounts.length > 0 && (
@@ -515,51 +584,20 @@ export default async function CrmDashboard({
                 </div>
                 <p className="mt-3 text-3xl font-black text-gray-900">{op.count}</p>
                 <p className="mt-1 text-xs text-gray-400">{op.isAdmin ? 'contatti totali' : 'contatti assegnati'}</p>
-                {/* Tag breakdown */}
-                {contactFilters.length > 0 && (
-                  <div className="mt-3 space-y-1.5 border-t border-gray-50 pt-3">
-                    {contactFilters.map((tag) => {
-                      const tagCount = op.tagCounts[tag] ?? 0
-                      return (
-                        <div key={tag} className="flex items-center justify-between text-xs">
-                          <span className="text-gray-500 capitalize">{tag}</span>
-                          <span className="font-semibold tabular-nums text-gray-700">{tagCount}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                {/* Category breakdown */}
+                <div className="mt-3 space-y-1.5 border-t border-gray-50 pt-3">
+                  {categories.map((cat) => {
+                    const catCount = op.categoryCounts[cat.label] ?? 0
+                    return (
+                      <div key={cat.slug} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500">{cat.label}</span>
+                        <span className="font-semibold tabular-nums text-gray-700">{catCount}</span>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             ))}
-          </div>
-        </section>
-      )}
-
-      {/* ═══ ENERGIA (admin only) ═══ */}
-      {isAdmin && energiaData && (
-        <section>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">Energia</h2>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Luce</p>
-              <p className="mt-2 text-3xl font-black text-amber-600">{energiaData.totaleLuce}</p>
-              <p className="mt-1 text-xs text-gray-400">contatti</p>
-            </div>
-            <div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Gas</p>
-              <p className="mt-2 text-3xl font-black text-amber-600">{energiaData.totaleGas}</p>
-              <p className="mt-1 text-xs text-gray-400">contatti</p>
-            </div>
-            <div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Totale Energia</p>
-              <p className="mt-2 text-3xl font-black text-amber-600">{energiaData.totaleLuceGas}</p>
-              <p className="mt-1 text-xs text-gray-400">contatti con tag Energia</p>
-            </div>
-            <div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">In Scadenza</p>
-              <p className="mt-2 text-3xl font-black text-red-500">{energiaData.expiring30}</p>
-              <p className="mt-1 text-xs text-gray-400">contatti con tag &quot;In Scadenza&quot;</p>
-            </div>
           </div>
         </section>
       )}
@@ -574,8 +612,8 @@ export default async function CrmDashboard({
                 <tr className="border-b border-gray-100 bg-gray-50/50">
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-widest text-gray-400">Collaboratore</th>
                   <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-widest text-gray-400">Contatti</th>
-                  {contactFilters.map((tag) => (
-                    <th key={tag} className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-widest text-gray-400 capitalize">{tag}</th>
+                  {categories.map((cat) => (
+                    <th key={cat.slug} className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-widest text-gray-400">{cat.label}</th>
                   ))}
                 </tr>
               </thead>
@@ -594,8 +632,8 @@ export default async function CrmDashboard({
                       </div>
                     </td>
                     <td className="px-5 py-3 text-right font-bold tabular-nums text-gray-900">{op.count}</td>
-                    {contactFilters.map((tag) => (
-                      <td key={tag} className="px-5 py-3 text-right tabular-nums text-gray-600">{op.tagCounts[tag] ?? 0}</td>
+                    {categories.map((cat) => (
+                      <td key={cat.slug} className="px-5 py-3 text-right tabular-nums text-gray-600">{op.categoryCounts[cat.label] ?? 0}</td>
                     ))}
                   </tr>
                 ))}
@@ -605,9 +643,9 @@ export default async function CrmDashboard({
                   <td className="px-5 py-3 text-right tabular-nums text-gray-900">
                     {operatorCounts.filter((o) => !o.isAdmin).reduce((s, o) => s + o.count, 0)}
                   </td>
-                  {contactFilters.map((tag) => (
-                    <td key={tag} className="px-5 py-3 text-right tabular-nums text-gray-900">
-                      {operatorCounts.filter((o) => !o.isAdmin).reduce((s, o) => s + (o.tagCounts[tag] ?? 0), 0)}
+                  {categories.map((cat) => (
+                    <td key={cat.slug} className="px-5 py-3 text-right tabular-nums text-gray-900">
+                      {operatorCounts.filter((o) => !o.isAdmin).reduce((s, o) => s + (o.categoryCounts[cat.label] ?? 0), 0)}
                     </td>
                   ))}
                 </tr>

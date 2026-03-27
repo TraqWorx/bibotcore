@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 import { runDesignInstaller } from '@/lib/designInstaller/runDesignInstaller'
 import { provisionLocation } from '@/lib/ghl/provisionLocation'
-import { fetchGhlPlans } from '@/lib/ghl/getGhlPlans'
+import { syncSubscriptionsCore } from '@/lib/syncSubscriptions'
 
 async function assertSuperAdmin() {
   const authClient = await createAuthClient()
@@ -92,15 +92,8 @@ export async function getGhlOAuthUrl(
   if (!clientId || !redirectUri) {
     return { error: 'GHL OAuth not configured (missing GHL_CLIENT_ID or GHL_REDIRECT_URI)' }
   }
-  const scope = process.env.GHL_SCOPES ??
-    'contacts.readonly contacts.write opportunities.readonly opportunities.write ' +
-    'calendars.readonly calendars.write calendars/events.readonly calendars/events.write ' +
-    'calendars/groups.readonly calendars/groups.write ' +
-    'conversations.readonly conversations.write conversations/message.readonly conversations/message.write ' +
-    'locations.readonly locations.write locations/customFields.readonly locations/customFields.write ' +
-    'locations/customValues.readonly locations/customValues.write ' +
-    'locations/tags.readonly locations/tags.write ' +
-    'users.readonly forms.readonly forms.write medias.readonly medias.write products.readonly products.write'
+  const { GHL_SCOPES } = await import('@/lib/ghl/scopes')
+  const scope = process.env.GHL_SCOPES ?? GHL_SCOPES
   const versionId = process.env.GHL_APP_VERSION_ID ?? ''
   const state = `${designSlug}|admin`
   // Build URL manually to avoid URLSearchParams encoding slashes in scope names
@@ -110,110 +103,10 @@ export async function getGhlOAuthUrl(
   return { url }
 }
 
-const GHL_BASE = 'https://services.leadconnectorhq.com'
-
 export async function syncLocationSubscriptions(): Promise<{ synced: number; error?: string }> {
   try {
     await assertSuperAdmin()
-    const supabase = createAdminClient()
-    const token = process.env.GHL_AGENCY_TOKEN
-    const companyId = process.env.GHL_COMPANY_ID
-    if (!token) return { synced: 0, error: 'GHL_AGENCY_TOKEN not set' }
-
-    // Step 1: Sync plan prices from GHL into ghl_plans table
-    const { plans } = await fetchGhlPlans(token, companyId)
-    for (const plan of plans) {
-      const row: Record<string, unknown> = { ghl_plan_id: plan.id, name: plan.name }
-      if (plan.priceMonthly != null) row.price_monthly = plan.priceMonthly
-      await supabase.from('ghl_plans').upsert(row, { onConflict: 'ghl_plan_id' })
-    }
-
-    // Step 2: Fetch all GHL locations (search gives us IDs)
-    const searchRes = await fetch(
-      `${GHL_BASE}/locations/search?limit=100${companyId ? `&companyId=${companyId}` : ''}`,
-      { headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' }, cache: 'no-store' }
-    )
-    const searchData = searchRes.ok ? await searchRes.json() : null
-    const locationIds: string[] = (searchData?.locations ?? []).map((l: { id: string }) => l.id).filter(Boolean)
-
-    if (locationIds.length === 0) {
-      revalidatePath('/admin/locations')
-      return { synced: 0, error: 'No locations found in GHL' }
-    }
-
-    // Step 3: Fetch each location individually (search strips saasSettings — individual GET has it)
-    const details = await Promise.all(
-      locationIds.map(async (id) => {
-        try {
-          const res = await fetch(`${GHL_BASE}/locations/${id}`, {
-            headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
-            cache: 'no-store',
-          })
-          if (!res.ok) {
-            console.warn(`[syncSubs] GET /locations/${id} status=${res.status}`)
-            return null
-          }
-          const data = await res.json()
-          const loc = data?.location ?? data
-          const saasSettings = loc?.settings?.saasSettings
-          const saasPlanId: string | null = saasSettings?.saasPlanId ?? null
-          const subscriptionStatus: string | null = saasSettings?.planDetails?.subscriptionStatus ?? null
-          const isActive = subscriptionStatus !== 'canceled' && subscriptionStatus !== 'cancelled'
-          const name: string = loc?.name ?? ''
-          const dateAdded: string | null =
-            loc?.dateAdded ?? loc?.date_added ?? loc?.createdAt ?? loc?.created_at ?? null
-          return { id, name, saasPlanId: isActive ? saasPlanId : null, lastPlanId: saasPlanId, dateAdded, canceled: !isActive }
-        } catch {
-          return null
-        }
-      })
-    )
-
-    // Step 4: Upsert into locations table with ghl_plan_id
-    let synced = 0
-    for (const detail of details) {
-      if (!detail) continue
-      const base: Record<string, unknown> = {
-        location_id: detail.id,
-        name: detail.name,
-        ...(detail.dateAdded ? { ghl_date_added: detail.dateAdded } : {}),
-      }
-      // Check current state to detect subscription changes
-      const { data: existing } = await supabase
-        .from('locations')
-        .select('ghl_plan_id, subscribed_at, churned_at')
-        .eq('location_id', detail.id)
-        .maybeSingle()
-
-      if (detail.saasPlanId) {
-        // Active subscription
-        const updates: Record<string, unknown> = { ...base, ghl_plan_id: detail.saasPlanId }
-        if (!existing?.subscribed_at) {
-          updates.subscribed_at = detail.dateAdded ?? new Date().toISOString()
-        }
-        updates.churned_at = null
-        const { error } = await supabase
-          .from('locations')
-          .upsert(updates, { onConflict: 'location_id' })
-        if (!error) synced++
-      } else if (detail.canceled && detail.lastPlanId) {
-        // Canceled subscription — keep plan ID for revenue, mark as churned
-        const updates: Record<string, unknown> = { ...base, ghl_plan_id: detail.lastPlanId }
-        if (!existing?.subscribed_at) {
-          updates.subscribed_at = detail.dateAdded ?? new Date().toISOString()
-        }
-        if (!existing?.churned_at) {
-          updates.churned_at = new Date().toISOString()
-        }
-        await supabase.from('locations').upsert(updates, { onConflict: 'location_id' })
-      } else {
-        // No plan at all
-        await supabase.from('locations').upsert(base, { onConflict: 'location_id' })
-      }
-    }
-    revalidatePath('/admin/locations')
-    revalidatePath('/admin/plan-mapping')
-    return { synced }
+    return await syncSubscriptionsCore()
   } catch (err) {
     return { synced: 0, error: err instanceof Error ? err.message : 'Failed to sync' }
   }

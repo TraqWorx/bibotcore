@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { GHL_SCOPES } from '@/lib/ghl/scopes'
 
 export async function GET(req: NextRequest) {
   const packageSlug = req.nextUrl.searchParams.get('packageSlug')
@@ -7,25 +8,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Missing packageSlug' }, { status: 400 })
   }
 
-  const scopes = [
-    'contacts.readonly',
-    'contacts.write',
-    'opportunities.readonly',
-    'opportunities.write',
-    'calendars.readonly',
-    'calendars.write',
-    'calendars/events.readonly',
-    'calendars/events.write',
-    'conversations.readonly',
-    'conversations.write',
-    'conversations/message.readonly',
-    'conversations/message.write',
-    'locations.readonly',
-    'locations.write',
-    'locations/customFields.readonly',
-    'locations/customFields.write',
-    'users.readonly',
-  ].join(' ')
+  const scopes = GHL_SCOPES
 
   // Build URL manually to avoid URLSearchParams encoding slashes in scopes
   const params = new URLSearchParams({

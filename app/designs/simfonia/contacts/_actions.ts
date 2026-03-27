@@ -195,6 +195,7 @@ export async function updateContact(
     revalidatePath('/designs/simfonia/dashboard')
     return {}
   } catch (err) {
+    console.error('[updateContact] FAILED:', err instanceof Error ? err.message : err)
     return { error: err instanceof Error ? err.message : 'Errore nel salvataggio' }
   }
 }

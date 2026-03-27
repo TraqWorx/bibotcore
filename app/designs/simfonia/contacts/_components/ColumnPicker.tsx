@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveContactColumns, type ContactColumn } from '../../settings/_actions'
+import { parseFieldCategory, isHiddenCategory, SHARED_CATEGORIES, getCategoriaField } from '@/lib/utils/categoryFields'
 
 // All standard GHL contact fields
 const ALL_STANDARD_FIELDS: { key: string; label: string }[] = [
@@ -30,21 +31,32 @@ const ALL_STANDARD_FIELDS: { key: string; label: string }[] = [
 interface GhlCustomField {
   id: string
   name: string
+  dataType?: string
+  fieldKey?: string
+  placeholder?: string
+  picklistOptions?: string[]
 }
 
 interface Props {
   locationId: string
   savedColumns: ContactColumn[]
   customFields: GhlCustomField[]
+  /** When set, only show custom fields matching this category label (+ Anagrafica). When null, show all. */
+  activeCategoryLabel?: string | null
 }
 
-export default function ColumnPicker({ locationId, savedColumns, customFields }: Props) {
+export default function ColumnPicker({ locationId, savedColumns, customFields, activeCategoryLabel }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [columns, setColumns] = useState<ContactColumn[]>(savedColumns)
   const [saving, setSaving] = useState(false)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+
+  // Sync columns when savedColumns change (e.g. switching category)
+  useEffect(() => {
+    setColumns(savedColumns)
+  }, [savedColumns])
 
   // Close on click outside
   useEffect(() => {
@@ -108,7 +120,7 @@ export default function ColumnPicker({ locationId, savedColumns, customFields }:
 
   async function handleSave() {
     setSaving(true)
-    await saveContactColumns(locationId, columns)
+    await saveContactColumns(locationId, columns, activeCategoryLabel ?? null)
     setSaving(false)
     setOpen(false)
     router.refresh()
@@ -205,30 +217,111 @@ export default function ColumnPicker({ locationId, savedColumns, customFields }:
               })}
             </div>
 
-            {customFields.length > 0 && (
-              <>
-                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-300">Campi personalizzati</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {customFields.map((cf) => {
-                    const selected = selectedKeys.has(cf.id)
-                    return (
-                      <button
-                        key={cf.id}
-                        type="button"
-                        onClick={() => toggle(cf.id, cf.name, 'custom')}
-                        className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all ${
-                          selected
-                            ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.08)] text-[#2A00CC]'
-                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'
-                        }`}
-                      >
-                        {selected ? '✓ ' : '+ '}{cf.name}
-                      </button>
-                    )
-                  })}
+            {/* Categoria column — only when viewing all categories */}
+            {!activeCategoryLabel && (() => {
+              const catField = getCategoriaField(customFields as { id: string; name: string; dataType: string; fieldKey: string }[])
+              if (!catField) return null
+              const selected = selectedKeys.has(catField.id)
+              return (
+                <div className="mb-3">
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-300">Categoria</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => toggle(catField.id, 'Categoria', 'custom')}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all ${
+                        selected
+                          ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.08)] text-[#2A00CC]'
+                          : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {selected ? '✓ ' : '+ '}Categoria
+                    </button>
+                  </div>
                 </div>
-              </>
-            )}
+              )
+            })()}
+
+            {customFields.length > 0 && (() => {
+              // Filter custom fields by active category if set
+              const visibleCf = activeCategoryLabel
+                ? customFields.filter((cf) => {
+                    const { category } = parseFieldCategory(cf.name)
+                    if (!category) return true
+                    if (SHARED_CATEGORIES.includes(category)) return true
+                    return (
+                      category === activeCategoryLabel ||
+                      activeCategoryLabel.startsWith(category) ||
+                      category.startsWith(activeCategoryLabel)
+                    )
+                  })
+                : customFields
+
+              if (visibleCf.length === 0) return null
+
+              // Group by category when showing all categories
+              if (!activeCategoryLabel) {
+                const groups = new Map<string, typeof visibleCf>()
+                for (const cf of visibleCf) {
+                  const { category } = parseFieldCategory(cf.name)
+                  const key = category ?? 'Altro'
+                  if (isHiddenCategory(key)) continue
+                  if (!groups.has(key)) groups.set(key, [])
+                  groups.get(key)!.push(cf)
+                }
+                return Array.from(groups.entries()).map(([groupName, fields]) => (
+                  <div key={groupName} className="mb-2">
+                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-300">{groupName}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {fields.map((cf) => {
+                        const selected = selectedKeys.has(cf.id)
+                        const { displayName } = parseFieldCategory(cf.name)
+                        return (
+                          <button
+                            key={cf.id}
+                            type="button"
+                            onClick={() => toggle(cf.id, displayName, 'custom')}
+                            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all ${
+                              selected
+                                ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.08)] text-[#2A00CC]'
+                                : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                            }`}
+                          >
+                            {selected ? '✓ ' : '+ '}{displayName}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))
+              }
+
+              return (
+                <>
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-300">Campi personalizzati</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {visibleCf.map((cf) => {
+                      const selected = selectedKeys.has(cf.id)
+                      const { displayName } = parseFieldCategory(cf.name)
+                      return (
+                        <button
+                          key={cf.id}
+                          type="button"
+                          onClick={() => toggle(cf.id, displayName, 'custom')}
+                          className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all ${
+                            selected
+                              ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.08)] text-[#2A00CC]'
+                              : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >
+                          {selected ? '✓ ' : '+ '}{displayName}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )
+            })()}
           </div>
 
           {/* Save */}

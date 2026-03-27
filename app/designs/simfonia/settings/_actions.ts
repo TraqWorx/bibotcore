@@ -83,27 +83,58 @@ export interface ContactColumn {
   type: 'standard' | 'custom'
 }
 
-export async function getContactColumns(locationId: string): Promise<ContactColumn[]> {
+export async function getContactColumns(locationId: string, categoryKey?: string | null): Promise<ContactColumn[]> {
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('location_settings')
     .select('contact_columns')
     .eq('location_id', locationId)
     .single()
-  const cols = (data as { contact_columns?: ContactColumn[] } | null)?.contact_columns
-  return Array.isArray(cols) && cols.length > 0 ? cols : []
+  const raw = (data as { contact_columns?: unknown } | null)?.contact_columns
+  // Legacy format: plain array → treat as "_default"
+  if (Array.isArray(raw)) {
+    return categoryKey ? [] : (raw as ContactColumn[])
+  }
+  // New format: { "_default": [...], "Telefonia": [...] }
+  if (raw && typeof raw === 'object') {
+    const map = raw as Record<string, ContactColumn[]>
+    const key = categoryKey ?? '_default'
+    const cols = map[key]
+    return Array.isArray(cols) ? cols : []
+  }
+  return []
 }
 
 export async function saveContactColumns(
   locationId: string,
-  columns: ContactColumn[]
+  columns: ContactColumn[],
+  categoryKey?: string | null
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
   const supabase = createAdminClient()
+  const key = categoryKey ?? '_default'
+
+  // Read existing to merge
+  const { data: existing } = await supabase
+    .from('location_settings')
+    .select('contact_columns')
+    .eq('location_id', locationId)
+    .single()
+
+  let map: Record<string, ContactColumn[]> = {}
+  const raw = (existing as { contact_columns?: unknown } | null)?.contact_columns
+  if (Array.isArray(raw)) {
+    // Migrate legacy array to new format
+    map._default = raw as ContactColumn[]
+  } else if (raw && typeof raw === 'object') {
+    map = { ...(raw as Record<string, ContactColumn[]>) }
+  }
+  map[key] = columns
+
   const { error } = await supabase
     .from('location_settings')
     .upsert(
-      { location_id: locationId, contact_columns: columns, updated_at: new Date().toISOString() },
+      { location_id: locationId, contact_columns: map, updated_at: new Date().toISOString() },
       { onConflict: 'location_id' }
     )
   if (error) return { error: error.message }
@@ -233,6 +264,44 @@ export async function saveHiddenTags(
     )
   if (error) return { error: error.message }
   return {}
+}
+
+// ─── Category Tags ────────────────────────────────────────────────────────
+
+export async function getCategoryTags(locationId: string): Promise<Record<string, string[]>> {
+  try {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase
+      .from('location_settings')
+      .select('category_tags')
+      .eq('location_id', locationId)
+      .single()
+    if (error) return {}
+    const tags = (data as { category_tags?: Record<string, string[]> } | null)?.category_tags
+    return tags && typeof tags === 'object' ? tags : {}
+  } catch {
+    return {}
+  }
+}
+
+export async function saveCategoryTags(
+  locationId: string,
+  categoryTags: Record<string, string[]>
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  try {
+    const supabase = createAdminClient()
+    const { error } = await supabase
+      .from('location_settings')
+      .upsert(
+        { location_id: locationId, category_tags: categoryTags, updated_at: new Date().toISOString() },
+        { onConflict: 'location_id' }
+      )
+    if (error) return { error: error.message }
+    return {}
+  } catch {
+    return { error: 'Colonna category_tags non disponibile. Eseguire la migrazione 045.' }
+  }
 }
 
 // ─── Gare Mensili ──────────────────────────────────────────────────────────

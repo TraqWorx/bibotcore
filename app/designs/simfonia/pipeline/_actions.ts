@@ -53,13 +53,14 @@ export async function getDealData(dealId: string, locationId: string) {
         if (conversation?.id) {
           try {
             const msgData = await ghl.conversations.messages(conversation.id)
-            messages = msgData?.messages ?? []
+            const rawMsgs = msgData?.messages
+            messages = Array.isArray(rawMsgs) ? rawMsgs : []
           } catch { /* ignore */ }
         }
       }
-      if (notesData.status === 'fulfilled') notes = notesData.value?.notes ?? []
-      if (tasksData.status === 'fulfilled') tasks = tasksData.value?.tasks ?? []
-      if (apptData.status === 'fulfilled') appointments = apptData.value?.events ?? []
+      if (notesData.status === 'fulfilled') { const r = notesData.value?.notes; notes = Array.isArray(r) ? r : [] }
+      if (tasksData.status === 'fulfilled') { const r = tasksData.value?.tasks; tasks = Array.isArray(r) ? r : [] }
+      if (apptData.status === 'fulfilled') { const r = apptData.value?.events; appointments = Array.isArray(r) ? r : [] }
     }
 
     return { opportunity, contact, conversation, messages, notes, tasks, appointments }

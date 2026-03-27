@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
-import { runAutomations } from '@/lib/automations/runAutomations'
 import { runDesignInstaller } from '@/lib/designInstaller/runDesignInstaller'
 import { provisionLocation } from '@/lib/ghl/provisionLocation'
 
@@ -9,7 +8,7 @@ import { provisionLocation } from '@/lib/ghl/provisionLocation'
  * Receives inbound GHL webhook events.
  * - location.created: full auto-provision (connection + install + users)
  * - UserDeleted / user.deleted: delete the user from the platform
- * - all events: persisted to ghl_webhook_events and run through automation engine
+ * - all events: persisted to ghl_webhook_events
  */
 export async function POST(req: Request) {
   let body: Record<string, unknown>
@@ -90,11 +89,6 @@ export async function POST(req: Request) {
     console.error('[ghl-webhook] Failed to persist event:', error.message)
     return NextResponse.json({ ok: false })
   }
-
-  // ── Fire automation engine (non-blocking) ────────────────────────────────
-  runAutomations(locationId, eventType, body, event.id).catch((err) =>
-    console.error('[ghl-webhook] runAutomations failed:', err)
-  )
 
   return NextResponse.json({ ok: true })
 }

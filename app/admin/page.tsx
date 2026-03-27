@@ -4,10 +4,19 @@ import LocationChart from './_components/LocationChart'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
-function monthsSince(iso: string, until?: string): number {
+function paymentsMade(iso: string, until?: string): number {
   const start = new Date(iso)
   const end = until ? new Date(until) : new Date()
-  return Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1)
+  // Count how many billing cycles have occurred (payment on creation day each month)
+  const billingDay = start.getDate()
+  let payments = 0
+  const cursor = new Date(start)
+  while (cursor <= end) {
+    payments++
+    cursor.setMonth(cursor.getMonth() + 1)
+    cursor.setDate(billingDay)
+  }
+  return Math.max(1, payments)
 }
 
 interface GhlLocation {
@@ -147,7 +156,7 @@ export default async function AdminPage() {
     if (!planId || !startDate) continue
     const price = planInfoById[planId]?.price
     if (price == null) continue
-    const months = monthsSince(startDate, r.churned_at ?? undefined)
+    const months = paymentsMade(startDate, r.churned_at ?? undefined)
     totalRevenue += price * months
   }
 

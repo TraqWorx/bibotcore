@@ -99,7 +99,7 @@ export async function provisionLocation(
   console.log(`[provisionLocation] done for ${locationId} (${locationName}) with design ${designSlug}`)
 }
 
-async function syncLocationUsers(
+export async function syncLocationUsers(
   locationId: string,
   companyId: string,
   accessToken: string,

@@ -2,14 +2,22 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase-server'
 import LoginAsButton from './_components/LoginAsButton'
+import ModuleToggles from './_components/ModuleToggles'
+import { DEFAULT_MODULES } from '@/lib/types/design'
+import type { DesignModules } from '@/lib/types/design'
 
-function monthsSince(iso: string): number {
+function paymentsMade(iso: string): number {
   const start = new Date(iso)
-  const now = new Date()
-  return Math.max(
-    1,
-    (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()) + 1,
-  )
+  const end = new Date()
+  const billingDay = start.getDate()
+  let payments = 0
+  const cursor = new Date(start)
+  while (cursor <= end) {
+    payments++
+    cursor.setMonth(cursor.getMonth() + 1)
+    cursor.setDate(billingDay)
+  }
+  return Math.max(1, payments)
 }
 
 function formatDate(iso: string) {
@@ -69,6 +77,19 @@ export default async function LocationDetailPage({
 
   if (!location) notFound()
 
+  // Design modules + location overrides
+  let designModules: Record<string, { enabled: boolean }> = {}
+  let locationModuleOverrides: Record<string, { enabled: boolean }> = {}
+
+  if (install?.design_slug) {
+    const [{ data: design }, { data: locSettings }] = await Promise.all([
+      supabase.from('designs').select('modules').eq('slug', install.design_slug).single(),
+      supabase.from('location_design_settings').select('module_overrides').eq('location_id', locationId).single(),
+    ])
+    designModules = (design?.modules as Partial<DesignModules> ?? DEFAULT_MODULES) as Record<string, { enabled: boolean }>
+    locationModuleOverrides = (locSettings?.module_overrides as Record<string, { enabled: boolean }>) ?? {}
+  }
+
   // Plan data
   let planName: string | null = null
   let priceMonthly: number | null = null
@@ -83,7 +104,7 @@ export default async function LocationDetailPage({
   }
 
   const subscriptionStart = (location as { ghl_date_added?: string | null }).ghl_date_added ?? null
-  const months = subscriptionStart ? monthsSince(subscriptionStart) : 0
+  const months = subscriptionStart ? paymentsMade(subscriptionStart) : 0
   const totalPaid = priceMonthly != null ? priceMonthly * months : null
 
   return (
@@ -239,6 +260,21 @@ export default async function LocationDetailPage({
               </dd>
             </div>
           </dl>
+        </div>
+      )}
+
+      {/* Module overrides */}
+      {install?.design_slug && (
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="mb-1">
+            <h2 className="text-sm font-semibold text-gray-800">Modules</h2>
+            <p className="text-xs text-gray-400">Enable or disable features for this location. Overrides the design defaults.</p>
+          </div>
+          <ModuleToggles
+            locationId={locationId}
+            designModules={designModules}
+            locationOverrides={locationModuleOverrides}
+          />
         </div>
       )}
     </div>

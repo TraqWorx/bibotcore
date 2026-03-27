@@ -24,22 +24,13 @@ export default async function PipelinePage({
 
   try {
     const [opportunitiesData, pipelinesData] = await Promise.all([
-      ghl.opportunities.list(),
-      ghl.pipelines.list(),
+      ghl.opportunities.list().catch(() => null),
+      ghl.pipelines.list().catch(() => null),
     ])
     pipelines = pipelinesData?.pipelines ?? []
     opportunities = opportunitiesData?.opportunities ?? []
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.includes('401') || msg.includes('not authorized')) {
-      return (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-10 text-center">
-          <p className="text-sm font-medium text-amber-800">Token GHL non autorizzato per questa funzione.</p>
-          <p className="mt-1 text-xs text-amber-600">Riconnetti la location con gli scope aggiornati.</p>
-        </div>
-      )
-    }
-    throw err
+  } catch {
+    // Silently handle — empty arrays are the fallback
   }
 
   return (

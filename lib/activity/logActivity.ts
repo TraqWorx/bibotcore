@@ -1,5 +1,4 @@
 import { createAdminClient } from '@/lib/supabase-server'
-import { runAutomations, type AutomationTrigger } from '@/lib/automations/runAutomations'
 
 export type ActivityType =
   | 'deal.created'
@@ -8,14 +7,6 @@ export type ActivityType =
   | 'appointment.created'
   | 'message.sent'
   | 'message.received'
-
-const TRIGGER_MAP: Partial<Record<ActivityType, AutomationTrigger>> = {
-  'contact.created':     'contact_created',
-  'deal.created':        'deal_created',
-  'deal.stage_changed':  'deal_stage_changed',
-  'appointment.created': 'appointment_created',
-  'message.received':    'message_received',
-}
 
 export async function logActivity(
   locationId: string,
@@ -32,12 +23,4 @@ export async function logActivity(
     entity_id: entityId,
     data,
   })
-
-  // Fire-and-forget: run matching automations
-  const trigger = TRIGGER_MAP[type]
-  if (trigger) {
-    runAutomations(locationId, trigger, { ...data, entityId }).catch(
-      (err) => console.error('runAutomations failed:', err)
-    )
-  }
 }

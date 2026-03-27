@@ -11,7 +11,6 @@ const MODULE_NAV = [
   { key: 'conversations',  label: 'Conversazioni', path: '/designs/simfonia/conversations' },
   { key: 'pipeline',       label: 'Pipeline',       path: '/designs/simfonia/pipeline' },
   { key: 'calendar',    label: 'Calendario',   path: '/designs/simfonia/calendar' },
-  { key: 'automations', label: 'Automazioni',  path: '/designs/simfonia/automations' },
   { key: 'settings',    label: 'Impostazioni', path: '/designs/simfonia/settings' },
 ] as const
 

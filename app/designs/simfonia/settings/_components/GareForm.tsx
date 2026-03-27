@@ -7,24 +7,24 @@ interface Props {
   locationId: string
   month: string // 'YYYY-MM-01'
   initialRows: GaraRow[]
-  ghlTags: string[]
+  gestoriOptions: string[]
 }
 
-export default function GareForm({ locationId, month, initialRows, ghlTags }: Props) {
+export default function GareForm({ locationId, month, initialRows, gestoriOptions }: Props) {
   const [rows, setRows] = useState<GaraRow[]>(initialRows)
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
 
-  // Tags already used in rows
-  const usedTags = new Set(rows.map((r) => r.tag.toLowerCase()))
+  // Gestori already used in rows
+  const usedGestori = new Set(rows.map((r) => r.tag.toLowerCase()))
 
   function updateObiettivo(index: number, value: number) {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, obiettivo: value } : r)))
   }
 
-  function addTag(tag: string) {
-    if (!tag || usedTags.has(tag.toLowerCase())) return
-    setRows((prev) => [...prev, { categoria: tag, tag: tag.toLowerCase(), obiettivo: 0 }])
+  function addGestore(gestore: string) {
+    if (!gestore || usedGestori.has(gestore.toLowerCase())) return
+    setRows((prev) => [...prev, { categoria: gestore, tag: gestore.toLowerCase(), obiettivo: 0 }])
   }
 
   function removeRow(index: number) {
@@ -48,8 +48,8 @@ export default function GareForm({ locationId, month, initialRows, ghlTags }: Pr
     year: 'numeric',
   })
 
-  // Available tags = GHL tags not already added
-  const availableTags = ghlTags.filter((t) => !usedTags.has(t.toLowerCase()))
+  // Available gestori = options not already added
+  const availableGestori = gestoriOptions.filter((g) => !usedGestori.has(g.toLowerCase()))
 
   return (
     <div className="space-y-4">
@@ -63,7 +63,7 @@ export default function GareForm({ locationId, month, initialRows, ghlTags }: Pr
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Tag
+                  Gestore
                 </th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                   Obiettivo
@@ -75,7 +75,7 @@ export default function GareForm({ locationId, month, initialRows, ghlTags }: Pr
               {rows.map((row, i) => (
                 <tr key={row.tag} className="hover:bg-gray-50/50">
                   <td className="px-4 py-2.5">
-                    <span className="inline-flex items-center rounded-full border border-[rgba(42,0,204,0.2)] bg-[rgba(42,0,204,0.05)] px-3 py-1 text-xs font-semibold capitalize" style={{ color: '#2A00CC' }}>
+                    <span className="inline-flex items-center rounded-full border border-[rgba(42,0,204,0.2)] bg-[rgba(42,0,204,0.05)] px-3 py-1 text-xs font-semibold" style={{ color: '#2A00CC' }}>
                       {row.categoria}
                     </span>
                   </td>
@@ -105,8 +105,8 @@ export default function GareForm({ locationId, month, initialRows, ghlTags }: Pr
         </div>
       )}
 
-      {/* Add tag selector */}
-      <TagSelector availableTags={availableTags} onSelect={addTag} />
+      {/* Add gestore selector */}
+      <GestoreSelector availableGestori={availableGestori} onSelect={addGestore} />
 
       {message && (
         <p className={`text-sm font-medium ${message.error ? 'text-red-600' : 'text-green-600'}`}>
@@ -127,16 +127,16 @@ export default function GareForm({ locationId, month, initialRows, ghlTags }: Pr
   )
 }
 
-function TagSelector({ availableTags, onSelect }: { availableTags: string[]; onSelect: (tag: string) => void }) {
+function GestoreSelector({ availableGestori, onSelect }: { availableGestori: string[]; onSelect: (g: string) => void }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
 
   const filtered = query.trim()
-    ? availableTags.filter((t) => t.toLowerCase().includes(query.toLowerCase()))
-    : availableTags
+    ? availableGestori.filter((g) => g.toLowerCase().includes(query.toLowerCase()))
+    : availableGestori
 
-  function select(tag: string) {
-    onSelect(tag)
+  function select(gestore: string) {
+    onSelect(gestore)
     setQuery('')
     setOpen(false)
   }
@@ -156,22 +156,22 @@ function TagSelector({ availableTags, onSelect }: { availableTags: string[]; onS
             }
             if (e.key === 'Escape') setOpen(false)
           }}
-          placeholder="Cerca tag per aggiungere gara..."
+          placeholder="Cerca gestore per aggiungere gara..."
           className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-all"
         />
       </div>
 
       {open && filtered.length > 0 && (
         <div className="absolute left-0 right-0 z-10 mt-1 max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
-          {filtered.map((tag) => (
+          {filtered.map((g) => (
             <button
-              key={tag}
+              key={g}
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => select(tag)}
-              className="flex w-full items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 capitalize transition-colors"
+              onClick={() => select(g)}
+              className="flex w-full items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              {tag}
+              {g}
             </button>
           ))}
         </div>
@@ -179,7 +179,7 @@ function TagSelector({ availableTags, onSelect }: { availableTags: string[]; onS
 
       {open && query && filtered.length === 0 && (
         <div className="absolute left-0 right-0 z-10 mt-1 rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
-          <p className="text-xs text-gray-400">Nessun tag trovato per &quot;{query}&quot;</p>
+          <p className="text-xs text-gray-400">Nessun gestore trovato per &quot;{query}&quot;</p>
         </div>
       )}
     </div>

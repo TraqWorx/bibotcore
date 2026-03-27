@@ -3,7 +3,7 @@ import { refreshIfNeeded } from './refreshIfNeeded'
 
 /**
  * Fetches a valid GHL access token for a location using the service-role client.
- * Used server-side without a user session (e.g. automation runner, getGhlClient).
+ * Used server-side without a user session (e.g. webhooks, getGhlClient).
  */
 export async function getGhlTokenForLocation(locationId: string): Promise<string> {
   const supabase = createAdminClient()

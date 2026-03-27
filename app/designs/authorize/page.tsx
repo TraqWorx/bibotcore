@@ -28,12 +28,8 @@ export default async function AuthorizePage({
   const designSlug = install?.design_slug ?? 'simfonia'
 
   // Build the OAuth URL — avoid URLSearchParams for scope to preserve slashes
-  const scope =
-    'contacts.readonly contacts.write opportunities.readonly opportunities.write ' +
-    'calendars.readonly calendars.write calendars/events.readonly calendars/events.write ' +
-    'conversations.readonly conversations.write conversations/message.readonly conversations/message.write ' +
-    'locations.readonly locations.write locations/customFields.readonly locations/customFields.write ' +
-    'users.readonly'
+  const { GHL_SCOPES } = await import('@/lib/ghl/scopes')
+  const scope = GHL_SCOPES
   const oauthParams = new URLSearchParams({
     response_type: 'code',
     redirect_uri: process.env.GHL_REDIRECT_URI!,

@@ -3,14 +3,19 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { DEFAULT_THEME, type DesignTheme } from '@/lib/types/design'
-import { getGareMensili, getContactFilters, getLocationTags, getProvvigioni, getUserAvailability } from './_actions'
+import { getCategoryTags, getGareMensili, getLocationTags, getProvvigioni, getUserAvailability } from './_actions'
+import {
+  discoverCategories,
+  getProviderField,
+  type CustomFieldDef,
+} from '@/lib/utils/categoryFields'
 import SettingsTabs from './_components/SettingsTabs'
 import TargetForm from './_components/TargetForm'
 import GareForm from './_components/GareForm'
-import ContactFiltersForm from './_components/ContactFiltersForm'
 import ProvvigioniForm from './_components/ProvvigioniForm'
 import AvailabilityForm from './_components/AvailabilityForm'
 import TagsManager from './_components/TagsManager'
+import CategoryTagsForm from './_components/CategoryTagsForm'
 import ThemeForm from './_components/ThemeForm'
 
 const BASE_URL = 'https://services.leadconnectorhq.com'
@@ -39,6 +44,39 @@ async function fetchGhlUsers(token: string, locationId: string): Promise<GhlUser
   }
 }
 
+async function fetchCustomFields(token: string, locationId: string): Promise<CustomFieldDef[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/locations/${locationId}/customFields`, {
+      headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
+      next: { revalidate: 300 },
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return ((data?.customFields ?? []) as CustomFieldDef[]).map((cf) => ({
+      id: cf.id,
+      name: cf.name,
+      fieldKey: cf.fieldKey ?? cf.id,
+      dataType: cf.dataType ?? 'TEXT',
+      placeholder: cf.placeholder,
+      picklistOptions: cf.picklistOptions,
+    }))
+  } catch {
+    return []
+  }
+}
+
+/** Collect all gestore picklist options across all categories */
+function getAllGestoreOptions(customFields: CustomFieldDef[], categories: { label: string }[]): string[] {
+  const allOptions = new Set<string>()
+  for (const cat of categories) {
+    const pf = getProviderField(customFields, cat.label)
+    if (pf?.picklistOptions) {
+      for (const opt of pf.picklistOptions) allOptions.add(opt)
+    }
+  }
+  return Array.from(allOptions).sort()
+}
+
 function getCurrentMonth(): string {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
@@ -58,7 +96,7 @@ export default async function SettingsPage({
   const currentMonth = getCurrentMonth()
   const token = await getGhlTokenForLocation(locationId).catch(() => null)
 
-  const [settingsRes, themeRes, gareRows, locationTags, contactFilters, provvigioniRows, availabilitySlots, ghlUsers] = await Promise.all([
+  const [settingsRes, themeRes, gareRows, locationTags, provvigioniRows, availabilitySlots, ghlUsers, customFields, categoryTagsMap] = await Promise.all([
     supabase
       .from('location_settings')
       .select('target_annuale')
@@ -71,13 +109,17 @@ export default async function SettingsPage({
       .single(),
     getGareMensili(locationId, currentMonth),
     getLocationTags(locationId),
-    getContactFilters(locationId),
     getProvvigioni(locationId),
     getUserAvailability(locationId),
     token ? fetchGhlUsers(token, locationId) : Promise.resolve([]),
+    token ? fetchCustomFields(token, locationId) : Promise.resolve([]),
+    getCategoryTags(locationId).catch(() => ({} as Record<string, string[]>)),
   ])
 
   const ghlTags = locationTags.map((t) => t.name)
+  const ghlTagsWithIds = locationTags.map((t) => ({ id: t.id, name: t.name }))
+  const categories = discoverCategories(customFields)
+  const gestoriOptions = getAllGestoreOptions(customFields, categories)
 
   const currentTarget = settingsRes.data?.target_annuale ?? 1900
   const overrides = (themeRes.data?.theme_overrides ?? {}) as Partial<DesignTheme>
@@ -87,21 +129,7 @@ export default async function SettingsPage({
       id: 'generale',
       label: 'Generale',
       content: (
-        <div className="space-y-6">
-          <TargetForm locationId={locationId} currentTarget={currentTarget} />
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-6">
-            <h2 className="text-base font-bold text-gray-800">Filtri Contatti</h2>
-            <p className="mt-1 mb-5 text-sm text-gray-500">
-              Scegli quali tag GHL mostrare come filtri rapidi nella pagina Contatti.
-            </p>
-            <ContactFiltersForm
-              locationId={locationId}
-              ghlTags={ghlTags}
-              selectedFilters={contactFilters}
-            />
-          </div>
-        </div>
+        <TargetForm locationId={locationId} currentTarget={currentTarget} />
       ),
     },
     {
@@ -121,6 +149,24 @@ export default async function SettingsPage({
       ),
     },
     {
+      id: 'categorie-tags',
+      label: 'Categorie & Tag',
+      content: (
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <h2 className="text-base font-bold text-gray-800">Tag per Categoria</h2>
+          <p className="mt-1 mb-5 text-sm text-gray-500">
+            Associa tag a ciascuna categoria. Solo i tag associati verranno mostrati nei filtri e nella creazione contatti.
+          </p>
+          <CategoryTagsForm
+            locationId={locationId}
+            categories={categories}
+            allTags={ghlTagsWithIds}
+            initialCategoryTags={categoryTagsMap}
+          />
+        </div>
+      ),
+    },
+    {
       id: 'gare',
       label: 'Gare',
       content: (
@@ -133,7 +179,7 @@ export default async function SettingsPage({
             locationId={locationId}
             month={currentMonth}
             initialRows={gareRows}
-            ghlTags={ghlTags}
+            gestoriOptions={gestoriOptions}
           />
         </div>
       ),

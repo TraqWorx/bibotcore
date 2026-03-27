@@ -11,6 +11,16 @@ import {
   type ContactDetail,
   type ConversationMessage,
 } from '../_actions'
+import {
+  isHiddenCategory,
+  parseFieldCategory,
+  discoverCategories,
+  getCategoriaField,
+  getDropdownFields,
+  getFieldsForCategory,
+  filterVisibleFields,
+  type CustomFieldDef,
+} from '@/lib/utils/categoryFields'
 
 const TAG_COLORS: Record<string, string> = {
   energia:      'bg-amber-50 text-amber-700',
@@ -24,24 +34,18 @@ const TAG_COLORS: Record<string, string> = {
   gas:          'bg-amber-50 text-amber-800',
 }
 
-interface CustomFieldDef {
-  id: string
-  name: string
-  fieldKey: string
-  dataType: string
-  placeholder?: string
-}
-
 interface Props {
   contactId: string | null
   locationId: string
   customFieldDefs?: CustomFieldDef[]
   availableTags?: string[]
+  categoryTags?: Record<string, string[]>
   initialTab?: 'info' | 'edit' | 'messages'
   onClose: () => void
+  onContactUpdated?: (contactId: string, data: Record<string, unknown>) => void
 }
 
-export default function ContactDrawer({ contactId, locationId, customFieldDefs = [], availableTags = [], initialTab = 'info', onClose }: Props) {
+export default function ContactDrawer({ contactId, locationId, customFieldDefs = [], availableTags = [], categoryTags = {}, initialTab = 'info', onClose, onContactUpdated }: Props) {
   const router = useRouter()
   const [contact, setContact] = useState<ContactDetail | null>(null)
   const [loading, setLoading] = useState(false)
@@ -177,37 +181,55 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
         .filter(([, v]) => v.trim() !== '')
         .map(([key, value]) => ({ id: key, field_value: value }))
 
-      const result = await updateContact(locationId, contactId, {
-        firstName: editData.firstName?.trim(),
-        lastName: editData.lastName?.trim(),
-        email: editData.email?.trim(),
-        phone: editData.phone?.trim(),
-        companyName: editData.companyName?.trim(),
-        tags: editTags,
-        ...(customFieldValues.length > 0 ? { customFields: customFieldValues } : {}),
-      })
+      // Only send non-empty optional fields — GHL rejects empty strings for email/phone
+      const payload: Record<string, unknown> = { tags: editTags }
+      if (editData.firstName?.trim()) payload.firstName = editData.firstName.trim()
+      if (editData.lastName?.trim()) payload.lastName = editData.lastName.trim()
+      if (editData.email?.trim()) payload.email = editData.email.trim()
+      if (editData.phone?.trim()) payload.phone = editData.phone.trim()
+      if (editData.companyName?.trim()) payload.companyName = editData.companyName.trim()
+      if (customFieldValues.length > 0) payload.customFields = customFieldValues
+
+      const result = await updateContact(locationId, contactId, payload)
       if (result.error) {
         setEditResult(result.error)
       } else {
         setEditResult('Salvato!')
-        // Refresh contact data
-        const updated = await getContactDetail(locationId, contactId)
-        if (updated) {
-          setContact(updated)
-          setEditData({
-            firstName: updated.firstName ?? '',
-            lastName: updated.lastName ?? '',
-            email: updated.email ?? '',
-            phone: updated.phone ?? '',
-            companyName: updated.companyName ?? '',
-          })
-          setEditTags(updated.tags ?? [])
-          const cfMap: Record<string, string> = {}
-          for (const cf of updated.customFields ?? []) {
-            const val = cf.value ?? cf.field_value ?? cf.fieldValue ?? ''
-            if (val) cfMap[cf.id] = String(val)
+        // Optimistically update contact state from edit values so info tab reflects changes immediately
+        setContact((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            firstName: editData.firstName?.trim() || prev.firstName,
+            lastName: editData.lastName?.trim() || prev.lastName,
+            email: editData.email?.trim() || prev.email,
+            phone: editData.phone?.trim() || prev.phone,
+            companyName: editData.companyName?.trim() || prev.companyName,
+            tags: editTags,
+            customFields: Object.entries(editCfValues)
+              .filter(([, v]) => v.trim() !== '')
+              .map(([id, value]) => {
+                const def = customFieldDefs.find((d) => d.id === id)
+                return { id, value, field_value: value, fieldValue: value, name: def?.name ?? '', key: def?.fieldKey ?? id }
+              }),
           }
-          setEditCfValues(cfMap)
+        })
+        // Notify parent list to update the contact row immediately
+        if (onContactUpdated) {
+          onContactUpdated(contactId, {
+            firstName: editData.firstName?.trim(),
+            lastName: editData.lastName?.trim(),
+            email: editData.email?.trim(),
+            phone: editData.phone?.trim(),
+            companyName: editData.companyName?.trim(),
+            tags: editTags,
+            customFields: Object.entries(editCfValues)
+              .filter(([, v]) => v.trim() !== '')
+              .map(([id, value]) => {
+                const def = customFieldDefs.find((d) => d.id === id)
+                return { id, value, field_value: value, fieldValue: value, name: def?.name ?? '', key: def?.fieldKey ?? id }
+              }),
+          })
         }
         router.refresh()
         setTimeout(() => { setEditResult(null); setTab('info') }, 1500)
@@ -330,28 +352,48 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     </div>
                   )}
 
-                  {/* Custom fields */}
-                  {customFields.length > 0 && (
-                    <div>
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">
-                        Campi Personalizzati
-                      </p>
-                      <div className="divide-y divide-gray-50 rounded-xl border border-gray-100">
-                        {customFields.map((field) => {
-                          const val = field.value ?? field.field_value ?? field.fieldValue ?? ''
-                          const label = field.name ?? field.key ?? field.id
-                          return (
-                            <div key={field.id} className="flex items-center gap-3 px-4 py-2.5">
-                              <span className="w-36 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-gray-400 truncate">
-                                {label}
-                              </span>
-                              <span className="text-sm text-gray-800">{val}</span>
-                            </div>
-                          )
-                        })}
+                  {/* Custom fields — grouped by category */}
+                  {customFields.length > 0 && (() => {
+                    // Build a lookup from field ID to custom field def for display name parsing
+                    const defMap = new Map(customFieldDefs.map((d) => [d.id, d]))
+
+                    // Group non-empty fields by their parsed category
+                    const groups = new Map<string, typeof customFields>()
+                    for (const field of customFields) {
+                      const def = defMap.get(field.id)
+                      const { category } = parseFieldCategory(def?.name ?? field.name ?? '')
+                      const key = category ?? 'Altro'
+
+                      // Hide admin-only categories
+                      if (isHiddenCategory(key)) continue
+
+                      if (!groups.has(key)) groups.set(key, [])
+                      groups.get(key)!.push(field)
+                    }
+
+                    return Array.from(groups.entries()).map(([groupName, fields]) => (
+                      <div key={groupName}>
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">
+                          {groupName}
+                        </p>
+                        <div className="divide-y divide-gray-50 rounded-xl border border-gray-100">
+                          {fields.map((field) => {
+                            const val = field.value ?? field.field_value ?? field.fieldValue ?? ''
+                            const def = defMap.get(field.id)
+                            const { displayName } = parseFieldCategory(def?.name ?? field.name ?? field.key ?? field.id)
+                            return (
+                              <div key={field.id} className="flex items-center gap-3 px-4 py-2.5">
+                                <span className="w-36 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-gray-400 truncate">
+                                  {displayName}
+                                </span>
+                                <span className="text-sm text-gray-800">{val}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ))
+                  })()}
 
                   {/* Opportunities */}
                   {(contact.opportunities ?? []).length > 0 && (
@@ -430,6 +472,58 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     />
                   </div>
 
+                  {/* Categoria + Dropdown fields */}
+                  {(() => {
+                    const categories = discoverCategories(customFieldDefs)
+                    const categoriaField = getCategoriaField(customFieldDefs)
+                    const selectedCatLabel = categoriaField ? (editCfValues[categoriaField.id] ?? '') : ''
+                    const ddFields = selectedCatLabel
+                      ? getDropdownFields(customFieldDefs, selectedCatLabel)
+                      : []
+
+                    return (
+                      <div className="space-y-4 border-t border-gray-100 pt-4">
+                        {categoriaField && (
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">Categoria</label>
+                            <select
+                              className={inputClass}
+                              value={selectedCatLabel}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setEditCfValues((p) => ({ ...p, [categoriaField.id]: val }))
+                              }}
+                            >
+                              <option value="">Seleziona categoria...</option>
+                              {categories.map((cat) => (
+                                <option key={cat.slug} value={cat.label}>{cat.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        {ddFields.map((df) =>
+                          df.picklistOptions && df.picklistOptions.length > 0 ? (
+                            <div key={df.id}>
+                              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">
+                                {parseFieldCategory(df.name).displayName}
+                              </label>
+                              <select
+                                className={inputClass}
+                                value={editCfValues[df.id] ?? ''}
+                                onChange={(e) => setEditCfValues((p) => ({ ...p, [df.id]: e.target.value }))}
+                              >
+                                <option value="">Seleziona...</option>
+                                {df.picklistOptions.map((opt) => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : null
+                        )}
+                      </div>
+                    )
+                  })()}
+
                   {/* Tags */}
                   <div className="space-y-2 border-t border-gray-100 pt-4">
                     <label className="block text-xs font-semibold uppercase tracking-widest text-gray-400">Tag</label>
@@ -485,10 +579,17 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                         +
                       </button>
                     </div>
-                    {/* Available tag suggestions */}
-                    {availableTags.filter((t) => !editTags.includes(t) && (!newTag || t.toLowerCase().includes(newTag.toLowerCase()))).length > 0 && (
+                    {/* Available tag suggestions — filtered by category */}
+                    {(() => {
+                      const catField = getCategoriaField(customFieldDefs)
+                      const catLabel = catField ? (editCfValues[catField.id] ?? '') : ''
+                      const associated = catLabel ? (categoryTags[catLabel] ?? []) : []
+                      const filteredTags = associated.length > 0
+                        ? availableTags.filter((t) => associated.includes(t))
+                        : []
+                      return filteredTags.filter((t) => !editTags.includes(t) && (!newTag || t.toLowerCase().includes(newTag.toLowerCase()))).length > 0 ? (
                       <div className="flex flex-wrap gap-1">
-                        {availableTags
+                        {filteredTags
                           .filter((t) => !editTags.includes(t) && (!newTag || t.toLowerCase().includes(newTag.toLowerCase())))
                           .map((tag) => (
                             <button
@@ -506,51 +607,81 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                             </button>
                           ))}
                       </div>
-                    )}
+                    ) : null
+                    })()}
                   </div>
 
-                  {/* Custom Fields */}
-                  {customFieldDefs.length > 0 && (
-                    <div className="space-y-4 border-t border-gray-100 pt-4">
-                      <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-                        Campi Personalizzati
-                      </p>
-                      {customFieldDefs.map((cf) => (
-                        <div key={cf.id}>
-                          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">
-                            {cf.name}
-                          </label>
-                          {cf.dataType === 'CHECKBOX' ? (
-                            <label className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={editCfValues[cf.id] === 'true'}
-                                onChange={(e) => setEditCfValues((p) => ({ ...p, [cf.id]: e.target.checked ? 'true' : '' }))}
-                                className="h-4 w-4 rounded border-gray-300"
-                              />
-                              <span className="text-sm text-gray-600">{cf.name}</span>
-                            </label>
-                          ) : cf.dataType === 'LARGE_TEXT' || cf.dataType === 'TEXTAREA' ? (
-                            <textarea
-                              className={inputClass}
-                              rows={3}
-                              placeholder={cf.placeholder ?? cf.name}
-                              value={editCfValues[cf.id] ?? ''}
-                              onChange={(e) => setEditCfValues((p) => ({ ...p, [cf.id]: e.target.value }))}
-                            />
-                          ) : (
-                            <input
-                              type={cf.dataType === 'NUMBER' || cf.dataType === 'MONETARY' ? 'number' : cf.dataType === 'DATE' ? 'date' : 'text'}
-                              className={inputClass}
-                              placeholder={cf.placeholder ?? cf.name}
-                              value={editCfValues[cf.id] ?? ''}
-                              onChange={(e) => setEditCfValues((p) => ({ ...p, [cf.id]: e.target.value }))}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {/* Custom Fields — filtered by selected category */}
+                  {(() => {
+                    const catField = getCategoriaField(customFieldDefs)
+                    const selectedCatLabel = catField ? (editCfValues[catField.id] ?? '') : ''
+                    if (!selectedCatLabel) return null
+
+                    const ddFieldIds = new Set(
+                      getDropdownFields(customFieldDefs, selectedCatLabel).map((f) => f.id)
+                    )
+                    const filtered = filterVisibleFields(customFieldDefs, false)
+                    const catFields = getFieldsForCategory(filtered, selectedCatLabel)
+                      .filter((f) => !ddFieldIds.has(f.id))
+
+                    if (catFields.length === 0) return null
+
+                    return (
+                      <div className="space-y-4 border-t border-gray-100 pt-4">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                          Campi — {selectedCatLabel}
+                        </p>
+                        {catFields.map((cf) => {
+                          const { displayName } = parseFieldCategory(cf.name)
+                          return (
+                            <div key={cf.id}>
+                              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">
+                                {displayName}
+                              </label>
+                              {cf.dataType === 'CHECKBOX' ? (
+                                <label className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={editCfValues[cf.id] === 'true'}
+                                    onChange={(e) => setEditCfValues((p) => ({ ...p, [cf.id]: e.target.checked ? 'true' : '' }))}
+                                    className="h-4 w-4 rounded border-gray-300"
+                                  />
+                                  <span className="text-sm text-gray-600">{displayName}</span>
+                                </label>
+                              ) : cf.dataType === 'SINGLE_OPTIONS' && cf.picklistOptions?.length ? (
+                                <select
+                                  className={inputClass}
+                                  value={editCfValues[cf.id] ?? ''}
+                                  onChange={(e) => setEditCfValues((p) => ({ ...p, [cf.id]: e.target.value }))}
+                                >
+                                  <option value="">Seleziona...</option>
+                                  {cf.picklistOptions.map((opt) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
+                              ) : cf.dataType === 'LARGE_TEXT' || cf.dataType === 'TEXTAREA' ? (
+                                <textarea
+                                  className={inputClass}
+                                  rows={3}
+                                  placeholder={cf.placeholder ?? displayName}
+                                  value={editCfValues[cf.id] ?? ''}
+                                  onChange={(e) => setEditCfValues((p) => ({ ...p, [cf.id]: e.target.value }))}
+                                />
+                              ) : (
+                                <input
+                                  type={cf.dataType === 'NUMBER' || cf.dataType === 'MONETARY' ? 'number' : cf.dataType === 'DATE' ? 'date' : 'text'}
+                                  className={inputClass}
+                                  placeholder={cf.placeholder ?? displayName}
+                                  value={editCfValues[cf.id] ?? ''}
+                                  onChange={(e) => setEditCfValues((p) => ({ ...p, [cf.id]: e.target.value }))}
+                                />
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
 
                   {editResult && (
                     <p className={`text-sm font-medium ${editResult.includes('Salvato') ? 'text-emerald-600' : 'text-red-600'}`}>

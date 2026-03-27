@@ -98,10 +98,11 @@ export async function getGhlClient(locationId: string) {
         pipelineStageId: string
         contactId?: string
         monetaryValue?: number
+        status?: string
       }) =>
         request('/opportunities/', {
           method: 'POST',
-          body: JSON.stringify({ ...data, locationId }),
+          body: JSON.stringify({ ...data, status: data.status ?? 'open', locationId }),
           headers: { 'Content-Type': 'application/json' },
         }),
       get: (id: string) => request(`/opportunities/${id}`),

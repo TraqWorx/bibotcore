@@ -18,7 +18,6 @@ export interface DesignModules {
   conversations?:  { enabled: boolean }
   pipeline?:       { enabled: boolean }
   calendar?:       { enabled: boolean }
-  automations?:    { enabled: boolean }
   settings?:       { enabled: boolean }
 }
 
@@ -35,7 +34,6 @@ export const DEFAULT_MODULES: DesignModules = {
   conversations:  { enabled: true },
   pipeline:       { enabled: true },
   calendar:       { enabled: true },
-  automations:    { enabled: true },
   settings:       { enabled: true },
 }
 

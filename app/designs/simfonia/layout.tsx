@@ -3,7 +3,6 @@ import { cookies } from 'next/headers'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { DEFAULT_THEME, DEFAULT_MODULES, type DesignTheme, type DesignModules } from '@/lib/types/design'
 import GymSidebar from './_components/GymSidebar'
-import NotificationBell from './_components/NotificationBell'
 import LocationSwitcher from './_components/LocationSwitcher'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
@@ -124,7 +123,7 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
           .single(),
         supabase
           .from('location_design_settings')
-          .select('theme_overrides')
+          .select('theme_overrides, module_overrides')
           .eq('location_id', currentLocationId)
           .single(),
       ])
@@ -137,6 +136,7 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
       finalModules = {
         ...DEFAULT_MODULES,
         ...(design?.modules as Partial<DesignModules> ?? {}),
+        ...(locationSettings?.module_overrides as Partial<DesignModules> ?? {}),
       }
     }
   }
@@ -157,7 +157,6 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
               />
             </Suspense>
             <div className="flex items-center gap-4">
-              {user && <NotificationBell userId={user.id} />}
             </div>
           </header>
           <main className="flex-1 p-8">

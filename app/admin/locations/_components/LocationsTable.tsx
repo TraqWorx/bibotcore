@@ -18,6 +18,8 @@ interface LocationRow {
   planId: string | null
   planName: string | null
   planPrice: number | null
+  totalPaid: number | null
+  totalPaidVat: number | null
   churned: boolean
 }
 
@@ -27,12 +29,12 @@ interface Props {
   unconnectedLocations: { id: string; name: string }[]
 }
 
-type SortCol = 'name' | 'dateAdded' | 'connected' | 'users' | 'design' | 'plan' | 'price'
+type SortCol = 'name' | 'dateAdded' | 'connected' | 'users' | 'design' | 'plan' | 'price' | 'totalPaid' | 'totalPaidVat'
 type SortDir = 'asc' | 'desc'
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) return <span className="ml-1 text-gray-300">↕</span>
-  return <span className="ml-1" style={{ color: '#2A00CC' }}>{dir === 'asc' ? '↑' : '↓'}</span>
+  if (!active) return <span className="ml-0.5 text-gray-300">↕</span>
+  return <span className="ml-0.5" style={{ color: '#2A00CC' }}>{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
 function formatDate(iso: string | null): string {
@@ -106,31 +108,42 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
       else if (sortCol === 'design') cmp = (a.design ?? '').localeCompare(b.design ?? '')
       else if (sortCol === 'plan') cmp = (a.planName ?? '').localeCompare(b.planName ?? '')
       else if (sortCol === 'price') cmp = (a.planPrice ?? 0) - (b.planPrice ?? 0)
+      else if (sortCol === 'totalPaid') cmp = (a.totalPaid ?? 0) - (b.totalPaid ?? 0)
+      else if (sortCol === 'totalPaidVat') cmp = (a.totalPaidVat ?? 0) - (b.totalPaidVat ?? 0)
       return sortDir === 'asc' ? cmp : -cmp
     })
   }, [rows, search, connectedFilter, usersFilter, designFilter, planFilter, dateFrom, dateTo, sortCol, sortDir])
 
   const hasDateFilter = dateFrom || dateTo
-  const thClass = 'px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400 cursor-pointer select-none hover:text-gray-700 whitespace-nowrap transition-colors'
-  const selectClass = 'rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 outline-none'
+  const selectClass = 'rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 outline-none focus:border-gray-300 focus:ring-1 focus:ring-gray-200'
+
+  const TH = ({ col, children, align }: { col: SortCol; children: React.ReactNode; align?: 'right' }) => (
+    <th
+      onClick={() => toggleSort(col)}
+      className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 cursor-pointer select-none hover:text-gray-600 whitespace-nowrap transition-colors ${align === 'right' ? 'text-right' : 'text-left'}`}
+    >
+      {children}
+      <SortIcon active={sortCol === col} dir={sortDir} />
+    </th>
+  )
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
       {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/60 px-5 py-3">
-        <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5">
-          <svg className="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+      <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/60 px-4 py-2.5">
+        <div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5">
+          <svg className="h-3.5 w-3.5 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clipRule="evenodd" />
           </svg>
           <input
             type="text"
-            placeholder="Search by name or ID…"
+            placeholder="Search…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
+            className="flex-1 bg-transparent text-xs outline-none placeholder:text-gray-400"
           />
           {search && (
-            <button onClick={() => setSearch('')} className="text-base leading-none text-gray-400 hover:text-gray-600">×</button>
+            <button onClick={() => setSearch('')} className="text-sm leading-none text-gray-400 hover:text-gray-600">×</button>
           )}
         </div>
 
@@ -170,7 +183,7 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
           <span className="text-gray-300">–</span>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-[112px] bg-transparent text-xs text-gray-600 outline-none" title="To date" />
           {hasDateFilter && (
-            <button onClick={() => { setDateFrom(''); setDateTo('') }} className="ml-1 text-base leading-none text-gray-400 hover:text-gray-600">×</button>
+            <button onClick={() => { setDateFrom(''); setDateTo('') }} className="ml-1 text-sm leading-none text-gray-400 hover:text-gray-600">×</button>
           )}
         </div>
 
@@ -184,52 +197,41 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
         <p className="p-8 text-center text-sm text-gray-400">No results match your filters.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-[13px]">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="w-10 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">#</th>
-                <th className={thClass} onClick={() => toggleSort('name')}>
-                  Location <SortIcon active={sortCol === 'name'} dir={sortDir} />
-                </th>
-                <th className={thClass} onClick={() => toggleSort('dateAdded')}>
-                  Added <SortIcon active={sortCol === 'dateAdded'} dir={sortDir} />
-                </th>
-                <th className={thClass} onClick={() => toggleSort('connected')}>
-                  Status <SortIcon active={sortCol === 'connected'} dir={sortDir} />
-                </th>
-                <th className={thClass} onClick={() => toggleSort('users')}>
-                  Users <SortIcon active={sortCol === 'users'} dir={sortDir} />
-                </th>
-                <th className={thClass} onClick={() => toggleSort('design')}>
-                  Design <SortIcon active={sortCol === 'design'} dir={sortDir} />
-                </th>
-                <th className={thClass} onClick={() => toggleSort('plan')}>
-                  Plan <SortIcon active={sortCol === 'plan'} dir={sortDir} />
-                </th>
-                <th className={thClass} onClick={() => toggleSort('price')}>
-                  Price <SortIcon active={sortCol === 'price'} dir={sortDir} />
-                </th>
-                <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-400">Actions</th>
+              <tr className="border-b border-gray-200 bg-gray-50/80">
+                <th className="w-9 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">#</th>
+                <TH col="name">Location</TH>
+                <TH col="dateAdded">Added</TH>
+                <TH col="connected">Status</TH>
+                <TH col="users">Users</TH>
+                <TH col="design">Design</TH>
+                <TH col="plan">Plan</TH>
+                <TH col="price" align="right">Price</TH>
+                <TH col="totalPaid" align="right">Total Paid</TH>
+                <TH col="totalPaidVat" align="right">+ VAT 22%</TH>
+                <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-400">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-100">
               {filtered.map((row, i) => (
-                <tr key={row.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
-                  <td className="px-4 py-3.5 text-xs text-gray-400 tabular-nums">{i + 1}</td>
-                  <td className="px-5 py-3.5">
+                <tr key={row.id} className={`hover:bg-gray-50/80 transition-colors ${row.churned ? 'bg-red-50/30' : ''}`}>
+                  <td className="px-3 py-3 text-xs text-gray-300 tabular-nums">{i + 1}</td>
+                  <td className="px-3 py-3 max-w-[200px]">
                     <Link
                       href={`/admin/locations/${row.id}`}
-                      className="font-medium hover:underline"
+                      className="font-medium hover:underline truncate block"
                       style={{ color: '#2A00CC' }}
+                      title={row.name}
                     >
                       {row.name}
                     </Link>
                   </td>
-                  <td className="px-5 py-3.5 text-xs text-gray-500 whitespace-nowrap">
+                  <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">
                     {formatDate(row.dateAdded)}
                   </td>
-                  <td className="px-5 py-3.5">
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+                  <td className="px-3 py-3">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
                       row.connected && !row.needsOAuth
                         ? 'bg-emerald-50 text-emerald-700'
                         : row.connected && row.needsOAuth
@@ -241,31 +243,41 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                         : row.connected && row.needsOAuth ? 'bg-amber-500'
                         : 'bg-gray-300'
                       }`} />
-                      {row.connected && row.needsOAuth ? 'Needs OAuth' : row.connected ? 'Connected' : 'Disconnected'}
+                      {row.connected && row.needsOAuth ? 'OAuth' : row.connected ? 'Active' : 'Off'}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-xs tabular-nums text-gray-600">
+                  <td className="px-3 py-3 text-xs tabular-nums text-center text-gray-600">
                     {row.users > 0 ? row.users : <span className="text-gray-300">0</span>}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-3 py-3">
                     {row.design ? (
                       <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">
                         {row.design}
                       </span>
                     ) : <span className="text-xs text-gray-300">—</span>}
                   </td>
-                  <td className="px-5 py-3.5 text-xs text-gray-600">
+                  <td className="px-3 py-3 text-xs text-gray-600">
                     {row.churned
                       ? <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600">Churned</span>
                       : row.planName ?? <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-5 py-3.5 text-xs font-semibold tabular-nums" style={{ color: row.planPrice != null ? '#0e9f6e' : undefined }}>
+                  <td className="px-3 py-3 text-xs font-medium tabular-nums text-right whitespace-nowrap" style={{ color: row.planPrice != null ? '#0e9f6e' : undefined }}>
                     {row.planPrice != null
                       ? `€${row.planPrice.toLocaleString('it-IT')}/mo`
                       : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center justify-end gap-1.5">
+                  <td className="px-3 py-3 text-xs font-semibold tabular-nums text-right whitespace-nowrap" style={{ color: row.totalPaid != null && row.totalPaid > 0 ? '#0e9f6e' : undefined }}>
+                    {row.totalPaid != null
+                      ? `€${row.totalPaid.toLocaleString('it-IT')}`
+                      : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-3 py-3 text-xs tabular-nums text-right whitespace-nowrap text-gray-400">
+                    {row.totalPaidVat != null
+                      ? `€${row.totalPaidVat.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="flex items-center justify-end gap-1">
                       {row.connected ? (
                         <>
                           {row.needsOAuth && row.design && (

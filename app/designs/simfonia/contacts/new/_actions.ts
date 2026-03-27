@@ -8,23 +8,23 @@ import { trackEvent } from '@/lib/analytics'
 
 export async function createContact(data: {
   firstName: string
-  lastName: string
-  email: string
-  phone: string
+  lastName?: string
+  email?: string
+  phone?: string
   tags?: string[]
   customFields?: { id: string; field_value: string }[]
 }, locationId: string): Promise<{ error: string } | undefined> {
   try {
     await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
-    await ghl.contacts.create({
-      firstName: data.firstName.trim(),
-      lastName: data.lastName.trim(),
-      email: data.email.trim(),
-      phone: data.phone.trim(),
-      ...(data.tags && data.tags.length > 0 ? { tags: data.tags } : {}),
-      ...(data.customFields && data.customFields.length > 0 ? { customFields: data.customFields } : {}),
-    })
+    // Only send non-empty fields — GHL rejects empty strings for email/phone
+    const payload: Record<string, unknown> = { firstName: data.firstName.trim() }
+    if (data.lastName?.trim()) payload.lastName = data.lastName.trim()
+    if (data.email?.trim()) payload.email = data.email.trim()
+    if (data.phone?.trim()) payload.phone = data.phone.trim()
+    if (data.tags && data.tags.length > 0) payload.tags = data.tags
+    if (data.customFields && data.customFields.length > 0) payload.customFields = data.customFields
+    await ghl.contacts.create(payload)
     await trackEvent(locationId, 'contact_created')
     revalidatePath('/designs/simfonia/contacts')
     revalidatePath('/designs/simfonia/dashboard')
