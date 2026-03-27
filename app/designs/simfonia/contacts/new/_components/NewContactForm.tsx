@@ -11,6 +11,7 @@ import {
   parseFieldCategory,
   filterVisibleFields,
   parseCategoriaValue,
+  getSwitchOutField,
   slugify,
   type CustomFieldDef,
 } from '@/lib/utils/categoryFields'
@@ -40,6 +41,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
   // Discover categories dynamically from the Categoria dropdown field
   const categories = useMemo(() => discoverCategories(customFields), [customFields])
   const categoriaField = useMemo(() => getCategoriaField(customFields), [customFields])
+  const switchOutField = useMemo(() => getSwitchOutField(customFields), [customFields])
 
   // Resolved selected category labels
   const selectedCatLabels = useMemo(() =>
@@ -49,23 +51,27 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
     [selectedCategories, categories]
   )
 
-  // Get ALL dropdown (SINGLE_OPTIONS) fields for all selected categories (union, deduplicated)
-  const dropdownFields = useMemo(() => {
-    if (selectedCategories.length === 0) return []
-    const seen = new Set<string>()
-    const result: CustomFieldDef[] = []
-    for (const slug of selectedCategories) {
-      const cat = categories.find((c) => c.slug === slug)
-      if (!cat) continue
-      for (const df of getDropdownFields(customFields, cat.label)) {
-        if (!seen.has(df.id)) {
-          seen.add(df.id)
-          result.push(df)
-        }
-      }
-    }
-    return result
+  // Get dropdown (SINGLE_OPTIONS) fields grouped by category
+  const dropdownFieldsByCategory = useMemo(() => {
+    if (selectedCategories.length === 0) return [] as { label: string; fields: CustomFieldDef[] }[]
+    const globalSeen = new Set<string>()
+    return selectedCategories
+      .map((slug) => {
+        const cat = categories.find((c) => c.slug === slug)
+        if (!cat) return null
+        const fields = getDropdownFields(customFields, cat.label)
+          .filter((df) => !globalSeen.has(df.id))
+        for (const f of fields) globalSeen.add(f.id)
+        return fields.length > 0 ? { label: cat.label, fields } : null
+      })
+      .filter((g): g is { label: string; fields: CustomFieldDef[] } => g !== null)
   }, [customFields, selectedCategories, categories])
+
+  // Flat list of all dropdown field IDs (for exclusion in other fields)
+  const dropdownFields = useMemo(() =>
+    dropdownFieldsByCategory.flatMap((g) => g.fields),
+    [dropdownFieldsByCategory]
+  )
 
   // Filter tags by category association — show tags from ALL selected categories
   const visibleTags = useMemo(() => {
@@ -79,25 +85,28 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
     return ghlTags.filter((t) => associated.has(t))
   }, [ghlTags, selectedCategories, categories, categoryTags])
 
-  // Filter custom fields based on selected categories (union), excluding dropdown fields
+  // Group custom fields by category (excluding dropdowns and Switch Out)
   const dropdownFieldIds = useMemo(() => new Set(dropdownFields.map((f) => f.id)), [dropdownFields])
-  const visibleFields = useMemo(() => {
+  const fieldsByCategory = useMemo(() => {
     const filtered = filterVisibleFields(customFields, false)
-    if (selectedCategories.length === 0) return []
-    const seen = new Set<string>()
-    const result: CustomFieldDef[] = []
-    for (const slug of selectedCategories) {
-      const cat = categories.find((c) => c.slug === slug)
-      if (!cat) continue
-      for (const f of getFieldsForCategory(filtered, cat.label)) {
-        if (!dropdownFieldIds.has(f.id) && !seen.has(f.id)) {
-          seen.add(f.id)
-          result.push(f)
+    if (selectedCategories.length === 0) return [] as { label: string; fields: CustomFieldDef[] }[]
+    const soId = switchOutField?.id
+    const globalSeen = new Set<string>() // track Anagrafica fields already shown
+    return selectedCategories
+      .map((slug) => {
+        const cat = categories.find((c) => c.slug === slug)
+        if (!cat) return null
+        const fields = getFieldsForCategory(filtered, cat.label)
+          .filter((f) => !dropdownFieldIds.has(f.id) && f.id !== soId && !globalSeen.has(f.id))
+        // Mark Anagrafica fields as seen so they only appear once (under first category)
+        for (const f of fields) {
+          const { category } = parseFieldCategory(f.name)
+          if (category && category !== cat.label) globalSeen.add(f.id)
         }
-      }
-    }
-    return result
-  }, [customFields, selectedCategories, categories, dropdownFieldIds])
+        return fields.length > 0 ? { label: cat.label, fields } : null
+      })
+      .filter((g): g is { label: string; fields: CustomFieldDef[] } => g !== null)
+  }, [customFields, selectedCategories, categories, dropdownFieldIds, switchOutField])
 
   function toggleTag(tag: string) {
     setTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])
@@ -170,6 +179,33 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
 
       <div className="max-w-lg rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-6 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Switch Out — red flag */}
+          {switchOutField && (
+            <label
+              className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition-all ${
+                cfValues[switchOutField.id] === 'true'
+                  ? 'border-red-400 bg-red-50'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={cfValues[switchOutField.id] === 'true'}
+                onChange={(e) => setCfValue(switchOutField.id, e.target.checked ? 'true' : '')}
+                className="sr-only"
+              />
+              <span className={`text-xl ${cfValues[switchOutField.id] === 'true' ? '' : 'opacity-30'}`}>
+                &#x1F6A9;
+              </span>
+              <div>
+                <span className={`text-sm font-bold ${cfValues[switchOutField.id] === 'true' ? 'text-red-700' : 'text-gray-500'}`}>
+                  Switch Out
+                </span>
+                <p className="text-[11px] text-gray-400">Segna questo contatto come switch out</p>
+              </div>
+            </label>
+          )}
+
           {/* Category selection — multi-select checkboxes */}
           <div>
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">
@@ -191,26 +227,33 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
             {fieldErrors.category && <p className="mt-1 text-xs font-medium text-red-500">{fieldErrors.category}</p>}
           </div>
 
-          {/* Dropdown fields — shown when a category is selected */}
-          {dropdownFields.map((df) =>
-            df.picklistOptions && df.picklistOptions.length > 0 ? (
-              <div key={df.id}>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">
-                  {parseFieldCategory(df.name).displayName}
-                </label>
-                <select
-                  value={cfValues[df.id] ?? ''}
-                  onChange={(e) => setCfValue(df.id, e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">Seleziona...</option>
-                  {df.picklistOptions.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-            ) : null
-          )}
+          {/* Dropdown fields — grouped by category */}
+          {dropdownFieldsByCategory.map((group) => (
+            <div key={group.label} className="space-y-4 border-t border-gray-100 pt-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                {group.label}
+              </p>
+              {group.fields.map((df) =>
+                df.picklistOptions && df.picklistOptions.length > 0 ? (
+                  <div key={df.id}>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">
+                      {parseFieldCategory(df.name).displayName}
+                    </label>
+                    <select
+                      value={cfValues[df.id] ?? ''}
+                      onChange={(e) => setCfValue(df.id, e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Seleziona...</option>
+                      {df.picklistOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null
+              )}
+            </div>
+          ))}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -345,13 +388,13 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
             )}
           </div>
 
-          {/* Custom Fields — filtered by selected categories */}
-          {selectedCategories.length > 0 && visibleFields.length > 0 && (
-            <div className="space-y-4 border-t border-gray-100 pt-4">
+          {/* Custom Fields — grouped by category */}
+          {fieldsByCategory.map((group) => (
+            <div key={group.label} className="space-y-4 border-t border-gray-100 pt-4">
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-                Campi — {selectedCatLabels.join(', ')}
+                {group.label}
               </p>
-              {visibleFields.map((cf) => {
+              {group.fields.map((cf) => {
                 const { displayName } = parseFieldCategory(cf.name)
                 return (
                   <div key={cf.id}>
@@ -400,7 +443,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
                 )
               })}
             </div>
-          )}
+          ))}
 
           {error && (
             <p className="text-sm font-medium text-red-600">{error}</p>

@@ -192,8 +192,8 @@ export async function updateContact(
     await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
     await ghl.contacts.update(contactId, data)
-    revalidatePath('/designs/simfonia/contacts')
-    revalidatePath('/designs/simfonia/dashboard')
+    revalidatePath('/designs/simfonia/contacts', 'page')
+    revalidatePath('/designs/simfonia/dashboard', 'page')
     return {}
   } catch (err) {
     console.error('[updateContact] FAILED:', err instanceof Error ? err.message : err)
@@ -210,8 +210,8 @@ export async function deleteContact(
     await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
     await ghl.contacts.delete(contactId)
-    revalidatePath('/designs/simfonia/contacts')
-    revalidatePath('/designs/simfonia/dashboard')
+    revalidatePath('/designs/simfonia/contacts', 'page')
+    revalidatePath('/designs/simfonia/dashboard', 'page')
     return {}
   } catch (err) {
     const { translateGhlError } = await import('@/lib/utils/ghlErrors')

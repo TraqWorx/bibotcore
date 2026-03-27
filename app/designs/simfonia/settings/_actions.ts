@@ -393,6 +393,24 @@ export async function saveClosedDays(
   return {}
 }
 
+// ─── Ensure Switch Out field ────────────────────────────────────────────────
+
+export async function ensureSwitchOutField(locationId: string): Promise<string | null> {
+  try {
+    const ghl = await getGhlClient(locationId)
+    const data = await ghl.customFields.list()
+    const fields = (data?.customFields ?? []) as { id: string; name: string; dataType: string }[]
+    const existing = fields.find((f) => f.name === 'Switch Out' && f.dataType === 'CHECKBOX')
+    if (existing) return existing.id
+    // Create it
+    const created = await ghl.customFields.create({ name: 'Switch Out', dataType: 'CHECKBOX', model: 'contact' })
+    return created?.customField?.id ?? null
+  } catch (err) {
+    console.error('[ensureSwitchOutField]', err)
+    return null
+  }
+}
+
 // ─── GHL Tags Management ───────────────────────────────────────────────────
 
 export interface GhlTag {

@@ -203,6 +203,14 @@ export function parseCategoriaValue(raw: string): string[] {
   return raw.split(',').map(s => s.trim()).filter(Boolean)
 }
 
+/** Name of the global "Switch Out" checkbox field (no category prefix — applies to all) */
+export const SWITCH_OUT_FIELD_NAME = 'Switch Out'
+
+/** Find the "Switch Out" checkbox field */
+export function getSwitchOutField(fields: CustomFieldDef[]): CustomFieldDef | undefined {
+  return fields.find((f) => f.name === SWITCH_OUT_FIELD_NAME && f.dataType === 'CHECKBOX')
+}
+
 /** Filter out hidden-category fields for non-admin users */
 export function filterVisibleFields(
   fields: CustomFieldDef[],

@@ -20,6 +20,7 @@ import {
   getFieldsForCategory,
   filterVisibleFields,
   parseCategoriaValue,
+  getSwitchOutField,
   type CustomFieldDef,
 } from '@/lib/utils/categoryFields'
 
@@ -304,6 +305,21 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
             <div className={`flex-1 ${tab === 'messages' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
               {tab === 'info' ? (
                 <div className="space-y-5 p-6">
+                  {/* Switch Out flag */}
+                  {(() => {
+                    const soField = getSwitchOutField(customFieldDefs)
+                    if (!soField) return null
+                    const val = (contact.customFields ?? []).find((f) => f.id === soField.id)
+                    const isOn = (val?.value ?? val?.field_value ?? val?.fieldValue ?? '') === 'true'
+                    if (!isOn) return null
+                    return (
+                      <div className="flex items-center gap-2 rounded-xl border-2 border-red-300 bg-red-50 px-4 py-2.5">
+                        <span className="text-lg">&#x1F6A9;</span>
+                        <span className="text-sm font-bold text-red-700">Switch Out</span>
+                      </div>
+                    )
+                  })()}
+
                   {/* Basic info */}
                   <div className="space-y-2">
                     {contact.email && (
@@ -357,10 +373,13 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                   {customFields.length > 0 && (() => {
                     // Build a lookup from field ID to custom field def for display name parsing
                     const defMap = new Map(customFieldDefs.map((d) => [d.id, d]))
+                    const soField = getSwitchOutField(customFieldDefs)
 
                     // Group non-empty fields by their parsed category
                     const groups = new Map<string, typeof customFields>()
                     for (const field of customFields) {
+                      // Skip Switch Out — rendered separately above
+                      if (soField && field.id === soField.id) continue
                       const def = defMap.get(field.id)
                       const { category } = parseFieldCategory(def?.name ?? field.name ?? '')
                       const key = category ?? 'Altro'
@@ -422,6 +441,32 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
               ) : tab === 'edit' ? (
                 /* Edit tab */
                 <div className="space-y-4 p-6">
+                  {/* Switch Out — red flag toggle */}
+                  {(() => {
+                    const soField = getSwitchOutField(customFieldDefs)
+                    if (!soField) return null
+                    const isOn = editCfValues[soField.id] === 'true'
+                    return (
+                      <label
+                        className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition-all ${
+                          isOn ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isOn}
+                          onChange={(e) => setEditCfValues((p) => ({ ...p, [soField.id]: e.target.checked ? 'true' : '' }))}
+                          className="sr-only"
+                        />
+                        <span className={`text-xl ${isOn ? '' : 'opacity-30'}`}>&#x1F6A9;</span>
+                        <div>
+                          <span className={`text-sm font-bold ${isOn ? 'text-red-700' : 'text-gray-500'}`}>Switch Out</span>
+                          <p className="text-[11px] text-gray-400">Segna questo contatto come switch out</p>
+                        </div>
+                      </label>
+                    )
+                  })()}
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">Nome</label>
@@ -480,17 +525,16 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     const selectedCatLabels = categoriaField
                       ? parseCategoriaValue(editCfValues[categoriaField.id] ?? '')
                       : []
-                    // Collect dropdown fields from ALL selected categories (union)
-                    const ddFieldIds = new Set<string>()
-                    const ddFields: typeof customFieldDefs = []
-                    for (const label of selectedCatLabels) {
-                      for (const df of getDropdownFields(customFieldDefs, label)) {
-                        if (!ddFieldIds.has(df.id)) {
-                          ddFieldIds.add(df.id)
-                          ddFields.push(df)
-                        }
-                      }
-                    }
+                    // Group dropdown fields by category
+                    const globalSeen = new Set<string>()
+                    const ddGroups = selectedCatLabels
+                      .map((label) => {
+                        const fields = getDropdownFields(customFieldDefs, label)
+                          .filter((df) => !globalSeen.has(df.id))
+                        for (const f of fields) globalSeen.add(f.id)
+                        return fields.length > 0 ? { label, fields } : null
+                      })
+                      .filter((g): g is { label: string; fields: CustomFieldDef[] } => g !== null)
 
                     return (
                       <div className="space-y-4 border-t border-gray-100 pt-4">
@@ -520,25 +564,30 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                             </div>
                           </div>
                         )}
-                        {ddFields.map((df) =>
-                          df.picklistOptions && df.picklistOptions.length > 0 ? (
-                            <div key={df.id}>
-                              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">
-                                {parseFieldCategory(df.name).displayName}
-                              </label>
-                              <select
-                                className={inputClass}
-                                value={editCfValues[df.id] ?? ''}
-                                onChange={(e) => setEditCfValues((p) => ({ ...p, [df.id]: e.target.value }))}
-                              >
-                                <option value="">Seleziona...</option>
-                                {df.picklistOptions.map((opt) => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            </div>
-                          ) : null
-                        )}
+                        {ddGroups.map((group) => (
+                          <div key={group.label} className="space-y-4">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">{group.label}</p>
+                            {group.fields.map((df) =>
+                              df.picklistOptions && df.picklistOptions.length > 0 ? (
+                                <div key={df.id}>
+                                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">
+                                    {parseFieldCategory(df.name).displayName}
+                                  </label>
+                                  <select
+                                    className={inputClass}
+                                    value={editCfValues[df.id] ?? ''}
+                                    onChange={(e) => setEditCfValues((p) => ({ ...p, [df.id]: e.target.value }))}
+                                  >
+                                    <option value="">Seleziona...</option>
+                                    {df.picklistOptions.map((opt) => (
+                                      <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ) : null
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )
                   })()}
@@ -630,40 +679,43 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     })()}
                   </div>
 
-                  {/* Custom Fields — filtered by selected categories (union) */}
+                  {/* Custom Fields — grouped by category */}
                   {(() => {
                     const catField = getCategoriaField(customFieldDefs)
                     const selectedCatLabels = catField ? parseCategoriaValue(editCfValues[catField.id] ?? '') : []
                     if (selectedCatLabels.length === 0) return null
 
-                    // Collect dropdown field IDs across all selected categories
                     const ddFieldIds = new Set<string>()
                     for (const label of selectedCatLabels) {
                       for (const f of getDropdownFields(customFieldDefs, label)) {
                         ddFieldIds.add(f.id)
                       }
                     }
+                    const soField = getSwitchOutField(customFieldDefs)
+                    const soId = soField?.id
                     const filtered = filterVisibleFields(customFieldDefs, false)
-                    // Union of fields from all selected categories, deduplicated
-                    const seenIds = new Set<string>()
-                    const catFields: typeof filtered = []
-                    for (const label of selectedCatLabels) {
-                      for (const f of getFieldsForCategory(filtered, label)) {
-                        if (!ddFieldIds.has(f.id) && !seenIds.has(f.id)) {
-                          seenIds.add(f.id)
-                          catFields.push(f)
+                    const globalSeen = new Set<string>()
+
+                    const groups = selectedCatLabels
+                      .map((label) => {
+                        const fields = getFieldsForCategory(filtered, label)
+                          .filter((f) => !ddFieldIds.has(f.id) && f.id !== soId && !globalSeen.has(f.id))
+                        for (const f of fields) {
+                          const { category } = parseFieldCategory(f.name)
+                          if (category && category !== label) globalSeen.add(f.id)
                         }
-                      }
-                    }
+                        return fields.length > 0 ? { label, fields } : null
+                      })
+                      .filter((g): g is { label: string; fields: CustomFieldDef[] } => g !== null)
 
-                    if (catFields.length === 0) return null
+                    if (groups.length === 0) return null
 
-                    return (
-                      <div className="space-y-4 border-t border-gray-100 pt-4">
+                    return groups.map((group) => (
+                      <div key={group.label} className="space-y-4 border-t border-gray-100 pt-4">
                         <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-                          Campi — {selectedCatLabels.join(', ')}
+                          {group.label}
                         </p>
-                        {catFields.map((cf) => {
+                        {group.fields.map((cf) => {
                           const { displayName } = parseFieldCategory(cf.name)
                           return (
                             <div key={cf.id}>
@@ -712,7 +764,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                           )
                         })}
                       </div>
-                    )
+                    ))
                   })()}
 
                   {editResult && (

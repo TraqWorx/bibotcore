@@ -53,7 +53,9 @@ export async function getDealData(dealId: string, locationId: string) {
         if (conversation?.id) {
           try {
             const msgData = await ghl.conversations.messages(conversation.id)
-            const rawMsgs = msgData?.messages
+            const nested = msgData?.messages
+            // GHL may return { messages: [...] } or { messages: { messages: [...] } }
+            const rawMsgs = Array.isArray(nested) ? nested : nested?.messages ?? []
             messages = Array.isArray(rawMsgs) ? rawMsgs : []
           } catch { /* ignore */ }
         }

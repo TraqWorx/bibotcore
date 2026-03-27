@@ -1,6 +1,6 @@
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
-import { getCategoryTags, getLocationTags } from '../../settings/_actions'
+import { getCategoryTags, getLocationTags, ensureSwitchOutField } from '../../settings/_actions'
 import NewContactForm from './_components/NewContactForm'
 import type { CustomFieldDef } from '@/lib/utils/categoryFields'
 
@@ -42,6 +42,9 @@ export default async function NewContactPage({
     token ? fetchCustomFields(token, locationId) : Promise.resolve([]),
     getCategoryTags(locationId).catch(() => ({} as Record<string, string[]>)),
   ])
+
+  // Ensure Switch Out field exists in GHL (auto-creates if missing)
+  await ensureSwitchOutField(locationId)
 
   const ghlTags = locationTagsList.map((t) => t.name)
 

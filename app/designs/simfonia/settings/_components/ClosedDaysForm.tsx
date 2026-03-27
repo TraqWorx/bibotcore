@@ -13,19 +13,42 @@ function formatDate(iso: string): string {
   return `${d}/${m}/${y}`
 }
 
+/** Generate all dates between start and end (inclusive) as YYYY-MM-DD strings */
+function getDateRange(start: string, end: string): string[] {
+  const dates: string[] = []
+  const cur = new Date(start + 'T00:00:00')
+  const endDate = new Date(end + 'T00:00:00')
+  if (cur > endDate) return getDateRange(end, start) // swap if reversed
+  while (cur <= endDate) {
+    const y = cur.getFullYear()
+    const m = String(cur.getMonth() + 1).padStart(2, '0')
+    const d = String(cur.getDate()).padStart(2, '0')
+    dates.push(`${y}-${m}-${d}`)
+    cur.setDate(cur.getDate() + 1)
+  }
+  return dates
+}
+
 export default function ClosedDaysForm({ locationId, initialDays }: Props) {
   const [days, setDays] = useState<string[]>(() =>
     [...initialDays].sort()
   )
-  const [dateValue, setDateValue] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<{ ok?: boolean; error?: string } | null>(null)
 
   function handleAdd() {
-    if (!dateValue) return
-    if (days.includes(dateValue)) return
-    setDays((prev) => [...prev, dateValue].sort())
-    setDateValue('')
+    if (!startDate) return
+    const newDays = endDate && endDate !== startDate
+      ? getDateRange(startDate, endDate)
+      : [startDate]
+    const existing = new Set(days)
+    const toAdd = newDays.filter((d) => !existing.has(d))
+    if (toAdd.length === 0) return
+    setDays((prev) => [...prev, ...toAdd].sort())
+    setStartDate('')
+    setEndDate('')
     setResult(null)
   }
 
@@ -42,6 +65,11 @@ export default function ClosedDaysForm({ locationId, initialDays }: Props) {
     setResult(res?.error ? { error: res.error } : { ok: true })
   }
 
+  // Preview count for range
+  const rangePreview = startDate && endDate && endDate !== startDate
+    ? getDateRange(startDate, endDate).filter((d) => !days.includes(d)).length
+    : 0
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6">
       <h2 className="text-base font-bold text-gray-800">Giorni di Chiusura</h2>
@@ -52,42 +80,54 @@ export default function ClosedDaysForm({ locationId, initialDays }: Props) {
       <div className="flex items-end gap-3">
         <div className="flex-1">
           <label className="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
-            Aggiungi Data
+            Da
           </label>
           <input
             type="date"
-            value={dateValue}
-            onChange={(e) => setDateValue(e.target.value)}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-all"
+          />
+        </div>
+        <div className="flex-1">
+          <label className="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
+            A <span className="font-normal text-gray-300">(opzionale)</span>
+          </label>
+          <input
+            type="date"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={(e) => setEndDate(e.target.value)}
             className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-all"
           />
         </div>
         <button
           type="button"
           onClick={handleAdd}
-          disabled={!dateValue}
-          className="rounded-xl px-5 py-2.5 text-sm font-bold text-black transition-all hover:opacity-90 disabled:opacity-50"
+          disabled={!startDate}
+          className="shrink-0 rounded-xl px-5 py-2.5 text-sm font-bold text-black transition-all hover:opacity-90 disabled:opacity-50"
           style={{ background: '#00F0FF' }}
         >
-          Aggiungi
+          {rangePreview > 1 ? `Aggiungi ${rangePreview} gg` : 'Aggiungi'}
         </button>
       </div>
 
       {days.length > 0 && (
-        <div className="mt-5 space-y-2">
+        <div className="mt-5 flex flex-wrap gap-2">
           {days.map((day) => (
-            <div
+            <span
               key={day}
-              className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-2.5"
+              className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-700"
             >
-              <span className="text-sm text-gray-700">{formatDate(day)}</span>
+              {formatDate(day)}
               <button
                 type="button"
                 onClick={() => handleRemove(day)}
-                className="text-sm font-bold text-red-500 hover:text-red-700 transition-colors"
+                className="text-sm font-bold text-red-400 hover:text-red-600 transition-colors"
               >
                 &times;
               </button>
-            </div>
+            </span>
           ))}
         </div>
       )}
@@ -96,7 +136,7 @@ export default function ClosedDaysForm({ locationId, initialDays }: Props) {
         <p className="mt-5 text-sm text-gray-400">Nessun giorno di chiusura impostato.</p>
       )}
 
-      <div className="mt-5">
+      <div className="mt-5 flex items-center gap-3">
         <button
           type="button"
           onClick={handleSave}
@@ -106,6 +146,9 @@ export default function ClosedDaysForm({ locationId, initialDays }: Props) {
         >
           {saving ? '...' : 'Salva'}
         </button>
+        {days.length > 0 && (
+          <span className="text-xs text-gray-400">{days.length} giorn{days.length === 1 ? 'o' : 'i'}</span>
+        )}
       </div>
 
       {result?.error && <p className="mt-2 text-sm text-red-600">{result.error}</p>}

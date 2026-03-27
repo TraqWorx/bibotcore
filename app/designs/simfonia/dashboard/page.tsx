@@ -7,6 +7,7 @@ import {
   discoverCategories,
   getCategoriaField,
   getProviderField,
+  getSwitchOutField,
   parseCategoriaValue,
   type CustomFieldDef,
 } from '@/lib/utils/categoryFields'
@@ -255,9 +256,16 @@ export default async function CrmDashboard({
   const categories = discoverCategories(customFields)
   const categoriaField = getCategoriaField(customFields)
   const categoriaFieldId = categoriaField?.id ?? null
+  const switchOutField = getSwitchOutField(customFields)
+  const switchOutFieldId = switchOutField?.id ?? null
 
   // ─── Fetch ALL contacts once, then group by Categoria custom field ──────
   const allContacts = await ghlSearchAll(locationId, token, [])
+
+  // Count Switch Out contacts
+  const switchOutCount = switchOutFieldId
+    ? allContacts.filter((c) => getCustomFieldValue(c, switchOutFieldId) === 'true').length
+    : 0
 
   const categoryData = categories.map((cat) => {
     // Filter by Categoria custom field value (not tags)
@@ -431,10 +439,14 @@ export default async function CrmDashboard({
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Operatori</p>
           <p className="mt-2 text-3xl font-black text-gray-900">{ghlUsers.length}</p>
         </div>
-        <Link href={`/designs/simfonia/pipeline${q}`} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-all">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Pipeline</p>
-          <p className="mt-2 text-sm font-medium text-gray-600">Vedi opportunit&agrave;</p>
-        </Link>
+        <div className={`rounded-2xl border p-5 shadow-sm ${switchOutCount > 0 ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-white'}`}>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+            <span className="mr-1">&#x1F6A9;</span> Switch Out
+          </p>
+          <p className={`mt-2 text-3xl font-black ${switchOutCount > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+            {switchOutCount}
+          </p>
+        </div>
         <Link href={`/designs/simfonia/calendar${q}`} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-all">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Calendario</p>
           <p className="mt-2 text-sm font-medium text-gray-600">Vedi appuntamenti</p>
