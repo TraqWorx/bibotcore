@@ -20,7 +20,7 @@ export default async function PipelinePage({
 
   const ghl = await getGhlClient(locationId)
   let pipelines: { id: string; name: string; stages: { id: string; name: string }[] }[] = []
-  let opportunities: { id: string; name?: string; pipelineId?: string; pipelineStageId?: string; monetaryValue?: number }[] = []
+  let opportunities: { id: string; name?: string; pipelineId?: string; pipelineStageId?: string; monetaryValue?: number; status?: string }[] = []
 
   try {
     const [opportunitiesData, pipelinesData] = await Promise.all([

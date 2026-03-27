@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import { moveOpportunity, deleteOpportunity } from './_actions'
+import { moveOpportunity, updateOpportunity, deleteOpportunity } from './_actions'
 
 interface Stage {
   id: string
@@ -30,6 +30,11 @@ function contactDisplayName(contact?: Opportunity['contact']): string | null {
   return parts.length > 0 ? parts.join(' ') : null
 }
 
+const STATUS_ZONES = [
+  { id: '__won__', label: 'Vinta', color: 'border-green-300 bg-green-50 text-green-700', activeColor: 'border-green-400 bg-green-100 ring-2 ring-green-300', status: 'won' },
+  { id: '__lost__', label: 'Persa', color: 'border-red-300 bg-red-50 text-red-700', activeColor: 'border-red-400 bg-red-100 ring-2 ring-red-300', status: 'lost' },
+] as const
+
 export default function PipelineBoard({
   pipelineId,
   stages,
@@ -49,12 +54,29 @@ export default function PipelineBoard({
       deals: opportunities.filter((o) => o.pipelineStageId === stage.id),
     }))
   )
+  const [isDragging, setIsDragging] = useState(false)
 
   async function onDragEnd(result: DropResult) {
+    setIsDragging(false)
     const { source, destination, draggableId } = result
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
 
+    // Check if dropped on a status zone
+    const statusZone = STATUS_ZONES.find((z) => z.id === destination.droppableId)
+    if (statusZone) {
+      // Remove deal from board and update status
+      setColumns((prev) =>
+        prev.map((col) => ({
+          ...col,
+          deals: col.deals.filter((d) => d.id !== draggableId),
+        }))
+      )
+      await updateOpportunity(draggableId, { status: statusZone.status }, locationId)
+      return
+    }
+
+    // Normal stage-to-stage move
     const sourceCol = columns.find((c) => c.id === source.droppableId)!
     const deal = sourceCol.deals[source.index]
 
@@ -91,7 +113,10 @@ export default function PipelineBoard({
   }
 
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
+    <DragDropContext
+      onDragStart={() => setIsDragging(true)}
+      onDragEnd={onDragEnd}
+    >
       <div className="flex gap-4 overflow-x-auto pb-4">
         {columns.map((stage) => {
           const stageTotal = stage.deals.reduce((sum, d) => sum + (d.monetaryValue ?? 0), 0)
@@ -170,6 +195,30 @@ export default function PipelineBoard({
             </Droppable>
           )
         })}
+      </div>
+
+      {/* Won / Lost drop zones — visible while dragging */}
+      <div
+        className={`mt-4 grid grid-cols-2 gap-4 transition-all duration-200 ${
+          isDragging ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none h-0 mt-0 overflow-hidden'
+        }`}
+      >
+        {STATUS_ZONES.map((zone) => (
+          <Droppable key={zone.id} droppableId={zone.id}>
+            {(provided, snapshot) => (
+              <div
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                className={`flex items-center justify-center rounded-2xl border-2 border-dashed py-6 text-sm font-bold transition-all ${
+                  snapshot.isDraggingOver ? zone.activeColor : zone.color
+                }`}
+              >
+                {zone.label}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        ))}
       </div>
     </DragDropContext>
   )
