@@ -2,6 +2,14 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+
+/** Format number as EUR without locale-dependent formatting (avoids hydration mismatch) */
+function formatEur(n: number): string {
+  const fixed = n.toFixed(2)
+  const [int, dec] = fixed.split('.')
+  const withDots = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${withDots},${dec}`
+}
 import ConnectButton from './ConnectButton'
 import DisconnectButton from './DisconnectButton'
 import ChangeDesignButton from './ChangeDesignButton'
@@ -263,17 +271,17 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                   </td>
                   <td className="px-3 py-3 text-xs font-medium tabular-nums text-right whitespace-nowrap" style={{ color: row.planPrice != null ? '#0e9f6e' : undefined }}>
                     {row.planPrice != null
-                      ? `€${row.planPrice.toLocaleString('it-IT')}/mo`
+                      ? `€${formatEur(row.planPrice)}/mo`
                       : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-3 text-xs font-semibold tabular-nums text-right whitespace-nowrap" style={{ color: row.totalPaid != null && row.totalPaid > 0 ? '#0e9f6e' : undefined }}>
                     {row.totalPaid != null
-                      ? `€${row.totalPaid.toLocaleString('it-IT')}`
+                      ? `€${formatEur(row.totalPaid)}`
                       : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-3 text-xs tabular-nums text-right whitespace-nowrap text-gray-400">
                     {row.totalPaidVat != null
-                      ? `€${row.totalPaidVat.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      ? `€${formatEur(row.totalPaidVat)}`
                       : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-3">
