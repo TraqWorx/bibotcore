@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useTransition } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
 import ContactsList from './ContactsList'
@@ -83,8 +83,13 @@ export default function ContactsPageClient(props: Props) {
   const hasFilters = !!(filters.category || filters.tag || filters.gestore || filters.dateFrom || filters.dateTo || filters.scadenzaFrom || filters.scadenzaTo || filters.search)
   const q = `?locationId=${locationId}`
 
+  const [isFilterPending, startFilterTransition] = useTransition()
+
   function handleFilterChange(overrides: Record<string, string | null>) {
-    setFilters((prev) => ({ ...prev, ...overrides }))
+    // Use startTransition so the filter button paint isn't blocked by list re-render
+    startFilterTransition(() => {
+      setFilters((prev) => ({ ...prev, ...overrides }))
+    })
   }
 
   return (
@@ -153,7 +158,7 @@ export default function ContactsPageClient(props: Props) {
           <p className="mt-3 text-sm text-gray-400">Caricamento contatti...</p>
         </div>
       ) : (
-        <div className={isLoading ? 'opacity-60 transition-opacity' : ''}>
+        <div className={isLoading || isFilterPending ? 'opacity-60 transition-opacity' : ''}>
           <ContactsList
             contacts={contacts}
             locationId={locationId}
