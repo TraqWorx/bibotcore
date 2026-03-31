@@ -24,9 +24,10 @@ export type CachedContact = {
   address1: string | null
   city: string | null
   tags: string[]
+  assigned_to: string | null
   date_added: string | null
   last_activity: string | null
-  raw: Record<string, unknown> | null
+  raw?: Record<string, unknown> | null
 }
 
 export type ContactCustomFieldValue = {
@@ -49,51 +50,35 @@ interface ListContactsOptions {
   search?: string | null
 }
 
-/** Check if the cache has been populated for this location */
-async function isCacheReady(locationId: string): Promise<boolean> {
-  const sb = createAdminClient()
-  const { data } = await sb
-    .from('sync_status')
-    .select('status')
-    .eq('location_id', locationId)
-    .eq('entity_type', 'contacts')
-    .single()
-  return data?.status === 'completed'
-}
-
-/** Trigger a background sync (fire-and-forget) */
-async function triggerBackgroundSync(locationId: string) {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000'
-    fetch(`${baseUrl}/api/admin/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locationId }),
-    }).catch(() => {})
-  } catch {
-    // Fire and forget
-  }
-}
-
 /**
  * List contacts from Supabase cache.
- * Falls back to GHL API if cache is not ready.
+ * If cache is empty, falls back to GHL API.
  */
 export async function listContacts(
   locationId: string,
   options: ListContactsOptions = {},
 ): Promise<{ contacts: CachedContact[]; fromCache: boolean }> {
-  const cacheReady = await isCacheReady(locationId)
+  const cached = await fetchContactsFromCache(locationId, options)
 
-  if (!cacheReady) {
-    // Fall back to GHL and trigger background sync
-    triggerBackgroundSync(locationId)
-    return { contacts: await fetchContactsFromGhl(locationId, options), fromCache: false }
+  // If cache has data, return it immediately
+  if (cached.length > 0) {
+    return { contacts: cached, fromCache: true }
   }
 
-  return { contacts: await fetchContactsFromCache(locationId, options), fromCache: true }
+  // Check if cache was synced but just has no matches for this filter
+  const sb = createAdminClient()
+  const { count } = await sb
+    .from('cached_contacts')
+    .select('*', { count: 'exact', head: true })
+    .eq('location_id', locationId)
+
+  if (count && count > 0) {
+    // Cache exists, filters just returned nothing
+    return { contacts: [], fromCache: true }
+  }
+
+  // Cache is truly empty — fall back to GHL
+  return { contacts: await fetchContactsFromGhl(locationId, options), fromCache: false }
 }
 
 /** Fetch a single contact from cache */
@@ -144,6 +129,10 @@ export async function getCustomFieldDefs(locationId: string): Promise<CustomFiel
   }))
 }
 
+// ── Lean column list (no raw JSONB on list queries) ──────────
+
+const CONTACT_LIST_COLUMNS = 'ghl_id, location_id, first_name, last_name, email, phone, company_name, address1, city, tags, assigned_to, date_added, last_activity'
+
 // ── Cache reads ──────────────────────────────────────────────
 
 async function fetchContactsFromCache(
@@ -153,7 +142,7 @@ async function fetchContactsFromCache(
   const sb = createAdminClient()
   let query = sb
     .from('cached_contacts')
-    .select('*')
+    .select(CONTACT_LIST_COLUMNS)
     .eq('location_id', locationId)
     .order('date_added', { ascending: false })
 
@@ -179,51 +168,48 @@ async function fetchContactsFromCache(
     query = query.lte('date_added', new Date(options.dateTo + 'T23:59:59.999Z').toISOString())
   }
 
-  const { data: contacts } = await query
-  let result = contacts ?? []
+  // Fire all filter queries in PARALLEL with the main contacts query
+  const needsCategory = options.categoryLabels && options.categoryLabels.length > 0 && options.categoriaFieldId
+  const needsGestore = options.gestore && options.gestoreFieldId
+  const needsScadenza = options.scadenzaFieldIds && options.scadenzaFieldIds.length > 0 && (options.scadenzaFrom || options.scadenzaTo)
 
-  // Category filtering via custom fields EAV table
-  if (options.categoryLabels && options.categoryLabels.length > 0 && options.categoriaFieldId) {
-    const { data: cfRows } = await sb
-      .from('cached_contact_custom_fields')
-      .select('contact_ghl_id, value')
-      .eq('location_id', locationId)
-      .eq('field_id', options.categoriaFieldId)
+  const [contactsResult, categoryResult, gestoreResult, scadenzaResult] = await Promise.all([
+    query,
+    needsCategory
+      ? sb.from('cached_contact_custom_fields').select('contact_ghl_id, value').eq('location_id', locationId).eq('field_id', options.categoriaFieldId!)
+      : null,
+    needsGestore
+      ? sb.from('cached_contact_custom_fields').select('contact_ghl_id').eq('location_id', locationId).eq('field_id', options.gestoreFieldId!).eq('value', options.gestore!)
+      : null,
+    needsScadenza
+      ? sb.from('cached_contact_custom_fields').select('contact_ghl_id, value').eq('location_id', locationId).in('field_id', options.scadenzaFieldIds!)
+      : null,
+  ])
 
+  let result: CachedContact[] = (contactsResult.data ?? []) as CachedContact[]
+
+  // Apply category filter
+  if (needsCategory && categoryResult) {
     const contactCatMap = new Map<string, string[]>()
-    for (const row of cfRows ?? []) {
+    for (const row of categoryResult.data ?? []) {
       contactCatMap.set(row.contact_ghl_id, parseCategoriaValue(row.value ?? ''))
     }
-
     result = result.filter((c) => {
       const cats = contactCatMap.get(c.ghl_id) ?? []
       return options.categoryLabels!.some((label) => cats.includes(label))
     })
   }
 
-  // Gestore (provider) filter via custom fields
-  if (options.gestore && options.gestoreFieldId) {
-    const { data: cfRows } = await sb
-      .from('cached_contact_custom_fields')
-      .select('contact_ghl_id, value')
-      .eq('location_id', locationId)
-      .eq('field_id', options.gestoreFieldId)
-      .eq('value', options.gestore)
-
-    const matchIds = new Set((cfRows ?? []).map((r) => r.contact_ghl_id))
+  // Apply gestore filter
+  if (needsGestore && gestoreResult) {
+    const matchIds = new Set((gestoreResult.data ?? []).map((r) => r.contact_ghl_id))
     result = result.filter((c) => matchIds.has(c.ghl_id))
   }
 
-  // Scadenza date range filter
-  if (options.scadenzaFieldIds && options.scadenzaFieldIds.length > 0 && (options.scadenzaFrom || options.scadenzaTo)) {
-    const { data: cfRows } = await sb
-      .from('cached_contact_custom_fields')
-      .select('contact_ghl_id, field_id, value')
-      .eq('location_id', locationId)
-      .in('field_id', options.scadenzaFieldIds)
-
+  // Apply scadenza filter
+  if (needsScadenza && scadenzaResult) {
     const matchIds = new Set<string>()
-    for (const row of cfRows ?? []) {
+    for (const row of scadenzaResult.data ?? []) {
       if (!row.value) continue
       const val = normalizeDateValue(row.value)
       if (options.scadenzaFrom && val < options.scadenzaFrom) continue
@@ -302,6 +288,7 @@ async function fetchContactsFromGhl(
     address1: (c.address1 as string) ?? null,
     city: (c.city as string) ?? null,
     tags: Array.isArray(c.tags) ? c.tags : [],
+    assigned_to: (c.assignedTo as string) ?? null,
     date_added: (c.dateAdded as string) ?? null,
     last_activity: (c.lastActivity as string) ?? null,
     raw: c,

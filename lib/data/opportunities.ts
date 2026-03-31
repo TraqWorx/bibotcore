@@ -19,34 +19,24 @@ export type CachedOpportunity = {
   raw: Record<string, unknown> | null
 }
 
-async function isCacheReady(locationId: string): Promise<boolean> {
-  const sb = createAdminClient()
-  const { data } = await sb
-    .from('sync_status')
-    .select('status')
-    .eq('location_id', locationId)
-    .eq('entity_type', 'opportunities')
-    .single()
-  return data?.status === 'completed'
-}
+const OPP_COLUMNS = 'ghl_id, location_id, name, pipeline_id, pipeline_stage_id, contact_ghl_id, monetary_value, status, assigned_to'
 
 /** List all opportunities for a location */
 export async function listOpportunities(
   locationId: string,
 ): Promise<{ opportunities: CachedOpportunity[]; fromCache: boolean }> {
-  const cacheReady = await isCacheReady(locationId)
-
-  if (!cacheReady) {
-    return { opportunities: await fetchFromGhl(locationId), fromCache: false }
-  }
-
   const sb = createAdminClient()
   const { data } = await sb
     .from('cached_opportunities')
-    .select('*')
+    .select(OPP_COLUMNS)
     .eq('location_id', locationId)
 
-  return { opportunities: data ?? [], fromCache: true }
+  if (data && data.length > 0) {
+    return { opportunities: data as CachedOpportunity[], fromCache: true }
+  }
+
+  // Fallback to GHL
+  return { opportunities: await fetchFromGhl(locationId), fromCache: false }
 }
 
 /** Get opportunities for a specific contact */
@@ -54,21 +44,18 @@ export async function getOpportunitiesByContact(
   locationId: string,
   contactGhlId: string,
 ): Promise<CachedOpportunity[]> {
-  const cacheReady = await isCacheReady(locationId)
-
-  if (!cacheReady) {
-    const all = await fetchFromGhl(locationId)
-    return all.filter((o) => o.contact_ghl_id === contactGhlId)
-  }
-
   const sb = createAdminClient()
   const { data } = await sb
     .from('cached_opportunities')
-    .select('*')
+    .select(OPP_COLUMNS)
     .eq('location_id', locationId)
     .eq('contact_ghl_id', contactGhlId)
 
-  return data ?? []
+  if (data && data.length > 0) return data as CachedOpportunity[]
+
+  // Fallback
+  const all = await fetchFromGhl(locationId)
+  return all.filter((o) => o.contact_ghl_id === contactGhlId)
 }
 
 async function fetchFromGhl(locationId: string): Promise<CachedOpportunity[]> {

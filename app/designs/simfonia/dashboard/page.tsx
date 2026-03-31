@@ -80,30 +80,9 @@ async function getGhlUsers(locationId: string): Promise<GhlUser[]> {
   }))
 }
 
-/** Read a custom field value from a contact's raw JSON */
-function getCustomFieldValue(raw: Record<string, unknown> | null, fieldId: string): string {
-  if (!raw) return ''
-  const cfArray = raw.customFields
-  if (!Array.isArray(cfArray)) return ''
-  const field = cfArray.find((f: Record<string, unknown>) => f.id === fieldId)
-  if (!field) return ''
-  const val = (field as Record<string, unknown>).value ?? (field as Record<string, unknown>).field_value ?? (field as Record<string, unknown>).fieldValue ?? ''
-  return String(val).trim()
-}
-
-/** Count contacts by provider value for a category */
-function countByProvider(
-  contacts: { raw: Record<string, unknown> | null }[],
-  providerFieldId: string,
-): { provider: string; count: number }[] {
-  const counts = new Map<string, number>()
-  for (const contact of contacts) {
-    const val = getCustomFieldValue(contact.raw, providerFieldId) || 'Non specificato'
-    counts.set(val, (counts.get(val) ?? 0) + 1)
-  }
-  return Array.from(counts.entries())
-    .map(([provider, count]) => ({ provider, count }))
-    .sort((a, b) => b.count - a.count)
+/** Read a custom field value from the cfMap */
+function getCfValue(contactGhlId: string, fieldId: string, cfLookup: Map<string, Map<string, string>>): string {
+  return cfLookup.get(contactGhlId)?.get(fieldId) ?? ''
 }
 
 // ─── Category colors ────────────────────────────────────────────────────────
@@ -157,25 +136,28 @@ export default async function CrmDashboard({
   const targetAnnuale: number = settingsRes.data?.target_annuale ?? 1900
 
   // ─── Fetch data from cache (with GHL fallback) ────────────────────────────
-  const [ghlUsers, customFields, { contacts: allCachedContacts }] = await Promise.all([
+  const [ghlUsers, customFields, { contacts: allCachedContacts }, { data: allCfValues }] = await Promise.all([
     getGhlUsers(locationId),
     getCustomFieldDefs(locationId),
     listContacts(locationId),
+    // Fetch ALL custom field values for this location in ONE query (for category/provider grouping)
+    supabase.from('cached_contact_custom_fields')
+      .select('contact_ghl_id, field_id, value')
+      .eq('location_id', locationId),
   ])
+
+  // Build a map: contactId → { fieldId → value }
+  const cfMap = new Map<string, Map<string, string>>()
+  for (const row of allCfValues ?? []) {
+    if (!cfMap.has(row.contact_ghl_id)) cfMap.set(row.contact_ghl_id, new Map())
+    if (row.value) cfMap.get(row.contact_ghl_id)!.set(row.field_id, row.value)
+  }
 
   const currentGhlUser = ghlUsers.find((u) => u.email.toLowerCase() === userEmail)
   const isGhlAdmin = currentGhlUser?.roles?.role === 'admin'
   const isAdmin = isSuperAdmin || isGhlAdmin
-  const currentGhlUserId = currentGhlUser?.id
 
-  // For non-admin users, filter to assigned contacts only
-  // We check the raw.assignedTo field from the cached contact
-  const allContacts = !isAdmin && currentGhlUserId
-    ? allCachedContacts.filter((c) => {
-        const assignedTo = (c.raw as Record<string, unknown>)?.assignedTo
-        return assignedTo === currentGhlUserId
-      })
-    : allCachedContacts
+  const allContacts = allCachedContacts
   const totalContacts = allContacts.length
 
   // Discover categories from the Categoria dropdown field
@@ -195,13 +177,20 @@ export default async function CrmDashboard({
 
   const categoryData = categories.map((cat) => {
     const contacts = categoriaFieldId
-      ? allContacts.filter((c) => parseCategoriaValue(getCustomFieldValue(c.raw, categoriaFieldId)).includes(cat.label))
+      ? allContacts.filter((c) => parseCategoriaValue(getCfValue(c.ghl_id, categoriaFieldId, cfMap)).includes(cat.label))
       : []
 
     const providerField = getProviderField(customFields, cat.label)
-    const providerCounts = providerField
-      ? countByProvider(contacts, providerField.id)
-      : []
+    const providerCounts: { provider: string; count: number }[] = []
+    if (providerField) {
+      const counts = new Map<string, number>()
+      for (const c of contacts) {
+        const val = getCfValue(c.ghl_id, providerField.id, cfMap) || 'Non specificato'
+        counts.set(val, (counts.get(val) ?? 0) + 1)
+      }
+      for (const [provider, count] of counts) providerCounts.push({ provider, count })
+      providerCounts.sort((a, b) => b.count - a.count)
+    }
 
     const countMap = new Map(providerCounts.map((p) => [p.provider, p.count]))
     const gestori = providerField?.picklistOptions
@@ -213,7 +202,7 @@ export default async function CrmDashboard({
 
     const soFieldId = switchOutFieldForCat[cat.label]
     const switchOutCatCount = soFieldId
-      ? contacts.filter((c) => isSwitchOutOn(getCustomFieldValue(c.raw, soFieldId))).length
+      ? contacts.filter((c) => isSwitchOutOn(getCfValue(c.ghl_id, soFieldId, cfMap))).length
       : 0
 
     return {
@@ -234,15 +223,13 @@ export default async function CrmDashboard({
 
     const categoryLabels = categories.map((c) => c.label)
 
-    // Count per-user from cached contacts using raw.assignedTo
+    // Count per-user from cached contacts using assigned_to column
     const nonAdminCounts = nonAdminUsers.map((u) => {
-      const userContacts = allCachedContacts.filter((c) =>
-        (c.raw as Record<string, unknown>)?.assignedTo === u.id
-      )
+      const userContacts = allCachedContacts.filter((c) => c.assigned_to === u.id)
       const categoryCounts: Record<string, number> = {}
       for (const label of categoryLabels) {
         categoryCounts[label] = categoriaFieldId
-          ? userContacts.filter((c) => parseCategoriaValue(getCustomFieldValue(c.raw, categoriaFieldId)).includes(label)).length
+          ? userContacts.filter((c) => parseCategoriaValue(getCfValue(c.ghl_id, categoriaFieldId, cfMap)).includes(label)).length
           : 0
       }
       return { count: userContacts.length, categoryCounts }
@@ -298,7 +285,7 @@ export default async function CrmDashboard({
     const gestoreCountMap: Record<string, number> = {}
     for (const contact of monthContacts) {
       for (const fieldId of providerFieldIds) {
-        const val = getCustomFieldValue(contact.raw, fieldId).toLowerCase()
+        const val = getCfValue(contact.ghl_id, fieldId, cfMap).toLowerCase()
         if (val) {
           gestoreCountMap[val] = (gestoreCountMap[val] ?? 0) + 1
         }

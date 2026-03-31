@@ -18,6 +18,7 @@ export interface CachedContactRow {
   address1: string | null
   city: string | null
   tags: string[]
+  assigned_to: string | null
   date_added: string | null
   last_activity: string | null
   ghl_updated_at: string | null
@@ -40,6 +41,7 @@ export function transformContact(
     address1: (c.address1 as string) ?? null,
     city: (c.city as string) ?? null,
     tags: Array.isArray(c.tags) ? c.tags : [],
+    assigned_to: (c.assignedTo as string) ?? null,
     date_added: (c.dateAdded as string) ?? null,
     last_activity: (c.lastActivity as string) ?? null,
     ghl_updated_at: (c.updatedAt as string) ?? (c.dateUpdated as string) ?? null,

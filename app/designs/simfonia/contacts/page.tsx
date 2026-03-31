@@ -67,7 +67,7 @@ function cachedToContact(c: {
   tags: string[]
   date_added: string | null
   last_activity: string | null
-  raw: Record<string, unknown> | null
+  raw?: Record<string, unknown> | null
 }): Contact {
   // If we have the raw GHL payload, use it directly (it has customFields etc)
   if (c.raw && typeof c.raw === 'object' && 'firstName' in c.raw) {

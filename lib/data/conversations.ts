@@ -20,53 +20,37 @@ export type CachedConversation = {
   raw: Record<string, unknown> | null
 }
 
-async function isCacheReady(locationId: string): Promise<boolean> {
-  const sb = createAdminClient()
-  const { data } = await sb
-    .from('sync_status')
-    .select('status')
-    .eq('location_id', locationId)
-    .eq('entity_type', 'conversations')
-    .single()
-  return data?.status === 'completed'
-}
+const CONVO_COLUMNS = 'ghl_id, location_id, contact_ghl_id, contact_name, type, last_message_body, last_message_date, last_message_direction, unread_count, assigned_to'
 
 export async function listConversations(
   locationId: string,
 ): Promise<{ conversations: CachedConversation[]; fromCache: boolean }> {
-  const cacheReady = await isCacheReady(locationId)
-
-  if (!cacheReady) {
-    return { conversations: await fetchFromGhl(locationId), fromCache: false }
-  }
-
   const sb = createAdminClient()
-  const { data } = await sb
-    .from('cached_conversations')
-    .select('*')
-    .eq('location_id', locationId)
-    .order('last_message_date', { ascending: false })
 
-  // Merge with conversation_metadata for assigned_to overrides
-  const convos = data ?? []
-  if (convos.length > 0) {
-    const convoIds = convos.map((c) => c.ghl_id)
-    const { data: metadata } = await sb
-      .from('conversation_metadata')
-      .select('conversation_id, assigned_to')
+  const [{ data: convos }, { data: metadata }] = await Promise.all([
+    sb.from('cached_conversations')
+      .select(CONVO_COLUMNS)
       .eq('location_id', locationId)
-      .in('conversation_id', convoIds)
+      .order('last_message_date', { ascending: false }),
+    sb.from('conversation_metadata')
+      .select('conversation_id, assigned_to')
+      .eq('location_id', locationId),
+  ])
 
+  if (convos && convos.length > 0) {
+    // Merge assigned_to from metadata
     if (metadata && metadata.length > 0) {
       const metaMap = new Map(metadata.map((m) => [m.conversation_id, m.assigned_to]))
       for (const c of convos) {
         const override = metaMap.get(c.ghl_id)
-        if (override) c.assigned_to = override
+        if (override) (c as Record<string, unknown>).assigned_to = override
       }
     }
+    return { conversations: convos as CachedConversation[], fromCache: true }
   }
 
-  return { conversations: convos, fromCache: true }
+  // Fallback to GHL
+  return { conversations: await fetchFromGhl(locationId), fromCache: false }
 }
 
 async function fetchFromGhl(locationId: string): Promise<CachedConversation[]> {

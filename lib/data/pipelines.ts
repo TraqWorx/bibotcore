@@ -12,38 +12,24 @@ export type CachedPipeline = {
   stages: { id: string; name: string }[]
 }
 
-async function isCacheReady(locationId: string): Promise<boolean> {
-  const sb = createAdminClient()
-  const { data } = await sb
-    .from('sync_status')
-    .select('status')
-    .eq('location_id', locationId)
-    .eq('entity_type', 'pipelines')
-    .single()
-  return data?.status === 'completed'
-}
-
 export async function listPipelines(
   locationId: string,
 ): Promise<{ pipelines: CachedPipeline[]; fromCache: boolean }> {
-  const cacheReady = await isCacheReady(locationId)
-
-  if (!cacheReady) {
-    return { pipelines: await fetchFromGhl(locationId), fromCache: false }
-  }
-
   const sb = createAdminClient()
   const { data } = await sb
     .from('cached_pipelines')
-    .select('*')
+    .select('ghl_id, location_id, name, stages')
     .eq('location_id', locationId)
 
-  const pipelines = (data ?? []).map((p) => ({
-    ...p,
-    stages: Array.isArray(p.stages) ? p.stages : [],
-  }))
+  if (data && data.length > 0) {
+    const pipelines = data.map((p) => ({
+      ...p,
+      stages: Array.isArray(p.stages) ? p.stages : [],
+    })) as CachedPipeline[]
+    return { pipelines, fromCache: true }
+  }
 
-  return { pipelines, fromCache: true }
+  return { pipelines: await fetchFromGhl(locationId), fromCache: false }
 }
 
 async function fetchFromGhl(locationId: string): Promise<CachedPipeline[]> {
