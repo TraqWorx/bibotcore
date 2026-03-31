@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
 import { darkenHex } from '@/lib/utils/colorUtils'
 import type { DesignTheme, DesignModules } from '@/lib/types/design'
 
@@ -18,25 +19,32 @@ function NavLink({
   href,
   label,
   secondaryColor,
+  isActive,
+  isPending,
+  onClick,
 }: {
   href: string
   label: string
   secondaryColor: string
+  isActive: boolean
+  isPending: boolean
+  onClick: () => void
 }) {
-  const pathname = usePathname()
-  const active = pathname.startsWith(href.split('?')[0])
+  const active = isActive || isPending
 
   return (
     <Link
       href={href}
       prefetch={true}
-      className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150"
+      onClick={onClick}
+      className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-100"
       style={
         active
           ? {
               background: `rgba(${hexToRgb(secondaryColor)}, 0.15)`,
               color: secondaryColor,
               border: `1px solid rgba(${hexToRgb(secondaryColor)}, 0.25)`,
+              opacity: isPending && !isActive ? 0.7 : 1,
             }
           : { color: 'rgba(255,255,255,0.65)' }
       }
@@ -62,10 +70,13 @@ interface GymSidebarProps {
 export default function GymSidebar({ theme, modules, locationId }: GymSidebarProps) {
   const darkBg = darkenHex(theme.primaryColor, 0.15)
   const qs = locationId ? `?locationId=${locationId}` : ''
+  const pathname = usePathname()
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [pendingPath, setPendingPath] = useState<string | null>(null)
 
   const navItems = MODULE_NAV.filter((item) => {
     const mod = modules[item.key as keyof DesignModules]
-    // show if explicitly enabled or module key not set (default = enabled)
     return mod === undefined || mod.enabled !== false
   })
 
@@ -104,14 +115,31 @@ export default function GymSidebar({ theme, modules, locationId }: GymSidebarPro
           CRM
         </p>
         <nav className="space-y-0.5">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.key}
-              href={`${item.path}${qs}`}
-              label={item.label}
-              secondaryColor={theme.secondaryColor}
-            />
-          ))}
+          {navItems.map((item) => {
+            const href = `${item.path}${qs}`
+            const basePath = item.path
+            const isActive = pathname.startsWith(basePath)
+            const isThisPending = isPending && pendingPath === basePath
+
+            return (
+              <NavLink
+                key={item.key}
+                href={href}
+                label={item.label}
+                secondaryColor={theme.secondaryColor}
+                isActive={isActive}
+                isPending={isThisPending}
+                onClick={() => {
+                  if (!isActive) {
+                    setPendingPath(basePath)
+                    startTransition(() => {
+                      router.push(href)
+                    })
+                  }
+                }}
+              />
+            )
+          })}
         </nav>
       </div>
 
