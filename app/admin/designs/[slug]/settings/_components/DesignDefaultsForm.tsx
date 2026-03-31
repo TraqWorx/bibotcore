@@ -21,11 +21,10 @@ interface Props {
   priceMonthly: number | null
 }
 
-export default function DesignDefaultsForm({ slug, name: initialName, theme: initialTheme, modules: initialModules, priceMonthly: initialPrice }: Props) {
+export default function DesignDefaultsForm({ slug, name: initialName, theme: initialTheme, modules: initialModules }: Props) {
   const [name, setName] = useState(initialName)
   const [theme, setTheme] = useState<DesignTheme>(initialTheme)
   const [modules, setModules] = useState<DesignModules>(initialModules)
-  const [priceMonthly, setPriceMonthly] = useState(initialPrice != null ? String(initialPrice) : '')
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<{ ok?: boolean; error?: string } | null>(null)
 
@@ -42,14 +41,8 @@ export default function DesignDefaultsForm({ slug, name: initialName, theme: ini
 
     const finalModules: DesignModules = { ...modules }
 
-    const parsedPrice = priceMonthly.trim() ? parseFloat(priceMonthly) : null
-    if (priceMonthly.trim() && (isNaN(parsedPrice!) || parsedPrice! < 0)) {
-      setResult({ error: 'Prezzo mensile non valido' })
-      return
-    }
-
     setSaving(true)
-    const res = await saveDesignDefaults(slug, name, theme, finalModules, parsedPrice)
+    const res = await saveDesignDefaults(slug, name, theme, finalModules, null)
     setSaving(false)
     setResult(res?.error ? { error: res.error } : { ok: true })
   }
@@ -67,24 +60,6 @@ export default function DesignDefaultsForm({ slug, name: initialName, theme: ini
           className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
           placeholder="Es. Simfonia"
         />
-      </div>
-
-      {/* Pricing */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-6">
-        <h2 className="text-base font-bold text-gray-800 mb-4">Prezzo Mensile</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-500">€</span>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={priceMonthly}
-            onChange={(e) => setPriceMonthly(e.target.value)}
-            placeholder="Es. 99.00"
-            className="w-40 rounded-xl border border-gray-200 px-3 py-2 text-sm"
-          />
-          <span className="text-xs text-gray-400">/ mese — usato per calcolare l&apos;MRR</span>
-        </div>
       </div>
 
       {/* Theme */}
