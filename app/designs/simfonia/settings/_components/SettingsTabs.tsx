@@ -19,7 +19,7 @@ export default function SettingsTabs({ tabs }: { tabs: Tab[] }) {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap"
+            className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold whitespace-nowrap"
             style={
               activeTab === tab.id
                 ? { background: '#2A00CC', color: 'white' }
