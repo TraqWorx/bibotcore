@@ -113,9 +113,30 @@ export default async function CrmDashboard({
   }
 
   const supabase = createAdminClient()
-  const authClient = await createAuthClient()
   const now = new Date()
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+
+  // ─── ALL data fetched in ONE parallel batch ────────────────────────────────
+  const authClientPromise = createAuthClient()
+  const [
+    authClient,
+    settingsRes,
+    { data: gareRows },
+    closedDaysArr,
+    ghlUsers,
+    customFields,
+    { contacts: allCachedContacts },
+    { data: allCfValues },
+  ] = await Promise.all([
+    authClientPromise,
+    supabase.from('location_settings').select('target_annuale').eq('location_id', locationId).single(),
+    supabase.from('gare_mensili').select('categoria, obiettivo, tag').eq('location_id', locationId).eq('month', currentMonth).order('categoria'),
+    getClosedDays(locationId),
+    getGhlUsers(locationId),
+    getCustomFieldDefs(locationId),
+    listContacts(locationId),
+    supabase.from('cached_contact_custom_fields').select('contact_ghl_id, field_id, value').eq('location_id', locationId),
+  ])
 
   const { data: { user: authUser } } = await authClient.auth.getUser()
   const userEmail = authUser?.email?.toLowerCase() ?? ''
@@ -125,26 +146,8 @@ export default async function CrmDashboard({
     : { data: null }
   const isSuperAdmin = profile?.role === 'super_admin'
 
-  const [settingsRes, { data: gareRows }, closedDaysArr] = await Promise.all([
-    supabase.from('location_settings').select('target_annuale').eq('location_id', locationId).single(),
-    supabase.from('gare_mensili').select('categoria, obiettivo, tag').eq('location_id', locationId).eq('month', currentMonth).order('categoria'),
-    getClosedDays(locationId),
-  ])
-
   const closedDays = new Set(closedDaysArr)
-
   const targetAnnuale: number = settingsRes.data?.target_annuale ?? 1900
-
-  // ─── Fetch data from cache (with GHL fallback) ────────────────────────────
-  const [ghlUsers, customFields, { contacts: allCachedContacts }, { data: allCfValues }] = await Promise.all([
-    getGhlUsers(locationId),
-    getCustomFieldDefs(locationId),
-    listContacts(locationId),
-    // Fetch ALL custom field values for this location in ONE query (for category/provider grouping)
-    supabase.from('cached_contact_custom_fields')
-      .select('contact_ghl_id, field_id, value')
-      .eq('location_id', locationId),
-  ])
 
   // Build a map: contactId → { fieldId → value }
   const cfMap = new Map<string, Map<string, string>>()

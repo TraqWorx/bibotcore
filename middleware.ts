@@ -78,21 +78,7 @@ export async function middleware(req: NextRequest) {
       }
     }
 
-    // If location needs OAuth, redirect to authorize page (skip if already on /authorize)
-    if (locationId && !pathname.startsWith('/designs/authorize')) {
-      const { data: conn } = await supabase
-        .from('ghl_connections')
-        .select('status, refresh_token')
-        .eq('location_id', locationId)
-        .single()
-
-      if (conn && conn.status === 'pending_oauth' && !conn.refresh_token) {
-        const authorizeUrl = req.nextUrl.clone()
-        authorizeUrl.pathname = '/designs/authorize'
-        authorizeUrl.searchParams.set('locationId', locationId)
-        return NextResponse.redirect(authorizeUrl)
-      }
-    }
+    // OAuth check moved to page-level — no longer blocking middleware
   }
 
   return res

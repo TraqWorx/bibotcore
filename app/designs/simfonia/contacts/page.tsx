@@ -169,8 +169,8 @@ export default async function ContactsPage({
 
   // Fetch custom field values for all listed contacts in ONE batch query
   const contactGhlIds = cachedContacts.map((c) => c.ghl_id)
-  const { createAdminClient } = await import('@/lib/supabase-server')
-  const sb = createAdminClient()
+  const { createAdminClient: createSb } = await import('@/lib/supabase-server')
+  const sb = createSb()
   const { data: allCfValues } = contactGhlIds.length > 0
     ? await sb.from('cached_contact_custom_fields')
         .select('contact_ghl_id, field_id, value')
