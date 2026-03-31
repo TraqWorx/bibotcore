@@ -24,11 +24,11 @@ import {
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 const BATCH_SIZE = 500
 
-type EntityType = 'contacts' | 'opportunities' | 'pipelines' | 'conversations' | 'custom_fields' | 'tags' | 'calendars' | 'calendar_events' | 'notes' | 'tasks' | 'users'
+type EntityType = 'contacts' | 'opportunities' | 'pipelines' | 'conversations' | 'custom_fields' | 'tags' | 'calendars' | 'calendar_events' | 'notes' | 'tasks' | 'users' | 'invoices'
 const ALL_ENTITIES: EntityType[] = [
   'custom_fields', 'tags', 'users', 'contacts', 'opportunities',
   'pipelines', 'conversations', 'calendars', 'calendar_events',
-  'notes', 'tasks',
+  'notes', 'tasks', 'invoices',
 ]
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -453,6 +453,42 @@ async function syncTasks(locationId: string, _token: string) {
   }
 }
 
+// ── Invoices ─────────────────────────────────────────────────
+
+async function syncInvoices(locationId: string, _token: string) {
+  await setSyncStatus(locationId, 'invoices', 'running')
+  try {
+    const ghl = await getGhlClient(locationId)
+    const data = await ghl.invoices.list().catch(() => ({ invoices: [] }))
+    const invoices = (data?.invoices ?? data?.data ?? []) as Record<string, unknown>[]
+
+    const rows = invoices.map((inv) => ({
+      ghl_id: inv.id as string ?? inv._id as string,
+      location_id: locationId,
+      contact_ghl_id: (inv.contactId as string) ?? (inv.contact_id as string) ?? null,
+      name: (inv.name as string) ?? (inv.title as string) ?? null,
+      status: (inv.status as string) ?? null,
+      amount_due: typeof inv.amountDue === 'number' ? inv.amountDue : null,
+      amount_paid: typeof inv.amountPaid === 'number' ? inv.amountPaid : null,
+      currency: (inv.currency as string) ?? 'EUR',
+      due_date: (inv.dueDate as string) ?? null,
+      created_at_ghl: (inv.createdAt as string) ?? null,
+      synced_at: new Date().toISOString(),
+      raw: inv,
+    }))
+    if (rows.length > 0) {
+      await upsertBatch('cached_invoices', rows, 'location_id,ghl_id')
+    }
+
+    await setSyncStatus(locationId, 'invoices', 'completed')
+    return { count: rows.length }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    await setSyncStatus(locationId, 'invoices', 'failed', msg)
+    throw err
+  }
+}
+
 // ── Main Entry Point ─────────────────────────────────────────
 
 export async function bulkSyncLocation(
@@ -498,6 +534,9 @@ export async function bulkSyncLocation(
           break
         case 'tasks':
           results[entity] = await syncTasks(locationId, token)
+          break
+        case 'invoices':
+          results[entity] = await syncInvoices(locationId, token)
           break
       }
     } catch (err) {

@@ -202,6 +202,14 @@ export async function getGhlClient(locationId: string) {
       delete: (tagId: string) =>
         request(`/locations/${locationId}/tags/${tagId}`, { method: 'DELETE' }),
     },
+    invoices: {
+      list: (params?: string) =>
+        request(`/invoices/search${params ? `?${params}` : `?locationId=${locationId}&limit=100`}`, {
+          method: 'POST',
+          body: JSON.stringify({ locationId }),
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    },
     calendars: {
       list: () => request(`/calendars/?locationId=${locationId}`, {}, '2021-04-15'),
     },

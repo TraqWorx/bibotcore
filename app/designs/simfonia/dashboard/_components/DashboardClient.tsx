@@ -1,7 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
+import { aiGenerateInsight } from '@/lib/ai/actions'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -67,7 +69,7 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
 
   const {
     totalContacts, operators, targetAnnuale, categoryData, switchOutTotal,
-    isAdmin, gareRows, closedDays: closedDaysArr,
+    isAdmin, gareRows, closedDays: closedDaysArr, aiEnabled,
   } = data as {
     totalContacts: number
     operators: number
@@ -77,7 +79,13 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
     isAdmin: boolean
     gareRows: { categoria: string; obiettivo: number; tag: string }[]
     closedDays: string[]
+    aiEnabled: boolean
   }
+
+  // AI Ask state
+  const [aiQuestion, setAiQuestion] = useState('')
+  const [aiAnswer, setAiAnswer] = useState<string | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
 
   const closedDays = new Set(closedDaysArr ?? [])
 
@@ -255,6 +263,61 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
                 </div>
               )
             })}
+          </div>
+        </section>
+      )}
+
+      {/* AI Ask Widget */}
+      {aiEnabled && (
+        <section>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">
+            <span className="mr-1.5">&#10024;</span> Chiedi all&apos;AI
+          </h2>
+          <div className="rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-5 shadow-sm">
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={aiQuestion}
+                onChange={(e) => setAiQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && aiQuestion.trim() && !aiLoading) {
+                    setAiLoading(true)
+                    setAiAnswer(null)
+                    aiGenerateInsight(locationId, aiQuestion.trim()).then((r) => {
+                      setAiAnswer(r.insight ?? r.error ?? 'Nessuna risposta')
+                      setAiLoading(false)
+                    })
+                  }
+                }}
+                placeholder="Es: Quanti contatti Fastweb abbiamo aggiunto questo mese?"
+                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+              />
+              <button
+                onClick={() => {
+                  if (!aiQuestion.trim() || aiLoading) return
+                  setAiLoading(true)
+                  setAiAnswer(null)
+                  aiGenerateInsight(locationId, aiQuestion.trim()).then((r) => {
+                    setAiAnswer(r.insight ?? r.error ?? 'Nessuna risposta')
+                    setAiLoading(false)
+                  })
+                }}
+                disabled={aiLoading || !aiQuestion.trim()}
+                className="rounded-xl bg-gradient-to-r from-[#2A00CC] to-[#6366f1] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:shadow-md disabled:opacity-50"
+              >
+                {aiLoading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Pensando...
+                  </span>
+                ) : 'Chiedi'}
+              </button>
+            </div>
+            {aiAnswer && (
+              <div className="mt-4 rounded-xl border border-[rgba(42,0,204,0.08)] bg-[rgba(42,0,204,0.02)] p-4">
+                <p className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">{aiAnswer}</p>
+              </div>
+            )}
           </div>
         </section>
       )}

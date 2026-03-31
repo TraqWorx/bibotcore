@@ -337,6 +337,13 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Auto-sync: populate the cache immediately so the new location has data
+    import('@/lib/sync/bulkSync').then(({ bulkSyncLocation }) => {
+      bulkSyncLocation(data.locationId).catch((err) =>
+        console.error('[oauth/callback] bulkSync failed:', err)
+      )
+    })
+
     if (isAdminFlow) {
       return NextResponse.redirect(new URL('/admin/locations', req.url))
     }

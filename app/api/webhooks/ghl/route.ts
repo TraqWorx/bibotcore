@@ -110,8 +110,34 @@ export async function POST(req: Request) {
         console.log(`[ghl-webhook] ${eventType} → cached ${entity} for ${locationId}`)
       }
     })
-    .catch((err) => {
+    .catch(async (err) => {
       console.error(`[ghl-webhook] cache update failed for ${eventType}:`, err)
+      // Track failures and notify admin if repeated
+      try {
+        const sb = createAdminClient()
+        // Count recent failures for this location (last hour)
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+        const { count } = await sb
+          .from('ghl_webhook_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('location_id', locationId)
+          .gte('created_at', oneHourAgo)
+          .like('event_type', '%fail%')
+
+        // If 5+ failures in an hour, create a notification for super_admin
+        if ((count ?? 0) >= 5) {
+          const { data: admins } = await sb.from('profiles').select('id').eq('role', 'super_admin')
+          for (const admin of admins ?? []) {
+            await Promise.resolve(sb.from('notifications').insert({
+              user_id: admin.id,
+              type: 'webhook_failure',
+              title: `Webhook failures per ${locationId}`,
+              body: `${count} webhook processing failures nell'ultima ora. Ultimo errore: ${err instanceof Error ? err.message : String(err)}`,
+              read: false,
+            })).catch(() => {})
+          }
+        }
+      } catch { /* ignore notification errors */ }
     })
 
   // ── Persist the raw event ────────────────────────────────────────────────

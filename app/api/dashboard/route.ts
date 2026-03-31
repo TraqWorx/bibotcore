@@ -136,6 +136,16 @@ export async function GET(req: NextRequest) {
       })
     : []
 
+  // Check if AI module is enabled
+  const { data: designSettings } = await sb
+    .from('location_design_settings')
+    .select('module_overrides')
+    .eq('location_id', locationId)
+    .maybeSingle()
+
+  const moduleOverrides = (designSettings?.module_overrides ?? {}) as Record<string, { enabled?: boolean }>
+  const aiEnabled = moduleOverrides.ai?.enabled !== false // default on
+
   return NextResponse.json({
     totalContacts: totalContacts ?? 0,
     operators: (ghlUsers ?? []).length,
@@ -146,5 +156,6 @@ export async function GET(req: NextRequest) {
     gareRows: gareRows ?? [],
     closedDays: closedDaysData?.closed_days ?? [],
     isAdmin,
+    aiEnabled,
   })
 }
