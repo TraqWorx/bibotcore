@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { assertUserOwnsLocation } from '@/lib/location/getActiveLocation'
+import { getUniqueFields } from '../settings/_actions'
+import { writeThroughContact, writeThroughContactDelete } from '@/lib/sync/writeThrough'
 
 export interface ContactDetail {
   id: string
@@ -24,57 +26,69 @@ export async function getContactDetail(
   contactId: string
 ): Promise<ContactDetail | null> {
   try {
-    const ghl = await getGhlClient(locationId)
+    const { getContact, getContactCustomFields } = await import('@/lib/data/contacts')
+    const { getOpportunitiesByContact } = await import('@/lib/data/opportunities')
+    const { listPipelines } = await import('@/lib/data/pipelines')
 
-    const [contactData, opportunitiesData, pipelinesData, conversationsData] = await Promise.all([
-      ghl.contacts.get(contactId),
-      ghl.opportunities.byContact(contactId),
-      ghl.pipelines.list(),
-      ghl.conversations.byContact(contactId).catch(() => null),
+    const [cached, customFieldValues, cachedOpps, { pipelines }] = await Promise.all([
+      getContact(locationId, contactId),
+      getContactCustomFields(locationId, contactId),
+      getOpportunitiesByContact(locationId, contactId),
+      listPipelines(locationId),
     ])
 
-    const contact = contactData?.contact
-    if (!contact) return null
+    // If not in cache, fall back to GHL
+    if (!cached) {
+      const ghl = await getGhlClient(locationId)
+      const contactData = await ghl.contacts.get(contactId)
+      const contact = contactData?.contact
+      if (!contact) return null
+      return {
+        id: contact.id,
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        email: contact.email,
+        phone: contact.phone,
+        companyName: contact.companyName,
+        address1: contact.address1,
+        city: contact.city,
+        tags: contact.tags ?? [],
+        customFields: contact.customFields ?? [],
+      }
+    }
 
-    // Build stage name map
+    // Build stage name map from cached pipelines
     const stageMap: Record<string, string> = {}
-    for (const pipeline of pipelinesData?.pipelines ?? []) {
+    for (const pipeline of pipelines) {
       for (const stage of pipeline.stages ?? []) {
         stageMap[stage.id] = stage.name
       }
     }
 
-    const opportunities = (opportunitiesData?.opportunities ?? []).map(
-      (opp: { id: string; name?: string; pipelineStageId?: string; monetaryValue?: number }) => ({
-        id: opp.id,
-        name: opp.name,
-        stageName: opp.pipelineStageId ? stageMap[opp.pipelineStageId] ?? '—' : '—',
-        monetaryValue: opp.monetaryValue ?? 0,
-      })
-    )
+    const opportunities = cachedOpps.map((opp) => ({
+      id: opp.ghl_id,
+      name: opp.name ?? undefined,
+      stageName: opp.pipeline_stage_id ? stageMap[opp.pipeline_stage_id] ?? '—' : '—',
+      monetaryValue: Number(opp.monetary_value) || 0,
+    }))
 
-    const conversations = (conversationsData?.conversations ?? [])
-      .slice(0, 5)
-      .map((c: { id: string; type?: string; lastMessageBody?: string; lastMessageDate?: string }) => ({
-        id: c.id,
-        type: c.type,
-        lastMessageBody: c.lastMessageBody,
-        lastMessageDate: c.lastMessageDate,
-      }))
+    // Build customFields array from cached raw data or EAV table
+    const rawCustomFields = cached.raw && Array.isArray((cached.raw as Record<string, unknown>).customFields)
+      ? ((cached.raw as Record<string, unknown>).customFields as { id: string; value?: string; field_value?: string; fieldValue?: string }[])
+      : customFieldValues.map((cf) => ({ id: cf.field_id, value: cf.value ?? '', field_value: cf.value ?? '' }))
 
     return {
-      id: contact.id,
-      firstName: contact.firstName,
-      lastName: contact.lastName,
-      email: contact.email,
-      phone: contact.phone,
-      companyName: contact.companyName,
-      address1: contact.address1,
-      city: contact.city,
-      tags: contact.tags ?? [],
-      customFields: contact.customFields ?? [],
+      id: cached.ghl_id,
+      firstName: cached.first_name ?? undefined,
+      lastName: cached.last_name ?? undefined,
+      email: cached.email ?? undefined,
+      phone: cached.phone ?? undefined,
+      companyName: cached.company_name ?? undefined,
+      address1: cached.address1 ?? undefined,
+      city: cached.city ?? undefined,
+      tags: cached.tags ?? [],
+      customFields: rawCustomFields,
       opportunities,
-      conversations,
     }
   } catch {
     return null
@@ -191,7 +205,10 @@ export async function updateContact(
   try {
     await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
-    await ghl.contacts.update(contactId, data)
+    const result = await ghl.contacts.update(contactId, data)
+    // Write-through: update cache with the returned contact data
+    const updatedContact = result?.contact ?? { ...data, id: contactId }
+    writeThroughContact(ghl.locationId, updatedContact as Record<string, unknown>)
     revalidatePath('/designs/simfonia/contacts', 'page')
     revalidatePath('/designs/simfonia/dashboard', 'page')
     return {}
@@ -210,6 +227,8 @@ export async function deleteContact(
     await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
     await ghl.contacts.delete(contactId)
+    // Write-through: remove from cache
+    writeThroughContactDelete(ghl.locationId, contactId)
     revalidatePath('/designs/simfonia/contacts', 'page')
     revalidatePath('/designs/simfonia/dashboard', 'page')
     return {}
@@ -217,4 +236,57 @@ export async function deleteContact(
     const { translateGhlError } = await import('@/lib/utils/ghlErrors')
     return { error: translateGhlError(err, 'Errore nella cancellazione') }
   }
+}
+
+// ─── Unique Field Validation ────────────────────────────────────────────────
+
+import { createAdminClient } from '@/lib/supabase-server'
+
+/**
+ * Check if any unique fields have duplicate values among existing contacts.
+ * Uses the Supabase cached_contact_custom_fields table for fast lookups.
+ * `excludeContactId` is used during edit to skip the current contact.
+ */
+export async function checkUniqueFieldDuplicates(
+  locationId: string,
+  fieldValues: { id: string; value: string }[],
+  excludeContactId?: string
+): Promise<Record<string, string>> {
+  const errors: Record<string, string> = {}
+
+  // Get configured unique fields
+  const uniqueFieldIds = await getUniqueFields(locationId)
+  if (uniqueFieldIds.length === 0) return errors
+
+  // Filter to only fields that have a value and are marked as unique
+  const fieldsToCheck = fieldValues.filter(
+    (f) => f.value.trim() && uniqueFieldIds.includes(f.id)
+  )
+  if (fieldsToCheck.length === 0) return errors
+
+  const sb = createAdminClient()
+
+  // Check each unique field for duplicates using the cache
+  for (const field of fieldsToCheck) {
+    const normalizedValue = field.value.trim().toLowerCase()
+
+    let query = sb
+      .from('cached_contact_custom_fields')
+      .select('contact_ghl_id, value')
+      .eq('location_id', locationId)
+      .eq('field_id', field.id)
+      .ilike('value', normalizedValue)
+      .limit(1)
+
+    if (excludeContactId) {
+      query = query.neq('contact_ghl_id', excludeContactId)
+    }
+
+    const { data } = await query
+    if (data && data.length > 0) {
+      errors[field.id] = `Valore già presente in un altro contatto`
+    }
+  }
+
+  return errors
 }

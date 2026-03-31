@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useTransition, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import ContactDrawer from './ContactDrawer'
 import { deleteContact } from '../_actions'
+import { parseFieldCategory, isSwitchOutOn } from '@/lib/utils/categoryFields'
 import type { ContactColumn } from '../../settings/_actions'
 
 type Contact = Record<string, unknown> & { id: string }
+
+/* ─── Tag colors ─── */
 
 const TAG_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   energia:      { bg: 'bg-amber-50',  text: 'text-amber-700',  dot: 'bg-amber-400' },
@@ -20,7 +23,6 @@ const TAG_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   gas:          { bg: 'bg-amber-50',  text: 'text-amber-800',  dot: 'bg-amber-500' },
 }
 
-// Pastel color palette for hash-based tag color assignment
 const PASTEL_PALETTE: { bg: string; text: string; dot: string }[] = [
   { bg: 'bg-sky-50',     text: 'text-sky-700',     dot: 'bg-sky-400' },
   { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-400' },
@@ -53,19 +55,19 @@ function hashString(str: string): number {
 function getTagColors(tag: string): { bg: string; text: string; dot: string } {
   const explicit = TAG_COLORS[tag.toLowerCase()]
   if (explicit) return explicit
-  const index = hashString(tag.toLowerCase()) % PASTEL_PALETTE.length
-  return PASTEL_PALETTE[index]
+  return PASTEL_PALETTE[hashString(tag.toLowerCase()) % PASTEL_PALETTE.length]
 }
 
-const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  telefonia:             { bg: 'bg-blue-100/80',    text: 'text-blue-800',    border: 'border-blue-200/80' },
-  energia:               { bg: 'bg-amber-100/80',   text: 'text-amber-800',   border: 'border-amber-200/80' },
-  'connettività casa':   { bg: 'bg-emerald-100/80', text: 'text-emerald-800', border: 'border-emerald-200/80' },
-  connettivita:          { bg: 'bg-emerald-100/80', text: 'text-emerald-800', border: 'border-emerald-200/80' },
-  intrattenimento:       { bg: 'bg-purple-100/80',  text: 'text-purple-800',  border: 'border-purple-200/80' },
+const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  telefonia:             { bg: 'bg-blue-100/80',    text: 'text-blue-800',    border: 'border-blue-200/80',    dot: 'bg-blue-500' },
+  energia:               { bg: 'bg-amber-100/80',   text: 'text-amber-800',   border: 'border-amber-200/80',   dot: 'bg-amber-500' },
+  'connettività casa':   { bg: 'bg-emerald-100/80', text: 'text-emerald-800', border: 'border-emerald-200/80', dot: 'bg-emerald-500' },
+  connettivita:          { bg: 'bg-emerald-100/80', text: 'text-emerald-800', border: 'border-emerald-200/80', dot: 'bg-emerald-500' },
+  intrattenimento:       { bg: 'bg-purple-100/80',  text: 'text-purple-800',  border: 'border-purple-200/80',  dot: 'bg-purple-500' },
 }
+const DEFAULT_CAT = { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200', dot: 'bg-gray-400' }
 
-const DEFAULT_CAT = { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200' }
+/* ─── Types ─── */
 
 interface CustomFieldDef {
   id: string
@@ -85,6 +87,41 @@ interface Props {
   categoryTags?: Record<string, string[]>
 }
 
+/* ─── Filter types ─── */
+
+type ColumnFilter =
+  | { type: 'text'; value: string }
+  | { type: 'multi'; values: string[] }
+  | { type: 'date'; from: string; to: string }
+
+const DATE_FIELDS = new Set(['dateAdded', 'lastActivity', 'dateOfBirth', 'dateUpdated'])
+
+function isFilterActive(f: ColumnFilter | undefined): boolean {
+  if (!f) return false
+  if (f.type === 'text') return f.value.trim() !== ''
+  if (f.type === 'multi') return f.values.length > 0
+  if (f.type === 'date') return f.from !== '' || f.to !== ''
+  return false
+}
+
+function filterSummary(f: ColumnFilter): string {
+  if (f.type === 'text') return f.value
+  if (f.type === 'multi') return f.values.length === 1 ? f.values[0] : `${f.values.length} selezionati`
+  if (f.type === 'date') {
+    if (f.from && f.to) return `${fmtDateShort(f.from)} — ${fmtDateShort(f.to)}`
+    if (f.from) return `da ${fmtDateShort(f.from)}`
+    if (f.to) return `fino a ${fmtDateShort(f.to)}`
+  }
+  return ''
+}
+
+function fmtDateShort(iso: string) {
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}`
+}
+
+/* ─── Helpers ─── */
+
 function formatDate(val: unknown): string {
   if (!val || typeof val !== 'string') return '—'
   const d = new Date(val)
@@ -101,8 +138,6 @@ function getCustomFieldValue(contact: Contact, fieldId: string): string {
   return String(val)
 }
 
-const DATE_FIELDS = new Set(['dateAdded', 'lastActivity', 'dateOfBirth', 'dateUpdated'])
-
 function formatCustomFieldValue(val: string): string {
   if (!val) return '—'
   if (/^\d{4}-\d{2}-\d{2}T/.test(val)) {
@@ -118,20 +153,63 @@ function formatCustomFieldValue(val: string): string {
   return val
 }
 
-function getCellValue(contact: Contact, col: ContactColumn): React.ReactNode {
-  // Custom field
+/** Determine what kind of filter a column should use */
+function getColumnFilterKind(col: ContactColumn, customFields: CustomFieldDef[]): 'multi' | 'text' | 'date' {
+  // Built-in date fields
+  if (DATE_FIELDS.has(col.key)) return 'date'
+  // Tags always multi-select
+  if (col.key === 'tags') return 'multi'
+  // DND is boolean → multi
+  if (col.key === 'dnd') return 'multi'
+  // Custom fields
+  if (col.type === 'custom') {
+    const def = customFields.find((d) => d.id === col.key)
+    if (def) {
+      if (def.dataType === 'DATE') return 'date'
+      if (def.dataType === 'SINGLE_OPTIONS' || def.dataType === 'CHECKBOX') return 'multi'
+      // Categoria (comma-separated multi) → multi
+      if (col.label === 'Categoria') return 'multi'
+    }
+  }
+  // Everything else → text search
+  return 'text'
+}
+
+/* ─── Cell rendering ─── */
+
+function getCellValue(contact: Contact, col: ContactColumn, customFields?: CustomFieldDef[]): React.ReactNode {
   if (col.type === 'custom') {
     const raw = getCustomFieldValue(contact, col.key)
-    // Categoria gets colored badge(s) — supports comma-separated multi-values
     if (col.label === 'Categoria' && raw) {
       const catValues = raw.split(',').map(s => s.trim()).filter(Boolean)
       return (
         <div className="flex flex-wrap gap-1">
           {catValues.map((cat) => {
+            const soFieldName = `[${cat}] Switch Out`
+            const cfArray = contact.customFields
+            let isSo = false
+            if (Array.isArray(cfArray)) {
+              const soField = (cfArray as { id: string; value?: unknown; field_value?: unknown; fieldValue?: unknown; key?: string }[])
+                .find((f) => {
+                  const fieldDef = customFields?.find((d) => d.id === f.id)
+                  return fieldDef?.name === soFieldName
+                })
+              if (soField) {
+                isSo = isSwitchOutOn(soField.value ?? soField.field_value ?? soField.fieldValue)
+              }
+            }
+            if (isSo) {
+              return (
+                <span key={cat} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold tracking-wide bg-red-100 text-red-700 border-red-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                  {cat}
+                </span>
+              )
+            }
             const colors = CATEGORY_COLORS[cat.toLowerCase()] ?? DEFAULT_CAT
             return (
               <span key={cat} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold tracking-wide ${colors.bg} ${colors.text} ${colors.border}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${colors.border.replace('border-', 'bg-').replace('/80', '')}`} />
+                <span className={`h-1.5 w-1.5 rounded-full ${colors.dot}`} />
                 {cat}
               </span>
             )
@@ -142,7 +220,6 @@ function getCellValue(contact: Contact, col: ContactColumn): React.ReactNode {
     return formatCustomFieldValue(raw)
   }
 
-  // Merged name
   if (col.key === 'contactName') {
     const name = String(
       contact.contactName ?? contact.name ?? ([contact.firstName, contact.lastName].filter(Boolean).join(' ') || '—')
@@ -158,7 +235,6 @@ function getCellValue(contact: Contact, col: ContactColumn): React.ReactNode {
     )
   }
 
-  // Tags
   if (col.key === 'tags') {
     const tags = Array.isArray(contact.tags) ? contact.tags : []
     if (tags.length === 0) return <span className="text-gray-300">—</span>
@@ -170,10 +246,7 @@ function getCellValue(contact: Contact, col: ContactColumn): React.ReactNode {
         {visible.map((tag: string) => {
           const colors = getTagColors(tag)
           return (
-            <span
-              key={tag}
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-5 ${colors.bg} ${colors.text} ring-1 ring-inset ring-current/10`}
-            >
+            <span key={tag} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-5 ${colors.bg} ${colors.text} ring-1 ring-inset ring-current/10`}>
               <span className={`h-1.5 w-1.5 rounded-full ${colors.dot}`} />
               {tag}
             </span>
@@ -188,19 +261,14 @@ function getCellValue(contact: Contact, col: ContactColumn): React.ReactNode {
     )
   }
 
-  // DND boolean
   if (col.key === 'dnd') {
     return contact.dnd
       ? <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-600 ring-1 ring-inset ring-red-100">DND</span>
       : <span className="text-gray-300/60">—</span>
   }
 
-  // Date fields
-  if (DATE_FIELDS.has(col.key)) {
-    return formatDate(contact[col.key])
-  }
+  if (DATE_FIELDS.has(col.key)) return formatDate(contact[col.key])
 
-  // Email with subtle styling
   if (col.key === 'email') {
     const val = contact[col.key]
     if (!val) return <span className="text-gray-300/60">—</span>
@@ -214,7 +282,6 @@ function getCellValue(contact: Contact, col: ContactColumn): React.ReactNode {
     )
   }
 
-  // Phone
   if (col.key === 'phone') {
     const val = contact[col.key]
     if (!val) return <span className="text-gray-300/60">—</span>
@@ -228,20 +295,328 @@ function getCellValue(contact: Contact, col: ContactColumn): React.ReactNode {
     )
   }
 
-  // Default
   const val = contact[col.key]
   if (val === null || val === undefined || val === '') return <span className="text-gray-300/60">—</span>
   return String(val)
 }
+
+/* ─── Filter dropdown component ─── */
+
+function ColumnFilterDropdown({
+  col,
+  filter,
+  uniqueValues,
+  kind,
+  onUpdate,
+  onClose,
+}: {
+  col: ContactColumn
+  filter: ColumnFilter | undefined
+  uniqueValues: string[]
+  kind: 'multi' | 'text' | 'date'
+  onUpdate: (f: ColumnFilter | null) => void
+  onClose: () => void
+}) {
+  const [search, setSearch] = useState('')
+
+  if (kind === 'date') {
+    const df = filter?.type === 'date' ? filter : { from: '', to: '' }
+    return (
+      <div className="space-y-3">
+        <p className="text-xs font-semibold text-gray-700">Filtra per data</p>
+        <div className="space-y-2">
+          <div>
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-400">Da</label>
+            <input
+              type="date"
+              value={df.from}
+              onChange={(e) => {
+                const next = { type: 'date' as const, from: e.target.value, to: df.to }
+                if (!next.from && !next.to) onUpdate(null)
+                else onUpdate(next)
+              }}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-400">A</label>
+            <input
+              type="date"
+              value={df.to}
+              onChange={(e) => {
+                const next = { type: 'date' as const, from: df.from, to: e.target.value }
+                if (!next.from && !next.to) onUpdate(null)
+                else onUpdate(next)
+              }}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+            />
+          </div>
+        </div>
+        {(df.from || df.to) && (
+          <button type="button" onClick={() => { onUpdate(null); onClose() }} className="text-[11px] font-medium text-red-500 hover:text-red-600">
+            Cancella filtro
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (kind === 'multi') {
+    const selected = filter?.type === 'multi' ? filter.values : []
+    const filtered = search
+      ? uniqueValues.filter((v) => v.toLowerCase().includes(search.toLowerCase()))
+      : uniqueValues
+
+    function toggle(val: string) {
+      const next = selected.includes(val)
+        ? selected.filter((s) => s !== val)
+        : [...selected, val]
+      if (next.length === 0) onUpdate(null)
+      else onUpdate({ type: 'multi', values: next })
+    }
+
+    return (
+      <div className="space-y-2">
+        {/* Search within options */}
+        {uniqueValues.length > 6 && (
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Cerca..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoFocus
+              className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+            />
+          </div>
+        )}
+
+        {/* Selected count */}
+        {selected.length > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-[#2A00CC]">{selected.length} selezionati</span>
+            <button type="button" onClick={() => { onUpdate(null) }} className="text-[11px] font-medium text-red-500 hover:text-red-600">
+              Deseleziona
+            </button>
+          </div>
+        )}
+
+        {/* Vertical checkbox list */}
+        <div className="max-h-56 overflow-y-auto -mx-1 space-y-0.5">
+          {filtered.length === 0 && (
+            <p className="px-3 py-2 text-xs text-gray-400">Nessun risultato</p>
+          )}
+          {filtered.map((val) => {
+            const isChecked = selected.includes(val)
+            return (
+              <label
+                key={val}
+                className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-xs transition-colors ${isChecked ? 'bg-[rgba(42,0,204,0.06)]' : 'hover:bg-gray-50'}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggle(val)}
+                  className="h-3.5 w-3.5 rounded border-gray-300 text-[#2A00CC] focus:ring-[#2A00CC] focus:ring-offset-0"
+                />
+                <span className={`truncate ${isChecked ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>{val}</span>
+              </label>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // Text search
+  const tv = filter?.type === 'text' ? filter.value : ''
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+        <input
+          type="text"
+          placeholder={`Cerca ${col.label.toLowerCase()}...`}
+          value={tv}
+          onChange={(e) => {
+            if (e.target.value.trim() === '') onUpdate(null)
+            else onUpdate({ type: 'text', value: e.target.value })
+          }}
+          onKeyDown={(e) => { if (e.key === 'Enter') onClose() }}
+          autoFocus
+          className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+        />
+      </div>
+      {tv && (
+        <button type="button" onClick={() => { onUpdate(null); onClose() }} className="text-[11px] font-medium text-red-500 hover:text-red-600">
+          Cancella filtro
+        </button>
+      )}
+    </div>
+  )
+}
+
+/* ─── Main component ─── */
 
 export default function ContactsList({ contacts: serverContacts, locationId, columns, customFields = [], availableTags = [], categoryTags = {} }: Props) {
   const router = useRouter()
   const [localContacts, setLocalContacts] = useState<Contact[]>(serverContacts)
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
   const [editContactId, setEditContactId] = useState<string | null>(null)
+  const skipSyncUntil = useRef(0)
+
+  // Column filters: colKey → ColumnFilter
+  const [columnFilters, setColumnFilters] = useState<Record<string, ColumnFilter>>({})
+  const [activeFilter, setActiveFilter] = useState<string | null>(null)
+  const filterRef = useRef<HTMLDivElement>(null)
+
+  // Close filter dropdown on click outside
+  useEffect(() => {
+    if (!activeFilter) return
+    function handleClick(e: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setActiveFilter(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [activeFilter])
+
+  // Determine filter kind for each column
+  const columnFilterKinds = useMemo(() => {
+    const map: Record<string, 'multi' | 'text' | 'date'> = {}
+    for (const col of columns) {
+      map[col.key] = getColumnFilterKind(col, customFields)
+    }
+    return map
+  }, [columns, customFields])
+
+  // Build unique values per column for multi-select filters
+  const uniqueValuesPerColumn = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    for (const col of columns) {
+      if (columnFilterKinds[col.key] !== 'multi') continue
+      const valSet = new Set<string>()
+      for (const c of localContacts) {
+        if (col.type === 'custom') {
+          const raw = getCustomFieldValue(c, col.key)
+          if (raw) {
+            // Categoria and other comma-separated fields
+            if (col.label === 'Categoria' || raw.includes(',')) {
+              raw.split(',').map(s => s.trim()).filter(Boolean).forEach(v => valSet.add(v))
+            } else {
+              valSet.add(raw)
+            }
+          }
+        } else if (col.key === 'tags') {
+          const tags = Array.isArray(c.tags) ? c.tags as string[] : []
+          tags.forEach(t => valSet.add(t))
+        } else if (col.key === 'dnd') {
+          if (c.dnd) valSet.add('Si')
+          else valSet.add('No')
+        } else {
+          const val = c[col.key]
+          if (val !== null && val !== undefined && val !== '') valSet.add(String(val))
+        }
+      }
+      map[col.key] = Array.from(valSet).sort((a, b) => a.localeCompare(b, 'it'))
+    }
+    return map
+  }, [localContacts, columns, columnFilterKinds])
+
+  // Apply filters to contacts
+  const filteredContacts = useMemo(() => {
+    const activeFilters = Object.entries(columnFilters).filter(([, f]) => isFilterActive(f))
+    if (activeFilters.length === 0) return localContacts
+    return localContacts.filter((contact) => {
+      return activeFilters.every(([colKey, filter]) => {
+        const col = columns.find((c) => c.key === colKey)
+        if (!col) return true
+
+        if (filter.type === 'text') {
+          const lower = filter.value.toLowerCase()
+          if (col.type === 'custom') {
+            return getCustomFieldValue(contact, col.key).toLowerCase().includes(lower)
+          }
+          if (col.key === 'contactName') {
+            const name = String(
+              contact.contactName ?? contact.name ?? ([contact.firstName, contact.lastName].filter(Boolean).join(' ') || '')
+            )
+            return name.toLowerCase().includes(lower)
+          }
+          if (col.key === 'tags') {
+            const tags = Array.isArray(contact.tags) ? contact.tags as string[] : []
+            return tags.some(t => t.toLowerCase().includes(lower))
+          }
+          const val = contact[col.key]
+          return val !== null && val !== undefined && String(val).toLowerCase().includes(lower)
+        }
+
+        if (filter.type === 'multi') {
+          const selected = filter.values.map(v => v.toLowerCase())
+          if (col.type === 'custom') {
+            const raw = getCustomFieldValue(contact, col.key).toLowerCase()
+            // For comma-separated values (Categoria), check if ANY selected value matches
+            const contactVals = raw.split(',').map(s => s.trim())
+            return selected.some(s => contactVals.includes(s))
+          }
+          if (col.key === 'tags') {
+            const tags = Array.isArray(contact.tags) ? (contact.tags as string[]).map(t => t.toLowerCase()) : []
+            return selected.some(s => tags.includes(s))
+          }
+          if (col.key === 'dnd') {
+            const isDnd = !!contact.dnd
+            return selected.includes(isDnd ? 'si' : 'no')
+          }
+          const val = String(contact[col.key] ?? '').toLowerCase()
+          return selected.includes(val)
+        }
+
+        if (filter.type === 'date') {
+          let rawDate: string | null = null
+          if (col.type === 'custom') {
+            rawDate = getCustomFieldValue(contact, col.key)
+          } else {
+            const val = contact[col.key]
+            rawDate = val ? String(val) : null
+          }
+          if (!rawDate) return false
+          // Normalize to YYYY-MM-DD for comparison
+          const iso = rawDate.slice(0, 10) // handles both "2025-01-15" and "2025-01-15T..."
+          if (filter.from && iso < filter.from) return false
+          if (filter.to && iso > filter.to) return false
+          return true
+        }
+
+        return true
+      })
+    })
+  }, [localContacts, columnFilters, columns])
+
+  const activeFilterCount = Object.values(columnFilters).filter(isFilterActive).length
+
+  function updateFilter(colKey: string, f: ColumnFilter | null) {
+    setColumnFilters((prev) => {
+      const next = { ...prev }
+      if (!f) delete next[colKey]
+      else next[colKey] = f
+      return next
+    })
+  }
+
+  function clearAllFilters() {
+    setColumnFilters({})
+    setActiveFilter(null)
+  }
 
   // Sync with server when props change
   useEffect(() => {
+    if (Date.now() < skipSyncUntil.current) return
     setLocalContacts(serverContacts)
   }, [serverContacts])
 
@@ -276,7 +651,29 @@ export default function ContactsList({ contacts: serverContacts, locationId, col
   return (
     <>
       <div className="overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm">
-        {localContacts.length === 0 ? (
+        {/* Active filters bar */}
+        {activeFilterCount > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/50 px-4 py-2.5">
+            <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+            </svg>
+            {Object.entries(columnFilters).filter(([, f]) => isFilterActive(f)).map(([colKey, f]) => {
+              const col = columns.find(c => c.key === colKey)
+              return (
+                <span key={colKey} className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(42,0,204,0.08)] px-2.5 py-1 text-[11px] font-semibold text-[#2A00CC]">
+                  <span className="text-[#2A00CC]/50">{col?.label}:</span> {filterSummary(f)}
+                  <button type="button" onClick={() => updateFilter(colKey, null)} className="ml-0.5 text-current opacity-50 hover:opacity-100">&times;</button>
+                </span>
+              )
+            })}
+            <button type="button" onClick={clearAllFilters} className="ml-auto text-[11px] font-medium text-gray-400 hover:text-gray-600 transition-colors">
+              Cancella tutti
+            </button>
+            <span className="text-[11px] text-gray-400">{filteredContacts.length} / {localContacts.length}</span>
+          </div>
+        )}
+
+        {filteredContacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
               <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -284,52 +681,87 @@ export default function ContactsList({ contacts: serverContacts, locationId, col
               </svg>
             </div>
             <p className="mt-4 text-sm font-medium text-gray-500">Nessun contatto trovato.</p>
-            <p className="mt-1 text-xs text-gray-400">Prova a modificare i filtri o crea un nuovo contatto.</p>
+            <p className="mt-1 text-xs text-gray-400">
+              {activeFilterCount > 0 ? 'Prova a modificare i filtri.' : 'Prova a modificare i filtri o crea un nuovo contatto.'}
+            </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200/60 bg-gray-50/60">
-                  <th className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400 w-12">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-gray-200/60 bg-gray-50">
+                  <th className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400 w-12 bg-gray-50 border-r border-gray-200/40">
                     #
                   </th>
-                  {columns.map((col) => (
-                    <th
-                      key={col.key}
-                      className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap"
-                    >
-                      {col.label}
-                    </th>
-                  ))}
-                  <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400 w-20">
+                  {columns.map((col, colIdx) => {
+                    const hasFilter = isFilterActive(columnFilters[col.key])
+                    const isOpen = activeFilter === col.key
+                    const kind = columnFilterKinds[col.key]
+                    const isLast = colIdx === columns.length - 1
+                    return (
+                      <th
+                        key={col.key}
+                        className={`relative px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap bg-gray-50 ${isLast ? '' : 'border-r border-gray-200/40'}`}
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setActiveFilter(isOpen ? null : col.key) }}
+                          className={`inline-flex items-center gap-1 transition-colors ${hasFilter ? 'text-[#2A00CC]' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                          {col.label}
+                          <svg className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                          </svg>
+                          {hasFilter && <span className="h-1.5 w-1.5 rounded-full bg-[#2A00CC]" />}
+                        </button>
+                        {/* Filter dropdown */}
+                        {isOpen && (
+                          <div
+                            ref={filterRef}
+                            className="absolute left-0 top-full mt-1 w-64 rounded-xl border border-gray-200 bg-white p-3 shadow-xl z-20"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ColumnFilterDropdown
+                              col={col}
+                              filter={columnFilters[col.key]}
+                              uniqueValues={uniqueValuesPerColumn[col.key] ?? []}
+                              kind={kind}
+                              onUpdate={(f) => updateFilter(col.key, f)}
+                              onClose={() => setActiveFilter(null)}
+                            />
+                          </div>
+                        )}
+                      </th>
+                    )
+                  })}
+                  <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400 w-20 bg-gray-50 border-l border-gray-200/40">
                     Azioni
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {localContacts.map((c, index) => (
+                {filteredContacts.map((c, index) => (
                   <tr
                     key={c.id}
                     className="group cursor-pointer border-b border-gray-100/70 bg-white transition-colors duration-150 hover:bg-indigo-50/30"
                     onClick={() => setSelectedContactId(c.id)}
                   >
-                    <td className="px-3 py-3.5 text-center">
+                    <td className="px-3 py-3.5 text-center border-r border-gray-100/60">
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-gray-100/80 text-[10px] font-bold tabular-nums text-gray-400">
                         {index + 1}
                       </span>
                     </td>
-                    {columns.map((col) => (
+                    {columns.map((col, colIdx) => (
                       <td
                         key={col.key}
                         className={`px-4 py-3.5 ${
                           DATE_FIELDS.has(col.key) || col.key === 'phone' ? 'whitespace-nowrap' : ''
-                        } ${col.key === 'contactName' ? '' : 'text-gray-500'}`}
+                        } ${col.key === 'contactName' ? '' : 'text-gray-500'} ${colIdx < columns.length - 1 ? 'border-r border-gray-100/60' : ''}`}
                       >
-                        {getCellValue(c, col)}
+                        {getCellValue(c, col, customFields)}
                       </td>
                     ))}
-                    <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                    <td className="px-3 py-3.5 text-right whitespace-nowrap border-l border-gray-100/60">
                       <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                         <button
                           onClick={(e) => handleEdit(c.id, e)}
@@ -380,6 +812,7 @@ export default function ContactsList({ contacts: serverContacts, locationId, col
           initialTab={editContactId ? 'edit' : 'info'}
           onClose={() => { setSelectedContactId(null); setEditContactId(null) }}
           onContactUpdated={(id, data) => {
+            skipSyncUntil.current = Date.now() + 5000
             setLocalContacts((prev) => prev.map((c) => {
               if (c.id !== id) return c
               return {

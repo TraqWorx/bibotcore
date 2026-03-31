@@ -8,7 +8,8 @@ export async function middleware(req: NextRequest) {
   // ✅ Allow public routes INCLUDING redirect
   if (
     pathname.startsWith('/login') ||
-    pathname.startsWith('/redirect') || // <-- THIS WAS MISSING
+    pathname.startsWith('/redirect') ||
+    pathname.startsWith('/portal/login') ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname === '/'
@@ -43,7 +44,16 @@ export async function middleware(req: NextRequest) {
 
   if (!session) {
     const loginUrl = req.nextUrl.clone()
-    loginUrl.pathname = '/login'
+    // Portal users get redirected to portal login
+    if (pathname.startsWith('/portal/')) {
+      // Extract locationId from /portal/[locationId]/...
+      const segments = pathname.split('/')
+      const portalLocationId = segments[2] ?? ''
+      loginUrl.pathname = '/portal/login'
+      if (portalLocationId) loginUrl.searchParams.set('locationId', portalLocationId)
+    } else {
+      loginUrl.pathname = '/login'
+    }
     return NextResponse.redirect(loginUrl)
   }
 
@@ -89,5 +99,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*', '/designs/:path*', '/agency', '/agency/:path*'],
+  matcher: ['/dashboard/:path*', '/admin/:path*', '/designs/:path*', '/agency', '/agency/:path*', '/portal/:path*'],
 }

@@ -1,22 +1,19 @@
 import Link from 'next/link'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
-import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { getCategoryTags, getContactColumns, getLocationTags, type ContactColumn } from '../settings/_actions'
+import { listContacts, getCustomFieldDefs, getContact } from '@/lib/data/contacts'
 import ContactsList from './_components/ContactsList'
 import ContactsFilters from './_components/ContactsFilters'
 import ColumnPicker from './_components/ColumnPicker'
 import {
   discoverCategories,
   getCategoriaField,
-  getFieldsForCategory,
   getProviderField,
   getScadenzaField,
+  getFieldsForCategory,
   parseFieldCategory,
-  parseCategoriaValue,
   type CustomFieldDef,
 } from '@/lib/utils/categoryFields'
-
-const BASE_URL = 'https://services.leadconnectorhq.com'
 
 type Contact = Record<string, unknown> & { id: string }
 
@@ -29,171 +26,6 @@ const DEFAULT_COLUMNS: ContactColumn[] = [
   { key: 'lastActivity', label: 'Last Activity', type: 'standard' },
   { key: 'tags', label: 'Tags', type: 'standard' },
 ]
-
-async function fetchCustomFields(token: string, locationId: string): Promise<CustomFieldDef[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/locations/${locationId}/customFields`, {
-      headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
-      next: { revalidate: 300 },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return ((data?.customFields ?? []) as CustomFieldDef[]).map((cf) => ({
-      id: cf.id,
-      name: cf.name,
-      fieldKey: cf.fieldKey ?? cf.id,
-      dataType: cf.dataType ?? 'TEXT',
-      placeholder: cf.placeholder,
-      picklistOptions: cf.picklistOptions,
-    }))
-  } catch {
-    return []
-  }
-}
-
-/** Read a custom field value from a contact's customFields array */
-function getContactCfValue(contact: Contact, fieldId: string): string {
-  const cfArray = contact.customFields
-  if (!Array.isArray(cfArray)) return ''
-  const field = cfArray.find((f: Record<string, unknown>) => f.id === fieldId)
-  if (!field) return ''
-  const val = (field as Record<string, unknown>).value ?? (field as Record<string, unknown>).field_value ?? ''
-  return String(val).trim()
-}
-
-async function fetchAllContacts(
-  locationId: string,
-  token: string,
-): Promise<Contact[]> {
-  const allContacts: Contact[] = []
-  for (let page = 1; page <= 5; page++) {
-    const res = await fetch(`${BASE_URL}/contacts/search`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Version: '2021-07-28',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ locationId, pageLimit: 100, page }),
-      cache: 'no-store',
-    })
-    if (!res.ok) break
-    const data = await res.json()
-    const contacts = (data?.contacts ?? []) as Contact[]
-    allContacts.push(...contacts)
-    if (contacts.length < 100) break
-  }
-  return allContacts
-}
-
-async function fetchContacts(
-  locationId: string,
-  token: string,
-  categoryLabels: string[],
-  categoriaFieldId: string | null,
-  activeTag: string | null,
-  gestoreFieldId: string | null,
-  activeGestore: string | null,
-  dateFrom: string | null,
-  dateTo: string | null,
-  scadenzaFieldIds: string[],
-  scadenzaFrom: string | null,
-  scadenzaTo: string | null,
-  search: string | null,
-): Promise<Contact[]> {
-  // Build GHL-compatible filters (standard fields + tags only — NOT custom fields)
-  const filters: { field: string; operator: string; value: string }[] = []
-
-  // Sub-filter by tags (comma-separated for multi-select)
-  if (activeTag) {
-    for (const tag of activeTag.split(',')) {
-      if (tag.trim()) {
-        filters.push({ field: 'tags', operator: 'contains', value: tag.trim() })
-      }
-    }
-  }
-
-  // Created date range
-  if (dateFrom) {
-    filters.push({ field: 'dateAdded', operator: 'GTE', value: new Date(dateFrom + 'T00:00:00.000Z').toISOString() })
-  }
-  if (dateTo) {
-    filters.push({ field: 'dateAdded', operator: 'LTE', value: new Date(dateTo + 'T23:59:59.999Z').toISOString() })
-  }
-
-  let contacts: Contact[]
-
-  if (filters.length > 0 || search) {
-    contacts = []
-    for (let page = 1; page <= 5; page++) {
-      const res = await fetch(`${BASE_URL}/contacts/search`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Version: '2021-07-28',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          locationId, pageLimit: 100, page,
-          ...(filters.length > 0 ? { filters } : {}),
-          ...(search ? { query: search } : {}),
-        }),
-        cache: 'no-store',
-      })
-      if (!res.ok) break
-      const data = await res.json()
-      const batch = (data?.contacts ?? []) as Contact[]
-      contacts.push(...batch)
-      if (batch.length < 100) break
-    }
-  } else {
-    contacts = await fetchAllContacts(locationId, token)
-  }
-
-  // Client-side filter by Categoria custom field (GHL search can't filter by custom field IDs)
-  // A contact's Categoria value can be comma-separated (multi-category). Match if ANY overlap.
-  if (categoryLabels.length > 0 && categoriaFieldId) {
-    contacts = contacts.filter((c) => {
-      const contactCats = parseCategoriaValue(getContactCfValue(c, categoriaFieldId))
-      return categoryLabels.some((label) => contactCats.includes(label))
-    })
-  }
-
-  // Client-side filter by Gestore custom field
-  if (activeGestore && gestoreFieldId) {
-    contacts = contacts.filter((c) => getContactCfValue(c, gestoreFieldId) === activeGestore)
-  }
-
-  // Client-side filter by Scadenza date range (check any scadenza field across categories)
-  if (scadenzaFieldIds.length > 0 && (scadenzaFrom || scadenzaTo)) {
-    contacts = contacts.filter((c) => {
-      // Match if ANY scadenza field falls within the range
-      return scadenzaFieldIds.some((fieldId) => {
-        const raw = getContactCfValue(c, fieldId)
-        if (!raw) return false
-        // Normalize to YYYY-MM-DD for comparison
-        // Handles: ISO (2026-03-27T00:00:00.000Z), YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY
-        let val: string
-        if (raw.includes('T')) {
-          val = raw.slice(0, 10)
-        } else if (raw.includes('/')) {
-          const [d, m, y] = raw.split('/')
-          val = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
-        } else if (raw.match(/^\d{2}-\d{2}-\d{4}$/)) {
-          const [d, m, y] = raw.split('-')
-          val = `${y}-${m}-${d}`
-        } else {
-          val = raw.slice(0, 10)
-        }
-        if (scadenzaFrom && val < scadenzaFrom) return false
-        if (scadenzaTo && val > scadenzaTo) return false
-        return true
-      })
-    })
-  }
-
-  return contacts
-}
 
 /** Build dynamic columns from category custom fields */
 function buildCategoryColumns(customFields: CustomFieldDef[], categoryLabel: string): ContactColumn[] {
@@ -222,6 +54,42 @@ function getAllGestoreOptions(customFields: CustomFieldDef[], categories: { labe
   return Array.from(allOptions).sort()
 }
 
+/** Convert cached contact to the Contact shape expected by child components */
+function cachedToContact(c: {
+  ghl_id: string
+  first_name: string | null
+  last_name: string | null
+  email: string | null
+  phone: string | null
+  company_name: string | null
+  address1: string | null
+  city: string | null
+  tags: string[]
+  date_added: string | null
+  last_activity: string | null
+  raw: Record<string, unknown> | null
+}): Contact {
+  // If we have the raw GHL payload, use it directly (it has customFields etc)
+  if (c.raw && typeof c.raw === 'object') {
+    return { ...c.raw, id: c.ghl_id } as Contact
+  }
+  // Otherwise build a minimal Contact from cached columns
+  return {
+    id: c.ghl_id,
+    firstName: c.first_name ?? '',
+    lastName: c.last_name ?? '',
+    email: c.email ?? '',
+    phone: c.phone ?? '',
+    companyName: c.company_name ?? '',
+    address1: c.address1 ?? '',
+    city: c.city ?? '',
+    tags: c.tags ?? [],
+    dateAdded: c.date_added ?? '',
+    lastActivity: c.last_activity ?? '',
+    customFields: [],
+  } as Contact
+}
+
 export default async function ContactsPage({
   searchParams,
 }: {
@@ -237,6 +105,7 @@ export default async function ContactsPage({
   const scadenzaFrom = typeof sp.scadenzaFrom === 'string' ? sp.scadenzaFrom : null
   const scadenzaTo = typeof sp.scadenzaTo === 'string' ? sp.scadenzaTo : null
   const search = typeof sp.search === 'string' ? sp.search : null
+  const newContactId = typeof sp.newContact === 'string' ? sp.newContact : null
 
   if (!locationId) {
     return (
@@ -246,11 +115,9 @@ export default async function ContactsPage({
     )
   }
 
-  const token = await getGhlTokenForLocation(locationId).catch(() => null)
-
   const [savedDefaultColumns, customFields, locationTags, categoryTagsMap] = await Promise.all([
     getContactColumns(locationId),
-    token ? fetchCustomFields(token, locationId) : Promise.resolve([]),
+    getCustomFieldDefs(locationId),
     getLocationTags(locationId),
     getCategoryTags(locationId).catch(() => ({} as Record<string, string[]>)),
   ])
@@ -265,42 +132,54 @@ export default async function ContactsPage({
   const categoryLabels = activeSlugs
     .map((slug) => categories.find((c) => c.slug === slug)?.label)
     .filter((l): l is string => !!l)
-  // For backward compat: single category label when exactly one is selected
   const categoryLabel = categoryLabels.length === 1 ? categoryLabels[0] : null
 
-  // Get gestore (provider) field for the active category, or all options for "Tutte" / multi
+  // Get gestore (provider) field for the active category
   const gestoreField = categoryLabel
     ? getProviderField(customFields, categoryLabel)
     : null
   const gestoreFieldId = gestoreField?.id ?? null
-  // For multi-category or no category, collect gestore options from ALL selected (or all) categories
   const gestoreOptions = categoryLabel
     ? (gestoreField?.picklistOptions ?? [])
     : categoryLabels.length > 0
       ? getAllGestoreOptions(customFields, categoryLabels.map((l) => ({ label: l })))
       : getAllGestoreOptions(customFields, categories)
 
-  // Get scadenza field(s) — single field for one category, or all scadenza fields otherwise
+  // Get scadenza field(s)
   const scadenzaFieldIds: string[] = categoryLabel
     ? [getScadenzaField(customFields, categoryLabel)?.id].filter((id): id is string => !!id)
     : categoryLabels.length > 0
       ? categoryLabels.map((l) => getScadenzaField(customFields, l)?.id).filter((id): id is string => !!id)
       : categories.map((c) => getScadenzaField(customFields, c.label)?.id).filter((id): id is string => !!id)
 
-  const contacts = token
-    ? await fetchContacts(
-        locationId, token, categoryLabels, categoriaFieldId,
-        activeTag, gestoreFieldId, activeGestore,
-        dateFrom, dateTo, scadenzaFieldIds, scadenzaFrom, scadenzaTo, search,
-      )
-    : []
+  // ─── Fetch contacts from Supabase cache (with GHL fallback) ───────────────
+  const { contacts: cachedContacts } = await listContacts(locationId, {
+    categoryLabels,
+    categoriaFieldId,
+    tag: activeTag,
+    gestoreFieldId,
+    gestore: activeGestore,
+    dateFrom,
+    dateTo,
+    scadenzaFieldIds,
+    scadenzaFrom,
+    scadenzaTo,
+    search,
+  })
+
+  let contacts: Contact[] = cachedContacts.map(cachedToContact)
+
+  // If a newly created contact isn't in results yet, fetch it from cache
+  if (newContactId && !contacts.some((c) => c.id === newContactId)) {
+    const newContact = await getContact(locationId, newContactId)
+    if (newContact) contacts.unshift(cachedToContact(newContact))
+  }
 
   // Load per-category saved columns if exactly one category is active
   const savedCategoryColumns = categoryLabel
     ? await getContactColumns(locationId, categoryLabel)
     : []
 
-  // Use saved category columns if available; for multi-category use default columns
   const columns = categoryLabel
     ? (savedCategoryColumns.length > 0 ? savedCategoryColumns : buildCategoryColumns(customFields, categoryLabel))
     : (savedDefaultColumns.length > 0 ? savedDefaultColumns : DEFAULT_COLUMNS)

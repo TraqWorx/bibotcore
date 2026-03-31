@@ -3,11 +3,14 @@ import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 import { getClosedDays } from '../settings/_actions'
+import { listContacts, getCustomFieldDefs } from '@/lib/data/contacts'
 import {
   discoverCategories,
   getCategoriaField,
   getProviderField,
-  getSwitchOutField,
+  getFieldsForCategory,
+  parseFieldCategory,
+  isSwitchOutOn,
   parseCategoriaValue,
   type CustomFieldDef,
 } from '@/lib/utils/categoryFields'
@@ -51,7 +54,7 @@ function getMonthWorkingDayStats(closedDays: Set<string> = new Set()) {
   return { passed, total, pct: total > 0 ? Math.round((passed / total) * 100) : 0 }
 }
 
-// ─── GHL helpers ─────────────────────────────────────────────────────────────
+// ─── GHL helpers (only for data not in cache) ───────────────────────────────
 
 interface GhlUser {
   id: string
@@ -71,72 +74,15 @@ async function ghlGet(path: string, token: string) {
   return res.json()
 }
 
-async function ghlSearch(
-  locationId: string,
-  token: string,
-  filters: { field: string; operator: string; value: string }[],
-  pageLimit = 100,
-): Promise<{ total: number; contacts: Record<string, unknown>[] }> {
-  try {
-    const res = await fetch(`${BASE_URL}/contacts/search`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locationId, pageLimit, filters }),
-      cache: 'no-store',
-    })
-    if (!res.ok) return { total: 0, contacts: [] }
-    const data = await res.json()
-    const contacts = data?.contacts ?? []
-    const total = data?.total ?? contacts.length
-    return { total, contacts }
-  } catch {
-    return { total: 0, contacts: [] }
-  }
-}
-
-/** Fetch ALL contacts matching a filter (paginated up to 500) — returns full contact objects with customFields */
-async function ghlSearchAll(
-  locationId: string,
-  token: string,
-  filters: { field: string; operator: string; value: string }[],
-): Promise<Record<string, unknown>[]> {
-  const allContacts: Record<string, unknown>[] = []
-  for (let page = 1; page <= 5; page++) {
-    try {
-      const res = await fetch(`${BASE_URL}/contacts/search`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locationId, pageLimit: 100, page, ...(filters.length > 0 ? { filters } : {}) }),
-        cache: 'no-store',
-      })
-      if (!res.ok) break
-      const data = await res.json()
-      const contacts: Record<string, unknown>[] = data?.contacts ?? []
-      allContacts.push(...contacts)
-      if (contacts.length < 100) break
-    } catch { break }
-  }
-  return allContacts
-}
-
-async function getContactsCount(locationId: string, token: string): Promise<number> {
-  const data = await ghlGet(`/contacts/?locationId=${locationId}&limit=1`, token)
-  return data?.total ?? data?.meta?.total ?? 0
-}
-
 async function getGhlUsers(locationId: string, token: string): Promise<GhlUser[]> {
   const data = await ghlGet(`/users/?locationId=${locationId}`, token)
   return (data?.users ?? []) as GhlUser[]
 }
 
-async function getContactsForUser(locationId: string, token: string, userId: string): Promise<number> {
-  const { total } = await ghlSearch(locationId, token, [{ field: 'assignedTo', operator: 'eq', value: userId }])
-  return total
-}
-
-/** Read a custom field value from a contact's customFields array */
-function getCustomFieldValue(contact: Record<string, unknown>, fieldId: string): string {
-  const cfArray = contact.customFields
+/** Read a custom field value from a contact's raw JSON */
+function getCustomFieldValue(raw: Record<string, unknown> | null, fieldId: string): string {
+  if (!raw) return ''
+  const cfArray = raw.customFields
   if (!Array.isArray(cfArray)) return ''
   const field = cfArray.find((f: Record<string, unknown>) => f.id === fieldId)
   if (!field) return ''
@@ -146,38 +92,17 @@ function getCustomFieldValue(contact: Record<string, unknown>, fieldId: string):
 
 /** Count contacts by provider value for a category */
 function countByProvider(
-  contacts: Record<string, unknown>[],
+  contacts: { raw: Record<string, unknown> | null }[],
   providerFieldId: string,
 ): { provider: string; count: number }[] {
   const counts = new Map<string, number>()
   for (const contact of contacts) {
-    const val = getCustomFieldValue(contact, providerFieldId) || 'Non specificato'
+    const val = getCustomFieldValue(contact.raw, providerFieldId) || 'Non specificato'
     counts.set(val, (counts.get(val) ?? 0) + 1)
   }
   return Array.from(counts.entries())
     .map(([provider, count]) => ({ provider, count }))
     .sort((a, b) => b.count - a.count)
-}
-
-async function fetchCustomFields(token: string, locationId: string): Promise<CustomFieldDef[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/locations/${locationId}/customFields`, {
-      headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
-      next: { revalidate: 300 },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return ((data?.customFields ?? []) as CustomFieldDef[]).map((cf) => ({
-      id: cf.id,
-      name: cf.name,
-      fieldKey: cf.fieldKey ?? cf.id,
-      dataType: cf.dataType ?? 'TEXT',
-      placeholder: cf.placeholder,
-      picklistOptions: cf.picklistOptions,
-    }))
-  } catch {
-    return []
-  }
 }
 
 // ─── Category colors ────────────────────────────────────────────────────────
@@ -239,39 +164,46 @@ export default async function CrmDashboard({
     )
   }
 
-  const ghlUsers = await getGhlUsers(locationId, token)
+  // ─── Fetch data from cache (with GHL fallback) ────────────────────────────
+  const [ghlUsers, customFields, { contacts: allCachedContacts }] = await Promise.all([
+    getGhlUsers(locationId, token),
+    getCustomFieldDefs(locationId),
+    listContacts(locationId),
+  ])
+
   const currentGhlUser = ghlUsers.find((u) => u.email.toLowerCase() === userEmail)
   const isGhlAdmin = currentGhlUser?.roles?.role === 'admin'
   const isAdmin = isSuperAdmin || isGhlAdmin
-
   const currentGhlUserId = currentGhlUser?.id
-  const [totalContacts, customFields] = await Promise.all([
-    !isAdmin && currentGhlUserId
-      ? getContactsForUser(locationId, token, currentGhlUserId)
-      : getContactsCount(locationId, token),
-    fetchCustomFields(token, locationId),
-  ])
+
+  // For non-admin users, filter to assigned contacts only
+  // We check the raw.assignedTo field from the cached contact
+  const allContacts = !isAdmin && currentGhlUserId
+    ? allCachedContacts.filter((c) => {
+        const assignedTo = (c.raw as Record<string, unknown>)?.assignedTo
+        return assignedTo === currentGhlUserId
+      })
+    : allCachedContacts
+  const totalContacts = allContacts.length
 
   // Discover categories from the Categoria dropdown field
   const categories = discoverCategories(customFields)
   const categoriaField = getCategoriaField(customFields)
   const categoriaFieldId = categoriaField?.id ?? null
-  const switchOutField = getSwitchOutField(customFields)
-  const switchOutFieldId = switchOutField?.id ?? null
 
-  // ─── Fetch ALL contacts once, then group by Categoria custom field ──────
-  const allContacts = await ghlSearchAll(locationId, token, [])
-
-  // Count Switch Out contacts
-  const switchOutCount = switchOutFieldId
-    ? allContacts.filter((c) => getCustomFieldValue(c, switchOutFieldId) === 'true').length
-    : 0
+  // Find per-category Switch Out field IDs
+  const switchOutFieldForCat: Record<string, string> = {}
+  for (const cat of categories) {
+    const soField = getFieldsForCategory(customFields, cat.label).find((f) => {
+      const { displayName } = parseFieldCategory(f.name)
+      return displayName.toLowerCase().includes('switch out')
+    })
+    if (soField) switchOutFieldForCat[cat.label] = soField.id
+  }
 
   const categoryData = categories.map((cat) => {
-    // Filter by Categoria custom field value (not tags)
-    // Supports comma-separated multi-category values: contact counts in EACH matching category
     const contacts = categoriaFieldId
-      ? allContacts.filter((c) => parseCategoriaValue(getCustomFieldValue(c, categoriaFieldId)).includes(cat.label))
+      ? allContacts.filter((c) => parseCategoriaValue(getCustomFieldValue(c.raw, categoriaFieldId)).includes(cat.label))
       : []
 
     const providerField = getProviderField(customFields, cat.label)
@@ -279,7 +211,6 @@ export default async function CrmDashboard({
       ? countByProvider(contacts, providerField.id)
       : []
 
-    // Build full gestori list from picklist options, merging counts
     const countMap = new Map(providerCounts.map((p) => [p.provider, p.count]))
     const gestori = providerField?.picklistOptions
       ? providerField.picklistOptions.map((opt) => ({
@@ -288,12 +219,20 @@ export default async function CrmDashboard({
         }))
       : providerCounts
 
+    const soFieldId = switchOutFieldForCat[cat.label]
+    const switchOutCatCount = soFieldId
+      ? contacts.filter((c) => isSwitchOutOn(getCustomFieldValue(c.raw, soFieldId))).length
+      : 0
+
     return {
       ...cat,
       total: contacts.length,
       providers: gestori,
+      switchOutCount: switchOutCatCount,
     }
   })
+
+  const switchOutTotal = categoryData.reduce((sum, c) => sum + c.switchOutCount, 0)
 
   // Per-operatore contact counts (admin only)
   const operatorCounts: { name: string; initials: string; count: number; isAdmin: boolean; categoryCounts: Record<string, number> }[] = []
@@ -301,25 +240,20 @@ export default async function CrmDashboard({
     const nonAdminUsers = ghlUsers.filter((u) => u.roles?.role !== 'admin')
     const adminUsers = ghlUsers.filter((u) => u.roles?.role === 'admin')
 
-    const nonAdminCounts = await Promise.all(
-      nonAdminUsers.map((u) => getContactsForUser(locationId, token, u.id))
-    )
     const categoryLabels = categories.map((c) => c.label)
-    // For per-user category counts, fetch assigned contacts and count by Categoria custom field
-    const nonAdminUserContacts = await Promise.all(
-      nonAdminUsers.map(async (u) => {
-        const { contacts } = await ghlSearch(locationId, token, [{ field: 'assignedTo', operator: 'eq', value: u.id }])
-        return contacts
-      })
-    )
-    const nonAdminTagCounts = nonAdminUserContacts.map((contacts) => {
-      const tagMap: Record<string, number> = {}
+
+    // Count per-user from cached contacts using raw.assignedTo
+    const nonAdminCounts = nonAdminUsers.map((u) => {
+      const userContacts = allCachedContacts.filter((c) =>
+        (c.raw as Record<string, unknown>)?.assignedTo === u.id
+      )
+      const categoryCounts: Record<string, number> = {}
       for (const label of categoryLabels) {
-        tagMap[label] = categoriaFieldId
-          ? contacts.filter((c) => parseCategoriaValue(getCustomFieldValue(c, categoriaFieldId)).includes(label)).length
+        categoryCounts[label] = categoriaFieldId
+          ? userContacts.filter((c) => parseCategoriaValue(getCustomFieldValue(c.raw, categoriaFieldId)).includes(label)).length
           : 0
       }
-      return tagMap
+      return { count: userContacts.length, categoryCounts }
     })
 
     const adminTagMap: Record<string, number> = {}
@@ -338,9 +272,9 @@ export default async function CrmDashboard({
       operatorCounts.push({
         name: u.name,
         initials: u.name?.charAt(0)?.toUpperCase() ?? '?',
-        count: nonAdminCounts[i],
+        count: nonAdminCounts[i].count,
         isAdmin: false,
-        categoryCounts: nonAdminTagCounts[i],
+        categoryCounts: nonAdminCounts[i].categoryCounts,
       })
     })
   }
@@ -354,27 +288,25 @@ export default async function CrmDashboard({
   }[] = []
 
   if (isAdmin && gareRows && gareRows.length > 0) {
-    // Collect all provider field IDs for gestore-based counting
     const providerFieldIds = categories
       .map((cat) => getProviderField(customFields, cat.label)?.id)
       .filter((id): id is string => !!id)
 
-    // Count contacts per gestore value for the current month
-    // We search ALL contacts created this month, then count per gestore value
     const monthStart = new Date(currentMonth + 'T00:00:00.000Z')
     const monthEnd = new Date(monthStart)
     monthEnd.setMonth(monthEnd.getMonth() + 1)
 
-    const monthContacts = await ghlSearchAll(locationId, token, [
-      { field: 'dateAdded', operator: 'GTE', value: monthStart.toISOString() },
-      { field: 'dateAdded', operator: 'LTE', value: monthEnd.toISOString() },
-    ])
+    // Filter cached contacts by dateAdded for this month
+    const monthContacts = allCachedContacts.filter((c) => {
+      if (!c.date_added) return false
+      const d = new Date(c.date_added)
+      return d >= monthStart && d < monthEnd
+    })
 
-    // Count how many contacts have each gestore value across all provider fields
     const gestoreCountMap: Record<string, number> = {}
     for (const contact of monthContacts) {
       for (const fieldId of providerFieldIds) {
-        const val = getCustomFieldValue(contact, fieldId).toLowerCase()
+        const val = getCustomFieldValue(contact.raw, fieldId).toLowerCase()
         if (val) {
           gestoreCountMap[val] = (gestoreCountMap[val] ?? 0) + 1
         }
@@ -439,13 +371,23 @@ export default async function CrmDashboard({
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Operatori</p>
           <p className="mt-2 text-3xl font-black text-gray-900">{ghlUsers.length}</p>
         </div>
-        <div className={`rounded-2xl border p-5 shadow-sm ${switchOutCount > 0 ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-white'}`}>
+        <div className={`rounded-2xl border p-5 shadow-sm ${switchOutTotal > 0 ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-white'}`}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
             <span className="mr-1">&#x1F6A9;</span> Switch Out
           </p>
-          <p className={`mt-2 text-3xl font-black ${switchOutCount > 0 ? 'text-red-600' : 'text-gray-900'}`}>
-            {switchOutCount}
+          <p className={`mt-2 text-3xl font-black ${switchOutTotal > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+            {switchOutTotal}
           </p>
+          {switchOutTotal > 0 && (
+            <div className="mt-2 space-y-0.5">
+              {categoryData.filter((c) => c.switchOutCount > 0).map((c) => (
+                <div key={c.slug} className="flex items-center justify-between text-xs">
+                  <span className="text-red-500">{c.label}</span>
+                  <span className="font-bold text-red-600">{c.switchOutCount}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <Link href={`/designs/simfonia/calendar${q}`} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-all">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Calendario</p>

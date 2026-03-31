@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { runDesignInstaller } from '@/lib/designInstaller/runDesignInstaller'
 import { provisionLocation } from '@/lib/ghl/provisionLocation'
+import { processWebhookEvent } from '@/lib/sync/webhookProcessor'
 
 /**
  * POST /api/webhooks/ghl
  * Receives inbound GHL webhook events.
+ * - CRM entity events: upsert into Supabase cache tables
  * - location.created: full auto-provision (connection + install + users)
  * - UserDeleted / user.deleted: delete the user from the platform
  * - all events: persisted to ghl_webhook_events
@@ -78,8 +80,19 @@ export async function POST(req: Request) {
     }
   }
 
+  // ── Process CRM entity events into cache (non-blocking) ──────────────────
+  processWebhookEvent(locationId, eventType, body)
+    .then(({ processed, entity }) => {
+      if (processed) {
+        console.log(`[ghl-webhook] ${eventType} → cached ${entity} for ${locationId}`)
+      }
+    })
+    .catch((err) => {
+      console.error(`[ghl-webhook] cache update failed for ${eventType}:`, err)
+    })
+
   // ── Persist the raw event ────────────────────────────────────────────────
-  const { data: event, error } = await supabase
+  const { error } = await supabase
     .from('ghl_webhook_events')
     .insert({ location_id: locationId, event_type: eventType, payload: body })
     .select('id')

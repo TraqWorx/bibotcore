@@ -82,6 +82,8 @@ export async function getActiveLocation(
 /**
  * Validates that the current user owns the given locationId.
  * Use inside server actions before calling getGhlClient.
+ *
+ * Checks profile_locations (RBAC) first, falls back to installs for backward compat.
  */
 export async function assertUserOwnsLocation(locationId: string): Promise<void> {
   const authClient = await createAuthClient()
@@ -98,6 +100,17 @@ export async function assertUserOwnsLocation(locationId: string): Promise<void> 
     .single()
   if (profile?.role === 'super_admin') return
 
+  // Check RBAC membership (any role = access)
+  const { data: membership } = await supabase
+    .from('profile_locations')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('location_id', locationId)
+    .limit(1)
+    .single()
+  if (membership) return
+
+  // Backward compat: check installs table
   const { data } = await supabase
     .from('installs')
     .select('location_id')
@@ -107,4 +120,16 @@ export async function assertUserOwnsLocation(locationId: string): Promise<void> 
     .single()
 
   if (!data) throw new Error('Location not found or access denied')
+}
+
+/**
+ * Validates that the current user has at least the specified role for a location.
+ * Use in server actions that need role-based access control.
+ */
+export async function assertUserRole(
+  locationId: string,
+  minimumRole: 'viewer' | 'team_member' | 'location_admin',
+): Promise<void> {
+  const { requireLocationRole } = await import('@/lib/auth/checkRole')
+  await requireLocationRole(locationId, minimumRole)
 }

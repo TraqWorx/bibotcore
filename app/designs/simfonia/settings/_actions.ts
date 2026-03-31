@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase-server'
 import { getGhlClient } from '@/lib/ghl/ghlClient'
+import { discoverCategories } from '@/lib/utils/categoryFields'
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
@@ -393,20 +394,65 @@ export async function saveClosedDays(
   return {}
 }
 
-// ─── Ensure Switch Out field ────────────────────────────────────────────────
+// ─── Unique Fields ──────────────────────────────────────────────────────────
 
-export async function ensureSwitchOutField(locationId: string): Promise<string | null> {
+export async function getUniqueFields(locationId: string): Promise<string[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('location_settings')
+    .select('unique_fields')
+    .eq('location_id', locationId)
+    .single()
+  const fields = (data as { unique_fields?: string[] } | null)?.unique_fields
+  return Array.isArray(fields) ? fields : []
+}
+
+export async function saveUniqueFields(
+  locationId: string,
+  fieldIds: string[]
+): Promise<{ error?: string }> {
+  if (!locationId) return { error: 'Location ID mancante' }
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('location_settings')
+    .upsert(
+      { location_id: locationId, unique_fields: fieldIds, updated_at: new Date().toISOString() },
+      { onConflict: 'location_id' }
+    )
+  if (error) return { error: error.message }
+  return {}
+}
+
+// ─── Ensure per-category Switch Out fields ─────────────────────────────────
+
+export async function ensureCategorySwitchOutFields(locationId: string): Promise<number | null> {
   try {
     const ghl = await getGhlClient(locationId)
     const data = await ghl.customFields.list()
-    const fields = (data?.customFields ?? []) as { id: string; name: string; dataType: string }[]
-    const existing = fields.find((f) => f.name === 'Switch Out' && f.dataType === 'CHECKBOX')
-    if (existing) return existing.id
-    // Create it
-    const created = await ghl.customFields.create({ name: 'Switch Out', dataType: 'CHECKBOX', model: 'contact' })
-    return created?.customField?.id ?? null
+    const rawFields = (data?.customFields ?? []) as { id: string; name: string; dataType: string; fieldKey?: string; placeholder?: string; picklistOptions?: string[] }[]
+    const fields = rawFields.map((f) => ({ ...f, fieldKey: f.fieldKey ?? f.id }))
+
+    // Discover categories from the Categoria custom field
+    const categories = discoverCategories(fields)
+    if (categories.length === 0) return 0
+
+    let created = 0
+    for (const cat of categories) {
+      const fieldName = `[${cat.label}] Switch Out`
+      const existing = fields.find((f) => f.name === fieldName)
+      if (existing) continue
+      // Create as SINGLE_OPTIONS with Si/No — GHL CHECKBOX requires special handling
+      await ghl.customFields.create({
+        name: fieldName,
+        dataType: 'SINGLE_OPTIONS',
+        model: 'contact',
+        options: ['Si', 'No'],
+      })
+      created++
+    }
+    return created
   } catch (err) {
-    console.error('[ensureSwitchOutField]', err)
+    console.error('[ensureCategorySwitchOutFields]', err)
     return null
   }
 }

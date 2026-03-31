@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveContactColumns, type ContactColumn } from '../../settings/_actions'
-import { parseFieldCategory, isHiddenCategory, SHARED_CATEGORIES, getCategoriaField } from '@/lib/utils/categoryFields'
+import { parseFieldCategory, isHiddenCategory, SHARED_CATEGORIES, getCategoriaField, discoverCategories, SWITCH_OUT_FIELD_NAME, CATEGORIA_FIELD_NAME, type CustomFieldDef } from '@/lib/utils/categoryFields'
 
 // All standard GHL contact fields
 const ALL_STANDARD_FIELDS: { key: string; label: string }[] = [
@@ -243,9 +243,13 @@ export default function ColumnPicker({ locationId, savedColumns, customFields, a
             })()}
 
             {customFields.length > 0 && (() => {
+              // Filter out global Switch Out (each category has its own) and Categoria dropdown
+              const baseCf = customFields.filter(
+                (cf) => cf.name !== SWITCH_OUT_FIELD_NAME && cf.name !== CATEGORIA_FIELD_NAME
+              )
               // Filter custom fields by active category if set
               const visibleCf = activeCategoryLabel
-                ? customFields.filter((cf) => {
+                ? baseCf.filter((cf) => {
                     const { category } = parseFieldCategory(cf.name)
                     if (!category) return true
                     if (SHARED_CATEGORIES.includes(category)) return true
@@ -255,17 +259,27 @@ export default function ColumnPicker({ locationId, savedColumns, customFields, a
                       category.startsWith(activeCategoryLabel)
                     )
                   })
-                : customFields
+                : baseCf
 
               if (visibleCf.length === 0) return null
 
               // Group by category when showing all categories
               if (!activeCategoryLabel) {
+                const categories = discoverCategories(customFields as CustomFieldDef[])
                 const groups = new Map<string, typeof visibleCf>()
                 for (const cf of visibleCf) {
-                  const { category } = parseFieldCategory(cf.name)
-                  const key = category ?? 'Altro'
-                  if (isHiddenCategory(key)) continue
+                  const { category: prefix } = parseFieldCategory(cf.name)
+                  if (!prefix) {
+                    if (!groups.has('Altro')) groups.set('Altro', [])
+                    groups.get('Altro')!.push(cf)
+                    continue
+                  }
+                  if (isHiddenCategory(prefix)) continue
+                  // Normalize: find the canonical category label that matches this prefix
+                  const canonical = categories.find(
+                    (c) => c.label === prefix || c.label.startsWith(prefix) || prefix.startsWith(c.label)
+                  )
+                  const key = canonical?.label ?? (SHARED_CATEGORIES.includes(prefix) ? prefix : prefix)
                   if (!groups.has(key)) groups.set(key, [])
                   groups.get(key)!.push(cf)
                 }

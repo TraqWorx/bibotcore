@@ -1,14 +1,9 @@
 import Link from 'next/link'
 import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
-
-interface Opportunity {
-  id: string
-  name?: string
-  pipelineStageId?: string
-  monetaryValue?: number
-  createdAt?: string
-}
+import { createAdminClient } from '@/lib/supabase-server'
+import { getOpportunitiesByContact } from '@/lib/data/opportunities'
+import { listPipelines } from '@/lib/data/pipelines'
 
 interface CalendarEvent {
   id: string
@@ -16,22 +11,6 @@ interface CalendarEvent {
   calendarId?: string
   startTime?: string
   appointmentStatus?: string
-}
-
-interface Conversation {
-  id: string
-  type?: string
-  lastMessageDate?: string
-  lastMessageBody?: string
-}
-
-interface CustomField {
-  id: string
-  value?: string
-  field_value?: string
-  fieldValue?: string
-  key?: string
-  name?: string
 }
 
 export default async function ContactProfilePage({
@@ -44,39 +23,63 @@ export default async function ContactProfilePage({
   const { contactId } = await params
   const sp = await searchParams
   const locationId = await getActiveLocation(sp).catch(() => null)
+  if (!locationId) {
+    return <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center"><p className="text-sm text-gray-500">Location non trovata.</p></div>
+  }
 
-  const ghl = await getGhlClient(locationId ?? '')
+  const sb = createAdminClient()
+  const ghl = await getGhlClient(locationId)
 
-  const [contactData, opportunitiesData, pipelinesData, eventsData, calendarsData, conversationsData] =
-    await Promise.all([
-      ghl.contacts.get(contactId),
-      ghl.opportunities.byContact(contactId),
-      ghl.pipelines.list(),
-      ghl.calendarEvents.byContact(contactId),
-      ghl.calendars.list(),
-      ghl.conversations.byContact(contactId).catch(() => null),
-    ])
+  // Fetch from cache + GHL (calendar events only)
+  const [
+    { data: cached },
+    { data: customFieldValues },
+    { data: fieldDefs },
+    cachedOpps,
+    { pipelines },
+    eventsData,
+    calendarsData,
+    { data: cachedConvos },
+  ] = await Promise.all([
+    sb.from('cached_contacts').select('*').eq('location_id', locationId).eq('ghl_id', contactId).single(),
+    sb.from('cached_contact_custom_fields').select('field_id, value').eq('location_id', locationId).eq('contact_ghl_id', contactId),
+    sb.from('cached_custom_fields').select('field_id, name').eq('location_id', locationId),
+    getOpportunitiesByContact(locationId, contactId),
+    listPipelines(locationId),
+    ghl.calendarEvents.byContact(contactId).catch(() => ({ events: [] })),
+    ghl.calendars.list().catch(() => ({ calendars: [] })),
+    sb.from('cached_conversations').select('ghl_id, type, last_message_date, last_message_body').eq('location_id', locationId).eq('contact_ghl_id', contactId).order('last_message_date', { ascending: false }).limit(5),
+  ])
 
-  const contact = contactData?.contact
-  const opportunities: Opportunity[] = opportunitiesData?.opportunities ?? []
+  const contact = cached
+    ? { firstName: cached.first_name, lastName: cached.last_name, email: cached.email, phone: cached.phone, address1: cached.address1, city: cached.city, tags: cached.tags ?? [], companyName: cached.company_name }
+    : null
+
   const events: CalendarEvent[] = eventsData?.events ?? []
-  const conversations: Conversation[] = conversationsData?.conversations ?? []
-  const customFields: CustomField[] = contact?.customFields ?? []
+  const conversations = (cachedConvos ?? []).map((c) => ({
+    id: c.ghl_id, type: c.type, lastMessageDate: c.last_message_date, lastMessageBody: c.last_message_body,
+  }))
 
+  // Build field name map
+  const fieldNameMap = new Map((fieldDefs ?? []).map((f) => [f.field_id, f.name ?? '']))
+  const customFields = (customFieldValues ?? []).filter((cf) => cf.value).map((cf) => ({
+    id: cf.field_id, value: cf.value, name: fieldNameMap.get(cf.field_id) ?? cf.field_id,
+  }))
+
+  // Build maps
   const stageMap: Record<string, string> = {}
-  for (const pipeline of pipelinesData?.pipelines ?? []) {
+  for (const pipeline of pipelines) {
     for (const stage of pipeline.stages ?? []) {
       stageMap[stage.id] = stage.name
     }
   }
-
   const calendarMap: Record<string, string> = {}
   for (const cal of calendarsData?.calendars ?? []) {
     calendarMap[cal.id] = cal.name
   }
 
   const fullName = [contact?.firstName, contact?.lastName].filter(Boolean).join(' ') || '—'
-  const q = locationId ? `?locationId=${locationId}` : ''
+  const q = `?locationId=${locationId}`
 
   const tagColors: Record<string, string> = {
     energia:      'bg-amber-50 text-amber-700',
@@ -121,24 +124,19 @@ export default async function ContactProfilePage({
       </div>
 
       {/* Custom fields */}
-      {customFields.filter((f) => (f.value ?? f.field_value ?? f.fieldValue) && (f.value ?? f.field_value ?? f.fieldValue) !== '').length > 0 && (
+      {customFields.length > 0 && (
         <section>
           <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">Campi Personalizzati</h2>
           <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
             <dl className="divide-y divide-gray-50">
-              {customFields.map((field) => {
-                const val = field.value ?? field.field_value ?? field.fieldValue ?? ''
-                if (!val) return null
-                const label = field.name ?? field.key ?? field.id
-                return (
-                  <div key={field.id} className="flex items-center gap-4 px-5 py-3">
-                    <dt className="w-48 shrink-0 text-xs font-semibold uppercase tracking-wide text-gray-400 truncate">
-                      {label}
-                    </dt>
-                    <dd className="text-sm text-gray-800">{val}</dd>
-                  </div>
-                )
-              })}
+              {customFields.map((field) => (
+                <div key={field.id} className="flex items-center gap-4 px-5 py-3">
+                  <dt className="w-48 shrink-0 text-xs font-semibold uppercase tracking-wide text-gray-400 truncate">
+                    {field.name}
+                  </dt>
+                  <dd className="text-sm text-gray-800">{field.value}</dd>
+                </div>
+              ))}
             </dl>
           </div>
         </section>
@@ -149,7 +147,7 @@ export default async function ContactProfilePage({
         <section>
           <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">Opportunità</h2>
           <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
-            {opportunities.length === 0 ? (
+            {cachedOpps.length === 0 ? (
               <p className="p-6 text-sm text-gray-400">Nessuna opportunità.</p>
             ) : (
               <table className="w-full text-sm">
@@ -161,14 +159,14 @@ export default async function ContactProfilePage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {opportunities.map((opp) => (
-                    <tr key={opp.id}>
+                  {cachedOpps.map((opp) => (
+                    <tr key={opp.ghl_id}>
                       <td className="px-5 py-3 font-medium text-gray-800">{opp.name ?? '—'}</td>
                       <td className="px-5 py-3 text-gray-500 text-xs">
-                        {opp.pipelineStageId ? (stageMap[opp.pipelineStageId] ?? '—') : '—'}
+                        {opp.pipeline_stage_id ? (stageMap[opp.pipeline_stage_id] ?? '—') : '—'}
                       </td>
                       <td className="px-5 py-3 text-right text-gray-600">
-                        €{(opp.monetaryValue ?? 0).toLocaleString('it-IT')}
+                        €{(Number(opp.monetary_value) || 0).toLocaleString('it-IT')}
                       </td>
                     </tr>
                   ))}
@@ -225,7 +223,7 @@ export default async function ContactProfilePage({
         <section>
           <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">Messaggi recenti</h2>
           <div className="space-y-2">
-            {conversations.slice(0, 5).map((conv) => (
+            {conversations.map((conv) => (
               <div key={conv.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-sm text-gray-700">{conv.lastMessageBody ?? '—'}</p>

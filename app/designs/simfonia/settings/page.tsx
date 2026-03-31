@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { DEFAULT_THEME, type DesignTheme } from '@/lib/types/design'
-import { getCategoryTags, getClosedDays, getGareMensili, getLocationTags, getProvvigioni, getUserAvailability } from './_actions'
+import { getCategoryTags, getClosedDays, getGareMensili, getLocationTags, getProvvigioni, getUserAvailability, getUniqueFields } from './_actions'
 import {
   discoverCategories,
   getProviderField,
@@ -18,6 +18,7 @@ import TagsManager from './_components/TagsManager'
 import CategoryTagsForm from './_components/CategoryTagsForm'
 import ThemeForm from './_components/ThemeForm'
 import ClosedDaysForm from './_components/ClosedDaysForm'
+import UniqueFieldsForm from './_components/UniqueFieldsForm'
 
 const BASE_URL = 'https://services.leadconnectorhq.com'
 
@@ -97,7 +98,7 @@ export default async function SettingsPage({
   const currentMonth = getCurrentMonth()
   const token = await getGhlTokenForLocation(locationId).catch(() => null)
 
-  const [settingsRes, themeRes, gareRows, locationTags, provvigioniRows, availabilitySlots, ghlUsers, customFields, categoryTagsMap, closedDays] = await Promise.all([
+  const [settingsRes, themeRes, gareRows, locationTags, provvigioniRows, availabilitySlots, ghlUsers, customFields, categoryTagsMap, closedDays, uniqueFieldIds] = await Promise.all([
     supabase
       .from('location_settings')
       .select('target_annuale')
@@ -116,6 +117,7 @@ export default async function SettingsPage({
     token ? fetchCustomFields(token, locationId) : Promise.resolve([]),
     getCategoryTags(locationId).catch(() => ({} as Record<string, string[]>)),
     getClosedDays(locationId),
+    getUniqueFields(locationId),
   ])
 
   const ghlTags = locationTags.map((t) => t.name)
@@ -128,10 +130,24 @@ export default async function SettingsPage({
 
   const tabs = [
     {
-      id: 'generale',
-      label: 'Generale',
+      id: 'obiettivi',
+      label: 'Obiettivi',
       content: (
-        <TargetForm locationId={locationId} currentTarget={currentTarget} />
+        <div className="space-y-6">
+          <TargetForm locationId={locationId} currentTarget={currentTarget} />
+          <div className="rounded-2xl border border-gray-200 bg-white p-6">
+            <h2 className="text-base font-bold text-gray-800">Gare Mensili</h2>
+            <p className="mt-1 mb-5 text-sm text-gray-500">
+              Imposta gli obiettivi mensili per operatore/categoria.
+            </p>
+            <GareForm
+              locationId={locationId}
+              month={currentMonth}
+              initialRows={gareRows}
+              gestoriOptions={gestoriOptions}
+            />
+          </div>
+        </div>
       ),
     },
     {
@@ -164,24 +180,6 @@ export default async function SettingsPage({
             categories={categories}
             allTags={ghlTagsWithIds}
             initialCategoryTags={categoryTagsMap}
-          />
-        </div>
-      ),
-    },
-    {
-      id: 'gare',
-      label: 'Gare',
-      content: (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-bold text-gray-800">Gare Mensili</h2>
-          <p className="mt-1 mb-5 text-sm text-gray-500">
-            Imposta gli obiettivi mensili per operatore/categoria.
-          </p>
-          <GareForm
-            locationId={locationId}
-            month={currentMonth}
-            initialRows={gareRows}
-            gestoriOptions={gestoriOptions}
           />
         </div>
       ),
@@ -221,6 +219,23 @@ export default async function SettingsPage({
       ),
     },
     {
+      id: 'campi-univoci',
+      label: 'Campi Univoci',
+      content: (
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <h2 className="text-base font-bold text-gray-800">Campi Univoci</h2>
+          <p className="mt-1 mb-5 text-sm text-gray-500">
+            Seleziona i campi personalizzati che devono avere valori unici tra i contatti (es. POD, PDR).
+          </p>
+          <UniqueFieldsForm
+            locationId={locationId}
+            customFields={customFields}
+            initialUniqueFieldIds={uniqueFieldIds}
+          />
+        </div>
+      ),
+    },
+    {
       id: 'aspetto',
       label: 'Aspetto',
       content: (
@@ -235,7 +250,7 @@ export default async function SettingsPage({
   ]
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Impostazioni</h1>
         <p className="mt-0.5 text-sm text-gray-500">Configurazione per questa location</p>

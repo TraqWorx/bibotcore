@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
+import { listPipelines } from '@/lib/data/pipelines'
+import { listOpportunities } from '@/lib/data/opportunities'
 import PipelineView from './PipelineView'
 
 export default async function PipelinePage({
@@ -18,20 +19,27 @@ export default async function PipelinePage({
     )
   }
 
-  const ghl = await getGhlClient(locationId)
-  let pipelines: { id: string; name: string; stages: { id: string; name: string }[] }[] = []
-  let opportunities: { id: string; name?: string; pipelineId?: string; pipelineStageId?: string; monetaryValue?: number; status?: string }[] = []
+  const [{ pipelines }, { opportunities: cachedOpps }] = await Promise.all([
+    listPipelines(locationId),
+    listOpportunities(locationId),
+  ])
 
-  try {
-    const [opportunitiesData, pipelinesData] = await Promise.all([
-      ghl.opportunities.list().catch(() => null),
-      ghl.pipelines.list().catch(() => null),
-    ])
-    pipelines = pipelinesData?.pipelines ?? []
-    opportunities = opportunitiesData?.opportunities ?? []
-  } catch {
-    // Silently handle — empty arrays are the fallback
-  }
+  // Map cached opportunities to the shape PipelineView expects
+  const opportunities = cachedOpps.map((o) => ({
+    id: o.ghl_id,
+    name: o.name ?? undefined,
+    pipelineId: o.pipeline_id ?? undefined,
+    pipelineStageId: o.pipeline_stage_id ?? undefined,
+    monetaryValue: o.monetary_value != null ? Number(o.monetary_value) : undefined,
+    status: o.status ?? undefined,
+  }))
+
+  // Map cached pipelines
+  const pipelinesMapped = pipelines.map((p) => ({
+    id: p.ghl_id,
+    name: p.name ?? '',
+    stages: p.stages ?? [],
+  }))
 
   return (
     <div className="space-y-6">
@@ -51,10 +59,10 @@ export default async function PipelinePage({
         </Link>
       </div>
 
-      {pipelines.length === 0 ? (
+      {pipelinesMapped.length === 0 ? (
         <p className="text-sm text-gray-500">Nessuna pipeline trovata.</p>
       ) : (
-        <PipelineView pipelines={pipelines} opportunities={opportunities} locationId={locationId} />
+        <PipelineView pipelines={pipelinesMapped} opportunities={opportunities} locationId={locationId} />
       )}
     </div>
   )

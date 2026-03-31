@@ -163,19 +163,31 @@ export async function getGhlClient(locationId: string) {
           body: JSON.stringify({ body }),
           headers: { 'Content-Type': 'application/json' },
         }),
+      delete: (contactId: string, noteId: string) =>
+        request(`/contacts/${contactId}/notes/${noteId}`, { method: 'DELETE' }),
+      update: (contactId: string, noteId: string, body: string) =>
+        request(`/contacts/${contactId}/notes/${noteId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ body }),
+          headers: { 'Content-Type': 'application/json' },
+        }),
     },
     tasks: {
       list: (contactId: string) => request(`/contacts/${contactId}/tasks`),
       create: (contactId: string, title: string, dueDate?: string) =>
         request(`/contacts/${contactId}/tasks`, {
           method: 'POST',
-          body: JSON.stringify({ title, dueDate, status: 'incompleted' }),
+          body: JSON.stringify({
+            title,
+            dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            completed: false,
+          }),
           headers: { 'Content-Type': 'application/json' },
         }),
       complete: (contactId: string, taskId: string) =>
         request(`/contacts/${contactId}/tasks/${taskId}`, {
           method: 'PUT',
-          body: JSON.stringify({ status: 'completed' }),
+          body: JSON.stringify({ completed: true }),
           headers: { 'Content-Type': 'application/json' },
         }),
     },
