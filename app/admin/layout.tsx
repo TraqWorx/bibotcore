@@ -31,8 +31,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin',              label: 'Dashboard' },
     { href: '/admin/users',        label: 'Utenti',       count: userCount ?? 0 },
     { href: '/admin/designs',      label: 'Designs',      count: designCount ?? 0 },
-    { href: '/admin/plan-mapping', label: 'Plan Mapping' },
     { href: '/admin/locations',    label: 'Locations',    count: locationCount ?? 0 },
+    { href: '/admin/roles',        label: 'Ruoli' },
+    { href: '/admin/sync',         label: 'Sync' },
+    { href: '/admin/plan-mapping', label: 'Plan Mapping' },
   ]
 
   return (
