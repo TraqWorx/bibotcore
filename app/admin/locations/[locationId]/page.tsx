@@ -1,10 +1,9 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase-server'
-import LoginAsButton from './_components/LoginAsButton'
 import ModuleToggles from './_components/ModuleToggles'
 import SyncStatus from './_components/SyncStatus'
-import RolesManager from './_components/RolesManager'
+import UsersAndRoles from './_components/UsersAndRoles'
 import { DEFAULT_MODULES } from '@/lib/types/design'
 import type { DesignModules } from '@/lib/types/design'
 
@@ -186,55 +185,8 @@ export default async function LocationDetailPage({
         </div>
       </div>
 
-      {/* Users */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <div className="border-b border-gray-100 px-5 py-4">
-          <h2 className="text-sm font-semibold text-gray-800">
-            Users
-            <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
-              {profiles.length}
-            </span>
-          </h2>
-        </div>
-        {profiles.length === 0 ? (
-          <p className="p-6 text-sm text-gray-400">No users for this location.</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Email</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Role</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Joined</th>
-                <th className="px-5 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {profiles.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50/60 transition-colors">
-                  <td className="px-5 py-3 font-medium text-gray-800">{p.email ?? '—'}</td>
-                  <td className="px-5 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      p.role === 'super_admin'
-                        ? 'bg-red-50 text-red-600'
-                        : p.role === 'agency'
-                          ? 'bg-amber-50 text-amber-700'
-                          : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {p.role ?? 'client'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-xs text-gray-400">
-                    {p.created_at ? formatDate(p.created_at) : '—'}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <LoginAsButton userId={p.id} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Users & Roles (unified) */}
+      <UsersAndRoles locationId={locationId} profiles={profiles} />
 
       {/* Install info */}
       {install && (
@@ -282,9 +234,6 @@ export default async function LocationDetailPage({
 
       {/* Sync Status */}
       <SyncStatus locationId={locationId} />
-
-      {/* Roles Manager */}
-      <RolesManager locationId={locationId} locationName={location.name ?? locationId} />
     </div>
   )
 }

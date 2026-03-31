@@ -10,7 +10,7 @@ import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
-export async function syncAllLocationUsers(): Promise<{
+export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
   locations: number
   usersCreated: number
   usersLinked: number
@@ -24,10 +24,10 @@ export async function syncAllLocationUsers(): Promise<{
   const agencyToken = process.env.GHL_AGENCY_TOKEN
   const companyId = process.env.GHL_COMPANY_ID ?? ''
 
-  // Get all locations (both OAuth and agency-provisioned)
-  const { data: allLocations } = await sb
-    .from('locations')
-    .select('location_id')
+  // Get locations (all or filtered)
+  let query = sb.from('locations').select('location_id')
+  if (filterLocationId) query = query.eq('location_id', filterLocationId)
+  const { data: allLocations } = await query
 
   if (!allLocations || allLocations.length === 0) {
     return { locations: 0, usersCreated: 0, usersLinked: 0, errors: [] }

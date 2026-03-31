@@ -65,8 +65,8 @@ export async function POST(request: Request) {
       results = { skipped: 'Location non ha connessione OAuth. Connettila prima di sincronizzare i dati.' }
     }
 
-    // User sync always works (uses agency token as fallback)
-    const userSync = await syncAllLocationUsers()
+    // User sync for this location only (fast — single location)
+    const userSync = await syncAllLocationUsers(locationId).catch(() => ({ skipped: true }))
 
     return NextResponse.json({ ok: true, results, userSync })
   } catch (err) {
