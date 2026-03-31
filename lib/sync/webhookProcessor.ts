@@ -56,6 +56,11 @@ const TASK_EVENTS = [
   'task.create', 'task.update', 'task.complete',
 ]
 
+const APPOINTMENT_EVENTS = [
+  'AppointmentCreate', 'AppointmentUpdate', 'AppointmentDelete',
+  'appointment.create', 'appointment.update', 'appointment.delete',
+]
+
 const DELETE_KEYWORDS = ['Delete', 'delete', 'Removed', 'removed']
 
 function isDeleteEvent(eventType: string): boolean {
@@ -95,6 +100,11 @@ export async function processWebhookEvent(
   if (TASK_EVENTS.some((e) => eventType.includes(e) || eventType === e)) {
     await processTaskEvent(locationId, eventType, data)
     return { processed: true, entity: 'task' }
+  }
+
+  if (APPOINTMENT_EVENTS.some((e) => eventType.includes(e) || eventType === e)) {
+    await processAppointmentEvent(locationId, eventType, data)
+    return { processed: true, entity: 'appointment' }
   }
 
   return { processed: false }
@@ -215,4 +225,34 @@ async function processTaskEvent(locationId: string, eventType: string, data: Web
 
   const row = transformTask(locationId, contactId, { ...data, id: taskId })
   await sb.from('cached_tasks').upsert(row as never, { onConflict: 'location_id,ghl_id' })
+}
+
+// ── Appointment events ───────────────────────────────────────
+
+async function processAppointmentEvent(locationId: string, eventType: string, data: WebhookPayload) {
+  const eventId = (data.id ?? data.appointmentId ?? data.appointment_id ?? data.eventId) as string | undefined
+  if (!eventId) return
+
+  const sb = createAdminClient()
+
+  if (isDeleteEvent(eventType)) {
+    await sb.from('cached_calendar_events').delete()
+      .eq('location_id', locationId).eq('ghl_id', eventId)
+    return
+  }
+
+  await sb.from('cached_calendar_events').upsert(
+    {
+      ghl_id: eventId,
+      location_id: locationId,
+      calendar_id: (data.calendarId ?? data.calendar_id) as string ?? null,
+      contact_ghl_id: (data.contactId ?? data.contact_id) as string ?? null,
+      title: (data.title as string) ?? null,
+      start_time: (data.startTime ?? data.start_time) as string ?? null,
+      end_time: (data.endTime ?? data.end_time) as string ?? null,
+      appointment_status: (data.appointmentStatus ?? data.status) as string ?? null,
+      synced_at: new Date().toISOString(),
+    } as never,
+    { onConflict: 'location_id,ghl_id' },
+  )
 }

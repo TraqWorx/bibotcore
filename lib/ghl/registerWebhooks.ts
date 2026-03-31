@@ -44,6 +44,10 @@ const WEBHOOK_EVENTS = [
   'TaskCreate',
   'TaskUpdate',
   'TaskComplete',
+  // Appointments
+  'AppointmentCreate',
+  'AppointmentUpdate',
+  'AppointmentDelete',
 ]
 
 function getWebhookUrl(): string {
