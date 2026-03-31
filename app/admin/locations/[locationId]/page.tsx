@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase-server'
 import LoginAsButton from './_components/LoginAsButton'
 import ModuleToggles from './_components/ModuleToggles'
+import SyncStatus from './_components/SyncStatus'
+import RolesManager from './_components/RolesManager'
 import { DEFAULT_MODULES } from '@/lib/types/design'
 import type { DesignModules } from '@/lib/types/design'
 
@@ -277,6 +279,12 @@ export default async function LocationDetailPage({
           />
         </div>
       )}
+
+      {/* Sync Status */}
+      <SyncStatus locationId={locationId} />
+
+      {/* Roles Manager */}
+      <RolesManager locationId={locationId} locationName={location.name ?? locationId} />
     </div>
   )
 }
