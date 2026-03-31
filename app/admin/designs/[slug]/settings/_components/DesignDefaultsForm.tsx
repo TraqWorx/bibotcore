@@ -4,12 +4,13 @@ import { useState } from 'react'
 import { saveDesignDefaults } from '../_actions'
 import type { DesignTheme, DesignModules } from '@/lib/types/design'
 
-const MODULE_KEYS = ['dashboard', 'contacts', 'pipeline', 'calendar', 'settings'] as const
+const MODULE_KEYS = ['dashboard', 'contacts', 'conversations', 'pipeline', 'calendar', 'ai', 'automations', 'settings'] as const
 type ModuleKey = typeof MODULE_KEYS[number]
 
 const MODULE_LABELS: Record<ModuleKey, string> = {
-  dashboard: 'Dashboard', contacts: 'Contatti', pipeline: 'Pipeline',
-  calendar: 'Calendario', settings: 'Impostazioni',
+  dashboard: 'Dashboard', contacts: 'Contatti', conversations: 'Conversazioni',
+  pipeline: 'Pipeline', calendar: 'Calendario', ai: 'AI Assistant',
+  automations: 'Automazioni', settings: 'Impostazioni',
 }
 
 interface Props {
