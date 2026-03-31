@@ -10,11 +10,13 @@ interface ModuleDef {
 }
 
 const MODULES: ModuleDef[] = [
-  { key: 'dashboard',     label: 'Dashboard',     description: 'Analytics overview and tag categories' },
+  { key: 'dashboard',     label: 'Dashboard',      description: 'Analytics overview and tag categories' },
   { key: 'contacts',      label: 'Contatti',       description: 'Contact list and details' },
   { key: 'conversations', label: 'Conversazioni',  description: 'Chat and messaging' },
   { key: 'pipeline',      label: 'Pipeline',       description: 'Opportunity board' },
   { key: 'calendar',      label: 'Calendario',     description: 'Appointments and scheduling' },
+  { key: 'ai',            label: 'AI Assistant',   description: 'AI summaries, reply suggestions, Ask AI widget' },
+  { key: 'automations',   label: 'Automazioni',    description: 'GHL workflow list (read-only)' },
   { key: 'settings',      label: 'Impostazioni',   description: 'Location settings' },
 ]
 
