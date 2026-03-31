@@ -28,29 +28,27 @@ function NavLink({
   secondaryColor: string
   isActive: boolean
   isPending: boolean
-  onClick: () => void
+  onClick: (e: React.MouseEvent) => void
 }) {
   const active = isActive || isPending
 
   return (
-    <Link
+    <a
       href={href}
-      prefetch={true}
       onClick={onClick}
-      className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-100"
+      className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium"
       style={
         active
           ? {
               background: `rgba(${hexToRgb(secondaryColor)}, 0.15)`,
               color: secondaryColor,
               border: `1px solid rgba(${hexToRgb(secondaryColor)}, 0.25)`,
-              opacity: isPending && !isActive ? 0.7 : 1,
             }
           : { color: 'rgba(255,255,255,0.65)' }
       }
     >
       {label}
-    </Link>
+    </a>
   )
 }
 
@@ -129,13 +127,17 @@ export default function GymSidebar({ theme, modules, locationId }: GymSidebarPro
                 secondaryColor={theme.secondaryColor}
                 isActive={isActive}
                 isPending={isThisPending}
-                onClick={() => {
-                  if (!isActive) {
-                    setPendingPath(basePath)
+                onClick={(e) => {
+                  e.preventDefault()
+                  if (isActive) return
+                  // Update highlight immediately (synchronous)
+                  setPendingPath(basePath)
+                  // Navigate in next frame to avoid blocking paint
+                  requestAnimationFrame(() => {
                     startTransition(() => {
                       router.push(href)
                     })
-                  }
+                  })
                 }}
               />
             )
