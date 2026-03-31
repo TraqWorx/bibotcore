@@ -161,7 +161,7 @@ export default function CategoryTagsForm({ locationId, categories, allTags: init
                 type="button"
                 onClick={() => handleCreateTag(cat.label)}
                 disabled={isPending}
-                className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50"
                 style={{ background: '#2A00CC' }}
               >
                 + Crea
@@ -181,7 +181,7 @@ export default function CategoryTagsForm({ locationId, categories, allTags: init
         type="button"
         onClick={handleSave}
         disabled={isPending}
-        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-all hover:opacity-90 disabled:opacity-50"
+        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
         style={{ background: '#00F0FF' }}
       >
         {isPending ? 'Salvataggio...' : 'Salva Associazioni Tag'}

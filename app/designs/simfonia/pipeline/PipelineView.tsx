@@ -106,7 +106,7 @@ export default function PipelineView({
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
-              className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition-all duration-150 ease-out ${
+              className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors duration-150 ease-out ${
                 filter === f.key
                   ? 'text-white'
                   : 'text-gray-500 hover:text-gray-700'
@@ -135,7 +135,7 @@ export default function PipelineView({
             placeholder="Cerca opportunità…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-9 rounded-xl border border-gray-200 bg-white pl-9 pr-4 text-sm text-gray-900 outline-none transition-all duration-150 focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)]"
+            className="h-9 rounded-xl border border-gray-200 bg-white pl-9 pr-4 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)]"
           />
         </div>
       </div>
@@ -228,7 +228,7 @@ function WonLostList({
           return (
             <div
               key={opp.id}
-              className="group flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 transition-all hover:border-[rgba(42,0,204,0.2)] hover:shadow-sm"
+              className="group flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 transition-colors hover:border-[rgba(42,0,204,0.2)] hover:shadow-sm"
             >
               <div className="cursor-pointer flex-1" onClick={() => onDealClick(opp.id)}>
                 <p className="text-sm font-medium text-gray-900">{opp.name ?? '—'}</p>

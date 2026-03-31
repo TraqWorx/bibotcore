@@ -88,7 +88,7 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
               key={u.id}
               type="button"
               onClick={() => { setSelectedUserId(u.id); setResult(null) }}
-              className="rounded-full border px-3 py-1 text-xs font-semibold transition-all"
+              className="rounded-full border px-3 py-1 text-xs font-semibold transition-colors"
               style={
                 selectedUserId === u.id
                   ? { background: '#2A00CC', color: 'white', borderColor: '#2A00CC' }
@@ -110,7 +110,7 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
             {userSlots.map((slot) => (
               <div
                 key={slot.day_of_week}
-                className={`flex items-center gap-3 rounded-xl border px-4 py-2.5 transition-all ${
+                className={`flex items-center gap-3 rounded-xl border px-4 py-2.5 transition-colors ${
                   slot.enabled ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-60'
                 }`}
               >
@@ -156,7 +156,7 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="mt-4 w-full rounded-xl py-2.5 text-sm font-bold text-black transition-all hover:opacity-90 disabled:opacity-50"
+            className="mt-4 w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
             style={{ background: '#00F0FF' }}
           >
             {saving ? 'Salvataggio...' : 'Salva Disponibilità'}

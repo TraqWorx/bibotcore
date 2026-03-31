@@ -62,7 +62,7 @@ export default function UniqueFieldsForm({ locationId, customFields, initialUniq
                     return (
                       <label
                         key={cf.id}
-                        className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-2.5 transition-all ${
+                        className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-2.5 transition-colors ${
                           selected.has(cf.id)
                             ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.04)]'
                             : 'border-gray-200 bg-white hover:border-gray-300'
@@ -89,7 +89,7 @@ export default function UniqueFieldsForm({ locationId, customFields, initialUniq
         <button
           onClick={handleSave}
           disabled={saving}
-          className="rounded-xl px-5 py-2.5 text-sm font-semibold text-black transition-all hover:opacity-90 disabled:opacity-50"
+          className="rounded-xl px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:opacity-90 disabled:opacity-50"
           style={{ background: '#00F0FF' }}
         >
           {saving ? 'Salvataggio...' : 'Salva'}

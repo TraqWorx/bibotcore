@@ -118,7 +118,7 @@ export default function GareForm({ locationId, month, initialRows, gestoriOption
         type="button"
         onClick={handleSave}
         disabled={isPending}
-        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-all hover:opacity-90 disabled:opacity-50"
+        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
         style={{ background: '#00F0FF' }}
       >
         {isPending ? 'Salvataggio...' : 'Salva Gare'}
@@ -157,7 +157,7 @@ function GestoreSelector({ availableGestori, onSelect }: { availableGestori: str
             if (e.key === 'Escape') setOpen(false)
           }}
           placeholder="Cerca gestore per aggiungere gara..."
-          className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-all"
+          className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
         />
       </div>
 

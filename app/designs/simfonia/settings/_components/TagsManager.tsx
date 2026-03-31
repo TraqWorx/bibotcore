@@ -63,13 +63,13 @@ export default function TagsManager({
           onChange={(e) => setNewTag(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd() } }}
           placeholder="Nuovo tag..."
-          className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)]"
+          className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition-colors focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)]"
         />
         <button
           type="button"
           onClick={handleAdd}
           disabled={adding || !newTag.trim()}
-          className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-40"
+          className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40"
           style={{ background: '#2A00CC' }}
         >
           {adding ? '...' : 'Aggiungi'}
@@ -83,7 +83,7 @@ export default function TagsManager({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Cerca tag..."
-          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-all"
+          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
         />
       )}
 

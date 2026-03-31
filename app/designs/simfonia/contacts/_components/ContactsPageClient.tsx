@@ -121,7 +121,7 @@ export default function ContactsPageClient(props: Props) {
           />
           <Link
             href={`/designs/simfonia/contacts/new${q}`}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#00F0FF] to-[#00d4e0] px-5 py-2.5 text-sm font-semibold text-black shadow-sm transition-all hover:shadow-md hover:brightness-105"
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#00F0FF] to-[#00d4e0] px-5 py-2.5 text-sm font-semibold text-black shadow-sm transition-colors hover:shadow-md hover:brightness-105"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

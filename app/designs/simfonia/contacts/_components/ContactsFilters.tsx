@@ -100,7 +100,7 @@ export default function ContactsFilters({
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           placeholder="Cerca per nome, email, telefono..."
-          className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-24 text-sm outline-none transition-all placeholder:text-gray-400 focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.1)]"
+          className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-24 text-sm outline-none transition-colors placeholder:text-gray-400 focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.1)]"
         />
         <div className="absolute inset-y-0 right-0 flex items-center gap-1 pr-1.5">
           {search && (
@@ -115,7 +115,7 @@ export default function ContactsFilters({
           )}
           <button
             onClick={handleSearch}
-            className="rounded-lg bg-[#2A00CC] px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-[#2200aa]"
+            className="rounded-lg bg-[#2A00CC] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#2200aa]"
           >
             Cerca
           </button>
@@ -130,7 +130,7 @@ export default function ContactsFilters({
             <>
               <button
                 onClick={() => navigate({ category: null, tag: null, gestore: null, scadenzaFrom: null, scadenzaTo: null })}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
                   selectedSlugs.length === 0
                     ? 'border-[#2A00CC] bg-[#2A00CC] text-white shadow-sm'
                     : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
@@ -153,7 +153,7 @@ export default function ContactsFilters({
                         tag: null, gestore: null, scadenzaFrom: null, scadenzaTo: null,
                       })
                     }}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
                       isActive
                         ? `${s.activeBg} ${s.activeText} ${s.border} shadow-sm`
                         : `border-gray-200 bg-white ${s.text} hover:${s.bg}`
@@ -188,7 +188,7 @@ export default function ContactsFilters({
             <select
               value={activeGestore ?? ''}
               onChange={(e) => navigate({ gestore: e.target.value || null })}
-              className={`appearance-none rounded-full border py-1.5 pl-3 pr-7 text-xs font-semibold outline-none transition-all ${
+              className={`appearance-none rounded-full border py-1.5 pl-3 pr-7 text-xs font-semibold outline-none transition-colors ${
                 activeGestore
                   ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.05)] text-[#2A00CC]'
                   : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
@@ -210,7 +210,7 @@ export default function ContactsFilters({
         {/* Date toggle */}
         <button
           onClick={() => setShowDates(!showDates)}
-          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
             dateFrom || dateTo || scadenzaFrom || scadenzaTo
               ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.05)] text-[#2A00CC]'
               : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
@@ -234,7 +234,7 @@ export default function ContactsFilters({
               category: null, tag: null, gestore: null,
               dateFrom: null, dateTo: null, scadenzaFrom: null, scadenzaTo: null, search: null,
             })}
-            className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-all hover:bg-red-100"
+            className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
           >
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -363,21 +363,21 @@ function DateRangeGroup({
             type="date"
             value={fromValue}
             onChange={(e) => onFromChange(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none transition-all focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.1)]"
+            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none transition-colors focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.1)]"
           />
           <span className="text-[10px] text-gray-400">—</span>
           <input
             type="date"
             value={toValue}
             onChange={(e) => onToChange(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none transition-all focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.1)]"
+            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none transition-colors focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.1)]"
           />
         </div>
       </div>
       <button
         onClick={onApply}
         disabled={!canApply}
-        className="rounded-lg bg-[#2A00CC] px-3 py-1.5 text-[11px] font-semibold text-white transition-all hover:bg-[#2200aa] disabled:opacity-30"
+        className="rounded-lg bg-[#2A00CC] px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#2200aa] disabled:opacity-30"
       >
         Applica
       </button>
@@ -438,7 +438,7 @@ function TagMultiSelect({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
+        className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
           selectedTags.length > 0
             ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.05)] text-[#2A00CC]'
             : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'

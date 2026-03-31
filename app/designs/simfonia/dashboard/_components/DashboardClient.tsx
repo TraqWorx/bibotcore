@@ -115,7 +115,7 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
             {isAdmin ? 'Panoramica operativa' : 'I tuoi risultati'} — {now.getFullYear()}
           </p>
         </div>
-        <Link href={`/designs/simfonia/contacts/new${q}`} className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black shadow-sm transition-all hover:opacity-90" style={{ background: '#00F0FF' }}>
+        <Link href={`/designs/simfonia/contacts/new${q}`} className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black shadow-sm transition-colors hover:opacity-90" style={{ background: '#00F0FF' }}>
           + Nuovo Contatto
         </Link>
       </div>
@@ -146,7 +146,7 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
             </div>
           )}
         </div>
-        <Link href={`/designs/simfonia/calendar${q}`} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-all">
+        <Link href={`/designs/simfonia/calendar${q}`} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-colors">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Calendario</p>
           <p className="mt-2 text-sm font-medium text-gray-600">Vedi appuntamenti</p>
         </Link>
@@ -169,7 +169,7 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">% Raggiunta</p>
               <p className="mt-2 text-4xl font-black" style={{ color: '#2A00CC' }}>{pctContratti.toFixed(1)}%</p>
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pctContratti, 100)}%`, background: perfStatus === 'green' ? '#16a34a' : perfStatus === 'yellow' ? '#d97706' : '#dc2626' }} />
+                <div className="h-full rounded-full transition-colors" style={{ width: `${Math.min(pctContratti, 100)}%`, background: perfStatus === 'green' ? '#16a34a' : perfStatus === 'yellow' ? '#d97706' : '#dc2626' }} />
               </div>
               <p className="mt-1 text-xs text-gray-400">obiettivo: {pctTempo.toFixed(1)}% atteso</p>
             </div>
@@ -201,14 +201,14 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
             const style = CATEGORY_STYLES[cat.slug] ?? { border: 'border-gray-200', accent: 'text-gray-700', bg: 'bg-gray-50' }
             const pctOfTotal = totalContacts > 0 ? (cat.total / totalContacts) * 100 : 0
             return (
-              <Link key={cat.slug} href={`/designs/simfonia/contacts${q}&category=${cat.slug}`} className={`group rounded-2xl border ${style.border} bg-white p-5 shadow-sm hover:shadow-md transition-all`}>
+              <Link key={cat.slug} href={`/designs/simfonia/contacts${q}&category=${cat.slug}`} className={`group rounded-2xl border ${style.border} bg-white p-5 shadow-sm hover:shadow-md transition-colors`}>
                 <p className={`text-xs font-semibold uppercase tracking-widest ${style.accent}`}>{cat.label}</p>
                 <div className="mt-3 flex items-baseline gap-1.5">
                   <span className={`text-3xl font-black tabular-nums ${style.accent}`}>{cat.total.toLocaleString('it-IT')}</span>
                   <span className="text-sm font-semibold tabular-nums text-gray-300">contatti</span>
                 </div>
                 <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                  <div className={`h-full rounded-full transition-all ${style.bg}`} style={{ width: `${Math.min(pctOfTotal, 100)}%` }} />
+                  <div className={`h-full rounded-full transition-colors ${style.bg}`} style={{ width: `${Math.min(pctOfTotal, 100)}%` }} />
                 </div>
                 <p className="mt-2 text-[11px] tabular-nums text-gray-400">{pctOfTotal.toFixed(1)}% del totale</p>
                 {cat.providers.length > 0 && (
@@ -250,7 +250,7 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
                     <span className="text-lg font-semibold tabular-nums text-gray-300">/ {g.obiettivo}</span>
                   </div>
                   <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pctRaggiunta, 100)}%`, background: isOnTrack ? '#16a34a' : '#dc2626' }} />
+                    <div className="h-full rounded-full transition-colors" style={{ width: `${Math.min(pctRaggiunta, 100)}%`, background: isOnTrack ? '#16a34a' : '#dc2626' }} />
                   </div>
                 </div>
               )

@@ -76,7 +76,7 @@ export default function ContactFiltersForm({ locationId, ghlTags, selectedFilter
                 key={tag}
                 type="button"
                 onClick={() => toggle(tag)}
-                className="rounded-full border px-3 py-1.5 text-xs font-semibold transition-all capitalize"
+                className="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors capitalize"
                 style={isSelected
                   ? { background: '#2A00CC', color: 'white', borderColor: '#2A00CC' }
                   : { background: 'white', color: '#374151', borderColor: '#e5e7eb' }
@@ -111,13 +111,13 @@ export default function ContactFiltersForm({ locationId, ghlTags, selectedFilter
               if (e.key === 'Escape') setShowSuggestions(false)
             }}
             placeholder="Cerca o aggiungi tag..."
-            className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-all"
+            className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
           />
           <button
             type="button"
             onClick={() => { addCustomTag(); setShowSuggestions(false) }}
             disabled={!customTag.trim()}
-            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-40"
+            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
           >
             Aggiungi
           </button>
@@ -151,7 +151,7 @@ export default function ContactFiltersForm({ locationId, ghlTags, selectedFilter
         type="button"
         onClick={handleSave}
         disabled={saving}
-        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-all hover:opacity-90 disabled:opacity-50"
+        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
         style={{ background: '#00F0FF' }}
       >
         {saving ? 'Salvataggio...' : 'Salva Filtri'}

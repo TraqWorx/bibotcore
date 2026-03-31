@@ -151,7 +151,7 @@ export default function ContactColumnsForm({ locationId, initialColumns, customF
                 key={f.key}
                 type="button"
                 onClick={() => addColumn({ key: f.key, label: f.label, type: 'standard' })}
-                className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-all"
+                className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
               >
                 + {f.label}
               </button>
@@ -161,7 +161,7 @@ export default function ContactColumnsForm({ locationId, initialColumns, customF
                 key={cf.id}
                 type="button"
                 onClick={() => addColumn({ key: cf.id, label: cf.name, type: 'custom' })}
-                className="rounded-full border border-[rgba(42,0,204,0.2)] bg-[rgba(42,0,204,0.05)] px-3 py-1.5 text-xs font-semibold transition-all hover:bg-[rgba(42,0,204,0.1)]"
+                className="rounded-full border border-[rgba(42,0,204,0.2)] bg-[rgba(42,0,204,0.05)] px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-[rgba(42,0,204,0.1)]"
                 style={{ color: '#2A00CC' }}
               >
                 + {cf.name}
@@ -178,7 +178,7 @@ export default function ContactColumnsForm({ locationId, initialColumns, customF
         type="button"
         onClick={handleSave}
         disabled={saving}
-        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-all hover:opacity-90 disabled:opacity-50"
+        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
         style={{ background: '#00F0FF' }}
       >
         {saving ? 'Salvataggio...' : 'Salva Colonne'}

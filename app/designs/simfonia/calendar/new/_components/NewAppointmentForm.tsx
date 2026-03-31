@@ -40,7 +40,7 @@ export default function NewAppointmentForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-all focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)]'
+  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)]'
 
   // Get availability for selected user
   const userAvailability = useMemo(
@@ -215,7 +215,7 @@ export default function NewAppointmentForm({
           <button
             type="submit"
             disabled={saving || !!isDayUnavailable}
-            className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-40"
+            className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40"
             style={{ background: '#2A00CC' }}
           >
             {saving ? 'Salvataggio…' : 'Salva Appuntamento'}
@@ -223,7 +223,7 @@ export default function NewAppointmentForm({
           <button
             type="button"
             onClick={() => router.push(`/designs/simfonia/calendar?locationId=${locationId}`)}
-            className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50"
+            className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
           >
             Annulla
           </button>

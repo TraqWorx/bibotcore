@@ -114,7 +114,7 @@ export default async function CalendarPage({
         </div>
         <Link
           href={`/designs/simfonia/calendar/new?locationId=${locationId}`}
-          className="rounded-xl px-5 py-2.5 text-sm font-semibold text-black transition-all hover:opacity-90"
+          className="rounded-xl px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:opacity-90"
           style={{ background: '#00F0FF' }}
         >
           + Nuovo Appuntamento

@@ -30,7 +30,7 @@ export default function PipelineClient({ locationId }: { locationId: string }) {
         </div>
         <Link
           href={`/designs/simfonia/pipeline/new${q}`}
-          className="rounded-xl px-5 py-2.5 text-sm font-semibold text-black transition-all hover:opacity-90"
+          className="rounded-xl px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:opacity-90"
           style={{ background: '#00F0FF' }}
         >
           + Nuova Opportunità

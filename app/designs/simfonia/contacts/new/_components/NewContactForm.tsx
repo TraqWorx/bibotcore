@@ -213,7 +213,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
     }
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-all'
+  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors'
 
   const CATEGORY_ACCENT: Record<string, { bg: string; border: string; text: string; dot: string }> = {
     telefonia:       { bg: 'bg-blue-50',    border: 'border-blue-200',    text: 'text-blue-700',    dot: 'bg-blue-400' },
@@ -306,12 +306,12 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
                   return (
                     <label
                       key={cat.slug}
-                      className={`flex cursor-pointer items-center gap-2.5 rounded-xl border-2 px-3.5 py-2.5 transition-all ${
+                      className={`flex cursor-pointer items-center gap-2.5 rounded-xl border-2 px-3.5 py-2.5 transition-colors ${
                         isChecked ? `${accent.bg} ${accent.border}` : 'border-gray-200 bg-white hover:border-gray-300'
                       }`}
                     >
                       <input type="checkbox" checked={isChecked} onChange={() => toggleCategory(cat.slug)} className="sr-only" />
-                      <span className={`h-2.5 w-2.5 rounded-full transition-all ${isChecked ? accent.dot : 'bg-gray-300'}`} />
+                      <span className={`h-2.5 w-2.5 rounded-full transition-colors ${isChecked ? accent.dot : 'bg-gray-300'}`} />
                       <span className={`text-sm font-semibold ${isChecked ? accent.text : 'text-gray-500'}`}>{cat.label}</span>
                     </label>
                   )
@@ -330,7 +330,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
                       const cat = categories.find((c) => c.slug === slug)
                       if (!cat) return null
                       return (
-                        <button key={slug} type="button" onClick={() => setCfTab(cat.label)} className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all whitespace-nowrap" style={cfTab === cat.label ? { background: '#2A00CC', color: 'white' } : { color: '#6B7280' }}>
+                        <button key={slug} type="button" onClick={() => setCfTab(cat.label)} className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap" style={cfTab === cat.label ? { background: '#2A00CC', color: 'white' } : { color: '#6B7280' }}>
                           {cat.label}
                         </button>
                       )
@@ -417,7 +417,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
                               onChange={(e) => setNewTag(e.target.value)}
                               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addNewTag() } }}
                               placeholder="Aggiungi tag..."
-                              className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)] transition-all"
+                              className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
                             />
                             <button
                               type="button"
@@ -445,7 +445,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
 
                     {/* Switch Out toggle */}
                     {soField && (
-                      <label className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition-all ${soIsOn ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                      <label className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition-colors ${soIsOn ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
                         <input type="checkbox" checked={soIsOn} onChange={(e) => setCfValue(soField.id, e.target.checked ? 'Si' : 'No')} className="sr-only" />
                         <span className={`text-lg ${soIsOn ? '' : 'opacity-30'}`}>&#x1F6A9;</span>
                         <div>
@@ -471,14 +471,14 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
             <button
               type="button"
               onClick={() => router.push(`/designs/simfonia/contacts?locationId=${locationId}`)}
-              className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50"
+              className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
             >
               Annulla
             </button>
             <button
               type="submit"
               disabled={saving || selectedCategories.length === 0}
-              className="rounded-xl px-8 py-2.5 text-sm font-bold text-black transition-all hover:opacity-90 disabled:opacity-50 shadow-sm"
+              className="rounded-xl px-8 py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50 shadow-sm"
               style={{ background: '#00F0FF' }}
             >
               {saving ? 'Salvataggio...' : 'Crea Contatto'}

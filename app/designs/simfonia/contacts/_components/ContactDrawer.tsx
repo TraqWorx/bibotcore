@@ -292,7 +292,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
     })
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-all'
+  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors'
 
   const TABS = [
     { key: 'info' as const, label: 'Dettagli', icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg> },
@@ -315,7 +315,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all"
+            className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
           </button>
@@ -400,7 +400,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     <button
                       onClick={handleAiSummary}
                       disabled={aiLoading}
-                      className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#2A00CC] to-[#6366f1] px-3 py-1.5 text-xs font-semibold text-white transition-all hover:shadow-md disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#2A00CC] to-[#6366f1] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:shadow-md disabled:opacity-50"
                     >
                       {aiLoading ? (
                         <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -510,7 +510,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                                     key={groupName}
                                     type="button"
                                     onClick={() => setInfoCfTab(groupName)}
-                                    className={`flex-1 rounded-lg px-4 py-2 text-xs font-semibold transition-all whitespace-nowrap ${
+                                    className={`flex-1 rounded-lg px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
                                       infoCfTab === groupName ? 'bg-white shadow-sm' : ''
                                     }`}
                                     style={infoCfTab === groupName ? { color: '#2A00CC' } : { color: '#6B7280' }}
@@ -718,7 +718,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                               return (
                                 <label
                                   key={cat.slug}
-                                  className={`flex cursor-pointer items-center gap-2.5 rounded-xl border-2 px-3.5 py-2.5 transition-all ${
+                                  className={`flex cursor-pointer items-center gap-2.5 rounded-xl border-2 px-3.5 py-2.5 transition-colors ${
                                     isChecked ? `${accent.bg} ${accent.border}` : 'border-gray-200 bg-white hover:border-gray-300'
                                   }`}
                                 >
@@ -736,7 +736,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                                     }}
                                     className="sr-only"
                                   />
-                                  <span className={`h-2.5 w-2.5 rounded-full transition-all ${isChecked ? accent.dot : 'bg-gray-300'}`} />
+                                  <span className={`h-2.5 w-2.5 rounded-full transition-colors ${isChecked ? accent.dot : 'bg-gray-300'}`} />
                                   <span className={`text-sm font-semibold ${isChecked ? accent.text : 'text-gray-500'}`}>{cat.label}</span>
                                 </label>
                               )
@@ -753,7 +753,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                               key={label}
                               type="button"
                               onClick={() => setEditCfTab(label)}
-                              className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all whitespace-nowrap"
+                              className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap"
                               style={editCfTab === label ? { background: '#2A00CC', color: 'white' } : { color: '#6B7280' }}
                             >
                               {label}
@@ -895,7 +895,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                                   onChange={(e) => setNewTag(e.target.value)}
                                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const t = newTag.trim(); if (t && !editTags.includes(t)) { setEditTags((prev) => [...prev, t]); setNewTag('') } } }}
                                   placeholder="Aggiungi tag..."
-                                  className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)] transition-all"
+                                  className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
                                 />
                                 <button
                                   type="button"
@@ -920,7 +920,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                             </div>
                             {/* Per-category Switch Out toggle */}
                             {soField && (
-                              <label className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition-all ${soIsOn ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                              <label className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition-colors ${soIsOn ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
                                 <input type="checkbox" checked={soIsOn} onChange={(e) => setEditCfValues((p) => ({ ...p, [soField.id]: e.target.checked ? 'Si' : 'No' }))} className="sr-only" />
                                 <span className={`text-lg ${soIsOn ? '' : 'opacity-30'}`}>&#x1F6A9;</span>
                                 <div>
@@ -948,7 +948,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                   <button
                     type="button"
                     onClick={() => setTab('info')}
-                    className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50"
+                    className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
                   >
                     Annulla
                   </button>
@@ -956,7 +956,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     type="button"
                     onClick={handleEditSave}
                     disabled={editSaving}
-                    className="flex-1 rounded-xl py-2.5 text-sm font-bold text-black transition-all hover:opacity-90 disabled:opacity-50 shadow-sm"
+                    className="flex-1 rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50 shadow-sm"
                     style={{ background: '#00F0FF' }}
                   >
                     {editSaving ? 'Salvataggio...' : 'Salva Modifiche'}
@@ -969,7 +969,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     <button
                       type="button"
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="w-full rounded-xl border border-red-200 py-2.5 text-sm font-semibold text-red-600 transition-all hover:bg-red-50"
+                      className="w-full rounded-xl border border-red-200 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
                     >
                       Elimina Contatto
                     </button>
@@ -983,7 +983,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                           type="button"
                           onClick={handleDelete}
                           disabled={deleting}
-                          className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white transition-all hover:bg-red-700 disabled:opacity-50"
+                          className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
                         >
                           {deleting ? 'Eliminazione...' : 'Conferma Eliminazione'}
                         </button>
@@ -1069,12 +1069,12 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                       onChange={(e) => setMessage(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && !sending && handleSend()}
                       placeholder="Scrivi un messaggio..."
-                      className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-all"
+                      className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
                     />
                     <button
                       onClick={handleSend}
                       disabled={sending || !message.trim()}
-                      className="rounded-xl px-5 py-3 text-sm font-semibold text-white transition-all disabled:opacity-40 shadow-sm"
+                      className="rounded-xl px-5 py-3 text-sm font-semibold text-white transition-colors disabled:opacity-40 shadow-sm"
                       style={{ background: '#2A00CC' }}
                     >
                       {sending ? (

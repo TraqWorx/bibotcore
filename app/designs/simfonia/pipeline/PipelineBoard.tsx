@@ -143,7 +143,7 @@ export default function PipelineBoard({
                     </div>
                     <Link
                       href={`/designs/simfonia/pipeline/new?pipelineId=${pipelineId}&stageId=${stage.id}&locationId=${locationId}`}
-                      className="flex h-6 w-6 items-center justify-center rounded-lg text-[#2A00CC] transition-all duration-150 hover:bg-[rgba(42,0,204,0.08)]"
+                      className="flex h-6 w-6 items-center justify-center rounded-lg text-[#2A00CC] transition-colors duration-150 hover:bg-[rgba(42,0,204,0.08)]"
                       title="Aggiungi opportunità"
                     >
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -162,7 +162,7 @@ export default function PipelineBoard({
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
                             onClick={() => onDealClick?.(deal.id)}
-                            className={`group relative mb-2 cursor-pointer rounded-xl border p-3 text-sm transition-all duration-150 ease-out ${
+                            className={`group relative mb-2 cursor-pointer rounded-xl border p-3 text-sm transition-colors duration-150 ease-out ${
                               snapshot.isDragging ? 'shadow-lg border-[rgba(42,0,204,0.2)] bg-white' : 'border-gray-200 bg-white hover:border-[rgba(42,0,204,0.2)] hover:shadow-sm'
                             }`}
                           >
@@ -199,7 +199,7 @@ export default function PipelineBoard({
 
       {/* Won / Lost drop zones — visible while dragging */}
       <div
-        className={`mt-4 grid grid-cols-2 gap-4 transition-all duration-200 ${
+        className={`mt-4 grid grid-cols-2 gap-4 transition-colors duration-200 ${
           isDragging ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none h-0 mt-0 overflow-hidden'
         }`}
       >
@@ -209,7 +209,7 @@ export default function PipelineBoard({
               <div
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className={`flex items-center justify-center rounded-2xl border-2 border-dashed py-6 text-sm font-bold transition-all ${
+                className={`flex items-center justify-center rounded-2xl border-2 border-dashed py-6 text-sm font-bold transition-colors ${
                   snapshot.isDraggingOver ? zone.activeColor : zone.color
                 }`}
               >

@@ -477,7 +477,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                         setAiSuggesting(false)
                       }}
                       disabled={aiSuggesting || messages.length === 0}
-                      className="rounded-xl border border-[rgba(42,0,204,0.2)] px-3 py-2.5 text-sm font-medium transition-all hover:bg-[rgba(42,0,204,0.05)] disabled:opacity-40"
+                      className="rounded-xl border border-[rgba(42,0,204,0.2)] px-3 py-2.5 text-sm font-medium transition-colors hover:bg-[rgba(42,0,204,0.05)] disabled:opacity-40"
                       style={{ color: '#2A00CC' }}
                       title="Suggerisci risposta con AI"
                     >
@@ -492,7 +492,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                     <button
                       onClick={handleSend}
                       disabled={sending || !messageText.trim()}
-                      className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-40"
+                      className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-40"
                       style={{ background: '#2A00CC' }}
                     >
                       {sending ? '...' : 'Invia'}
@@ -526,7 +526,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                     <button
                       onClick={handleSaveNote}
                       disabled={savingNote || !newNote.trim()}
-                      className="mt-1.5 w-full rounded-lg py-1.5 text-xs font-semibold text-white transition-all disabled:opacity-40"
+                      className="mt-1.5 w-full rounded-lg py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-40"
                       style={{ background: '#2A00CC' }}
                     >
                       {savingNote ? 'Salvataggio...' : 'Salva Nota'}

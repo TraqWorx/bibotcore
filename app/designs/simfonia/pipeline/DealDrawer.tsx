@@ -114,7 +114,7 @@ function formatTime(d: string) {
   return date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
 }
 
-const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-all'
+const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors'
 
 export default function DealDrawer({
   dealId,
@@ -314,7 +314,7 @@ export default function DealDrawer({
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all"
+            className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
           </button>
@@ -365,7 +365,7 @@ export default function DealDrawer({
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold transition-all ${
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors ${
                     tab === t.key
                       ? 'bg-white text-gray-900 shadow-sm'
                       : 'text-gray-500 hover:text-gray-700'
@@ -426,7 +426,7 @@ export default function DealDrawer({
                   <button
                     onClick={handleSaveDetails}
                     disabled={saving}
-                    className="mt-4 w-full rounded-xl py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-40"
+                    className="mt-4 w-full rounded-xl py-2.5 text-sm font-bold text-white transition-colors hover:opacity-90 disabled:opacity-40"
                     style={{ background: '#2A00CC' }}
                   >
                     {saving ? 'Salvataggio...' : 'Salva Modifiche'}
@@ -554,7 +554,7 @@ export default function DealDrawer({
                       <button
                         onClick={handleSend}
                         disabled={sending || !message.trim()}
-                        className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-40"
+                        className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40"
                         style={{ background: '#2A00CC' }}
                       >
                         {sending ? '...' : 'Invia'}
@@ -580,7 +580,7 @@ export default function DealDrawer({
                     <button
                       onClick={handleAddNote}
                       disabled={savingNote || !noteText.trim()}
-                      className="mt-2 w-full rounded-xl py-2 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-40"
+                      className="mt-2 w-full rounded-xl py-2 text-sm font-bold text-white transition-colors hover:opacity-90 disabled:opacity-40"
                       style={{ background: '#2A00CC' }}
                     >
                       {savingNote ? 'Salvataggio...' : 'Aggiungi Nota'}
@@ -695,7 +695,7 @@ export default function DealDrawer({
                     <button
                       onClick={handleAddTask}
                       disabled={savingTask || !taskTitle.trim()}
-                      className="w-full rounded-xl py-2 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-40"
+                      className="w-full rounded-xl py-2 text-sm font-bold text-white transition-colors hover:opacity-90 disabled:opacity-40"
                       style={{ background: '#2A00CC' }}
                     >
                       {savingTask ? 'Creazione...' : 'Aggiungi Attività'}
@@ -717,7 +717,7 @@ export default function DealDrawer({
                         <div key={task.id} className="flex items-start gap-3 rounded-2xl border border-gray-200/60 bg-white p-4 shadow-sm">
                           <button
                             onClick={() => !done && handleCompleteTask(task.id)}
-                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
                               done
                                 ? 'border-emerald-500 bg-emerald-500'
                                 : 'border-gray-300 hover:border-[#2A00CC]'

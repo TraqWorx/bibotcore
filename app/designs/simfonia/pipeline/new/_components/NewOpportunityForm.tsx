@@ -88,7 +88,7 @@ export default function NewOpportunityForm({ pipelines, contacts, locationId, pr
     }
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-all focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)]'
+  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)]'
 
   return (
     <div className="max-w-lg rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-6">
@@ -225,7 +225,7 @@ export default function NewOpportunityForm({ pipelines, contacts, locationId, pr
           <button
             type="submit"
             disabled={saving}
-            className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-40"
+            className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40"
             style={{ background: '#2A00CC' }}
           >
             {saving ? 'Salvataggio…' : 'Salva Opportunità'}
@@ -233,7 +233,7 @@ export default function NewOpportunityForm({ pipelines, contacts, locationId, pr
           <button
             type="button"
             onClick={() => router.push(`/designs/simfonia/pipeline?locationId=${locationId}`)}
-            className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50"
+            className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
           >
             Annulla
           </button>

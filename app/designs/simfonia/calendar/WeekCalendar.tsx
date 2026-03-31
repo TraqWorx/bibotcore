@@ -113,7 +113,7 @@ export default function WeekCalendar({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setWeekOffset(0)}
-              className="rounded-xl px-4 py-1.5 text-xs font-semibold transition-all duration-150 ease-out"
+              className="rounded-xl px-4 py-1.5 text-xs font-semibold transition-colors duration-150 ease-out"
               style={
                 weekOffset === 0
                   ? { background: '#2A00CC', color: 'white' }
@@ -194,7 +194,7 @@ export default function WeekCalendar({
                   return (
                     <div
                       key={event.id}
-                      className="rounded-xl border p-2.5 text-xs transition-all duration-150 hover:shadow-sm"
+                      className="rounded-xl border p-2.5 text-xs transition-colors duration-150 hover:shadow-sm"
                       style={
                         style
                           ? { background: style.bg, color: style.text, borderColor: style.border }
@@ -244,7 +244,7 @@ export default function WeekCalendar({
               {isAdmin && (
                 <button
                   onClick={() => setSelectedUserId(null)}
-                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-all"
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors"
                   style={
                     !selectedUserId
                       ? { background: 'rgba(42,0,204,0.08)', color: '#2A00CC' }
@@ -272,7 +272,7 @@ export default function WeekCalendar({
                   <button
                     key={user.id}
                     onClick={() => isAdmin ? setSelectedUserId(isActive ? null : user.id) : undefined}
-                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-all ${!isAdmin ? 'cursor-default' : ''}`}
+                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${!isAdmin ? 'cursor-default' : ''}`}
                     style={
                       isActive
                         ? { background: 'rgba(42,0,204,0.08)', color: '#2A00CC' }

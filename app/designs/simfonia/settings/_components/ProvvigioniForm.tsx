@@ -40,7 +40,7 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
     })
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-all'
+  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors'
 
   return (
     <div className="space-y-4">
@@ -95,7 +95,7 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
       <button
         type="button"
         onClick={addRow}
-        className="rounded-xl border border-dashed border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-500 transition-all hover:border-[#2A00CC] hover:text-[#2A00CC]"
+        className="rounded-xl border border-dashed border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-500 transition-colors hover:border-[#2A00CC] hover:text-[#2A00CC]"
       >
         + Aggiungi Provvigione
       </button>
@@ -110,7 +110,7 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
         type="button"
         onClick={handleSave}
         disabled={isPending}
-        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-all hover:opacity-90 disabled:opacity-50"
+        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
         style={{ background: '#00F0FF' }}
       >
         {isPending ? 'Salvataggio...' : 'Salva Provvigioni'}
