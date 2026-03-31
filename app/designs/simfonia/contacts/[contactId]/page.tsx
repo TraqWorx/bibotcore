@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { createAdminClient } from '@/lib/supabase-server'
 import { getOpportunitiesByContact } from '@/lib/data/opportunities'
@@ -28,17 +27,16 @@ export default async function ContactProfilePage({
   }
 
   const sb = createAdminClient()
-  const ghl = await getGhlClient(locationId)
 
-  // Fetch from cache + GHL (calendar events only)
+  // Fetch everything from cache
   const [
     { data: cached },
     { data: customFieldValues },
     { data: fieldDefs },
     cachedOpps,
     { pipelines },
-    eventsData,
-    calendarsData,
+    { data: cachedEvents },
+    { data: cachedCalendars },
     { data: cachedConvos },
   ] = await Promise.all([
     sb.from('cached_contacts').select('*').eq('location_id', locationId).eq('ghl_id', contactId).single(),
@@ -46,8 +44,8 @@ export default async function ContactProfilePage({
     sb.from('cached_custom_fields').select('field_id, name').eq('location_id', locationId),
     getOpportunitiesByContact(locationId, contactId),
     listPipelines(locationId),
-    ghl.calendarEvents.byContact(contactId).catch(() => ({ events: [] })),
-    ghl.calendars.list().catch(() => ({ calendars: [] })),
+    sb.from('cached_calendar_events').select('ghl_id, calendar_id, title, start_time, appointment_status').eq('location_id', locationId).eq('contact_ghl_id', contactId).order('start_time', { ascending: false }),
+    sb.from('cached_calendars').select('ghl_id, name').eq('location_id', locationId),
     sb.from('cached_conversations').select('ghl_id, type, last_message_date, last_message_body').eq('location_id', locationId).eq('contact_ghl_id', contactId).order('last_message_date', { ascending: false }).limit(5),
   ])
 
@@ -55,7 +53,9 @@ export default async function ContactProfilePage({
     ? { firstName: cached.first_name, lastName: cached.last_name, email: cached.email, phone: cached.phone, address1: cached.address1, city: cached.city, tags: cached.tags ?? [], companyName: cached.company_name }
     : null
 
-  const events: CalendarEvent[] = eventsData?.events ?? []
+  const events: CalendarEvent[] = (cachedEvents ?? []).map((e) => ({
+    id: e.ghl_id, title: e.title, calendarId: e.calendar_id, startTime: e.start_time, appointmentStatus: e.appointment_status,
+  }))
   const conversations = (cachedConvos ?? []).map((c) => ({
     id: c.ghl_id, type: c.type, lastMessageDate: c.last_message_date, lastMessageBody: c.last_message_body,
   }))
@@ -74,8 +74,8 @@ export default async function ContactProfilePage({
     }
   }
   const calendarMap: Record<string, string> = {}
-  for (const cal of calendarsData?.calendars ?? []) {
-    calendarMap[cal.id] = cal.name
+  for (const cal of cachedCalendars ?? []) {
+    calendarMap[cal.ghl_id] = cal.name ?? ''
   }
 
   const fullName = [contact?.firstName, contact?.lastName].filter(Boolean).join(' ') || '—'

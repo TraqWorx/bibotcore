@@ -1,37 +1,7 @@
-import { getGhlClient } from '@/lib/ghl/ghlClient'
-import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
+import { createAdminClient } from '@/lib/supabase-server'
+import { listPipelines } from '@/lib/data/pipelines'
 import NewOpportunityForm from './_components/NewOpportunityForm'
-
-const BASE_URL = 'https://services.leadconnectorhq.com'
-
-async function fetchAllContacts(locationId: string, token: string) {
-  const contacts: { id: string; name: string }[] = []
-  let startAfterId: string | undefined
-  for (let page = 0; page < 10; page++) {
-    try {
-      const params = new URLSearchParams({ locationId, limit: '100' })
-      if (startAfterId) params.set('startAfterId', startAfterId)
-      const res = await fetch(`${BASE_URL}/contacts/?${params}`, {
-        headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
-        next: { revalidate: 120 },
-      })
-      if (!res.ok) break
-      const data = await res.json()
-      const raw = (data?.contacts ?? []) as { id: string; firstName?: string; lastName?: string }[]
-      if (raw.length === 0) break
-      for (const c of raw) {
-        const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.id
-        contacts.push({ id: c.id, name })
-      }
-      if (raw.length < 100) break
-      startAfterId = raw[raw.length - 1].id
-    } catch {
-      break
-    }
-  }
-  return contacts.sort((a, b) => a.name.localeCompare(b.name))
-}
 
 export default async function NewOpportunityPage({
   searchParams,
@@ -40,16 +10,27 @@ export default async function NewOpportunityPage({
 }) {
   const sp = await searchParams
   const locationId = await getActiveLocation(sp)
-  const ghl = await getGhlClient(locationId)
-  const token = await getGhlTokenForLocation(locationId)
+  const sb = createAdminClient()
 
-  const [pipelinesData, contacts] = await Promise.all([
-    ghl.pipelines.list(),
-    fetchAllContacts(locationId, token),
+  const [{ pipelines: cachedPipelines }, { data: cachedContacts }] = await Promise.all([
+    listPipelines(locationId),
+    sb.from('cached_contacts')
+      .select('ghl_id, first_name, last_name')
+      .eq('location_id', locationId)
+      .order('first_name'),
   ])
-  const pipelines = pipelinesData?.pipelines ?? []
 
-  // Pre-select pipeline/stage if passed in query params
+  const pipelines = cachedPipelines.map((p) => ({
+    id: p.ghl_id,
+    name: p.name ?? '',
+    stages: p.stages ?? [],
+  }))
+
+  const contacts = (cachedContacts ?? []).map((c) => ({
+    id: c.ghl_id,
+    name: [c.first_name, c.last_name].filter(Boolean).join(' ') || c.ghl_id,
+  }))
+
   const preselectedPipelineId = typeof sp.pipelineId === 'string' ? sp.pipelineId : undefined
   const preselectedStageId = typeof sp.stageId === 'string' ? sp.stageId : undefined
 

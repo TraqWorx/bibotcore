@@ -1,29 +1,6 @@
 import { createAdminClient } from '@/lib/supabase-server'
-import { getGhlClient } from '@/lib/ghl/ghlClient'
-import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import NewAppointmentForm from './_components/NewAppointmentForm'
-
-const BASE_URL = 'https://services.leadconnectorhq.com'
-
-interface GhlUser { id: string; name: string }
-
-async function fetchGhlUsers(token: string, locationId: string): Promise<GhlUser[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/users/?locationId=${locationId}`, {
-      headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
-      next: { revalidate: 300 },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return ((data?.users ?? []) as { id: string; name?: string; firstName?: string; lastName?: string }[]).map((u) => ({
-      id: u.id,
-      name: u.name || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.id,
-    }))
-  } catch {
-    return []
-  }
-}
 
 export interface AvailabilitySlot {
   ghl_user_id: string
@@ -39,22 +16,27 @@ export default async function NewAppointmentPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const locationId = await getActiveLocation(await searchParams)
-  const ghl = await getGhlClient(locationId)
-  const token = await getGhlTokenForLocation(locationId).catch(() => null)
   const supabase = createAdminClient()
 
-  const [calendarsData, contactsData, ghlUsers, { data: availabilityRows }] = await Promise.all([
-    ghl.calendars.list(),
-    ghl.contacts.list(),
-    token ? fetchGhlUsers(token, locationId) : Promise.resolve([]),
-    supabase
-      .from('user_availability')
-      .select('ghl_user_id, day_of_week, start_time, end_time, enabled')
-      .eq('location_id', locationId),
+  const [{ data: cachedCalendars }, { data: cachedContacts }, { data: cachedUsers }, { data: availabilityRows }] = await Promise.all([
+    supabase.from('cached_calendars').select('ghl_id, name').eq('location_id', locationId),
+    supabase.from('cached_contacts').select('ghl_id, first_name, last_name, email, phone').eq('location_id', locationId).order('first_name'),
+    supabase.from('cached_ghl_users').select('ghl_id, name, first_name, last_name').eq('location_id', locationId),
+    supabase.from('user_availability').select('ghl_user_id, day_of_week, start_time, end_time, enabled').eq('location_id', locationId),
   ])
 
-  const calendars = calendarsData?.calendars ?? []
-  const contacts = contactsData?.contacts ?? []
+  const calendars = (cachedCalendars ?? []).map((c) => ({ id: c.ghl_id, name: c.name ?? '' }))
+  const contacts = (cachedContacts ?? []).map((c) => ({
+    id: c.ghl_id,
+    firstName: c.first_name ?? '',
+    lastName: c.last_name ?? '',
+    email: c.email ?? '',
+    phone: c.phone ?? '',
+  }))
+  const users = (cachedUsers ?? []).map((u) => ({
+    id: u.ghl_id,
+    name: u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.ghl_id,
+  }))
   const availability = (availabilityRows ?? []) as AvailabilitySlot[]
 
   return (
@@ -63,7 +45,7 @@ export default async function NewAppointmentPage({
       <NewAppointmentForm
         calendars={calendars}
         contacts={contacts}
-        users={ghlUsers.map((u) => ({ id: u.id, name: u.name }))}
+        users={users}
         availability={availability}
         locationId={locationId}
       />

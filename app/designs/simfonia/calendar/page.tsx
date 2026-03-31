@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 import WeekCalendar from './WeekCalendar'
@@ -49,25 +48,18 @@ export default async function CalendarPage({
   let authUser: { id: string; email?: string } | null = null
 
   try {
-    // Try GHL for real-time events, fall back to cache
-    let calData: Record<string, unknown> | null = null
-    try {
-      const ghl = await getGhlClient(locationId)
-      calData = await ghl.calendarEvents.list()
-    } catch {
-      // GHL down — read from cache
-      const { data: cachedEvents } = await supabase
-        .from('cached_calendar_events')
-        .select('ghl_id, calendar_id, contact_ghl_id, title, start_time, end_time, appointment_status')
-        .eq('location_id', locationId)
-      calData = {
-        events: (cachedEvents ?? []).map((e) => ({
-          id: e.ghl_id, calendarId: e.calendar_id, contactId: e.contact_ghl_id,
-          title: e.title, startTime: e.start_time, endTime: e.end_time,
-          appointmentStatus: e.appointment_status,
-        })),
-      }
-    }
+    // Read calendar events from Supabase cache
+    const { data: cachedEvents } = await supabase
+      .from('cached_calendar_events')
+      .select('ghl_id, calendar_id, contact_ghl_id, title, start_time, end_time, appointment_status')
+      .eq('location_id', locationId)
+    const calData = {
+      events: (cachedEvents ?? []).map((e) => ({
+        id: e.ghl_id, calendarId: e.calendar_id, contactId: e.contact_ghl_id,
+        title: e.title, startTime: e.start_time, endTime: e.end_time,
+        appointmentStatus: e.appointment_status,
+      })),
+    } as Record<string, unknown>
 
     const [users, { data: { user } }] = await Promise.all([
       fetchGhlUsers(locationId),
