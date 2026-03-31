@@ -46,6 +46,11 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
   const now = new Date()
   const q = `?locationId=${locationId}`
 
+  // AI Ask state — must be before any early return
+  const [aiQuestion, setAiQuestion] = useState('')
+  const [aiAnswer, setAiAnswer] = useState<string | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+
   if (isLoading || !data) {
     return (
       <div className="space-y-6">
@@ -81,11 +86,6 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
     closedDays: string[]
     aiEnabled: boolean
   }
-
-  // AI Ask state
-  const [aiQuestion, setAiQuestion] = useState('')
-  const [aiAnswer, setAiAnswer] = useState<string | null>(null)
-  const [aiLoading, setAiLoading] = useState(false)
 
   const closedDays = new Set(closedDaysArr ?? [])
 
