@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useTransition, useRef, useMemo } from 'react'
+import { useState, useEffect, useTransition, useRef, useMemo, useDeferredValue, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import ContactDrawer from './ContactDrawer'
 import { deleteContact } from '../_actions'
@@ -463,9 +463,10 @@ function ColumnFilterDropdown({
 
 /* ─── Main component ─── */
 
-export default function ContactsList({ contacts: serverContacts, locationId, columns, customFields = [], availableTags = [], categoryTags = {} }: Props) {
+export default memo(function ContactsList({ contacts: serverContacts, locationId, columns, customFields = [], availableTags = [], categoryTags = {} }: Props) {
   const router = useRouter()
-  const [localContacts, setLocalContacts] = useState<Contact[]>(serverContacts)
+  const deferredContacts = useDeferredValue(serverContacts)
+  const [localContacts, setLocalContacts] = useState<Contact[]>(deferredContacts)
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
   const [editContactId, setEditContactId] = useState<string | null>(null)
   const skipSyncUntil = useRef(0)
@@ -614,11 +615,11 @@ export default function ContactsList({ contacts: serverContacts, locationId, col
     setActiveFilter(null)
   }
 
-  // Sync with server when props change
+  // Sync with server when props change (deferred to avoid blocking UI)
   useEffect(() => {
     if (Date.now() < skipSyncUntil.current) return
-    setLocalContacts(serverContacts)
-  }, [serverContacts])
+    setLocalContacts(deferredContacts)
+  }, [deferredContacts])
 
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
@@ -827,4 +828,4 @@ export default function ContactsList({ contacts: serverContacts, locationId, col
       )}
     </>
   )
-}
+})
