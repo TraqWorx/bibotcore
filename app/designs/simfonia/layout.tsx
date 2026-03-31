@@ -1,11 +1,15 @@
-import { Suspense } from 'react'
+import { Suspense, cache } from 'react'
 import { cookies } from 'next/headers'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { DEFAULT_THEME, DEFAULT_MODULES, type DesignTheme, type DesignModules } from '@/lib/types/design'
 import GymSidebar from './_components/GymSidebar'
 import LocationSwitcher from './_components/LocationSwitcher'
 
-export default async function CrmLayout({ children }: { children: React.ReactNode }) {
+/**
+ * Cached layout data loader — React `cache()` deduplicates across
+ * the same server request, so layout + page don't double-query.
+ */
+const getLayoutData = cache(async () => {
   const authClient = await createAuthClient()
   const { data: { user } } = await authClient.auth.getUser()
 
@@ -17,7 +21,6 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
   if (user) {
     const supabase = createAdminClient()
 
-    // ALL initial queries in parallel
     const [{ data: profile }, { data: connections }, { data: profileLocs }, { data: allInstalls }, { data: allLocationNames }, cookieStore] = await Promise.all([
       supabase.from('profiles').select('role, location_id').eq('id', user.id).single(),
       supabase.from('ghl_connections').select('location_id').order('location_id'),
@@ -30,7 +33,6 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
     const isSuperAdmin = profile?.role === 'super_admin'
     const connectedIds = new Set((connections ?? []).map((c) => c.location_id).filter(Boolean))
 
-    // Determine which locations user can see
     let locationIds: string[]
     if (isSuperAdmin) {
       locationIds = [...connectedIds]
@@ -42,17 +44,12 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
       }
     }
 
-    // Build design map from pre-fetched installs
     const designByLocation: Record<string, string | null> = {}
     for (const i of allInstalls ?? []) {
-      if (locationIds.includes(i.location_id)) {
-        designByLocation[i.location_id] = i.design_slug
-      }
+      if (locationIds.includes(i.location_id)) designByLocation[i.location_id] = i.design_slug
     }
 
     const locationIdsWithDesign = locationIds.filter((id) => designByLocation[id])
-
-    // Build name map from pre-fetched names
     const nameById: Record<string, string> = {}
     for (const r of allLocationNames ?? []) nameById[r.location_id] = r.name
 
@@ -62,21 +59,17 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
       name: nameById[id] ?? id,
     }))
 
-    // Active location from cookie
     const cookieLocation = cookieStore.get('active_location_id')?.value
     currentLocationId =
       (cookieLocation && locationIds.includes(cookieLocation) ? cookieLocation : null) ??
-      locations[0]?.location_id ??
-      ''
+      locations[0]?.location_id ?? ''
 
-    // Load design theme (1 parallel query)
     const designSlug = designByLocation[currentLocationId]
     if (designSlug) {
       const [{ data: design }, { data: locationSettings }] = await Promise.all([
         supabase.from('designs').select('theme, modules').eq('slug', designSlug).single(),
         supabase.from('location_design_settings').select('theme_overrides, module_overrides').eq('location_id', currentLocationId).single(),
       ])
-
       finalTheme = {
         ...DEFAULT_THEME,
         ...(design?.theme as Partial<DesignTheme> ?? {}),
@@ -89,6 +82,12 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
       }
     }
   }
+
+  return { locations, currentLocationId, finalTheme, finalModules }
+})
+
+export default async function CrmLayout({ children }: { children: React.ReactNode }) {
+  const { locations, currentLocationId, finalTheme, finalModules } = await getLayoutData()
 
   const cssVars = `:root { --brand: ${finalTheme.primaryColor}; --accent: ${finalTheme.secondaryColor}; }`
 
