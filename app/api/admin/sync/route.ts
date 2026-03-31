@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase-server'
 import { bulkSyncLocation, getSyncStatus } from '@/lib/sync/bulkSync'
+import { syncAllLocationUsers } from '@/lib/sync/syncAllUsers'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes for large locations
@@ -48,8 +49,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const results = await bulkSyncLocation(locationId, body.entities)
-    return NextResponse.json({ ok: true, results })
+    const [results, userSync] = await Promise.all([
+      bulkSyncLocation(locationId, body.entities),
+      syncAllLocationUsers(),
+    ])
+    return NextResponse.json({ ok: true, results, userSync })
   } catch (err) {
     console.error('[admin/sync] error:', err)
     return NextResponse.json(
