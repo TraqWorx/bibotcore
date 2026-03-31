@@ -26,6 +26,7 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => { loadRoles() }, [locationId])
 
@@ -73,9 +74,35 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
           </h2>
           <p className="text-[10px] text-gray-400 mt-0.5">Sincronizzati da GHL. Ruoli CRM modificabili qui.</p>
         </div>
-        {message && (
-          <span className="text-xs font-medium text-green-600">{message}</span>
-        )}
+        <div className="flex items-center gap-3">
+          {message && (
+            <span className="text-xs font-medium text-green-600">{message}</span>
+          )}
+          <button
+            onClick={async () => {
+              setSyncing(true)
+              setMessage(null)
+              const res = await fetch('/api/admin/sync/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ locationId }),
+              })
+              if (res.ok) {
+                setMessage('Utenti sincronizzati')
+                loadRoles()
+                // Reload page to refresh server-rendered profiles
+                window.location.reload()
+              } else {
+                setMessage('Errore sync utenti')
+              }
+              setSyncing(false)
+            }}
+            disabled={syncing}
+            className="rounded-lg bg-[#2A00CC] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#2200aa] disabled:opacity-50"
+          >
+            {syncing ? 'Syncing...' : 'Sync Utenti'}
+          </button>
+        </div>
       </div>
       {profiles.length === 0 ? (
         <p className="p-6 text-sm text-gray-400">Nessun utente per questa location.</p>
