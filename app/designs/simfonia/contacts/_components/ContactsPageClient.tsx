@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
 import ContactsList from './ContactsList'
@@ -36,36 +37,55 @@ interface Props {
 }
 
 export default function ContactsPageClient(props: Props) {
-  const {
-    locationId, columns, customFields, categories, allTags, gestoreOptions,
-    categoryTags, activeCategory, activeTag, activeGestore, dateFrom, dateTo,
-    scadenzaFrom, scadenzaTo, search, categoryLabels, categoriaFieldId,
-    gestoreFieldId, scadenzaFieldIds, activeCategoryLabel,
-  } = props
+  const { locationId, columns, customFields, categories, allTags, gestoreOptions, categoryTags, categoriaFieldId, gestoreFieldId, scadenzaFieldIds, activeCategoryLabel } = props
 
-  // Build API URL with all filters
-  const params = new URLSearchParams({ locationId })
-  if (search) params.set('search', search)
-  if (activeTag) params.set('tag', activeTag)
-  if (categoryLabels.length > 0) params.set('categoryLabels', categoryLabels.join(','))
-  if (categoriaFieldId) params.set('categoriaFieldId', categoriaFieldId)
-  if (gestoreFieldId) params.set('gestoreFieldId', gestoreFieldId)
-  if (activeGestore) params.set('gestore', activeGestore)
-  if (dateFrom) params.set('dateFrom', dateFrom)
-  if (dateTo) params.set('dateTo', dateTo)
-  if (scadenzaFieldIds.length > 0) params.set('scadenzaFieldIds', scadenzaFieldIds.join(','))
-  if (scadenzaFrom) params.set('scadenzaFrom', scadenzaFrom)
-  if (scadenzaTo) params.set('scadenzaTo', scadenzaTo)
+  // Client-side filter state — initialized from server props (URL params)
+  const [filters, setFilters] = useState({
+    category: props.activeCategory,
+    tag: props.activeTag,
+    gestore: props.activeGestore,
+    dateFrom: props.dateFrom,
+    dateTo: props.dateTo,
+    scadenzaFrom: props.scadenzaFrom,
+    scadenzaTo: props.scadenzaTo,
+    search: props.search,
+  })
 
-  const { data, isLoading } = useSWR(`/api/contacts?${params}`, fetcher, {
+  const categoryLabels = useMemo(() => {
+    const slugs = filters.category ? filters.category.split(',').filter(Boolean) : []
+    return slugs.map((slug) => categories.find((c) => c.slug === slug)?.label).filter((l): l is string => !!l)
+  }, [filters.category, categories])
+
+  // Build API URL from current filter state
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams({ locationId })
+    if (filters.search) params.set('search', filters.search)
+    if (filters.tag) params.set('tag', filters.tag)
+    if (categoryLabels.length > 0) params.set('categoryLabels', categoryLabels.join(','))
+    if (categoriaFieldId) params.set('categoriaFieldId', categoriaFieldId)
+    if (gestoreFieldId) params.set('gestoreFieldId', gestoreFieldId)
+    if (filters.gestore) params.set('gestore', filters.gestore)
+    if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
+    if (filters.dateTo) params.set('dateTo', filters.dateTo)
+    if (scadenzaFieldIds.length > 0) params.set('scadenzaFieldIds', scadenzaFieldIds.join(','))
+    if (filters.scadenzaFrom) params.set('scadenzaFrom', filters.scadenzaFrom)
+    if (filters.scadenzaTo) params.set('scadenzaTo', filters.scadenzaTo)
+    return `/api/contacts?${params}`
+  }, [locationId, filters, categoryLabels, categoriaFieldId, gestoreFieldId, scadenzaFieldIds])
+
+  const { data, isLoading } = useSWR(apiUrl, fetcher, {
     revalidateOnFocus: false,
-    dedupingInterval: 5000,
+    keepPreviousData: true,
   })
 
   const contacts: Contact[] = data?.contacts ?? []
   const total: number = data?.total ?? 0
-  const hasFilters = !!(activeCategory || activeTag || activeGestore || dateFrom || dateTo || scadenzaFrom || scadenzaTo || search)
+  const hasFilters = !!(filters.category || filters.tag || filters.gestore || filters.dateFrom || filters.dateTo || filters.scadenzaFrom || filters.scadenzaTo || filters.search)
   const q = `?locationId=${locationId}`
+
+  function handleFilterChange(overrides: Record<string, string | null>) {
+    setFilters((prev) => ({ ...prev, ...overrides }))
+  }
 
   return (
     <div className="space-y-5">
@@ -79,14 +99,14 @@ export default function ContactsPageClient(props: Props) {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Contatti</h1>
             <p className="mt-0.5 text-sm text-gray-500">
-              {isLoading ? (
+              {isLoading && !data ? (
                 <span className="inline-block h-4 w-16 animate-pulse rounded bg-gray-200" />
               ) : (
                 <>
                   <span className="font-semibold text-gray-700">{total}</span> contatti
                   {categoryLabels.length > 0 ? <span className="ml-1 text-[#2A00CC]"> · {categoryLabels.join(', ')}</span> : ''}
-                  {activeTag ? ` · ${activeTag}` : ''}
-                  {activeGestore ? ` · ${activeGestore}` : ''}
+                  {filters.tag ? ` · ${filters.tag}` : ''}
+                  {filters.gestore ? ` · ${filters.gestore}` : ''}
                 </>
               )}
             </p>
@@ -116,37 +136,43 @@ export default function ContactsPageClient(props: Props) {
         categories={categories}
         allTags={allTags}
         gestoreOptions={gestoreOptions}
-        activeCategory={activeCategory}
-        activeTag={activeTag}
-        activeGestore={activeGestore}
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        scadenzaFrom={scadenzaFrom}
-        scadenzaTo={scadenzaTo}
-        search={search}
+        activeCategory={filters.category}
+        activeTag={filters.tag}
+        activeGestore={filters.gestore}
+        dateFrom={filters.dateFrom}
+        dateTo={filters.dateTo}
+        scadenzaFrom={filters.scadenzaFrom}
+        scadenzaTo={filters.scadenzaTo}
+        search={filters.search}
+        onFilterChange={handleFilterChange}
       />
 
-      {isLoading ? (
+      {isLoading && !data ? (
         <div className="rounded-2xl border border-gray-100 bg-white p-12 text-center shadow-sm">
           <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#2A00CC]" />
           <p className="mt-3 text-sm text-gray-400">Caricamento contatti...</p>
         </div>
       ) : (
-        <ContactsList
-          contacts={contacts}
-          locationId={locationId}
-          columns={columns}
-          customFields={customFields}
-          availableTags={allTags}
-          categoryTags={categoryTags}
-        />
+        <div className={isLoading ? 'opacity-60 transition-opacity' : ''}>
+          <ContactsList
+            contacts={contacts}
+            locationId={locationId}
+            columns={columns}
+            customFields={customFields}
+            availableTags={allTags}
+            categoryTags={categoryTags}
+          />
+        </div>
       )}
 
       {hasFilters && !isLoading && contacts.length === 0 && (
         <div className="text-center">
-          <Link href={`/designs/simfonia/contacts${q}`} className="text-xs underline" style={{ color: '#2A00CC' }}>
+          <button
+            onClick={() => handleFilterChange({ category: null, tag: null, gestore: null, dateFrom: null, dateTo: null, scadenzaFrom: null, scadenzaTo: null, search: null })}
+            className="text-xs underline" style={{ color: '#2A00CC' }}
+          >
             Rimuovi filtri
-          </Link>
+          </button>
         </div>
       )}
     </div>

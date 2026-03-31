@@ -17,6 +17,8 @@ interface Props {
   scadenzaFrom: string | null
   scadenzaTo: string | null
   search: string | null
+  /** If provided, filter changes call this instead of router.push */
+  onFilterChange?: (filters: Record<string, string | null>) => void
 }
 
 const CATEGORY_STYLES: Record<string, { bg: string; activeBg: string; text: string; activeText: string; border: string; dot: string }> = {
@@ -33,6 +35,7 @@ export default function ContactsFilters({
   locationId, categories, allTags, gestoreOptions,
   activeCategory, activeTag, activeGestore,
   dateFrom, dateTo, scadenzaFrom, scadenzaTo, search,
+  onFilterChange,
 }: Props) {
   const router = useRouter()
   const [from, setFrom] = useState(dateFrom ?? '')
@@ -63,8 +66,20 @@ export default function ContactsFilters({
     return `/designs/simfonia/contacts?${params}`
   }
 
+  function navigate(overrides: Record<string, string | null | undefined>) {
+    if (onFilterChange) {
+      // Client-side filter change — no page navigation
+      const resolved: Record<string, string | null> = {}
+      for (const [k, v] of Object.entries(overrides)) resolved[k] = v ?? null
+      onFilterChange(resolved)
+    } else {
+      // Fallback: full page navigation
+      router.push(buildUrl(overrides))
+    }
+  }
+
   function handleSearch() {
-    router.push(buildUrl({ search: query.trim() || null }))
+    navigate({ search: query.trim() || null })
   }
 
   const selectedTags = activeTag ? activeTag.split(',') : []
@@ -90,7 +105,7 @@ export default function ContactsFilters({
         <div className="absolute inset-y-0 right-0 flex items-center gap-1 pr-1.5">
           {search && (
             <button
-              onClick={() => { setQuery(''); router.push(buildUrl({ search: null })) }}
+              onClick={() => { setQuery(''); navigate({ search: null }) }}
               className="rounded-lg px-2 py-1.5 text-xs text-gray-400 transition-colors hover:text-gray-600"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -114,7 +129,7 @@ export default function ContactsFilters({
           return (
             <>
               <button
-                onClick={() => router.push(buildUrl({ category: null, tag: null, gestore: null, scadenzaFrom: null, scadenzaTo: null }))}
+                onClick={() => navigate({ category: null, tag: null, gestore: null, scadenzaFrom: null, scadenzaTo: null })}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
                   selectedSlugs.length === 0
                     ? 'border-[#2A00CC] bg-[#2A00CC] text-white shadow-sm'
@@ -133,10 +148,10 @@ export default function ContactsFilters({
                       const next = isActive
                         ? selectedSlugs.filter((s) => s !== cat.slug)
                         : [...selectedSlugs, cat.slug]
-                      router.push(buildUrl({
+                      navigate({
                         category: next.length > 0 ? next.join(',') : null,
                         tag: null, gestore: null, scadenzaFrom: null, scadenzaTo: null,
-                      }))
+                      })
                     }}
                     className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
                       isActive
@@ -163,7 +178,7 @@ export default function ContactsFilters({
           <TagMultiSelect
             allTags={allTags}
             selectedTags={selectedTags}
-            onChange={(tags) => router.push(buildUrl({ tag: tags.length > 0 ? tags.join(',') : null }))}
+            onChange={(tags) => navigate({ tag: tags.length > 0 ? tags.join(',') : null })}
           />
         )}
 
@@ -172,7 +187,7 @@ export default function ContactsFilters({
           <div className="relative">
             <select
               value={activeGestore ?? ''}
-              onChange={(e) => router.push(buildUrl({ gestore: e.target.value || null }))}
+              onChange={(e) => navigate({ gestore: e.target.value || null })}
               className={`appearance-none rounded-full border py-1.5 pl-3 pr-7 text-xs font-semibold outline-none transition-all ${
                 activeGestore
                   ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.05)] text-[#2A00CC]'
@@ -215,10 +230,10 @@ export default function ContactsFilters({
         {/* Clear all */}
         {hasFilters && (
           <button
-            onClick={() => router.push(buildUrl({
+            onClick={() => navigate({
               category: null, tag: null, gestore: null,
               dateFrom: null, dateTo: null, scadenzaFrom: null, scadenzaTo: null, search: null,
-            }))}
+            })}
             className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-all hover:bg-red-100"
           >
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -235,13 +250,13 @@ export default function ContactsFilters({
           {search && (
             <FilterChip
               label={`"${search}"`}
-              onRemove={() => { setQuery(''); router.push(buildUrl({ search: null })) }}
+              onRemove={() => { setQuery(''); navigate({ search: null }) }}
             />
           )}
           {activeGestore && (
             <FilterChip
               label={`Gestore: ${activeGestore}`}
-              onRemove={() => router.push(buildUrl({ gestore: null }))}
+              onRemove={() => navigate({ gestore: null })}
             />
           )}
           {selectedTags.map((tag) => (
@@ -250,32 +265,32 @@ export default function ContactsFilters({
               label={tag}
               onRemove={() => {
                 const next = selectedTags.filter((t) => t !== tag)
-                router.push(buildUrl({ tag: next.length > 0 ? next.join(',') : null }))
+                navigate({ tag: next.length > 0 ? next.join(',') : null })
               }}
             />
           ))}
           {dateFrom && (
             <FilterChip
               label={`Da: ${formatDateLabel(dateFrom)}`}
-              onRemove={() => { setFrom(''); router.push(buildUrl({ dateFrom: null })) }}
+              onRemove={() => { setFrom(''); navigate({ dateFrom: null }) }}
             />
           )}
           {dateTo && (
             <FilterChip
               label={`A: ${formatDateLabel(dateTo)}`}
-              onRemove={() => { setTo(''); router.push(buildUrl({ dateTo: null })) }}
+              onRemove={() => { setTo(''); navigate({ dateTo: null }) }}
             />
           )}
           {scadenzaFrom && (
             <FilterChip
               label={`Scadenza da: ${formatDateLabel(scadenzaFrom)}`}
-              onRemove={() => { setScFrom(''); router.push(buildUrl({ scadenzaFrom: null })) }}
+              onRemove={() => { setScFrom(''); navigate({ scadenzaFrom: null }) }}
             />
           )}
           {scadenzaTo && (
             <FilterChip
               label={`Scadenza a: ${formatDateLabel(scadenzaTo)}`}
-              onRemove={() => { setScTo(''); router.push(buildUrl({ scadenzaTo: null })) }}
+              onRemove={() => { setScTo(''); navigate({ scadenzaTo: null }) }}
             />
           )}
         </div>
@@ -290,8 +305,8 @@ export default function ContactsFilters({
             toValue={to}
             onFromChange={setFrom}
             onToChange={setTo}
-            onApply={() => router.push(buildUrl({ dateFrom: from || null, dateTo: to || null }))}
-            onReset={(dateFrom || dateTo) ? () => { setFrom(''); setTo(''); router.push(buildUrl({ dateFrom: null, dateTo: null })) } : undefined}
+            onApply={() => navigate({ dateFrom: from || null, dateTo: to || null })}
+            onReset={(dateFrom || dateTo) ? () => { setFrom(''); setTo(''); navigate({ dateFrom: null, dateTo: null }) } : undefined}
             canApply={!!(from || to)}
           />
           <div className="mx-2 hidden h-8 w-px bg-gray-200 sm:block" />
@@ -301,8 +316,8 @@ export default function ContactsFilters({
             toValue={scTo}
             onFromChange={setScFrom}
             onToChange={setScTo}
-            onApply={() => router.push(buildUrl({ scadenzaFrom: scFrom || null, scadenzaTo: scTo || null }))}
-            onReset={(scadenzaFrom || scadenzaTo) ? () => { setScFrom(''); setScTo(''); router.push(buildUrl({ scadenzaFrom: null, scadenzaTo: null })) } : undefined}
+            onApply={() => navigate({ scadenzaFrom: scFrom || null, scadenzaTo: scTo || null })}
+            onReset={(scadenzaFrom || scadenzaTo) ? () => { setScFrom(''); setScTo(''); navigate({ scadenzaFrom: null, scadenzaTo: null }) } : undefined}
             canApply={!!(scFrom || scTo)}
           />
         </div>
