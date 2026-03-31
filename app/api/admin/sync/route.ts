@@ -49,10 +49,25 @@ export async function POST(request: Request) {
   }
 
   try {
-    const [results, userSync] = await Promise.all([
-      bulkSyncLocation(locationId, body.entities),
-      syncAllLocationUsers(),
-    ])
+    // Check if location has an OAuth connection
+    const sb = createAdminClient()
+    const { data: conn } = await sb
+      .from('ghl_connections')
+      .select('refresh_token')
+      .eq('location_id', locationId)
+      .maybeSingle()
+
+    let results: Record<string, unknown> = {}
+    if (conn?.refresh_token) {
+      // Has OAuth — full data sync
+      results = await bulkSyncLocation(locationId, body.entities)
+    } else {
+      results = { skipped: 'Location non ha connessione OAuth. Connettila prima di sincronizzare i dati.' }
+    }
+
+    // User sync always works (uses agency token as fallback)
+    const userSync = await syncAllLocationUsers()
+
     return NextResponse.json({ ok: true, results, userSync })
   } catch (err) {
     console.error('[admin/sync] error:', err)

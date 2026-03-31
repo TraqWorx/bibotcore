@@ -36,7 +36,12 @@ export default function SyncStatus({ locationId }: { locationId: string }) {
       body: JSON.stringify({ locationId }),
     })
     if (res.ok) {
-      setMessage('Sync completato')
+      const data = await res.json()
+      if (data.results?.skipped) {
+        setMessage(data.results.skipped)
+      } else {
+        setMessage('Sync completato — dati e utenti aggiornati')
+      }
       loadStatus()
     } else {
       const data = await res.json()
