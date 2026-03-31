@@ -7,12 +7,13 @@ import { darkenHex } from '@/lib/utils/colorUtils'
 import type { DesignTheme, DesignModules } from '@/lib/types/design'
 
 const MODULE_NAV = [
-  { key: 'dashboard',   label: 'Dashboard',    path: '/designs/simfonia/dashboard' },
+  { key: 'dashboard',      label: 'Dashboard',      path: '/designs/simfonia/dashboard' },
   { key: 'contacts',       label: 'Contatti',       path: '/designs/simfonia/contacts' },
-  { key: 'conversations',  label: 'Conversazioni', path: '/designs/simfonia/conversations' },
+  { key: 'conversations',  label: 'Conversazioni',  path: '/designs/simfonia/conversations' },
   { key: 'pipeline',       label: 'Pipeline',       path: '/designs/simfonia/pipeline' },
-  { key: 'calendar',    label: 'Calendario',   path: '/designs/simfonia/calendar' },
-  { key: 'settings',    label: 'Impostazioni', path: '/designs/simfonia/settings' },
+  { key: 'calendar',       label: 'Calendario',     path: '/designs/simfonia/calendar' },
+  { key: 'automations',    label: 'Automazioni',    path: '/designs/simfonia/automations' },
+  { key: 'settings',       label: 'Impostazioni',   path: '/designs/simfonia/settings' },
 ] as const
 
 function NavLink({

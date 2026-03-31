@@ -202,6 +202,9 @@ export async function getGhlClient(locationId: string) {
       delete: (tagId: string) =>
         request(`/locations/${locationId}/tags/${tagId}`, { method: 'DELETE' }),
     },
+    workflows: {
+      list: () => request(`/workflows/?locationId=${locationId}`),
+    },
     invoices: {
       list: (params?: string) =>
         request(`/invoices/search${params ? `?${params}` : `?locationId=${locationId}&limit=100`}`, {
