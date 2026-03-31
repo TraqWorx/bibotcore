@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { bulkSyncLocation } from '@/lib/sync/bulkSync'
+import { syncAllLocationUsers } from '@/lib/sync/syncAllUsers'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -39,6 +40,15 @@ export async function GET(request: Request) {
     }
   }
 
+  // Also sync GHL users → Supabase profiles + profile_locations
+  let userSyncResult: unknown = null
+  try {
+    userSyncResult = await syncAllLocationUsers()
+    console.log('[cron/sync-ghl-cache] user sync:', userSyncResult)
+  } catch (err) {
+    userSyncResult = { error: err instanceof Error ? err.message : String(err) }
+  }
+
   console.log('[cron/sync-ghl-cache] completed:', Object.keys(results).length, 'locations')
-  return NextResponse.json({ synced: Object.keys(results).length, results })
+  return NextResponse.json({ synced: Object.keys(results).length, results, userSync: userSyncResult })
 }

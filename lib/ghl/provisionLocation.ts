@@ -149,6 +149,13 @@ export async function syncLocationUsers(
     }
     await supabase.from('profiles').update({ location_id: locationId }).eq('id', profileId)
     await supabase.from('installs').update({ user_id: profileId }).eq('location_id', locationId)
+
+    // Ensure profile_locations entry exists (RBAC)
+    await supabase.from('profile_locations').upsert(
+      { user_id: profileId, location_id: locationId, role: 'team_member' },
+      { onConflict: 'user_id,location_id' }
+    )
+
     console.log(`[provisionLocation] linked ${email} → ${locationId}`)
   }
 }
