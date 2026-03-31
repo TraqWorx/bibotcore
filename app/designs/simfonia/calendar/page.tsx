@@ -1,11 +1,8 @@
 import Link from 'next/link'
 import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
-import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 import WeekCalendar from './WeekCalendar'
-
-const BASE_URL = 'https://services.leadconnectorhq.com'
 
 interface GhlUser {
   id: string
@@ -14,26 +11,19 @@ interface GhlUser {
   role?: string
 }
 
-async function fetchGhlUsers(token: string, locationId: string): Promise<GhlUser[]> {
-  try {
-    const res = await fetch(
-      `${BASE_URL}/users/?locationId=${locationId}`,
-      {
-        headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
-        next: { revalidate: 300 },
-      }
-    )
-    if (!res.ok) return []
-    const data = await res.json()
-    return ((data?.users ?? []) as { id: string; name?: string; firstName?: string; lastName?: string; email?: string; roles?: { role?: string } }[]).map((u) => ({
-      id: u.id,
-      name: u.name || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.id,
-      email: u.email ?? '',
-      role: u.roles?.role,
-    }))
-  } catch {
-    return []
-  }
+async function fetchGhlUsers(locationId: string): Promise<GhlUser[]> {
+  const sb = createAdminClient()
+  const { data: cached } = await sb
+    .from('cached_ghl_users')
+    .select('ghl_id, name, first_name, last_name, email, role')
+    .eq('location_id', locationId)
+  if (!cached || cached.length === 0) return []
+  return cached.map((u) => ({
+    id: u.ghl_id,
+    name: u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.ghl_id,
+    email: u.email ?? '',
+    role: u.role ?? undefined,
+  }))
 }
 
 export default async function CalendarPage({
@@ -51,8 +41,6 @@ export default async function CalendarPage({
     )
   }
 
-  const token = await getGhlTokenForLocation(locationId).catch(() => null)
-  const ghl = await getGhlClient(locationId)
   const authClient = await createAuthClient()
   const supabase = createAdminClient()
 
@@ -61,12 +49,31 @@ export default async function CalendarPage({
   let authUser: { id: string; email?: string } | null = null
 
   try {
-    const [calData, users, { data: { user } }] = await Promise.all([
-      ghl.calendarEvents.list(),
-      token ? fetchGhlUsers(token, locationId) : Promise.resolve([]),
+    // Try GHL for real-time events, fall back to cache
+    let calData: Record<string, unknown> | null = null
+    try {
+      const ghl = await getGhlClient(locationId)
+      calData = await ghl.calendarEvents.list()
+    } catch {
+      // GHL down — read from cache
+      const { data: cachedEvents } = await supabase
+        .from('cached_calendar_events')
+        .select('ghl_id, calendar_id, contact_ghl_id, title, start_time, end_time, appointment_status')
+        .eq('location_id', locationId)
+      calData = {
+        events: (cachedEvents ?? []).map((e) => ({
+          id: e.ghl_id, calendarId: e.calendar_id, contactId: e.contact_ghl_id,
+          title: e.title, startTime: e.start_time, endTime: e.end_time,
+          appointmentStatus: e.appointment_status,
+        })),
+      }
+    }
+
+    const [users, { data: { user } }] = await Promise.all([
+      fetchGhlUsers(locationId),
       authClient.auth.getUser(),
     ])
-    data = calData
+    data = calData as Record<string, unknown>
     ghlUsers = users
     authUser = user
   } catch (err) {

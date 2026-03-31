@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase-server'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
-import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { DEFAULT_THEME, type DesignTheme } from '@/lib/types/design'
 import { getCategoryTags, getClosedDays, getGareMensili, getLocationTags, getProvvigioni, getUserAvailability, getUniqueFields } from './_actions'
+import { getCustomFieldDefs } from '@/lib/data/contacts'
 import {
   discoverCategories,
   getProviderField,
@@ -20,51 +20,24 @@ import ThemeForm from './_components/ThemeForm'
 import ClosedDaysForm from './_components/ClosedDaysForm'
 import UniqueFieldsForm from './_components/UniqueFieldsForm'
 
-const BASE_URL = 'https://services.leadconnectorhq.com'
-
 interface GhlUser {
   id: string
   name: string
   email: string
 }
 
-async function fetchGhlUsers(token: string, locationId: string): Promise<GhlUser[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/users/?locationId=${locationId}`, {
-      headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
-      next: { revalidate: 300 },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return ((data?.users ?? []) as { id: string; name?: string; firstName?: string; lastName?: string; email?: string }[]).map((u) => ({
-      id: u.id,
-      name: u.name || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.id,
-      email: u.email ?? '',
-    }))
-  } catch {
-    return []
-  }
-}
-
-async function fetchCustomFields(token: string, locationId: string): Promise<CustomFieldDef[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/locations/${locationId}/customFields`, {
-      headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
-      next: { revalidate: 300 },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return ((data?.customFields ?? []) as CustomFieldDef[]).map((cf) => ({
-      id: cf.id,
-      name: cf.name,
-      fieldKey: cf.fieldKey ?? cf.id,
-      dataType: cf.dataType ?? 'TEXT',
-      placeholder: cf.placeholder,
-      picklistOptions: cf.picklistOptions,
-    }))
-  } catch {
-    return []
-  }
+async function fetchGhlUsers(locationId: string): Promise<GhlUser[]> {
+  const sb = createAdminClient()
+  const { data: cached } = await sb
+    .from('cached_ghl_users')
+    .select('ghl_id, name, first_name, last_name, email')
+    .eq('location_id', locationId)
+  if (!cached || cached.length === 0) return []
+  return cached.map((u) => ({
+    id: u.ghl_id,
+    name: u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.ghl_id,
+    email: u.email ?? '',
+  }))
 }
 
 /** Collect all gestore picklist options across all categories */
@@ -96,7 +69,6 @@ export default async function SettingsPage({
 
   const supabase = createAdminClient()
   const currentMonth = getCurrentMonth()
-  const token = await getGhlTokenForLocation(locationId).catch(() => null)
 
   const [settingsRes, themeRes, gareRows, locationTags, provvigioniRows, availabilitySlots, ghlUsers, customFields, categoryTagsMap, closedDays, uniqueFieldIds] = await Promise.all([
     supabase
@@ -113,8 +85,8 @@ export default async function SettingsPage({
     getLocationTags(locationId),
     getProvvigioni(locationId),
     getUserAvailability(locationId),
-    token ? fetchGhlUsers(token, locationId) : Promise.resolve([]),
-    token ? fetchCustomFields(token, locationId) : Promise.resolve([]),
+    fetchGhlUsers(locationId),
+    getCustomFieldDefs(locationId),
     getCategoryTags(locationId).catch(() => ({} as Record<string, string[]>)),
     getClosedDays(locationId),
     getUniqueFields(locationId),

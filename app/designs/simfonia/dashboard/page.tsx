@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
+// GHL token only needed as a fallback check — all data now from cache
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 import { getClosedDays } from '../settings/_actions'
@@ -14,8 +14,6 @@ import {
   parseCategoriaValue,
   type CustomFieldDef,
 } from '@/lib/utils/categoryFields'
-
-const BASE_URL = 'https://services.leadconnectorhq.com'
 
 // ─── Working days helpers ────────────────────────────────────────────────────
 
@@ -54,7 +52,7 @@ function getMonthWorkingDayStats(closedDays: Set<string> = new Set()) {
   return { passed, total, pct: total > 0 ? Math.round((passed / total) * 100) : 0 }
 }
 
-// ─── GHL helpers (only for data not in cache) ───────────────────────────────
+// ─── Cached GHL users ───────────────────────────────────────────────────────
 
 interface GhlUser {
   id: string
@@ -65,18 +63,21 @@ interface GhlUser {
   roles?: { role?: string }
 }
 
-async function ghlGet(path: string, token: string) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
-    next: { revalidate: 300 },
-  })
-  if (!res.ok) return null
-  return res.json()
-}
-
-async function getGhlUsers(locationId: string, token: string): Promise<GhlUser[]> {
-  const data = await ghlGet(`/users/?locationId=${locationId}`, token)
-  return (data?.users ?? []) as GhlUser[]
+async function getGhlUsers(locationId: string): Promise<GhlUser[]> {
+  const sb = createAdminClient()
+  const { data: cached } = await sb
+    .from('cached_ghl_users')
+    .select('ghl_id, name, first_name, last_name, email, role')
+    .eq('location_id', locationId)
+  if (!cached) return []
+  return cached.map((u) => ({
+    id: u.ghl_id,
+    name: u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.ghl_id,
+    firstName: u.first_name ?? undefined,
+    lastName: u.last_name ?? undefined,
+    email: u.email ?? '',
+    roles: u.role ? { role: u.role } : undefined,
+  }))
 }
 
 /** Read a custom field value from a contact's raw JSON */
@@ -145,8 +146,7 @@ export default async function CrmDashboard({
     : { data: null }
   const isSuperAdmin = profile?.role === 'super_admin'
 
-  const [token, settingsRes, { data: gareRows }, closedDaysArr] = await Promise.all([
-    getGhlTokenForLocation(locationId).catch(() => null),
+  const [settingsRes, { data: gareRows }, closedDaysArr] = await Promise.all([
     supabase.from('location_settings').select('target_annuale').eq('location_id', locationId).single(),
     supabase.from('gare_mensili').select('categoria, obiettivo, tag').eq('location_id', locationId).eq('month', currentMonth).order('categoria'),
     getClosedDays(locationId),
@@ -156,17 +156,9 @@ export default async function CrmDashboard({
 
   const targetAnnuale: number = settingsRes.data?.target_annuale ?? 1900
 
-  if (!token) {
-    return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-        <p className="text-sm text-gray-500">Token GHL non trovato per questa location.</p>
-      </div>
-    )
-  }
-
   // ─── Fetch data from cache (with GHL fallback) ────────────────────────────
   const [ghlUsers, customFields, { contacts: allCachedContacts }] = await Promise.all([
-    getGhlUsers(locationId, token),
+    getGhlUsers(locationId),
     getCustomFieldDefs(locationId),
     listContacts(locationId),
   ])

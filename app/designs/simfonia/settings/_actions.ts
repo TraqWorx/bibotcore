@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { discoverCategories } from '@/lib/utils/categoryFields'
+import { assertUserOwnsLocation } from '@/lib/location/getActiveLocation'
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
@@ -11,6 +12,7 @@ export async function saveThemeOverrides(
   overrides: { primaryColor?: string; secondaryColor?: string; logoUrl?: string }
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   if (overrides.primaryColor && !HEX_RE.test(overrides.primaryColor))
     return { error: 'Colore primario non valido' }
   if (overrides.secondaryColor && !HEX_RE.test(overrides.secondaryColor))
@@ -33,6 +35,7 @@ export async function saveLocationSettings(
   targetAnnuale: number
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   if (!Number.isFinite(targetAnnuale) || targetAnnuale < 1) return { error: 'Target non valido' }
 
   const supabase = createAdminClient()
@@ -65,6 +68,7 @@ export async function saveContactFilters(
   filters: string[]
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   const supabase = createAdminClient()
   const { error } = await supabase
     .from('location_settings')
@@ -112,6 +116,7 @@ export async function saveContactColumns(
   categoryKey?: string | null
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   const supabase = createAdminClient()
   const key = categoryKey ?? '_default'
 
@@ -167,6 +172,7 @@ export async function saveProvvigioni(
   rows: ProvvigioneRow[]
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   const supabase = createAdminClient()
 
   // Delete existing then insert fresh
@@ -217,6 +223,7 @@ export async function saveUserAvailability(
   slots: AvailabilitySlot[]
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   const supabase = createAdminClient()
 
   // Delete all existing for this location, then insert fresh
@@ -256,6 +263,7 @@ export async function saveHiddenTags(
   tags: string[]
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   const supabase = createAdminClient()
   const { error } = await supabase
     .from('location_settings')
@@ -290,6 +298,7 @@ export async function saveCategoryTags(
   categoryTags: Record<string, string[]>
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   try {
     const supabase = createAdminClient()
     const { error } = await supabase
@@ -334,6 +343,7 @@ export async function saveGareMensili(
   rows: GaraRow[]
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   if (!month) return { error: 'Mese mancante' }
 
   const supabase = createAdminClient()
@@ -383,6 +393,7 @@ export async function saveClosedDays(
   days: string[]
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   const supabase = createAdminClient()
   const { error } = await supabase
     .from('location_settings')
@@ -412,6 +423,7 @@ export async function saveUniqueFields(
   fieldIds: string[]
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   const supabase = createAdminClient()
   const { error } = await supabase
     .from('location_settings')
@@ -466,6 +478,19 @@ export interface GhlTag {
 
 export async function getLocationTags(locationId: string): Promise<GhlTag[]> {
   try {
+    // Read from cache first
+    const sb = createAdminClient()
+    const { data: cached } = await sb
+      .from('cached_tags')
+      .select('ghl_id, name')
+      .eq('location_id', locationId)
+      .order('name')
+
+    if (cached && cached.length > 0) {
+      return cached.map((t) => ({ id: t.ghl_id, name: t.name }))
+    }
+
+    // Fallback to GHL if cache is empty
     const ghl = await getGhlClient(locationId)
     const data = await ghl.tags.list()
     return ((data?.tags ?? []) as GhlTag[]).sort((a, b) => a.name.localeCompare(b.name))
@@ -479,6 +504,7 @@ export async function createLocationTag(
   name: string
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   if (!name.trim()) return { error: 'Nome tag mancante' }
   try {
     const ghl = await getGhlClient(locationId)
@@ -496,6 +522,7 @@ export async function deleteLocationTag(
   tagId: string
 ): Promise<{ error?: string }> {
   if (!locationId) return { error: 'Location ID mancante' }
+  try { await assertUserOwnsLocation(locationId) } catch { return { error: 'Accesso negato' } }
   if (!tagId) return { error: 'Tag ID mancante' }
   try {
     const ghl = await getGhlClient(locationId)

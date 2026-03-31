@@ -13,6 +13,16 @@ import { processWebhookEvent } from '@/lib/sync/webhookProcessor'
  * - all events: persisted to ghl_webhook_events
  */
 export async function POST(req: Request) {
+  // ── Authenticate webhook request ────────────────────────────────────────
+  const webhookSecret = process.env.WEBHOOK_SECRET
+  if (webhookSecret) {
+    const url = new URL(req.url)
+    const secret = url.searchParams.get('secret')
+    if (secret !== webhookSecret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  }
+
   let body: Record<string, unknown>
   try {
     body = await req.json()
@@ -27,7 +37,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing locationId or type' }, { status: 400 })
   }
 
-  const supabase = createAdminClient()
+  // Verify the location exists in our system
+  const sb = createAdminClient()
+  const { data: conn } = await sb
+    .from('ghl_connections')
+    .select('location_id')
+    .eq('location_id', locationId)
+    .limit(1)
+    .maybeSingle()
+  // Allow location.created even if not yet provisioned
+  if (!conn && eventType !== 'location.created') {
+    return NextResponse.json({ error: 'Unknown location' }, { status: 403 })
+  }
+
+  const supabase = sb
 
   // ── Handle location.created: full provision (same as bulk connect) ────────
   if (eventType === 'location.created') {

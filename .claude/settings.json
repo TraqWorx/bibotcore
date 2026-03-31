@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch",
+      "Agent",
+      "TodoWrite",
+      "Task",
+      "TaskOutput",
+      "TaskStop",
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "ToolSearch",
+      "AskUserQuestion",
+      "NotebookEdit",
+      "Skill"
+    ],
+    "defaultMode": "dontAsk",
+    "additionalDirectories": [
+      "/Users/dan/.claude"
+    ]
+  }
+}
