@@ -110,6 +110,8 @@ export default async function PortalLayout({
       <nav className="border-b border-gray-100 bg-white">
         <div className="mx-auto flex max-w-5xl gap-6 px-6">
           <a href={`/portal/${locationId}`} className="border-b-2 border-transparent py-3 text-sm font-medium text-gray-500 hover:text-gray-900">Dashboard</a>
+          <a href={`/portal/${locationId}/appointments`} className="border-b-2 border-transparent py-3 text-sm font-medium text-gray-500 hover:text-gray-900">Appuntamenti</a>
+          <a href={`/portal/${locationId}/messages`} className="border-b-2 border-transparent py-3 text-sm font-medium text-gray-500 hover:text-gray-900">Messaggi</a>
           <a href={`/portal/${locationId}/invoices`} className="border-b-2 border-transparent py-3 text-sm font-medium text-gray-500 hover:text-gray-900">Fatture</a>
         </div>
       </nav>

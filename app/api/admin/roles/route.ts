@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { createAdminClient } from '@/lib/supabase-server'
 
-async function assertSuperAdmin(req: NextRequest) {
+async function getAuthUser(req: NextRequest) {
   const authClient = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -12,13 +12,36 @@ async function assertSuperAdmin(req: NextRequest) {
   if (!user) return null
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'super_admin') return null
+  return { ...user, platformRole: profile?.role ?? 'client' }
+}
+
+async function assertSuperAdmin(req: NextRequest) {
+  const user = await getAuthUser(req)
+  if (!user || user.platformRole !== 'super_admin') return null
   return user
 }
 
-/** GET — list all users with roles across locations */
+/** Check if user is super_admin OR location_admin for a specific location */
+async function assertCanManageRoles(req: NextRequest, locationId?: string) {
+  const user = await getAuthUser(req)
+  if (!user) return null
+  if (user.platformRole === 'super_admin') return user
+  if (!locationId) return null
+  const sb = createAdminClient()
+  const { data: membership } = await sb
+    .from('profile_locations')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('location_id', locationId)
+    .maybeSingle()
+  if (membership?.role === 'location_admin') return user
+  return null
+}
+
+/** GET — list all users with roles (super_admin sees all, location_admin sees own location) */
 export async function GET(req: NextRequest) {
-  if (!await assertSuperAdmin(req)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const user = await getAuthUser(req)
+  if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const sb = createAdminClient()
   const [{ data: memberships }, { data: profiles }, { data: locations }] = await Promise.all([
@@ -42,9 +65,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ users, locations: locationList })
 }
 
-/** PUT — update a user's role */
+/** PUT — update a user's role (super_admin or location_admin) */
 export async function PUT(req: NextRequest) {
-  if (!await assertSuperAdmin(req)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const body = await req.clone().json()
+  if (!await assertCanManageRoles(req, body?.locationId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { userId, locationId, role } = await req.json()
   if (!userId || !locationId || !role) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })

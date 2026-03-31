@@ -19,6 +19,7 @@ import CategoryTagsForm from './_components/CategoryTagsForm'
 import ThemeForm from './_components/ThemeForm'
 import ClosedDaysForm from './_components/ClosedDaysForm'
 import UniqueFieldsForm from './_components/UniqueFieldsForm'
+import TeamManager from './_components/TeamManager'
 
 interface GhlUser {
   id: string
@@ -218,6 +219,11 @@ export default async function SettingsPage({
           logoUrl={overrides.logoUrl ?? ''}
         />
       ),
+    },
+    {
+      id: 'team',
+      label: 'Team',
+      content: <TeamManager locationId={locationId} />,
     },
   ]
 
