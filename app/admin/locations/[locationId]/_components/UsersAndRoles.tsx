@@ -84,7 +84,6 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
           <thead>
             <tr className="border-b border-gray-100">
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Email</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Piattaforma</th>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Ruolo CRM</th>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Registrato</th>
               <th className="px-5 py-3" />
@@ -96,15 +95,6 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
               return (
                 <tr key={p.id} className="hover:bg-gray-50/60">
                   <td className="px-5 py-3 font-medium text-gray-800">{p.email ?? '—'}</td>
-                  <td className="px-5 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      p.role === 'super_admin' ? 'bg-red-50 text-red-600' :
-                      p.role === 'agency' ? 'bg-amber-50 text-amber-700' :
-                      'bg-gray-100 text-gray-500'
-                    }`}>
-                      {p.role ?? 'client'}
-                    </span>
-                  </td>
                   <td className="px-5 py-3">
                     {loading ? (
                       <span className="inline-block h-6 w-20 animate-pulse rounded-lg bg-gray-100" />
