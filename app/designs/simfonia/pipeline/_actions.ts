@@ -14,11 +14,19 @@ import {
 
 const BASE_URL = 'https://services.leadconnectorhq.com'
 
-export async function moveOpportunity(opportunityId: string, stageId: string, locationId: string) {
-  await assertUserOwnsLocation(locationId)
-  const ghl = await getGhlClient(locationId)
-  await ghl.opportunities.updateStage(opportunityId, stageId)
-  writeThroughOpportunity(locationId, { id: opportunityId, pipelineStageId: stageId })
+export async function moveOpportunity(
+  opportunityId: string,
+  stageId: string,
+  locationId: string,
+): Promise<{ error: string } | undefined> {
+  try {
+    await assertUserOwnsLocation(locationId)
+    const ghl = await getGhlClient(locationId)
+    await ghl.opportunities.updateStage(opportunityId, stageId)
+    await writeThroughOpportunity(locationId, { id: opportunityId, pipelineStageId: stageId })
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to move opportunity' }
+  }
 }
 
 export async function updateOpportunity(
@@ -30,7 +38,7 @@ export async function updateOpportunity(
     await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
     await ghl.opportunities.update(opportunityId, data)
-    writeThroughOpportunity(locationId, { id: opportunityId, ...data })
+    await writeThroughOpportunity(locationId, { id: opportunityId, ...data })
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to update' }
   }
@@ -180,7 +188,7 @@ export async function deleteOpportunity(
     await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
     await ghl.opportunities.delete(opportunityId)
-    writeThroughOpportunityDelete(locationId, opportunityId)
+    await writeThroughOpportunityDelete(locationId, opportunityId)
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to delete' }
   }
@@ -196,7 +204,7 @@ export async function createNote(
     const ghl = await getGhlClient(locationId)
     const result = await ghl.notes.create(contactId, body)
     const note = result?.note ?? result
-    if (note?.id) writeThroughNote(locationId, contactId, note)
+    if (note?.id) await writeThroughNote(locationId, contactId, note)
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to save note' }
   }
@@ -211,7 +219,7 @@ export async function deleteNote(
     await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
     await ghl.notes.delete(contactId, noteId)
-    writeThroughNoteDelete(locationId, noteId)
+    await writeThroughNoteDelete(locationId, noteId)
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Errore eliminazione nota' }
   }
@@ -227,7 +235,7 @@ export async function updateNote(
     await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
     await ghl.notes.update(contactId, noteId, body)
-    writeThroughNote(locationId, contactId, { id: noteId, body })
+    await writeThroughNote(locationId, contactId, { id: noteId, body })
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Errore aggiornamento nota' }
   }
@@ -244,7 +252,7 @@ export async function createTask(
     const ghl = await getGhlClient(locationId)
     const result = await ghl.tasks.create(contactId, title, dueDate)
     const task = result?.task ?? result
-    if (task?.id) writeThroughTask(locationId, contactId, task)
+    if (task?.id) await writeThroughTask(locationId, contactId, task)
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to create task' }
   }

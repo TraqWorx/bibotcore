@@ -25,7 +25,20 @@ export async function writeThroughContact(
     if (!contactId) return
 
     const sb = createAdminClient()
-    const row = transformContact(locationId, contactData)
+
+    // Merge with existing raw data to avoid losing fields on partial updates
+    const { data: existing } = await sb
+      .from('cached_contacts')
+      .select('raw')
+      .eq('location_id', locationId)
+      .eq('ghl_id', contactId)
+      .maybeSingle()
+
+    const mergedData = existing?.raw
+      ? { ...(existing.raw as Record<string, unknown>), ...contactData }
+      : contactData
+
+    const row = transformContact(locationId, mergedData)
     await sb.from('cached_contacts').upsert(row as never, { onConflict: 'location_id,ghl_id' })
 
     // Update custom fields if present

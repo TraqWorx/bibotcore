@@ -70,7 +70,7 @@ function cachedToContact(c: {
   raw: Record<string, unknown> | null
 }): Contact {
   // If we have the raw GHL payload, use it directly (it has customFields etc)
-  if (c.raw && typeof c.raw === 'object') {
+  if (c.raw && typeof c.raw === 'object' && 'firstName' in c.raw) {
     return { ...c.raw, id: c.ghl_id } as Contact
   }
   // Otherwise build a minimal Contact from cached columns

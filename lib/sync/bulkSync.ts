@@ -124,9 +124,15 @@ async function syncContacts(locationId: string, token: string) {
         (c.customFields ?? []) as Array<Record<string, unknown>>,
       ),
     )
-    // Delete existing custom fields for this location first (clean slate per sync)
+    // Delete custom fields only for contacts we're syncing (avoids race with webhooks)
     const sb = createAdminClient()
-    await sb.from('cached_contact_custom_fields').delete().eq('location_id', locationId)
+    const syncedContactIds = allContacts.map((c) => c.id as string)
+    for (let i = 0; i < syncedContactIds.length; i += BATCH_SIZE) {
+      const batch = syncedContactIds.slice(i, i + BATCH_SIZE)
+      await sb.from('cached_contact_custom_fields').delete()
+        .eq('location_id', locationId)
+        .in('contact_ghl_id', batch)
+    }
     await upsertBatch('cached_contact_custom_fields', cfRows, 'location_id,contact_ghl_id,field_id')
 
     // Remove contacts from cache that no longer exist in GHL

@@ -30,7 +30,7 @@ export async function createContact(data: {
     const createdContact = (response as { contact: Record<string, unknown> }).contact
     contactId = createdContact.id as string
     // Write-through: add to cache immediately
-    writeThroughContact(ghl.locationId, createdContact)
+    await writeThroughContact(ghl.locationId, createdContact)
     await trackEvent(locationId, 'contact_created')
   } catch (err) {
     console.error('Create contact failed:', err)

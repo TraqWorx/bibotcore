@@ -30,6 +30,7 @@ export default async function PipelinePage({
     name: o.name ?? undefined,
     pipelineId: o.pipeline_id ?? undefined,
     pipelineStageId: o.pipeline_stage_id ?? undefined,
+    contactId: o.contact_ghl_id ?? undefined,
     monetaryValue: o.monetary_value != null ? Number(o.monetary_value) : undefined,
     status: o.status ?? undefined,
   }))

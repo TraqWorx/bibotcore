@@ -3,6 +3,7 @@
 import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { createAdminClient } from '@/lib/supabase-server'
+import { assertUserOwnsLocation } from '@/lib/location/getActiveLocation'
 import { writeThroughNote, writeThroughNoteDelete } from '@/lib/sync/writeThrough'
 
 const BASE_URL = 'https://services.leadconnectorhq.com'
@@ -45,6 +46,7 @@ export async function getConversations(
   locationId: string
 ): Promise<ConversationItem[]> {
   try {
+    await assertUserOwnsLocation(locationId)
     const { listConversations } = await import('@/lib/data/conversations')
     const { conversations: cached } = await listConversations(locationId)
 
@@ -115,6 +117,8 @@ export async function sendMessage(
   type: string
 ): Promise<{ error?: string }> {
   try {
+    const { assertUserOwnsLocation } = await import('@/lib/location/getActiveLocation')
+    await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
 
     const TYPE_MAP: Record<string, string> = {
@@ -188,9 +192,10 @@ export async function deleteContactNote(
   noteId: string
 ): Promise<{ error?: string }> {
   try {
+    await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
     await ghl.notes.delete(contactId, noteId)
-    writeThroughNoteDelete(locationId, noteId)
+    await writeThroughNoteDelete(locationId, noteId)
     return {}
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Errore eliminazione nota' }
@@ -204,9 +209,10 @@ export async function updateContactNote(
   body: string
 ): Promise<{ error?: string }> {
   try {
+    await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
     await ghl.notes.update(contactId, noteId, body)
-    writeThroughNote(locationId, contactId, { id: noteId, body })
+    await writeThroughNote(locationId, contactId, { id: noteId, body })
     return {}
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Errore aggiornamento nota' }
@@ -220,6 +226,7 @@ export async function createContactNote(
   authorUserId?: string
 ): Promise<{ error?: string }> {
   try {
+    await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
     const result = await ghl.notes.create(contactId, body)
 
@@ -236,7 +243,7 @@ export async function createContactNote(
         })
       }
       // Write-through: add to cache
-      writeThroughNote(locationId, contactId, result?.note ?? result)
+      await writeThroughNote(locationId, contactId, result?.note ?? result)
     }
 
     return {}
@@ -272,6 +279,7 @@ export async function assignConversation(
   userId: string
 ): Promise<{ error?: string }> {
   try {
+    await assertUserOwnsLocation(locationId)
     // Always persist in Supabase first (GHL search doesn't return assignedTo)
     const supabase = createAdminClient()
     const { error: upsertErr } = await supabase.from('conversation_metadata').upsert(

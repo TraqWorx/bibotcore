@@ -208,7 +208,7 @@ export async function updateContact(
     const result = await ghl.contacts.update(contactId, data)
     // Write-through: update cache with the returned contact data
     const updatedContact = result?.contact ?? { ...data, id: contactId }
-    writeThroughContact(ghl.locationId, updatedContact as Record<string, unknown>)
+    await writeThroughContact(ghl.locationId, updatedContact as Record<string, unknown>)
     revalidatePath('/designs/simfonia/contacts', 'page')
     revalidatePath('/designs/simfonia/dashboard', 'page')
     return {}
@@ -228,7 +228,7 @@ export async function deleteContact(
     const ghl = await getGhlClient(locationId)
     await ghl.contacts.delete(contactId)
     // Write-through: remove from cache
-    writeThroughContactDelete(ghl.locationId, contactId)
+    await writeThroughContactDelete(ghl.locationId, contactId)
     revalidatePath('/designs/simfonia/contacts', 'page')
     revalidatePath('/designs/simfonia/dashboard', 'page')
     return {}
