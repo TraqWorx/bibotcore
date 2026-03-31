@@ -155,32 +155,54 @@ export async function getConversationMessages(
   locationId: string,
   contactId: string
 ): Promise<{ conversationId: string | null; type: string | null; messages: ConversationMessage[] }> {
+  const sb = createAdminClient()
+
+  // Find conversation for this contact from cache
+  const { data: cachedConvo } = await sb
+    .from('cached_conversations')
+    .select('ghl_id, type')
+    .eq('location_id', locationId)
+    .eq('contact_ghl_id', contactId)
+    .limit(1)
+    .maybeSingle()
+
+  const conversationId = cachedConvo?.ghl_id ?? null
+  const conversationType = cachedConvo?.type ?? null
+
+  if (!conversationId) {
+    // Try GHL as fallback
+    try {
+      const ghl = await getGhlClient(locationId)
+      const convData = await ghl.conversations.byContact(contactId).catch(() => null)
+      const conversation = convData?.conversations?.[0]
+      if (!conversation?.id) return { conversationId: null, type: null, messages: [] }
+      return { conversationId: conversation.id, type: conversation.type ?? null, messages: [] }
+    } catch {
+      return { conversationId: null, type: null, messages: [] }
+    }
+  }
+
+  // Try GHL for real-time messages, fall back to cache
   try {
     const ghl = await getGhlClient(locationId)
-    const convData = await ghl.conversations.byContact(contactId).catch(() => null)
-    const conversation = convData?.conversations?.[0]
-    if (!conversation?.id) return { conversationId: null, type: null, messages: [] }
-
-    // Paginate through ALL messages
     let allMessages: Record<string, unknown>[] = []
-    let lastMessageId: string | undefined
+    let lastMsgId: string | undefined
     let page = 0
-    while (page < 10) { // max 10 pages = 500 messages
-      const url = lastMessageId
-        ? `/conversations/${conversation.id}/messages?limit=50&lastMessageId=${lastMessageId}`
-        : `/conversations/${conversation.id}/messages?limit=50`
+    while (page < 10) {
+      const url = lastMsgId
+        ? `/conversations/${conversationId}/messages?limit=50&lastMessageId=${lastMsgId}`
+        : `/conversations/${conversationId}/messages?limit=50`
       const msgData = await ghl.conversations.messages_raw(url).catch(() => null)
       const nested = msgData?.messages
       const pageMessages: Record<string, unknown>[] = Array.isArray(nested) ? nested : nested?.messages ?? []
       if (pageMessages.length === 0) break
       allMessages = allMessages.concat(pageMessages)
       const hasNext = Array.isArray(nested) ? false : nested?.nextPage === true
-      lastMessageId = Array.isArray(nested) ? undefined : nested?.lastMessageId
+      lastMsgId = Array.isArray(nested) ? undefined : nested?.lastMessageId
       page++
-      if (!hasNext || !lastMessageId) break
+      if (!hasNext || !lastMsgId) break
     }
-    const rawMessages = allMessages
-    const messages = (rawMessages as unknown as ConversationMessage[])
+    const messages = (allMessages as unknown as ConversationMessage[])
       .map((m) => ({
         id: m.id,
         body: m.body ?? m.message ?? '',
@@ -191,9 +213,36 @@ export async function getConversationMessages(
       }))
       .sort((a, b) => new Date(a.dateAdded ?? 0).getTime() - new Date(b.dateAdded ?? 0).getTime())
 
-    return { conversationId: conversation.id, type: conversation.type ?? null, messages }
+    // Cache in background
+    if (messages.length > 0) {
+      const rows = messages.map((m) => ({
+        ghl_id: m.id, location_id: locationId, conversation_id: conversationId,
+        body: m.body ?? '', direction: m.direction ?? '', type: String(m.type ?? ''),
+        status: m.status ?? null, date_added: m.dateAdded || null, synced_at: new Date().toISOString(),
+      }))
+      Promise.resolve(sb.from('cached_messages').upsert(rows, { onConflict: 'location_id,ghl_id' })).catch(() => {})
+    }
+
+    return { conversationId, type: conversationType, messages }
   } catch {
-    return { conversationId: null, type: null, messages: [] }
+    // GHL down — read from cache
+    const { data: cached } = await sb
+      .from('cached_messages')
+      .select('ghl_id, body, direction, type, date_added, status')
+      .eq('location_id', locationId)
+      .eq('conversation_id', conversationId)
+      .order('date_added', { ascending: true })
+
+    const messages = (cached ?? []).map((m) => ({
+      id: m.ghl_id,
+      body: m.body ?? '',
+      direction: m.direction ?? '',
+      type: m.type ?? undefined,
+      dateAdded: m.date_added ?? '',
+      status: m.status ?? undefined,
+    }))
+
+    return { conversationId, type: conversationType, messages }
   }
 }
 

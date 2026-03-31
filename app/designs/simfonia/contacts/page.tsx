@@ -167,7 +167,32 @@ export default async function ContactsPage({
     search,
   })
 
-  let contacts: Contact[] = cachedContacts.map(cachedToContact)
+  // Fetch custom field values for all listed contacts in ONE batch query
+  const contactGhlIds = cachedContacts.map((c) => c.ghl_id)
+  const { createAdminClient } = await import('@/lib/supabase-server')
+  const sb = createAdminClient()
+  const { data: allCfValues } = contactGhlIds.length > 0
+    ? await sb.from('cached_contact_custom_fields')
+        .select('contact_ghl_id, field_id, value')
+        .eq('location_id', locationId)
+        .in('contact_ghl_id', contactGhlIds)
+    : { data: [] }
+
+  // Build a map: contactId → customFields array (GHL format)
+  const cfByContact = new Map<string, { id: string; value: string }[]>()
+  for (const row of allCfValues ?? []) {
+    if (!cfByContact.has(row.contact_ghl_id)) cfByContact.set(row.contact_ghl_id, [])
+    if (row.value) cfByContact.get(row.contact_ghl_id)!.push({ id: row.field_id, value: row.value })
+  }
+
+  let contacts: Contact[] = cachedContacts.map((c) => {
+    const base = cachedToContact(c)
+    // Attach custom fields from batch query
+    if (!base.customFields || (base.customFields as unknown[]).length === 0) {
+      (base as Record<string, unknown>).customFields = cfByContact.get(c.ghl_id) ?? []
+    }
+    return base
+  })
 
   // If a newly created contact isn't in results yet, fetch it from cache
   if (newContactId && !contacts.some((c) => c.id === newContactId)) {

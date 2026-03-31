@@ -71,6 +71,9 @@ export async function getConversationMessages(
   locationId: string,
   conversationId: string
 ): Promise<ConversationMessage[]> {
+  const sb = createAdminClient()
+
+  // Try GHL first for real-time messages, cache them, fall back to cache if GHL is down
   try {
     const ghl = await getGhlClient(locationId)
 
@@ -93,7 +96,7 @@ export async function getConversationMessages(
       if (!hasNext || !lastMessageId) break
     }
 
-    return allMessages
+    const messages = allMessages
       .map((m) => ({
         id: String(m.id),
         body: String(m.body ?? m.message ?? ''),
@@ -104,8 +107,41 @@ export async function getConversationMessages(
       }))
       .filter((m) => m.body)
       .sort((a, b) => new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime())
+
+    // Cache messages in background (fire-and-forget)
+    if (messages.length > 0) {
+      const rows = messages.map((m) => ({
+        ghl_id: m.id,
+        location_id: locationId,
+        conversation_id: conversationId,
+        body: m.body,
+        direction: m.direction,
+        type: typeof m.type === 'string' ? m.type : String(m.type ?? ''),
+        status: m.status ?? null,
+        date_added: m.dateAdded || null,
+        synced_at: new Date().toISOString(),
+      }))
+      Promise.resolve(sb.from('cached_messages').upsert(rows, { onConflict: 'location_id,ghl_id' })).catch(() => {})
+    }
+
+    return messages
   } catch {
-    return []
+    // GHL down — read from cache
+    const { data: cached } = await sb
+      .from('cached_messages')
+      .select('ghl_id, body, direction, type, date_added, status')
+      .eq('location_id', locationId)
+      .eq('conversation_id', conversationId)
+      .order('date_added', { ascending: true })
+
+    return (cached ?? []).map((m) => ({
+      id: m.ghl_id,
+      body: m.body ?? '',
+      direction: m.direction ?? '',
+      type: m.type ?? undefined,
+      dateAdded: m.date_added ?? '',
+      status: m.status ?? undefined,
+    }))
   }
 }
 
