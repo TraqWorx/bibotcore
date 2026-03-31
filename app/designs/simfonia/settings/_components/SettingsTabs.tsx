@@ -31,9 +31,13 @@ export default function SettingsTabs({ tabs }: { tabs: Tab[] }) {
         ))}
       </div>
 
-      {/* Tab content */}
+      {/* Tab content — only active tab is mounted */}
       <div className="mt-6">
-        {tabs.find((t) => t.id === activeTab)?.content}
+        {tabs.map((tab) => (
+          <div key={tab.id} className={tab.id === activeTab ? '' : 'hidden'}>
+            {tab.content}
+          </div>
+        ))}
       </div>
     </div>
   )

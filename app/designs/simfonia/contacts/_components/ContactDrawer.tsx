@@ -370,7 +370,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
-                  className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
                     tab === t.key
                       ? 'bg-white text-gray-900 shadow-sm'
                       : 'text-gray-500 hover:text-gray-700'
