@@ -1091,8 +1091,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     )}
                     <button onClick={handleSend} disabled={sending || !message.trim()} className="rounded-xl px-5 py-1.5 text-sm font-semibold text-white disabled:opacity-40" style={{ background: '#2A00CC' }}>
                       {sending ? '...' : 'Invia'}
-                      </button>
-                    </div>
+                    </button>
                   </div>
                 </div>
               </div>
