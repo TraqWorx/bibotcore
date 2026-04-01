@@ -1,24 +1,38 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
 
 type NavLink = { href: string; label: string; count?: number }
 
 export default function AdminNavClient({ navLinks }: { navLinks: NavLink[] }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
 
   return (
     <nav className="space-y-0.5">
       {navLinks.map((link) => {
-        const active = link.href === '/admin'
+        const isActive = link.href === '/admin'
           ? pathname === '/admin'
           : pathname.startsWith(link.href)
+        const isThisPending = isPending && pendingHref === link.href
+        const active = isActive || isThisPending
+
         return (
-          <Link
+          <a
             key={link.href}
             href={link.href}
-            className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
+            onClick={(e) => {
+              e.preventDefault()
+              if (isActive) return
+              setPendingHref(link.href)
+              requestAnimationFrame(() => {
+                startTransition(() => { router.push(link.href) })
+              })
+            }}
+            className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
               active
                 ? 'bg-[rgba(0,240,255,0.15)] text-[#00F0FF] border border-[rgba(0,240,255,0.25)]'
                 : 'text-[rgba(255,255,255,0.65)] hover:text-white hover:bg-[rgba(255,255,255,0.07)]'
@@ -34,7 +48,7 @@ export default function AdminNavClient({ navLinks }: { navLinks: NavLink[] }) {
                 {link.count}
               </span>
             )}
-          </Link>
+          </a>
         )
       })}
     </nav>
