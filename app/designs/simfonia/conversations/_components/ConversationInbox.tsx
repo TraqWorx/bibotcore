@@ -462,7 +462,11 @@ export default function ConversationInbox({ conversations: initialConversations,
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none resize-y min-h-[70px] max-h-[200px] focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
                   />
                   <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center gap-1">
+                    <div />
+                    <div className="flex items-center gap-2">
+                      {messageText.trim() && (
+                        <button onClick={() => setMessageText('')} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50">Cancella</button>
+                      )}
                       {messages.length > 0 && (
                         <button
                           onClick={async () => {
@@ -474,7 +478,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                             setAiSuggesting(false)
                           }}
                           disabled={aiSuggesting}
-                          className="flex items-center justify-center rounded-lg h-8 w-8 hover:bg-[rgba(42,0,204,0.05)] disabled:opacity-40"
+                          className="flex items-center justify-center rounded-xl h-8 w-8 bg-[rgba(42,0,204,0.08)] hover:bg-[rgba(42,0,204,0.15)] disabled:opacity-40"
                           style={{ color: '#2A00CC' }}
                           title="Suggerisci risposta AI"
                         >
@@ -484,11 +488,6 @@ export default function ConversationInbox({ conversations: initialConversations,
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
                           )}
                         </button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {messageText.trim() && (
-                        <button onClick={() => setMessageText('')} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50">Cancella</button>
                       )}
                       <button onClick={handleSend} disabled={sending || !messageText.trim()} className="rounded-xl px-5 py-1.5 text-sm font-semibold text-white disabled:opacity-40" style={{ background: '#2A00CC' }}>
                         {sending ? '...' : 'Invia'}

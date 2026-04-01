@@ -553,31 +553,27 @@ export default function DealDrawer({
                       onChange={(e) => setMessage(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !sending) { e.preventDefault(); handleSend() } }}
                     />
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="flex items-center gap-1">
-                        {data.messages.length > 0 && data.contact?.id && (
-                          <button
-                            onClick={async () => {
-                              const { aiSuggestReply } = await import('@/lib/ai/actions')
-                              const result = await aiSuggestReply(locationId, data.contact!.id!, data.conversation?.type ?? 'SMS', data.messages.slice(-10).map((m) => ({ direction: m.direction ?? 'inbound', body: m.body ?? '' })))
-                              if (result.reply) setMessage(result.reply)
-                            }}
-                            className="flex items-center justify-center rounded-lg h-9 w-9 border border-[#2A00CC] bg-[rgba(42,0,204,0.05)] hover:bg-[rgba(42,0,204,0.12)]"
-                            style={{ color: '#2A00CC' }}
-                            title="Suggerisci risposta AI"
-                          >
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {message.trim() && (
-                          <button onClick={() => setMessage('')} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50">Cancella</button>
-                        )}
-                        <button onClick={handleSend} disabled={sending || !message.trim()} className="rounded-xl px-5 py-1.5 text-sm font-semibold text-white disabled:opacity-40" style={{ background: '#2A00CC' }}>
-                          {sending ? '...' : 'Invia'}
+                    <div className="flex items-center justify-end gap-2 mt-2">
+                      {message.trim() && (
+                        <button onClick={() => setMessage('')} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50">Cancella</button>
+                      )}
+                      {data.messages.length > 0 && data.contact?.id && (
+                        <button
+                          onClick={async () => {
+                            const { aiSuggestReply } = await import('@/lib/ai/actions')
+                            const result = await aiSuggestReply(locationId, data.contact!.id!, data.conversation?.type ?? 'SMS', data.messages.slice(-10).map((m) => ({ direction: m.direction ?? 'inbound', body: m.body ?? '' })))
+                            if (result.reply) setMessage(result.reply)
+                          }}
+                          className="flex items-center justify-center rounded-xl h-8 w-8 bg-[rgba(42,0,204,0.08)] hover:bg-[rgba(42,0,204,0.15)]"
+                          style={{ color: '#2A00CC' }}
+                          title="Suggerisci risposta AI"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
                         </button>
-                      </div>
+                      )}
+                      <button onClick={handleSend} disabled={sending || !message.trim()} className="rounded-xl px-5 py-1.5 text-sm font-semibold text-white disabled:opacity-40" style={{ background: '#2A00CC' }}>
+                        {sending ? '...' : 'Invia'}
+                      </button>
                     </div>
                   </div>
                 )}
