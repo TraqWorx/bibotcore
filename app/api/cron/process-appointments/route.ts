@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { processAppointmentQueue } from '@/lib/sync/appointmentQueue'
+import { processBulkJobGhlSync } from '@/lib/sync/bulkActions'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -15,9 +16,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await processAppointmentQueue()
-    console.log('[cron/process-appointments]', result)
-    return NextResponse.json(result)
+    const [appointmentResult, bulkResult] = await Promise.all([
+      processAppointmentQueue(),
+      processBulkJobGhlSync(),
+    ])
+    console.log('[cron/process-appointments]', appointmentResult, bulkResult)
+    return NextResponse.json({ appointments: appointmentResult, bulkJobs: bulkResult })
   } catch (err) {
     console.error('[cron/process-appointments] error:', err)
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed' }, { status: 500 })

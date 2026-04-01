@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import ModuleToggles from './_components/ModuleToggles'
 import SyncStatus from './_components/SyncStatus'
 import UsersAndRoles from './_components/UsersAndRoles'
+import BulkJobsDashboard from './_components/BulkJobsDashboard'
 import { DEFAULT_MODULES } from '@/lib/types/design'
 import type { DesignModules } from '@/lib/types/design'
 
@@ -234,6 +235,9 @@ export default async function LocationDetailPage({
 
       {/* Sync Status */}
       <SyncStatus locationId={locationId} />
+
+      {/* Bulk AI Jobs */}
+      <BulkJobsDashboard locationId={locationId} />
     </div>
   )
 }

@@ -6,6 +6,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { writeThroughContact, writeThroughOpportunity, writeThroughNote } from '@/lib/sync/writeThrough'
+import { createBulkJob } from '@/lib/sync/bulkActions'
 
 // ── Tool definitions (sent to Claude) ────────────────────────
 
@@ -245,22 +246,16 @@ export async function executeTool(
     case 'bulk_remove_tag': {
       const contacts = await findBulkContacts(sb, locationId, input)
       if (contacts.length === 0) return 'Nessun contatto corrisponde ai filtri.'
-      const ghl = await getGhlClient(locationId)
-      let updated = 0
-      for (const c of contacts) {
-        try {
-          const currentTags: string[] = c.tags ?? []
-          const newTags = toolName === 'bulk_add_tag'
-            ? [...new Set([...currentTags, input.tag])]
-            : currentTags.filter((t) => t.toLowerCase() !== input.tag.toLowerCase())
-          if (JSON.stringify(currentTags.sort()) === JSON.stringify(newTags.sort())) continue
-          await ghl.contacts.update(c.ghl_id, { tags: newTags })
-          await writeThroughContact(locationId, { id: c.ghl_id, tags: newTags })
-          updated++
-        } catch { /* skip individual failures */ }
-      }
-      const action = toolName === 'bulk_add_tag' ? 'aggiunto' : 'rimosso'
-      return `Tag "${input.tag}" ${action} a ${updated} contatti su ${contacts.length} trovati.`
+      const action = toolName === 'bulk_add_tag' ? 'add_tag' : 'remove_tag'
+      const { jobId, total } = await createBulkJob({
+        locationId,
+        action: action as 'add_tag' | 'remove_tag',
+        description: `${action === 'add_tag' ? 'Aggiungi' : 'Rimuovi'} tag "${input.tag}" a ${contacts.length} contatti`,
+        contactGhlIds: contacts.map((c) => c.ghl_id),
+        params: { tag: input.tag },
+      })
+      const verb = action === 'add_tag' ? 'aggiunto' : 'rimosso'
+      return `Job creato: tag "${input.tag}" ${verb} a ${total} contatti nel nostro database. Sincronizzazione con GHL in corso in background. ID job: ${jobId}`
     }
 
     case 'bulk_update_field': {
@@ -269,21 +264,14 @@ export async function executeTool(
       const { data: fieldDef } = await sb.from('cached_custom_fields')
         .select('field_id').eq('location_id', locationId).ilike('name', `%${input.fieldName}%`).limit(1).single()
       if (!fieldDef) return `Campo "${input.fieldName}" non trovato.`
-      const ghl = await getGhlClient(locationId)
-      let updated = 0
-      for (const c of contacts) {
-        try {
-          await ghl.contacts.update(c.ghl_id, {
-            customFields: [{ id: fieldDef.field_id, field_value: input.value }],
-          })
-          await sb.from('cached_contact_custom_fields').upsert({
-            location_id: locationId, contact_ghl_id: c.ghl_id,
-            field_id: fieldDef.field_id, value: input.value,
-          } as never, { onConflict: 'location_id,contact_ghl_id,field_id' })
-          updated++
-        } catch { /* skip */ }
-      }
-      return `Campo "${input.fieldName}" aggiornato a "${input.value}" per ${updated} contatti su ${contacts.length} trovati.`
+      const { jobId, total } = await createBulkJob({
+        locationId,
+        action: 'update_field',
+        description: `Aggiorna "${input.fieldName}" a "${input.value}" per ${contacts.length} contatti`,
+        contactGhlIds: contacts.map((c) => c.ghl_id),
+        params: { fieldId: fieldDef.field_id, fieldName: input.fieldName, value: input.value },
+      })
+      return `Job creato: campo "${input.fieldName}" aggiornato a "${input.value}" per ${total} contatti nel nostro database. Sincronizzazione con GHL in background. ID job: ${jobId}`
     }
 
     default:
