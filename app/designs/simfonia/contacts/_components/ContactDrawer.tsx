@@ -1056,11 +1056,26 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                 </div>
 
                 {/* Send message */}
-                <div className="border-t border-gray-200/60 bg-white p-5">
+                <div className="border-t border-gray-200/60 bg-white p-5 space-y-2">
                   {sendResult && (
-                    <p className={`mb-2 text-xs font-medium ${sendResult.includes('inviato') ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`text-xs font-medium ${sendResult.includes('inviato') ? 'text-green-600' : 'text-red-600'}`}>
                       {sendResult}
                     </p>
+                  )}
+                  {messages.length > 0 && (
+                    <button
+                      onClick={async () => {
+                        if (!contactId) return
+                        const { aiSuggestReply } = await import('@/lib/ai/actions')
+                        const result = await aiSuggestReply(locationId, contactId, 'SMS', messages.slice(-10).map((m) => ({ direction: m.direction ?? 'inbound', body: m.body ?? '' })))
+                        if (result.reply) setMessage(result.reply)
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg border border-[rgba(42,0,204,0.15)] px-2.5 py-1 text-[11px] font-medium hover:bg-[rgba(42,0,204,0.05)]"
+                      style={{ color: '#2A00CC' }}
+                    >
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                      Suggerisci risposta
+                    </button>
                   )}
                   <div className="flex gap-3">
                     <input

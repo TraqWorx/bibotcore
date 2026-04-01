@@ -36,7 +36,7 @@ export default function AiChat({ locationId }: { locationId: string }) {
       {/* Floating button */}
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#2A00CC] to-[#6366f1] text-white shadow-lg hover:shadow-xl"
+        className="fixed bottom-6 left-[17rem] z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#2A00CC] to-[#6366f1] text-white shadow-lg hover:shadow-xl"
         title="Chiedi all'AI"
       >
         {open ? (
@@ -52,7 +52,7 @@ export default function AiChat({ locationId }: { locationId: string }) {
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 flex h-[500px] w-[380px] flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl">
+        <div className="fixed bottom-24 left-[17rem] z-50 flex h-[500px] w-[380px] flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl">
           {/* Header */}
           <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#2A00CC] to-[#6366f1]">
