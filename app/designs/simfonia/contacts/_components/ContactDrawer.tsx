@@ -1080,7 +1080,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                             const result = await aiSuggestReply(locationId, contactId, 'SMS', messages.slice(-10).map((m) => ({ direction: m.direction ?? 'inbound', body: m.body ?? '' })))
                             if (result.reply) setMessage(result.reply)
                           }}
-                          className="flex items-center justify-center rounded-lg h-8 w-8 hover:bg-[rgba(42,0,204,0.05)]"
+                          className="flex items-center justify-center rounded-lg h-9 w-9 border border-[#2A00CC] bg-[rgba(42,0,204,0.05)] hover:bg-[rgba(42,0,204,0.12)]"
                           style={{ color: '#2A00CC' }}
                           title="Suggerisci risposta AI"
                         >

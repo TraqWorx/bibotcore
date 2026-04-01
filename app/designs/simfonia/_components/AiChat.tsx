@@ -92,8 +92,8 @@ export default function AiChat({ locationId }: { locationId: string }) {
         <div
           style={{
             position: 'fixed',
-            left: Math.min(pos.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 390),
-            top: Math.max(10, pos.y - 520),
+            left: Math.max(0, Math.min(pos.x - 340, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 390)),
+            top: Math.min(pos.y + 60, (typeof window !== 'undefined' ? window.innerHeight : 800) - 510),
             zIndex: 50,
           }}
           className="flex h-[500px] w-[380px] flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl"
