@@ -204,6 +204,7 @@ export async function executeTool(
   locationId: string,
   toolName: string,
   input: Record<string, string>,
+  userId?: string,
 ): Promise<string> {
   const sb = createAdminClient()
 
@@ -360,7 +361,18 @@ export async function executeTool(
       const ghl = await getGhlClient(locationId)
       const result = await ghl.notes.create(contact.ghl_id, input.body)
       const note = result?.note ?? result
-      if (note?.id) await writeThroughNote(locationId, contact.ghl_id, note)
+      if (note?.id) {
+        await writeThroughNote(locationId, contact.ghl_id, note)
+        // Save note author
+        if (userId) {
+          await Promise.resolve(sb.from('note_authors').insert({
+            location_id: locationId,
+            contact_id: contact.ghl_id,
+            note_id: String(note.id),
+            author_user_id: userId,
+          })).catch(() => {})
+        }
+      }
       return `Nota creata per ${contact.first_name} ${contact.last_name}.`
     }
 

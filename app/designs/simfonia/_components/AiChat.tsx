@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { aiGenerateInsight } from '@/lib/ai/actions'
 
 interface Message {
@@ -15,6 +15,32 @@ export default function AiChat({ locationId }: { locationId: string }) {
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Draggable position
+  const [pos, setPos] = useState({ x: 270, y: typeof window !== 'undefined' ? window.innerHeight - 80 : 700 })
+  const dragging = useRef(false)
+  const dragOffset = useRef({ x: 0, y: 0 })
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (open) return // Don't drag when chat is open
+    dragging.current = true
+    dragOffset.current = { x: e.clientX - pos.x, y: e.clientY - pos.y }
+    e.preventDefault()
+  }, [pos, open])
+
+  useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      if (!dragging.current) return
+      setPos({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y })
+    }
+    function handleMouseUp() { dragging.current = false }
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [])
+
   useEffect(() => {
     if (open) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, open])
@@ -25,7 +51,6 @@ export default function AiChat({ locationId }: { locationId: string }) {
     setInput('')
     setMessages((prev) => [...prev, { role: 'user', text: question }])
     setLoading(true)
-
     const result = await aiGenerateInsight(locationId, question)
     setMessages((prev) => [...prev, { role: 'ai', text: result.insight ?? result.error ?? 'Nessuna risposta' }])
     setLoading(false)
@@ -33,26 +58,34 @@ export default function AiChat({ locationId }: { locationId: string }) {
 
   return (
     <>
-      {/* Floating button */}
-      <button
-        onClick={() => setOpen(!open)}
-        className="fixed bottom-6 left-[17rem] z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#2A00CC] to-[#6366f1] text-white shadow-lg hover:shadow-xl"
-        title="Chiedi all'AI"
+      {/* Draggable floating button */}
+      <div
+        style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 50, cursor: open ? 'pointer' : 'grab' }}
+        onMouseDown={handleMouseDown}
       >
-        {open ? (
-          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        ) : (
-          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
-          </svg>
-        )}
-      </button>
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#2A00CC] to-[#6366f1] text-white shadow-lg hover:shadow-xl"
+          title="Chiedi all'AI"
+        >
+          {open ? (
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+            </svg>
+          )}
+        </button>
+      </div>
 
-      {/* Chat panel */}
+      {/* Chat panel — positioned near the button */}
       {open && (
-        <div className="fixed bottom-24 left-[17rem] z-50 flex h-[500px] w-[380px] flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl">
+        <div
+          style={{ position: 'fixed', left: pos.x, top: pos.y - 520, zIndex: 50 }}
+          className="flex h-[500px] w-[380px] flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl"
+        >
           {/* Header */}
           <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#2A00CC] to-[#6366f1]">
@@ -80,7 +113,7 @@ export default function AiChat({ locationId }: { locationId: string }) {
                     ].map((q) => (
                       <button
                         key={q}
-                        onClick={() => { setInput(q); }}
+                        onClick={() => setInput(q)}
                         className="block w-full rounded-lg border border-gray-100 px-3 py-2 text-left text-xs text-gray-500 hover:bg-gray-50"
                       >
                         {q}
@@ -94,9 +127,7 @@ export default function AiChat({ locationId }: { locationId: string }) {
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${
-                  m.role === 'user'
-                    ? 'bg-[#2A00CC] text-white'
-                    : 'bg-gray-100 text-gray-800'
+                  m.role === 'user' ? 'bg-[#2A00CC] text-white' : 'bg-gray-100 text-gray-800'
                 }`}>
                   <p className="text-sm whitespace-pre-wrap">{m.text}</p>
                 </div>

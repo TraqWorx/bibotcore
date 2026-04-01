@@ -476,11 +476,10 @@ export default function ConversationInbox({ conversations: initialConversations,
                       {aiSuggesting ? (
                         <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#2A00CC] border-t-transparent" />
                       ) : (
-                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                         </svg>
                       )}
-                      Suggerisci risposta
                     </button>
                   )}
                   {/* Input + Send */}

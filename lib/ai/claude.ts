@@ -286,7 +286,7 @@ Regole:
     const toolUse = response.content.find((b) => b.type === 'tool_use')
     if (toolUse && toolUse.type === 'tool_use') {
       // Execute the tool
-      const toolResult = await executeTool(locationId, toolUse.name, toolUse.input as Record<string, string>)
+      const toolResult = await executeTool(locationId, toolUse.name, toolUse.input as Record<string, string>, userId ?? undefined)
 
       // Feed result back to Claude
       messages.push({ role: 'assistant', content: response.content as unknown[] })
