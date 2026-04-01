@@ -457,7 +457,7 @@ function TagMultiSelect({
       </button>
 
       {open && (
-        <div className="absolute left-0 z-30 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-xl">
+        <div className="absolute left-0 z-50 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-xl">
           {/* Search within tags */}
           <div className="border-b border-gray-100 px-3 py-2">
             <input
