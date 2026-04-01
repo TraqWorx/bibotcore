@@ -99,6 +99,55 @@ export const AI_TOOLS = [
       required: ['dealName', 'status'],
     },
   },
+  {
+    name: 'bulk_add_tag',
+    description: 'Add a tag to multiple contacts matching a filter. Can filter by: tag, custom field value, deal monetary value (min/max), category. Returns how many contacts were updated.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        tag: { type: 'string', description: 'Tag to add to matching contacts' },
+        filterTag: { type: 'string', description: 'Only contacts that have this existing tag' },
+        filterCategory: { type: 'string', description: 'Only contacts in this Categoria value' },
+        filterFieldName: { type: 'string', description: 'Filter by custom field name' },
+        filterFieldValue: { type: 'string', description: 'Filter by custom field value' },
+        filterMinDealValue: { type: 'number', description: 'Only contacts with deals worth at least this amount' },
+        filterMaxDealValue: { type: 'number', description: 'Only contacts with deals worth at most this amount' },
+      },
+      required: ['tag'],
+    },
+  },
+  {
+    name: 'bulk_remove_tag',
+    description: 'Remove a tag from multiple contacts matching a filter. Same filters as bulk_add_tag.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        tag: { type: 'string', description: 'Tag to remove from matching contacts' },
+        filterTag: { type: 'string', description: 'Only contacts that have this existing tag' },
+        filterCategory: { type: 'string', description: 'Only contacts in this Categoria value' },
+        filterFieldName: { type: 'string', description: 'Filter by custom field name' },
+        filterFieldValue: { type: 'string', description: 'Filter by custom field value' },
+        filterMinDealValue: { type: 'number', description: 'Minimum deal value' },
+        filterMaxDealValue: { type: 'number', description: 'Maximum deal value' },
+      },
+      required: ['tag'],
+    },
+  },
+  {
+    name: 'bulk_update_field',
+    description: 'Update a custom field for multiple contacts matching a filter.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        fieldName: { type: 'string', description: 'Custom field name to update' },
+        value: { type: 'string', description: 'New value' },
+        filterTag: { type: 'string', description: 'Only contacts with this tag' },
+        filterCategory: { type: 'string', description: 'Only contacts in this Categoria' },
+        filterMinDealValue: { type: 'number', description: 'Minimum deal value' },
+      },
+      required: ['fieldName', 'value'],
+    },
+  },
 ]
 
 // ── Tool executor ────────────────────────────────────────────
@@ -192,6 +241,51 @@ export async function executeTool(
       return `Deal "${input.dealName}" aggiornato a "${input.status}".`
     }
 
+    case 'bulk_add_tag':
+    case 'bulk_remove_tag': {
+      const contacts = await findBulkContacts(sb, locationId, input)
+      if (contacts.length === 0) return 'Nessun contatto corrisponde ai filtri.'
+      const ghl = await getGhlClient(locationId)
+      let updated = 0
+      for (const c of contacts) {
+        try {
+          const currentTags: string[] = c.tags ?? []
+          const newTags = toolName === 'bulk_add_tag'
+            ? [...new Set([...currentTags, input.tag])]
+            : currentTags.filter((t) => t.toLowerCase() !== input.tag.toLowerCase())
+          if (JSON.stringify(currentTags.sort()) === JSON.stringify(newTags.sort())) continue
+          await ghl.contacts.update(c.ghl_id, { tags: newTags })
+          await writeThroughContact(locationId, { id: c.ghl_id, tags: newTags })
+          updated++
+        } catch { /* skip individual failures */ }
+      }
+      const action = toolName === 'bulk_add_tag' ? 'aggiunto' : 'rimosso'
+      return `Tag "${input.tag}" ${action} a ${updated} contatti su ${contacts.length} trovati.`
+    }
+
+    case 'bulk_update_field': {
+      const contacts = await findBulkContacts(sb, locationId, input)
+      if (contacts.length === 0) return 'Nessun contatto corrisponde ai filtri.'
+      const { data: fieldDef } = await sb.from('cached_custom_fields')
+        .select('field_id').eq('location_id', locationId).ilike('name', `%${input.fieldName}%`).limit(1).single()
+      if (!fieldDef) return `Campo "${input.fieldName}" non trovato.`
+      const ghl = await getGhlClient(locationId)
+      let updated = 0
+      for (const c of contacts) {
+        try {
+          await ghl.contacts.update(c.ghl_id, {
+            customFields: [{ id: fieldDef.field_id, field_value: input.value }],
+          })
+          await sb.from('cached_contact_custom_fields').upsert({
+            location_id: locationId, contact_ghl_id: c.ghl_id,
+            field_id: fieldDef.field_id, value: input.value,
+          } as never, { onConflict: 'location_id,contact_ghl_id,field_id' })
+          updated++
+        } catch { /* skip */ }
+      }
+      return `Campo "${input.fieldName}" aggiornato a "${input.value}" per ${updated} contatti su ${contacts.length} trovati.`
+    }
+
     default:
       return `Tool "${toolName}" non riconosciuto.`
   }
@@ -221,4 +315,81 @@ async function findContact(
     if (data) return data
   }
   return null
+}
+
+/**
+ * Find contacts matching bulk filters.
+ * Supports: tag, category, custom field, deal monetary value.
+ */
+async function findBulkContacts(
+  sb: ReturnType<typeof createAdminClient>,
+  locationId: string,
+  filters: Record<string, string | number | undefined>,
+): Promise<{ ghl_id: string; tags: string[] }[]> {
+  // Start with all contacts
+  let query = sb.from('cached_contacts')
+    .select('ghl_id, tags')
+    .eq('location_id', locationId)
+
+  // Filter by existing tag
+  if (filters.filterTag) {
+    query = query.contains('tags', [filters.filterTag as string])
+  }
+
+  const { data: allContacts } = await query
+  let contacts = allContacts ?? []
+
+  // Filter by category (custom field)
+  if (filters.filterCategory) {
+    const { data: fieldDef } = await sb.from('cached_custom_fields')
+      .select('field_id').eq('location_id', locationId).eq('name', 'Categoria').limit(1).single()
+    if (fieldDef) {
+      const { data: cfRows } = await sb.from('cached_contact_custom_fields')
+        .select('contact_ghl_id, value')
+        .eq('location_id', locationId).eq('field_id', fieldDef.field_id)
+      const matchIds = new Set(
+        (cfRows ?? [])
+          .filter((r) => r.value?.toLowerCase().includes((filters.filterCategory as string).toLowerCase()))
+          .map((r) => r.contact_ghl_id)
+      )
+      contacts = contacts.filter((c) => matchIds.has(c.ghl_id))
+    }
+  }
+
+  // Filter by custom field value
+  if (filters.filterFieldName && filters.filterFieldValue) {
+    const { data: fieldDef } = await sb.from('cached_custom_fields')
+      .select('field_id').eq('location_id', locationId).ilike('name', `%${filters.filterFieldName}%`).limit(1).single()
+    if (fieldDef) {
+      const { data: cfRows } = await sb.from('cached_contact_custom_fields')
+        .select('contact_ghl_id')
+        .eq('location_id', locationId).eq('field_id', fieldDef.field_id)
+        .ilike('value', `%${filters.filterFieldValue}%`)
+      const matchIds = new Set((cfRows ?? []).map((r) => r.contact_ghl_id))
+      contacts = contacts.filter((c) => matchIds.has(c.ghl_id))
+    }
+  }
+
+  // Filter by deal monetary value
+  if (filters.filterMinDealValue || filters.filterMaxDealValue) {
+    const { data: opps } = await sb.from('cached_opportunities')
+      .select('contact_ghl_id, monetary_value')
+      .eq('location_id', locationId)
+
+    // Sum deal values per contact
+    const contactTotals = new Map<string, number>()
+    for (const o of opps ?? []) {
+      if (!o.contact_ghl_id) continue
+      contactTotals.set(o.contact_ghl_id, (contactTotals.get(o.contact_ghl_id) ?? 0) + (Number(o.monetary_value) || 0))
+    }
+
+    contacts = contacts.filter((c) => {
+      const total = contactTotals.get(c.ghl_id) ?? 0
+      if (filters.filterMinDealValue && total < Number(filters.filterMinDealValue)) return false
+      if (filters.filterMaxDealValue && total > Number(filters.filterMaxDealValue)) return false
+      return true
+    })
+  }
+
+  return contacts
 }
