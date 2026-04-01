@@ -79,8 +79,21 @@ export default async function PortalLayout({
     )
   }
 
+  // Fetch portal icon for apple-touch-icon
+  const { data: portalSettings } = await sb
+    .from('location_settings')
+    .select('portal_icon_url')
+    .eq('location_id', locationId)
+    .maybeSingle()
+  const iconUrl = portalSettings?.portal_icon_url ?? null
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* PWA manifest + icon */}
+      <head>
+        <link rel="manifest" href={`/api/portal/manifest?locationId=${locationId}`} />
+        {iconUrl && <link rel="apple-touch-icon" href={iconUrl} />}
+      </head>
       {/* Portal header */}
       <header className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">

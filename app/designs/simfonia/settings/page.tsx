@@ -20,6 +20,7 @@ import ThemeForm from './_components/ThemeForm'
 import ClosedDaysForm from './_components/ClosedDaysForm'
 import UniqueFieldsForm from './_components/UniqueFieldsForm'
 import TeamManager from './_components/TeamManager'
+import PortalSettingsForm from './_components/PortalSettingsForm'
 
 interface GhlUser {
   id: string
@@ -74,7 +75,7 @@ export default async function SettingsPage({
   const [settingsRes, themeRes, gareRows, locationTags, provvigioniRows, availabilitySlots, ghlUsers, customFields, categoryTagsMap, closedDays, uniqueFieldIds] = await Promise.all([
     supabase
       .from('location_settings')
-      .select('target_annuale')
+      .select('target_annuale, portal_icon_url, portal_welcome_message, portal_auto_invite')
       .eq('location_id', locationId)
       .single(),
     supabase
@@ -224,6 +225,19 @@ export default async function SettingsPage({
       id: 'team',
       label: 'Team',
       content: <TeamManager locationId={locationId} />,
+    },
+    {
+      id: 'portale',
+      label: 'Portale Clienti',
+      content: (
+        <PortalSettingsForm
+          locationId={locationId}
+          portalUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://core.bibotcrm.it'}/portal/${locationId}`}
+          initialIconUrl={(settingsRes.data as Record<string, unknown>)?.portal_icon_url as string ?? ''}
+          initialWelcomeMessage={(settingsRes.data as Record<string, unknown>)?.portal_welcome_message as string ?? 'Benvenuto! Accedi al tuo portale clienti per visualizzare i tuoi dati.'}
+          initialAutoInvite={(settingsRes.data as Record<string, unknown>)?.portal_auto_invite as boolean ?? false}
+        />
+      ),
     },
   ]
 

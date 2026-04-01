@@ -157,6 +157,41 @@ async function processContactEvent(locationId: string, eventType: string, data: 
       )
     }
   }
+
+  // Auto-invite: send portal link to new contacts with email
+  const isCreate = eventType.includes('Create') || eventType.includes('create')
+  if (isCreate) {
+    const email = (data.email as string)?.toLowerCase()
+    if (email) {
+      try {
+        const { data: settings } = await sb
+          .from('location_settings')
+          .select('portal_auto_invite, portal_welcome_message')
+          .eq('location_id', locationId)
+          .maybeSingle()
+
+        if (settings?.portal_auto_invite) {
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://core.bibotcrm.it'
+          const portalUrl = `${appUrl}/portal/${locationId}`
+          const welcomeMsg = settings.portal_welcome_message ?? 'Benvenuto! Accedi al tuo portale clienti.'
+
+          // Create Supabase auth user and send magic link as invite
+          const { error: inviteErr } = await sb.auth.admin.inviteUserByEmail(email, {
+            redirectTo: `${appUrl}/api/auth/callback?redirectTo=/portal/${locationId}`,
+            data: { portal_location: locationId },
+          })
+
+          if (inviteErr && !inviteErr.message.toLowerCase().includes('already')) {
+            console.error(`[webhook] portal auto-invite failed for ${email}:`, inviteErr.message)
+          } else {
+            console.log(`[webhook] portal invite sent to ${email} for ${locationId}`)
+          }
+        }
+      } catch (err) {
+        console.error('[webhook] auto-invite error:', err)
+      }
+    }
+  }
 }
 
 // ── Opportunity events ───────────────────────────────────────
