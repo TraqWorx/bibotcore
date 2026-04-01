@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { installDesign } from '../_actions'
+import { ad } from '@/lib/admin/ui'
 
 interface Props {
   locationId: string
@@ -38,7 +39,7 @@ export default function InstallDesignButton({ locationId, designs }: Props) {
     <form action={handleSubmit} className="flex items-center gap-2">
       <select
         name="design_slug"
-        className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-gray-300"
+        className="rounded-xl border border-gray-200/90 bg-white px-2 py-1 text-xs outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
       >
         {designs.map((d) => (
           <option key={d.slug} value={d.slug}>
@@ -49,7 +50,7 @@ export default function InstallDesignButton({ locationId, designs }: Props) {
       <button
         type="submit"
         disabled={loading}
-        className="rounded-lg bg-[#2A00CC] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#1A0099] disabled:opacity-50 transition-colors"
+        className="rounded-xl bg-brand px-2.5 py-1 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-50"
       >
         {loading ? '…' : 'Install'}
       </button>

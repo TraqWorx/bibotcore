@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { connectLocations } from '../_actions'
+import { ad } from '@/lib/admin/ui'
 
 interface Props {
   designs: { slug: string; name: string }[]
@@ -52,7 +53,7 @@ export default function BulkConnectButton({ designs, unconnectedLocations }: Pro
     return (
       <button
         onClick={() => setOpen(true)}
-        className="rounded-lg bg-[#2A00CC] px-4 py-2 text-sm font-medium text-white hover:bg-[#1A0099] transition-colors"
+        className={ad.btnPrimary}
       >
         Bulk Connect
       </button>
@@ -60,8 +61,8 @@ export default function BulkConnectButton({ designs, unconnectedLocations }: Pro
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2A00CC]/40">
-      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-md space-y-4 rounded-3xl border border-gray-200/70 bg-white/95 p-6 shadow-2xl backdrop-blur-sm">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">Bulk Connect</h2>
           <button onClick={() => setOpen(false)} className="text-sm text-gray-400 hover:text-gray-600">✕</button>
@@ -77,7 +78,7 @@ export default function BulkConnectButton({ designs, unconnectedLocations }: Pro
           <select
             value={designSlug}
             onChange={(e) => setDesignSlug(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-300"
+            className={ad.input}
           >
             {designs.map((d) => (
               <option key={d.slug} value={d.slug}>{d.name}</option>
@@ -118,14 +119,14 @@ export default function BulkConnectButton({ designs, unconnectedLocations }: Pro
         <div className="flex justify-end gap-2">
           <button
             onClick={() => setOpen(false)}
-            className="rounded-lg px-4 py-2 text-sm text-gray-500 hover:text-gray-700"
+            className={ad.btnSecondary}
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="rounded-lg bg-[#2A00CC] px-4 py-2 text-sm font-medium text-white hover:bg-[#1A0099] disabled:opacity-50 transition-colors"
+            className={ad.btnPrimary}
           >
             {loading ? 'Connecting…' : `Connect${selected.size > 0 ? ` (${selected.size})` : ''}`}
           </button>

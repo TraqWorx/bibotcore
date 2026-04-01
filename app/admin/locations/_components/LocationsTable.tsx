@@ -230,7 +230,7 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                     <Link
                       href={`/admin/locations/${row.id}`}
                       className="font-medium hover:underline truncate block"
-                      style={{ color: '#2A00CC' }}
+                      style={{ color: 'var(--brand)' }}
                       title={row.name}
                     >
                       {row.name}

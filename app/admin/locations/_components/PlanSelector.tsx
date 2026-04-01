@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { setLocationPlan } from '../_actions'
+import { ad } from '@/lib/admin/ui'
 
 interface Props {
   locationId: string
@@ -31,7 +32,7 @@ export default function PlanSelector({ locationId, currentPlanId, plans }: Props
         value={value}
         onChange={handleChange}
         disabled={saving}
-        className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[#2A00CC] disabled:opacity-50"
+        className="rounded-xl border border-gray-200/90 bg-white px-2 py-1 text-xs text-gray-700 outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10 disabled:opacity-50"
       >
         <option value="">— no plan —</option>
         {plans.map((p) => (

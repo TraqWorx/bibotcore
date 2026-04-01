@@ -250,7 +250,7 @@ export default function ConversationInbox({ conversations: initialConversations,
     : null
 
   return (
-    <div className={`flex h-[calc(100vh-12rem)] min-h-[400px] overflow-hidden ${sf.inbox}`}>
+    <div className={`flex flex-1 min-h-0 overflow-hidden ${sf.inbox}`}>
       {/* Left — conversation list */}
       <div className="flex w-80 shrink-0 flex-col border-r border-gray-100">
         {/* Search */}

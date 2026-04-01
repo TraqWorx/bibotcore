@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createPackage } from '../_actions'
+import { ad } from '@/lib/admin/ui'
 
 export default function NewPackageForm() {
   const [open, setOpen] = useState(false)
@@ -26,7 +27,7 @@ export default function NewPackageForm() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="rounded-lg bg-[#2A00CC] px-4 py-2 text-sm text-white hover:bg-[#1A0099]"
+        className={ad.btnPrimary}
       >
         New Package
       </button>
@@ -34,8 +35,8 @@ export default function NewPackageForm() {
   }
 
   return (
-    <div className="rounded-lg border bg-white p-4">
-      <h2 className="mb-4 font-semibold">New Package</h2>
+    <div className="rounded-3xl border border-gray-200/70 bg-white/95 p-5 shadow-sm backdrop-blur-sm">
+      <h2 className="mb-4 text-sm font-bold text-gray-900">New Package</h2>
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -43,7 +44,7 @@ export default function NewPackageForm() {
             <input
               name="slug"
               required
-              className="w-full rounded-lg border p-2 text-sm"
+              className={ad.input}
               placeholder="gym-crm"
             />
           </div>
@@ -52,7 +53,7 @@ export default function NewPackageForm() {
             <input
               name="name"
               required
-              className="w-full rounded-lg border p-2 text-sm"
+              className={ad.input}
               placeholder="Gym CRM"
             />
           </div>
@@ -61,7 +62,7 @@ export default function NewPackageForm() {
           <label className="mb-1 block text-xs font-medium">Description</label>
           <input
             name="description"
-            className="w-full rounded-lg border p-2 text-sm"
+            className={ad.input}
             placeholder="Optional description"
           />
         </div>
@@ -72,6 +73,7 @@ export default function NewPackageForm() {
               type="checkbox"
               name="auto_install"
               value="true"
+              className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand/20"
             />
             Auto Install
           </label>
@@ -81,6 +83,7 @@ export default function NewPackageForm() {
               type="checkbox"
               name="auto_apply_design"
               value="true"
+              className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand/20"
             />
             Auto Apply Design
           </label>
@@ -90,14 +93,14 @@ export default function NewPackageForm() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-[#2A00CC] px-4 py-2 text-sm text-white disabled:opacity-50"
+            className={ad.btnPrimary}
           >
             {saving ? 'Saving…' : 'Create'}
           </button>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="rounded-lg border px-4 py-2 text-sm"
+            className={ad.btnSecondary}
           >
             Cancel
           </button>

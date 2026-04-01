@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { activateInstall } from './_actions'
 import RetryButton from './_components/RetryButton'
+import { ad } from '@/lib/admin/ui'
 
 export default async function InstallsPage() {
   const supabase = createAdminClient()
@@ -30,17 +31,17 @@ export default async function InstallsPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold text-gray-900">Installs</h1>
+      <h1 className={ad.pageTitle}>Installs</h1>
 
       {needsRetry.length > 0 && (
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-red-600">
             Failed / Needs Retry ({needsRetry.length})
           </h2>
-          <div className="overflow-x-auto rounded-xl border border-red-200 bg-white">
+          <div className="overflow-x-auto rounded-2xl border border-red-200/80 bg-white/95 shadow-sm">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200">
+                <tr className={`${ad.tableHeadRow} border-red-100`}>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">User</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Location</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Design</th>
@@ -75,10 +76,10 @@ export default async function InstallsPage() {
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-orange-600">
             Pending ({pending.length})
           </h2>
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div className={ad.tableShell}>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200">
+                <tr className={ad.tableHeadRow}>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">User</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Location</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Package</th>
@@ -106,7 +107,7 @@ export default async function InstallsPage() {
                       >
                         <button
                           type="submit"
-                          className="rounded-lg bg-[#2A00CC] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1A0099] transition-colors"
+                          className="rounded-xl bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
                         >
                           Activate
                         </button>
@@ -124,13 +125,13 @@ export default async function InstallsPage() {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
           All Installs
         </h2>
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className={ad.tableShell}>
           {rows.length === 0 ? (
             <p className="p-4 text-sm text-gray-400">No installs yet.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200">
+                <tr className={ad.tableHeadRow}>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">User</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Location</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Design</th>

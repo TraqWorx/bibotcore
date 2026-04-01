@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { createPackage } from '../../_actions'
+import { ad } from '@/lib/admin/ui'
 
 const FIELD = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500'
-const INPUT = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none transition-all duration-150 focus:ring-1 focus:ring-gray-300'
+const INPUT = ad.input
 
 export default function NewPackagePageForm() {
   const [error, setError] = useState('')
@@ -23,7 +24,7 @@ export default function NewPackagePageForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 space-y-5">
+    <form onSubmit={handleSubmit} className={`${ad.panel} space-y-5`}>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className={FIELD}>Name</label>
@@ -84,7 +85,7 @@ export default function NewPackagePageForm() {
       <button
         type="submit"
         disabled={saving}
-        className="w-full rounded-lg bg-[#2A00CC] py-2.5 text-sm font-medium text-white transition-all duration-150 ease-out hover:bg-[#1A0099] disabled:opacity-40"
+        className={`w-full ${ad.btnPrimary}`}
       >
         {saving ? 'Creating…' : 'Create Package'}
       </button>

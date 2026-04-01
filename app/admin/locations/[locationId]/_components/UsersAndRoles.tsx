@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import LoginAsButton from './LoginAsButton'
+import { ad } from '@/lib/admin/ui'
 
 interface Profile {
   id: string
@@ -63,7 +64,7 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div className={ad.tableShell}>
       <div className="border-b border-gray-100 px-5 py-4 flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-gray-800">
@@ -98,7 +99,7 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
               setSyncing(false)
             }}
             disabled={syncing}
-            className="rounded-lg bg-[#2A00CC] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#2200aa] disabled:opacity-50"
+            className={`${ad.btnPrimary} px-3 py-1.5 text-xs disabled:opacity-50`}
           >
             {syncing ? 'Syncing...' : 'Sync Utenti'}
           </button>

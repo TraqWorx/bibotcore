@@ -189,8 +189,7 @@ export default function DesignDefaultsForm({ slug, name: initialName, theme: ini
       <button
         type="submit"
         disabled={saving}
-        className="w-full rounded-xl py-3 text-sm font-bold text-black transition-all hover:opacity-90 disabled:opacity-50"
-        style={{ background: '#00F0FF' }}
+        className="w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white shadow-sm transition hover:brightness-110 disabled:opacity-50"
       >
         {saving ? 'Salvataggio...' : 'Salva Design'}
       </button>

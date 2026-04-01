@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPlanMapping } from '../_actions'
+import { ad } from '@/lib/admin/ui'
 
 interface Props {
   designs: { slug: string; name: string }[]
@@ -35,7 +36,7 @@ export default function AddMappingForm({ designs, plans }: Props) {
   }
 
   return (
-    <form action={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+    <form action={handleSubmit} className={`${ad.panel} space-y-4`}>
       <h2 className="text-sm font-semibold text-gray-700">Add Plan Mapping</h2>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -48,7 +49,7 @@ export default function AddMappingForm({ designs, plans }: Props) {
           {plans.length > 0 ? (
             <select
               name="ghl_plan_id"
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gray-300"
+              className={ad.input}
             >
               {plans.map((p) => (
                 <option key={p.ghl_plan_id} value={p.ghl_plan_id}>
@@ -61,7 +62,7 @@ export default function AddMappingForm({ designs, plans }: Props) {
               name="ghl_plan_id"
               required
               placeholder="Sync plans first to populate this list"
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gray-300"
+              className={ad.input}
             />
           )}
         </div>
@@ -72,7 +73,7 @@ export default function AddMappingForm({ designs, plans }: Props) {
           </label>
           <select
             name="design_slug"
-            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-gray-300"
+            className={ad.input}
           >
             {designs.length === 0 ? (
               <option value="">No designs available</option>
@@ -90,7 +91,7 @@ export default function AddMappingForm({ designs, plans }: Props) {
       <button
         type="submit"
         disabled={saving}
-        className="rounded-lg bg-[#2A00CC] px-4 py-2 text-sm font-medium text-white transition-all duration-150 ease-out hover:bg-[#1A0099] disabled:opacity-50"
+        className={ad.btnPrimary}
       >
         {saving ? 'Saving…' : success ? 'Saved!' : 'Save Mapping'}
       </button>

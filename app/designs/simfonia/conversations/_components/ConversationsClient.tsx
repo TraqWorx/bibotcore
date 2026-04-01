@@ -19,7 +19,7 @@ export default function ConversationsClient({ locationId }: { locationId: string
   const currentUserEmail: string = data?.currentUserEmail ?? ''
 
   return (
-    <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-6">
+    <div className="flex h-[calc(100vh-7rem)] flex-col gap-6 overflow-hidden">
       <SimfoniaPageHeader
         eyebrow="Messaggistica"
         title="Conversazioni"

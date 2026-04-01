@@ -212,9 +212,9 @@ export default function LocationChart({ allDates }: { allDates: string[] }) {
           <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="100%">
             <defs>
               <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#2A00CC" stopOpacity="0.22" />
-                <stop offset="55%" stopColor="#2A00CC" stopOpacity="0.06" />
-                <stop offset="100%" stopColor="#2A00CC" stopOpacity="0" />
+                <stop offset="0%" stopColor="var(--brand)" stopOpacity="0.22" />
+                <stop offset="55%" stopColor="var(--brand)" stopOpacity="0.06" />
+                <stop offset="100%" stopColor="var(--brand)" stopOpacity="0" />
               </linearGradient>
               <filter id="tipShadow" x="-25%" y="-25%" width="150%" height="150%">
                 <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="#00000028" />
@@ -250,7 +250,7 @@ export default function LocationChart({ allDates }: { allDates: string[] }) {
             <path d={areaPath} fill="url(#chartGrad)" />
             <path
               d={linePath} fill="none"
-              stroke="#2A00CC" strokeWidth="2.5"
+              stroke="var(--brand)" strokeWidth="2.5"
               strokeLinecap="round" strokeLinejoin="round"
             />
 
@@ -281,10 +281,10 @@ export default function LocationChart({ allDates }: { allDates: string[] }) {
                 <>
                   <line
                     x1={hov.x} y1={PT} x2={hov.x} y2={PT + chartH}
-                    stroke="#2A00CC" strokeWidth="1" strokeDasharray="4 3" opacity="0.35"
+                    stroke="var(--brand)" strokeWidth="1" strokeDasharray="4 3" opacity="0.35"
                   />
-                  <circle cx={hov.x} cy={hov.y} r="9" fill="#2A00CC" fillOpacity="0.1" />
-                  <circle cx={hov.x} cy={hov.y} r="4.5" fill="white" stroke="#2A00CC" strokeWidth="2.5" />
+                  <circle cx={hov.x} cy={hov.y} r="9" fill="var(--brand)" fillOpacity="0.1" />
+                  <circle cx={hov.x} cy={hov.y} r="4.5" fill="white" stroke="var(--brand)" strokeWidth="2.5" />
                   <g filter="url(#tipShadow)">
                     <rect x={tx} y={ty} width={tw} height={th} rx={8} fill="#18183a" />
                   </g>

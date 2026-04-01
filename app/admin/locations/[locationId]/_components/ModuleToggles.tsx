@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { saveModuleOverrides } from '../_actions'
+import { ad } from '@/lib/admin/ui'
 
 interface ModuleDef {
   key: string
@@ -111,8 +112,7 @@ export default function ModuleToggles({ locationId, designModules, locationOverr
         <button
           onClick={handleSave}
           disabled={isPending}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50"
-          style={{ backgroundColor: '#2A00CC' }}
+          className={`${ad.btnPrimary} disabled:opacity-50`}
         >
           {isPending ? 'Saving…' : 'Save Modules'}
         </button>

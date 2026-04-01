@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { savePlanPrice } from '../_actions'
+import { ad } from '@/lib/admin/ui'
 
 export default function PlanPriceInput({ ghlPlanId, current }: { ghlPlanId: string; current: number | null }) {
   const [value, setValue] = useState(current != null ? String(current) : '')
@@ -30,7 +31,7 @@ export default function PlanPriceInput({ ghlPlanId, current }: { ghlPlanId: stri
         onChange={(e) => { setValue(e.target.value); setSaved(false) }}
         onBlur={handleBlur}
         placeholder="0.00"
-        className="w-24 rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[#2A00CC]"
+        className="w-24 rounded-xl border border-gray-200/90 bg-white px-2 py-1 text-xs outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
       />
       {saving && <span className="text-[10px] text-gray-400">saving…</span>}
       {saved && <span className="text-[10px] text-green-600">✓</span>}

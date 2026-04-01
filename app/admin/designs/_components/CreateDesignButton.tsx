@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createDesign } from '../_actions'
+import { ad } from '@/lib/admin/ui'
 
 export default function CreateDesignButton() {
   const [open, setOpen] = useState(false)
@@ -35,14 +36,17 @@ export default function CreateDesignButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="rounded-lg bg-[#2A00CC] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1A0099]"
+        className={ad.btnPrimary}
       >
-        + New Design
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        New design
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-3xl border border-gray-200/70 bg-white/95 p-6 shadow-2xl backdrop-blur-sm">
             <h2 className="mb-4 text-base font-semibold text-gray-900">Create New Design</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -53,7 +57,7 @@ export default function CreateDesignButton() {
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="e.g. Simfonia"
                   required
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[#2A00CC]"
+                  className={ad.input}
                 />
               </div>
               <div>
@@ -65,7 +69,7 @@ export default function CreateDesignButton() {
                   placeholder="e.g. simfonia"
                   required
                   pattern="[a-z0-9-]+"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[#2A00CC]"
+                  className={`${ad.input} font-mono`}
                 />
                 <p className="mt-1 text-[11px] text-gray-400">Lowercase letters, numbers, hyphens only</p>
               </div>
@@ -74,14 +78,14 @@ export default function CreateDesignButton() {
                 <button
                   type="button"
                   onClick={() => { setOpen(false); setError('') }}
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                  className={ad.btnSecondary}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="rounded-lg bg-[#2A00CC] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1A0099] disabled:opacity-50"
+                  className={ad.btnPrimary}
                 >
                   {loading ? 'Creating…' : 'Create'}
                 </button>

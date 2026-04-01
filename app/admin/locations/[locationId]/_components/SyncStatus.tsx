@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ad } from '@/lib/admin/ui'
 
 interface EntityStatus {
   entity_type: string
@@ -56,16 +57,16 @@ export default function SyncStatus({ locationId }: { locationId: string }) {
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className={ad.panel}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-sm font-semibold text-gray-800">Data Sync</h2>
-          <p className="text-xs text-gray-400">Stato della sincronizzazione dati da GHL</p>
+          <h2 className="text-sm font-bold text-gray-900">Data Sync</h2>
+          <p className="text-xs text-gray-500">Stato della sincronizzazione dati da GHL</p>
         </div>
         <button
           onClick={handleSync}
           disabled={syncing}
-          className="rounded-lg bg-[#2A00CC] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2200aa] disabled:opacity-50"
+          className={`${ad.btnPrimary} px-4 py-1.5 text-xs`}
         >
           {syncing ? 'Syncing...' : 'Sync Now'}
         </button>

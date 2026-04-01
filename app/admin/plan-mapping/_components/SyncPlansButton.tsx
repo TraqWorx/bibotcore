@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ad } from '@/lib/admin/ui'
 
 export default function SyncPlansButton() {
   const router = useRouter()
@@ -37,7 +38,7 @@ export default function SyncPlansButton() {
       <button
         onClick={handleSync}
         disabled={loading}
-        className="rounded-lg bg-[#2A00CC] px-4 py-2 text-sm font-medium text-white hover:bg-[#1A0099] disabled:opacity-50 transition-colors"
+        className={ad.btnPrimary}
       >
         {loading ? 'Syncing…' : 'Sync GHL Plans'}
       </button>

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { getGhlOAuthUrl } from '../_actions'
+import { ad } from '@/lib/admin/ui'
 
 interface Props {
   designs: { slug: string; name: string }[]
@@ -33,7 +34,7 @@ export default function ConnectButton({ designs }: Props) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="rounded-md border border-[#2A00CC]/20 bg-[#2A00CC]/5 px-3 py-1 text-xs font-medium text-[#2A00CC] hover:bg-[#2A00CC]/10 transition-colors"
+        className="rounded-xl border border-brand/25 bg-brand/5 px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/10"
       >
         Connect
       </button>
@@ -41,8 +42,8 @@ export default function ConnectButton({ designs }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2A00CC]/40">
-      <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-xl space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-sm space-y-4 rounded-3xl border border-gray-200/70 bg-white/95 p-6 shadow-2xl backdrop-blur-sm">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">Connect via GHL</h2>
           <button onClick={() => setOpen(false)} className="text-sm text-gray-400 hover:text-gray-600">✕</button>
@@ -53,7 +54,7 @@ export default function ConnectButton({ designs }: Props) {
           <select
             value={designSlug}
             onChange={(e) => setDesignSlug(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-300"
+            className={ad.input}
           >
             {designs.map((d) => (
               <option key={d.slug} value={d.slug}>{d.name}</option>
@@ -70,14 +71,14 @@ export default function ConnectButton({ designs }: Props) {
         <div className="flex justify-end gap-2">
           <button
             onClick={() => setOpen(false)}
-            className="rounded-lg px-4 py-2 text-sm text-gray-500 hover:text-gray-700"
+            className={ad.btnSecondary}
           >
             Cancel
           </button>
           <button
             onClick={handleConnect}
             disabled={loading}
-            className="rounded-lg bg-[#2A00CC] px-4 py-2 text-sm font-medium text-white hover:bg-[#1A0099] disabled:opacity-50 transition-colors"
+            className={ad.btnPrimary}
           >
             {loading ? 'Redirecting…' : 'Connect via GHL'}
           </button>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ad } from '@/lib/admin/ui'
 
 interface Job {
   id: string
@@ -50,8 +51,8 @@ export default function BulkJobsDashboard({ locationId }: { locationId: string }
   if (jobs.length === 0) return null
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
-      <h2 className="mb-4 text-sm font-semibold text-gray-800">Azioni Bulk AI</h2>
+    <div className={ad.panel}>
+      <h2 className="mb-4 text-sm font-bold text-gray-900">Azioni Bulk AI</h2>
       <div className="space-y-3">
         {jobs.map((job) => {
           const style = STATUS_STYLES[job.status] ?? STATUS_STYLES.pending
@@ -76,7 +77,7 @@ export default function BulkJobsDashboard({ locationId }: { locationId: string }
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
                   <div
-                    className="h-full rounded-full bg-[#2A00CC]"
+                    className="h-full rounded-full bg-brand"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
