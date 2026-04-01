@@ -81,11 +81,11 @@ export default function SyncStatus({ locationId }: { locationId: string }) {
       ) : statuses.length === 0 ? (
         <p className="text-xs text-gray-400">Nessun sync effettuato. Clicca "Sync Now" per iniziare.</p>
       ) : (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {statuses.map((s) => (
             <div
               key={s.entity_type}
-              className={`rounded-lg border p-2.5 ${
+              className={`rounded-2xl border p-3 ${
                 s.status === 'completed' ? 'border-green-100 bg-green-50/50' :
                 s.status === 'failed' ? 'border-red-100 bg-red-50/50' :
                 s.status === 'running' ? 'border-blue-100 bg-blue-50/50' :

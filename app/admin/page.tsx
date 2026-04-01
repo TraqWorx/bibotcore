@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import LogoutButton from './_components/LogoutButton'
 import LocationChart from './_components/LocationChart'
+import { ad } from '@/lib/admin/ui'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
@@ -203,7 +204,7 @@ export default async function AdminPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Platform Dashboard</h1>
+          <h1 className={ad.pageTitle}>Platform Dashboard</h1>
           <p className="mt-0.5 text-sm text-gray-400">
             {now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
@@ -214,16 +215,17 @@ export default async function AdminPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-4 gap-4">
         {/* Locations */}
-        <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100">
+        <div className={ad.card}>
+          <div className={ad.cardPadding}>
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Locations</p>
-              <p className="mt-2 text-4xl font-bold tracking-tight" style={{ color: '#2A00CC' }}>
+              <p className="mt-2 text-4xl font-bold tracking-tight text-brand">
                 {totalLocationsCount.toLocaleString()}
               </p>
               <p className="mt-0.5 text-xs text-gray-400">with paid plan</p>
             </div>
-            <div className="rounded-xl p-2.5" style={{ background: 'rgba(42,0,204,0.07)', color: '#2A00CC' }}>
+            <div className="rounded-2xl bg-brand/10 p-2.5 text-brand ring-1 ring-brand/15">
               <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
                 <path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 14.988 17 12.493 17 9A7 7 0 103 9c0 3.492 1.698 5.988 3.355 7.584a13.731 13.731 0 002.273 1.765 11.842 11.842 0 00.976.544l.062.029.018.008.006.003zM10 11.25a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z" clipRule="evenodd" />
               </svg>
@@ -237,6 +239,7 @@ export default async function AdminPage() {
               <span className="text-[11px] text-gray-400">this week</span>
             </div>
           )}
+          </div>
         </div>
 
         {/* Users */}
@@ -461,7 +464,7 @@ export default async function AdminPage() {
                       <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
                         <div
                           className="h-1.5 rounded-full transition-all"
-                          style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #2A00CC, #7c3aed)' }}
+                          style={{ width: `${pct}%`, background: 'linear-gradient(90deg, var(--brand), color-mix(in_srgb,var(--brand)_35%, #7c3aed))' }}
                         />
                       </div>
                       <p className="mt-0.5 text-right text-[10px] text-gray-400">{pct}%</p>

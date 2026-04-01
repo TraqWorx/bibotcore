@@ -83,7 +83,7 @@ export default function ModuleToggles({ locationId, designModules, locationOverr
                     </span>
                   )}
                   {isOverridden && (
-                    <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600">
+                    <span className="rounded border border-brand/20 bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">
                       Override
                     </span>
                   )}

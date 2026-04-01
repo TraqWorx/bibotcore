@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import OpenCrmButton from './locations/_components/OpenCrmButton'
+import { ad } from '@/lib/admin/ui'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
@@ -186,11 +187,11 @@ export default async function AgencyPage({
     <div className="space-y-6">
       {/* Preview banner */}
       {previewUserEmail && (
-        <div className="flex items-center justify-between rounded-xl border border-violet-200 bg-violet-50 px-5 py-3">
-          <p className="text-sm text-violet-800">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/25 bg-brand/10 px-5 py-3">
+          <p className="text-sm font-medium text-gray-900">
             Viewing as <span className="font-semibold">{previewUserEmail}</span>
           </p>
-          <a href="/admin/users" className="text-xs font-medium text-violet-600 hover:text-violet-900">
+          <a href="/admin/users" className="text-xs font-bold text-brand underline-offset-4 hover:underline">
             Back to Users
           </a>
         </div>
@@ -198,20 +199,20 @@ export default async function AgencyPage({
 
       {/* Header */}
       <div>
-        <h1 className="text-xl font-semibold text-gray-900">My Locations</h1>
-        <p className="mt-0.5 text-sm text-gray-500">Select a location to open its CRM</p>
+        <h1 className={ad.pageTitle}>My Locations</h1>
+        <p className={ad.pageSubtitle}>Select a location to open its CRM.</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         {/* Total locations */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Locations</p>
           <p className="mt-2 text-3xl font-bold text-gray-900">{rows.length}</p>
         </div>
 
         {/* Per design */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className={ad.panel}>
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">By Design</p>
           {Object.keys(designCounts).length === 0 ? (
             <p className="text-sm text-gray-300">—</p>
@@ -221,7 +222,11 @@ export default async function AgencyPage({
                 .sort((a, b) => b[1] - a[1])
                 .map(([slug, count]) => (
                   <div key={slug} className="flex items-center justify-between">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${slug === '—' ? 'bg-gray-100 text-gray-400' : 'bg-violet-50 text-violet-700'}`}>
+                    <span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${
+                      slug === '—'
+                        ? 'border-gray-200 bg-gray-50 text-gray-500'
+                        : 'border-brand/20 bg-brand/10 text-brand'
+                    }`}>
                       {slug}
                     </span>
                     <span className="text-sm font-semibold text-gray-700">{count}</span>
@@ -232,7 +237,7 @@ export default async function AgencyPage({
         </div>
 
         {/* Monthly revenue */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Monthly Revenue</p>
           {monthlyRevenue != null ? (
             <>
@@ -252,11 +257,11 @@ export default async function AgencyPage({
         </div>
 
         {/* Total revenue since added */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Revenue</p>
           {totalRevenue > 0 ? (
             <>
-              <p className="mt-2 text-3xl font-bold" style={{ color: '#0e9f6e' }}>
+              <p className="mt-2 text-3xl font-bold text-emerald-600">
                 €{totalRevenue.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
               <p className="mt-1 text-xs text-gray-400">since locations were added</p>
@@ -272,17 +277,17 @@ export default async function AgencyPage({
 
       {/* Location list */}
       {rows.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center">
+        <div className={`${ad.panel} p-10 text-center`}>
           <p className="text-sm font-medium text-gray-900">No locations found</p>
           <p className="mt-1 text-sm text-gray-500">
             Your account is not associated with any connected locations yet.
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className={ad.tableShell}>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100">
+              <tr className={ad.tableHeadRow}>
                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Location</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Design</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Plan</th>
@@ -294,11 +299,11 @@ export default async function AgencyPage({
             </thead>
             <tbody className="divide-y divide-gray-50">
               {rows.map((row) => (
-                <tr key={row.locationId} className="hover:bg-gray-50 transition-colors">
+                <tr key={row.locationId} className="hover:bg-gray-50/60 transition-colors">
                   <td className="px-5 py-4 font-medium text-gray-900">{row.name}</td>
                   <td className="px-5 py-4 text-gray-600">
                     {row.designSlug
-                      ? <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">{row.designSlug}</span>
+                      ? <span className="rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand">{row.designSlug}</span>
                       : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-5 py-4 text-xs font-medium text-gray-700">
@@ -312,7 +317,7 @@ export default async function AgencyPage({
                   <td className="px-5 py-4 text-right text-xs tabular-nums text-gray-500">
                     {row.dateAdded ? `${monthsSince(row.dateAdded)} mo` : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-5 py-4 text-right text-xs font-semibold tabular-nums" style={{ color: '#0e9f6e' }}>
+                  <td className="px-5 py-4 text-right text-xs font-bold tabular-nums text-emerald-600">
                     {row.planPrice != null && row.dateAdded
                       ? `€${(row.planPrice * monthsSince(row.dateAdded)).toLocaleString('it-IT')}`
                       : <span className="text-gray-300">—</span>}

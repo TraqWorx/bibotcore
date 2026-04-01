@@ -73,7 +73,7 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
     })
   }, [rows, search, roleFilter, locationFilter, sortCol, sortDir])
 
-  const thClass = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap'
+  const thClass = 'px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap'
 
   return (
     <div className={ad.tableShell}>
@@ -146,12 +146,17 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
           </thead>
           <tbody>
             {filtered.map((row, i) => (
-              <tr key={row.id} className="border-b border-gray-100 last:border-0">
+              <tr key={row.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
                 <td className="px-4 py-3 text-xs text-gray-400 tabular-nums">{i + 1}</td>
-                <td className="px-4 py-3 font-medium text-gray-900">{row.email ?? '—'}</td>
                 <td className="px-4 py-3">
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    row.role === 'super_admin' ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-600'
+                  <div className="font-semibold text-gray-900">{row.email ?? '—'}</div>
+                  <div className="mt-0.5 font-mono text-[10px] text-gray-400">{row.id}</div>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+                    row.role === 'super_admin'
+                      ? 'border-purple-200 bg-purple-50/80 text-purple-800'
+                      : 'border-gray-200 bg-gray-50 text-gray-600'
                   }`}>
                     {row.role ?? 'user'}
                   </span>
@@ -160,10 +165,13 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
                   {row.locations.length === 0 ? (
                     <span className="text-gray-300">—</span>
                   ) : row.locations.length === 1 ? (
-                    <span className="text-gray-500">{row.locations[0].name}</span>
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-gray-700">{row.locations[0].name}</div>
+                      <div className="mt-0.5 truncate font-mono text-[10px] text-gray-400">{row.locations[0].id}</div>
+                    </div>
                   ) : (
                     <div className="flex flex-wrap gap-1">
-                      <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">
+                      <span className="rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand">
                         {row.locations.length} locations
                       </span>
                       <span className="text-xs text-gray-400 truncate max-w-[200px]">
@@ -181,7 +189,7 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
                       <Link
                         href={`/agency?as=${row.id}`}
                         target="_blank"
-                        className="text-xs font-medium text-violet-600 transition-colors hover:text-violet-900"
+                        className="text-xs font-bold text-brand underline-offset-4 transition-colors hover:underline"
                       >
                         Login
                       </Link>
@@ -189,7 +197,7 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
                     {row.role !== 'super_admin' && (
                       <Link
                         href={`/admin/users/${row.id}`}
-                        className="text-xs font-medium text-gray-500 transition-colors hover:text-gray-900"
+                        className="text-xs font-semibold text-gray-600 transition-colors hover:text-gray-900"
                       >
                         View →
                       </Link>

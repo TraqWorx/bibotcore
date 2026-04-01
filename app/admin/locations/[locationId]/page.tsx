@@ -7,6 +7,7 @@ import UsersAndRoles from './_components/UsersAndRoles'
 import BulkJobsDashboard from './_components/BulkJobsDashboard'
 import { DEFAULT_MODULES } from '@/lib/types/design'
 import type { DesignModules } from '@/lib/types/design'
+import { ad } from '@/lib/admin/ui'
 
 function paymentsMade(iso: string): number {
   const start = new Date(iso)
@@ -114,7 +115,7 @@ export default async function LocationDetailPage({
       {/* Back */}
       <Link
         href="/admin/locations"
-        className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors"
       >
         <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
           <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
@@ -123,13 +124,13 @@ export default async function LocationDetailPage({
       </Link>
 
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">{location.name || location.location_id}</h1>
-          <p className="mt-0.5 font-mono text-xs text-gray-400">{location.location_id}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className={ad.pageTitle}>{location.name || location.location_id}</h1>
+          <p className="mt-1 font-mono text-xs text-gray-400">{location.location_id}</p>
         </div>
         {install?.design_slug && (
-          <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">
+          <span className="rounded-full border border-brand/20 bg-brand/10 px-3 py-1 text-xs font-bold text-brand">
             {install.design_slug}
           </span>
         )}
@@ -138,7 +139,7 @@ export default async function LocationDetailPage({
       {/* Stat cards */}
       <div className="grid grid-cols-4 gap-4">
         {/* Plan */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Plan</p>
           <p className="mt-2 text-xl font-bold text-gray-900">
             {planName ?? <span className="text-gray-300">—</span>}
@@ -149,7 +150,7 @@ export default async function LocationDetailPage({
         </div>
 
         {/* Monthly price */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Monthly</p>
           <p className="mt-2 text-xl font-bold text-gray-900">
             {priceMonthly != null
@@ -162,7 +163,7 @@ export default async function LocationDetailPage({
         </div>
 
         {/* Subscription duration */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Subscribed</p>
           <p className="mt-2 text-xl font-bold text-gray-900">
             {subscriptionStart ? `${months} mo` : <span className="text-gray-300">—</span>}
@@ -173,9 +174,9 @@ export default async function LocationDetailPage({
         </div>
 
         {/* Total paid */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Paid</p>
-          <p className="mt-2 text-xl font-bold" style={{ color: '#0e9f6e' }}>
+          <p className="mt-2 text-xl font-bold text-emerald-700">
             {totalPaid != null
               ? `€${totalPaid.toLocaleString('it-IT')}`
               : <span className="text-gray-300">—</span>}
@@ -191,8 +192,8 @@ export default async function LocationDetailPage({
 
       {/* Install info */}
       {install && (
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="mb-3 text-sm font-semibold text-gray-800">Install</h2>
+        <div className={ad.panel}>
+          <h2 className="mb-3 text-sm font-bold text-gray-900">Install</h2>
           <dl className="grid grid-cols-3 gap-4 text-sm">
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">Design</dt>
@@ -207,8 +208,8 @@ export default async function LocationDetailPage({
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">Status</dt>
               <dd className="mt-1">
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                  install.configured ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+                <span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${
+                  install.configured ? 'border-emerald-200 bg-emerald-50/80 text-emerald-800' : 'border-amber-200 bg-amber-50/80 text-amber-800'
                 }`}>
                   {install.configured ? 'Configured' : 'Pending'}
                 </span>
@@ -220,10 +221,10 @@ export default async function LocationDetailPage({
 
       {/* Module overrides */}
       {install?.design_slug && (
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className={ad.panel}>
           <div className="mb-1">
-            <h2 className="text-sm font-semibold text-gray-800">Modules</h2>
-            <p className="text-xs text-gray-400">Enable or disable features for this location. Overrides the design defaults.</p>
+            <h2 className="text-sm font-bold text-gray-900">Modules</h2>
+            <p className="text-xs text-gray-500">Enable or disable features for this location. Overrides the design defaults.</p>
           </div>
           <ModuleToggles
             locationId={locationId}

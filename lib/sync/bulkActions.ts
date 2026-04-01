@@ -202,13 +202,26 @@ export async function processBulkJobGhlSync(): Promise<{ processed: number }> {
   return { processed: totalProcessed }
 }
 
-/** Get jobs for a location */
+/** Get jobs for a location — active jobs + recent completed (last 24h) */
 export async function getBulkJobs(locationId: string) {
   const sb = createAdminClient()
-  const { data } = await sb.from('bulk_action_jobs')
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+  // Get active jobs (no limit)
+  const { data: active } = await sb.from('bulk_action_jobs')
     .select('*')
     .eq('location_id', locationId)
+    .in('status', ['pending', 'running', 'syncing'])
     .order('created_at', { ascending: false })
-    .limit(20)
-  return data ?? []
+
+  // Get recent completed/failed (last 24h, max 5)
+  const { data: recent } = await sb.from('bulk_action_jobs')
+    .select('*')
+    .eq('location_id', locationId)
+    .in('status', ['completed', 'failed'])
+    .gte('completed_at', oneDayAgo)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  return [...(active ?? []), ...(recent ?? [])]
 }

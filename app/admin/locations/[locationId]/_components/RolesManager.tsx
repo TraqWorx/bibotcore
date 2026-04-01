@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ad } from '@/lib/admin/ui'
 
 interface UserRole {
   userId: string
@@ -46,10 +47,10 @@ export default function RolesManager({ locationId, locationName }: { locationId:
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className={ad.panel}>
       <div className="mb-4">
-        <h2 className="text-sm font-semibold text-gray-800">Ruoli CRM</h2>
-        <p className="text-xs text-gray-400">
+        <h2 className="text-sm font-bold text-gray-900">Ruoli CRM</h2>
+        <p className="text-xs text-gray-500">
           Utenti sincronizzati da GHL. I ruoli qui controllano solo il nostro CRM, non GHL.
         </p>
       </div>

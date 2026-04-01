@@ -65,15 +65,15 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
 
   return (
     <div className={ad.tableShell}>
-      <div className="border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
         <div>
-          <h2 className="text-sm font-semibold text-gray-800">
+          <h2 className="text-sm font-bold text-gray-900">
             Utenti
             <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
               {profiles.length}
             </span>
           </h2>
-          <p className="text-[10px] text-gray-400 mt-0.5">Sincronizzati da GHL. Ruoli CRM modificabili qui.</p>
+          <p className="mt-0.5 text-[10px] text-gray-500">Sincronizzati da GHL. Ruoli CRM modificabili qui.</p>
         </div>
         <div className="flex items-center gap-3">
           {message && (
@@ -110,7 +110,7 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-100">
+            <tr className={ad.tableHeadRow}>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Email</th>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Ruolo CRM</th>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Registrato</th>
@@ -122,7 +122,10 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
               const crmRole = roles.get(p.id)
               return (
                 <tr key={p.id} className="hover:bg-gray-50/60">
-                  <td className="px-5 py-3 font-medium text-gray-800">{p.email ?? '—'}</td>
+                  <td className="px-5 py-3">
+                    <div className="font-semibold text-gray-900">{p.email ?? '—'}</div>
+                    <div className="mt-0.5 font-mono text-[10px] text-gray-400">{p.id}</div>
+                  </td>
                   <td className="px-5 py-3">
                     {loading ? (
                       <span className="inline-block h-6 w-20 animate-pulse rounded-lg bg-gray-100" />

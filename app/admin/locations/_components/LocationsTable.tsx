@@ -208,8 +208,8 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50/80">
-                <th className="w-9 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">#</th>
+              <tr className={ad.tableHeadRow}>
+                <th className="w-9 px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-gray-400">#</th>
                 <TH col="name">Location</TH>
                 <TH col="dateAdded">Added</TH>
                 <TH col="connected">Status</TH>
@@ -219,63 +219,73 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                 <TH col="price" align="right">Price</TH>
                 <TH col="totalPaid" align="right">Total Paid</TH>
                 <TH col="totalPaidVat" align="right">+ VAT 22%</TH>
-                <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-400">Actions</th>
+                <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-wide text-gray-400">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map((row, i) => (
-                <tr key={row.id} className={`hover:bg-gray-50/80 transition-colors ${row.churned ? 'bg-red-50/30' : ''}`}>
+                <tr
+                  key={row.id}
+                  className={`transition-colors hover:bg-gray-50/70 ${row.churned ? 'bg-red-50/25' : ''}`}
+                >
                   <td className="px-3 py-3 text-xs text-gray-300 tabular-nums">{i + 1}</td>
-                  <td className="px-3 py-3 max-w-[200px]">
+                  <td className="px-3 py-3 max-w-[260px]">
                     <Link
                       href={`/admin/locations/${row.id}`}
-                      className="font-medium hover:underline truncate block"
+                      className="block truncate font-semibold text-brand hover:underline"
                       style={{ color: 'var(--brand)' }}
                       title={row.name}
                     >
                       {row.name}
                     </Link>
+                    <div className="mt-0.5 truncate font-mono text-[10px] text-gray-400" title={row.id}>
+                      {row.id}
+                    </div>
                   </td>
                   <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">
                     {formatDate(row.dateAdded)}
                   </td>
                   <td className="px-3 py-3">
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                      row.connected && !row.needsOAuth
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : row.connected && row.needsOAuth
-                        ? 'bg-amber-50 text-amber-700'
-                        : 'bg-gray-100 text-gray-400'
-                    }`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${
-                        row.connected && !row.needsOAuth ? 'bg-emerald-500'
-                        : row.connected && row.needsOAuth ? 'bg-amber-500'
-                        : 'bg-gray-300'
-                      }`} />
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+                        row.connected && !row.needsOAuth
+                          ? 'border-emerald-200 bg-emerald-50/80 text-emerald-800'
+                          : row.connected && row.needsOAuth
+                          ? 'border-amber-200 bg-amber-50/80 text-amber-800'
+                          : 'border-gray-200 bg-gray-50 text-gray-500'
+                      }`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          row.connected && !row.needsOAuth ? 'bg-emerald-500'
+                          : row.connected && row.needsOAuth ? 'bg-amber-500'
+                          : 'bg-gray-300'
+                        }`}
+                      />
                       {row.connected && row.needsOAuth ? 'OAuth' : row.connected ? 'Active' : 'Off'}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-xs tabular-nums text-center text-gray-600">
+                  <td className="px-3 py-3 text-center text-xs font-semibold tabular-nums text-gray-700">
                     {row.users > 0 ? row.users : <span className="text-gray-300">0</span>}
                   </td>
                   <td className="px-3 py-3">
                     {row.design ? (
-                      <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">
+                      <span className="rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand">
                         {row.design}
                       </span>
                     ) : <span className="text-xs text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-3 text-xs text-gray-600">
                     {row.churned
-                      ? <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600">Churned</span>
+                      ? <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">Churned</span>
                       : row.planName ?? <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-3 py-3 text-xs font-medium tabular-nums text-right whitespace-nowrap" style={{ color: row.planPrice != null ? '#0e9f6e' : undefined }}>
+                  <td className={`px-3 py-3 text-right text-xs font-bold tabular-nums whitespace-nowrap ${row.planPrice != null ? 'text-emerald-700' : 'text-gray-400'}`}>
                     {row.planPrice != null
                       ? `€${formatEur(row.planPrice)}/mo`
                       : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-3 py-3 text-xs font-semibold tabular-nums text-right whitespace-nowrap" style={{ color: row.totalPaid != null && row.totalPaid > 0 ? '#0e9f6e' : undefined }}>
+                  <td className={`px-3 py-3 text-right text-xs font-bold tabular-nums whitespace-nowrap ${row.totalPaid != null && row.totalPaid > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
                     {row.totalPaid != null
                       ? `€${formatEur(row.totalPaid)}`
                       : <span className="text-gray-300">—</span>}
