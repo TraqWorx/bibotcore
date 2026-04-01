@@ -551,6 +551,20 @@ export default function DealDrawer({
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && !sending && handleSend()}
                       />
+                      {data.messages.length > 0 && data.contact?.id && (
+                        <button
+                          onClick={async () => {
+                            const { aiSuggestReply } = await import('@/lib/ai/actions')
+                            const result = await aiSuggestReply(locationId, data.contact!.id!, data.conversation?.type ?? 'SMS', data.messages.slice(-10).map((m) => ({ direction: m.direction ?? 'inbound', body: m.body ?? '' })))
+                            if (result.reply) setMessage(result.reply)
+                          }}
+                          className="flex items-center justify-center rounded-xl border border-[rgba(42,0,204,0.2)] w-10 shrink-0 hover:bg-[rgba(42,0,204,0.05)]"
+                          style={{ color: '#2A00CC' }}
+                          title="Suggerisci risposta AI"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                        </button>
+                      )}
                       <button
                         onClick={handleSend}
                         disabled={sending || !message.trim()}
@@ -560,19 +574,6 @@ export default function DealDrawer({
                         {sending ? '...' : 'Invia'}
                       </button>
                     </div>
-                    {data.messages.length > 0 && data.contact?.id && (
-                      <button
-                        onClick={async () => {
-                          const { aiSuggestReply } = await import('@/lib/ai/actions')
-                          const result = await aiSuggestReply(locationId, data.contact!.id!, data.conversation?.type ?? 'SMS', data.messages.slice(-10).map((m) => ({ direction: m.direction ?? 'inbound', body: m.body ?? '' })))
-                          if (result.reply) setMessage(result.reply)
-                        }}
-                        className="flex items-center justify-center rounded-lg border border-[rgba(42,0,204,0.15)] h-8 w-8 hover:bg-[rgba(42,0,204,0.05)]"
-                        style={{ color: '#2A00CC' }}
-                      >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
-                      </button>
-                    )}
                   </div>
                 )}
               </>

@@ -1062,21 +1062,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                       {sendResult}
                     </p>
                   )}
-                  {messages.length > 0 && (
-                    <button
-                      onClick={async () => {
-                        if (!contactId) return
-                        const { aiSuggestReply } = await import('@/lib/ai/actions')
-                        const result = await aiSuggestReply(locationId, contactId, 'SMS', messages.slice(-10).map((m) => ({ direction: m.direction ?? 'inbound', body: m.body ?? '' })))
-                        if (result.reply) setMessage(result.reply)
-                      }}
-                      className="flex items-center justify-center rounded-lg border border-[rgba(42,0,204,0.15)] h-8 w-8 hover:bg-[rgba(42,0,204,0.05)]"
-                      style={{ color: '#2A00CC' }}
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
-                    </button>
-                  )}
-                  <div className="flex gap-3">
+                  <div className="flex gap-2">
                     <input
                       type="text"
                       value={message}
@@ -1085,6 +1071,21 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                       placeholder="Scrivi un messaggio..."
                       className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
                     />
+                    {messages.length > 0 && (
+                      <button
+                        onClick={async () => {
+                          if (!contactId) return
+                          const { aiSuggestReply } = await import('@/lib/ai/actions')
+                          const result = await aiSuggestReply(locationId, contactId, 'SMS', messages.slice(-10).map((m) => ({ direction: m.direction ?? 'inbound', body: m.body ?? '' })))
+                          if (result.reply) setMessage(result.reply)
+                        }}
+                        className="flex items-center justify-center rounded-xl border border-[rgba(42,0,204,0.2)] w-11 shrink-0 hover:bg-[rgba(42,0,204,0.05)]"
+                        style={{ color: '#2A00CC' }}
+                        title="Suggerisci risposta AI"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                      </button>
+                    )}
                     <button
                       onClick={handleSend}
                       disabled={sending || !message.trim()}

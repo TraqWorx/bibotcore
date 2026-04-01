@@ -453,36 +453,6 @@ export default function ConversationInbox({ conversations: initialConversations,
                   {sendResult && (
                     <p className="text-xs font-medium text-red-600">{sendResult}</p>
                   )}
-                  {/* AI suggest button — above input */}
-                  {messages.length > 0 && (
-                    <button
-                      onClick={async () => {
-                        if (!selected || aiSuggesting) return
-                        setAiSuggesting(true)
-                        const result = await aiSuggestReply(
-                          locationId,
-                          selected.contactId,
-                          selected.type,
-                          messages.slice(-10).map((m) => ({ direction: m.direction, body: m.body })),
-                        )
-                        if (result.reply) setMessageText(result.reply)
-                        if (result.error) setSendResult(result.error)
-                        setAiSuggesting(false)
-                      }}
-                      disabled={aiSuggesting}
-                      className="flex items-center gap-1.5 self-start rounded-lg border border-[rgba(42,0,204,0.15)] px-2.5 py-1 text-[11px] font-medium transition-colors hover:bg-[rgba(42,0,204,0.05)] disabled:opacity-40"
-                      style={{ color: '#2A00CC' }}
-                    >
-                      {aiSuggesting ? (
-                        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#2A00CC] border-t-transparent" />
-                      ) : (
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                        </svg>
-                      )}
-                    </button>
-                  )}
-                  {/* Input + Send */}
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -492,6 +462,33 @@ export default function ConversationInbox({ conversations: initialConversations,
                       placeholder="Scrivi un messaggio..."
                       className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
                     />
+                    {messages.length > 0 && (
+                      <button
+                        onClick={async () => {
+                          if (!selected || aiSuggesting) return
+                          setAiSuggesting(true)
+                          const result = await aiSuggestReply(
+                            locationId, selected.contactId, selected.type,
+                            messages.slice(-10).map((m) => ({ direction: m.direction, body: m.body })),
+                          )
+                          if (result.reply) setMessageText(result.reply)
+                          if (result.error) setSendResult(result.error)
+                          setAiSuggesting(false)
+                        }}
+                        disabled={aiSuggesting}
+                        className="flex items-center justify-center rounded-xl border border-[rgba(42,0,204,0.2)] w-10 transition-colors hover:bg-[rgba(42,0,204,0.05)] disabled:opacity-40"
+                        style={{ color: '#2A00CC' }}
+                        title="Suggerisci risposta AI"
+                      >
+                        {aiSuggesting ? (
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#2A00CC] border-t-transparent" />
+                        ) : (
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
                     <button
                       onClick={handleSend}
                       disabled={sending || !messageText.trim()}
