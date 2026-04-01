@@ -4,6 +4,7 @@ import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { DEFAULT_THEME, DEFAULT_MODULES, type DesignTheme, type DesignModules } from '@/lib/types/design'
 import GymSidebar from './_components/GymSidebar'
 import LocationSwitcher from './_components/LocationSwitcher'
+import AiChat from './_components/AiChat'
 
 /**
  * Cached layout data loader — React `cache()` deduplicates across
@@ -112,6 +113,10 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
           </main>
         </div>
       </div>
+      {/* Floating AI Chat — only if AI module is enabled */}
+      {finalModules.ai?.enabled !== false && currentLocationId && (
+        <AiChat locationId={currentLocationId} />
+      )}
     </>
   )
 }

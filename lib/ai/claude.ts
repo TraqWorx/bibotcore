@@ -236,6 +236,31 @@ export async function generateInsight(
 }
 
 /**
+ * Answer any question with full location data context.
+ */
+export async function generateInsightFull(
+  locationId: string,
+  userId: string | null,
+  question: string,
+  fullContext: string,
+): Promise<string> {
+  const systemPrompt = `Sei un assistente AI per un CRM italiano. Hai accesso completo a tutti i dati della location: contatti, campi personalizzati, deal, pipeline, conversazioni, appuntamenti, note, task, fatture, operatori.
+
+Rispondi in italiano, in modo chiaro e conciso. Usa numeri, percentuali e nomi specifici. Se i dati non contengono la risposta, dillo chiaramente.
+
+Non inventare dati. Rispondi SOLO basandoti sui dati forniti.`
+
+  const { text } = await callClaude(
+    locationId,
+    userId,
+    'analytics_insight_full',
+    systemPrompt,
+    `DATI COMPLETI DELLA LOCATION:\n\n${fullContext}\n\n---\n\nDOMANDA: ${question}`,
+  )
+  return text
+}
+
+/**
  * Get AI usage stats for a location.
  */
 export async function getAiUsageStats(locationId: string) {

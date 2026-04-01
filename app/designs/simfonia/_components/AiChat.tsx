@@ -1,0 +1,145 @@
+'use client'
+
+import { useState, useRef, useEffect } from 'react'
+import { aiGenerateInsight } from '@/lib/ai/actions'
+
+interface Message {
+  role: 'user' | 'ai'
+  text: string
+}
+
+export default function AiChat({ locationId }: { locationId: string }) {
+  const [open, setOpen] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (open) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, open])
+
+  async function handleSend() {
+    if (!input.trim() || loading) return
+    const question = input.trim()
+    setInput('')
+    setMessages((prev) => [...prev, { role: 'user', text: question }])
+    setLoading(true)
+
+    const result = await aiGenerateInsight(locationId, question)
+    setMessages((prev) => [...prev, { role: 'ai', text: result.insight ?? result.error ?? 'Nessuna risposta' }])
+    setLoading(false)
+  }
+
+  return (
+    <>
+      {/* Floating button */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#2A00CC] to-[#6366f1] text-white shadow-lg hover:shadow-xl"
+        title="Chiedi all'AI"
+      >
+        {open ? (
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+          </svg>
+        )}
+      </button>
+
+      {/* Chat panel */}
+      {open && (
+        <div className="fixed bottom-24 right-6 z-50 flex h-[500px] w-[380px] flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#2A00CC] to-[#6366f1]">
+              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900">AI Assistant</p>
+              <p className="text-[10px] text-gray-400">Chiedi qualsiasi cosa sui tuoi dati</p>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.length === 0 && !loading && (
+              <div className="flex h-full items-center justify-center">
+                <div className="text-center">
+                  <p className="text-sm text-gray-400">Ciao! Come posso aiutarti?</p>
+                  <div className="mt-3 space-y-1.5">
+                    {[
+                      'Quanti contatti abbiamo?',
+                      'Qual è il valore totale della pipeline?',
+                      'Chi ha più contatti assegnati?',
+                    ].map((q) => (
+                      <button
+                        key={q}
+                        onClick={() => { setInput(q); }}
+                        className="block w-full rounded-lg border border-gray-100 px-3 py-2 text-left text-xs text-gray-500 hover:bg-gray-50"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {messages.map((m, i) => (
+              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${
+                  m.role === 'user'
+                    ? 'bg-[#2A00CC] text-white'
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  <p className="text-sm whitespace-pre-wrap">{m.text}</p>
+                </div>
+              </div>
+            ))}
+
+            {loading && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl bg-gray-100 px-4 py-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '0ms' }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '150ms' }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-gray-100 p-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                placeholder="Chiedi qualcosa..."
+                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC]"
+              />
+              <button
+                onClick={handleSend}
+                disabled={loading || !input.trim()}
+                className="rounded-xl bg-[#2A00CC] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                Invia
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}

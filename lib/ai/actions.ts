@@ -2,7 +2,7 @@
 
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { assertUserOwnsLocation } from '@/lib/location/getActiveLocation'
-import { summarizeContact, suggestReply, generateInsight, getAiUsageStats } from './claude'
+import { summarizeContact, suggestReply, generateInsight, generateInsightFull, getAiUsageStats } from './claude'
 
 /**
  * Server action: Generate a contact summary.
@@ -92,7 +92,7 @@ export async function aiSuggestReply(
 }
 
 /**
- * Server action: Get analytics insight.
+ * Server action: Get analytics insight with full location context.
  */
 export async function aiGenerateInsight(
   locationId: string,
@@ -104,47 +104,10 @@ export async function aiGenerateInsight(
     const authClient = await createAuthClient()
     const { data: { user } } = await authClient.auth.getUser()
 
-    const sb = createAdminClient()
+    const { buildLocationContext } = await import('./buildContext')
+    const fullContext = await buildLocationContext(locationId)
 
-    const [{ count: totalContacts }, { data: opportunities }] = await Promise.all([
-      sb.from('cached_contacts').select('*', { count: 'exact', head: true }).eq('location_id', locationId),
-      sb.from('cached_opportunities').select('name, status, monetary_value').eq('location_id', locationId).limit(20),
-    ])
-
-    // Get category breakdown from custom fields
-    const { data: fieldDefs } = await sb
-      .from('cached_custom_fields')
-      .select('field_id, name')
-      .eq('location_id', locationId)
-      .ilike('name', 'Categoria')
-      .limit(1)
-
-    let categories: { label: string; count: number }[] = []
-    if (fieldDefs && fieldDefs.length > 0) {
-      const { data: cfValues } = await sb
-        .from('cached_contact_custom_fields')
-        .select('value')
-        .eq('location_id', locationId)
-        .eq('field_id', fieldDefs[0].field_id)
-
-      const catCounts = new Map<string, number>()
-      for (const row of cfValues ?? []) {
-        for (const cat of (row.value ?? '').split(',').map((s: string) => s.trim()).filter(Boolean)) {
-          catCounts.set(cat, (catCounts.get(cat) ?? 0) + 1)
-        }
-      }
-      categories = Array.from(catCounts.entries()).map(([label, count]) => ({ label, count }))
-    }
-
-    const insight = await generateInsight(locationId, user?.id ?? null, question, {
-      totalContacts: totalContacts ?? 0,
-      categories,
-      recentDeals: (opportunities ?? []).map((o) => ({
-        name: o.name ?? 'Deal',
-        status: o.status ?? 'open',
-        value: Number(o.monetary_value) || 0,
-      })),
-    })
+    const insight = await generateInsightFull(locationId, user?.id ?? null, question, fullContext)
 
     return { insight }
   } catch (err) {
