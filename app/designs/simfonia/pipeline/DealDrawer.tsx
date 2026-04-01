@@ -543,13 +543,14 @@ export default function DealDrawer({
                           <path d="M5 10c.8 1.2 2 1.8 3 1.8s2.2-.6 3-1.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                         </svg>
                       </button>
-                      <input
-                        ref={messageInputRef}
-                        className={`flex-1 ${inputClass}`}
+                      <textarea
+                        ref={messageInputRef as unknown as React.RefObject<HTMLTextAreaElement>}
+                        className={`flex-1 resize-none overflow-hidden ${inputClass}`}
                         placeholder="Scrivi un messaggio..."
                         value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && !sending && handleSend()}
+                        rows={1}
+                        onChange={(e) => { setMessage(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !sending) { e.preventDefault(); handleSend() } }}
                       />
                       {data.messages.length > 0 && data.contact?.id && (
                         <button

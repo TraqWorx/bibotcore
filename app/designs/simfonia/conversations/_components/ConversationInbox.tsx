@@ -454,13 +454,13 @@ export default function ConversationInbox({ conversations: initialConversations,
                     <p className="text-xs font-medium text-red-600">{sendResult}</p>
                   )}
                   <div className="flex gap-2">
-                    <input
-                      type="text"
+                    <textarea
                       value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && !sending && handleSend()}
+                      onChange={(e) => { setMessageText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !sending) { e.preventDefault(); handleSend() } }}
                       placeholder="Scrivi un messaggio..."
-                      className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+                      rows={1}
+                      className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none resize-none overflow-hidden focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
                     />
                     {messages.length > 0 && (
                       <button
