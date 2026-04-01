@@ -94,6 +94,10 @@ async function recordUsage(
   ])
 }
 
+// ── Tool-use imports ─────────────────────────────────────────
+
+import { AI_TOOLS, executeTool } from './tools'
+
 // ── Core AI call ─────────────────────────────────────────────
 
 async function callClaude(
@@ -233,6 +237,77 @@ export async function generateInsight(
     `Dati disponibili:\n${dataContext}\n\nDomanda: ${question}`,
   )
   return text
+}
+
+/**
+ * AI Chat with tool use — can read data AND execute actions.
+ * Loops until Claude returns text (not a tool call).
+ */
+export async function chatWithTools(
+  locationId: string,
+  userId: string | null,
+  question: string,
+  fullContext: string,
+): Promise<string> {
+  const { allowed } = await checkRateLimit(locationId)
+  if (!allowed) throw new Error('Limite AI mensile raggiunto.')
+
+  const client = getClient()
+  const systemPrompt = `Sei un assistente AI per un CRM italiano. Hai accesso ai dati della location E puoi eseguire azioni (aggiungere tag, aggiornare campi, creare note, spostare deal).
+
+Regole:
+- Rispondi in italiano
+- Quando l'utente chiede di FARE qualcosa, usa il tool appropriato
+- Quando l'utente chiede INFORMAZIONI, rispondi dai dati forniti
+- Dopo aver eseguito un'azione, conferma cosa hai fatto
+- Non inventare dati`
+
+  const messages: { role: 'user' | 'assistant'; content: string | unknown[] }[] = [
+    { role: 'user', content: `DATI LOCATION:\n${fullContext}\n\n---\n\nRICHIESTA: ${question}` },
+  ]
+
+  let totalIn = 0
+  let totalOut = 0
+
+  // Loop: Claude may call tools, then we feed results back
+  for (let i = 0; i < 5; i++) {
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      system: systemPrompt,
+      messages: messages as Anthropic.MessageParam[],
+      tools: AI_TOOLS as Anthropic.Tool[],
+    })
+
+    totalIn += response.usage.input_tokens
+    totalOut += response.usage.output_tokens
+
+    // Check if Claude wants to use a tool
+    const toolUse = response.content.find((b) => b.type === 'tool_use')
+    if (toolUse && toolUse.type === 'tool_use') {
+      // Execute the tool
+      const toolResult = await executeTool(locationId, toolUse.name, toolUse.input as Record<string, string>)
+
+      // Feed result back to Claude
+      messages.push({ role: 'assistant', content: response.content as unknown[] })
+      messages.push({
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: toolUse.id, content: toolResult }] as unknown[],
+      })
+      continue
+    }
+
+    // No tool call — extract text response
+    const text = response.content
+      .filter((b) => b.type === 'text')
+      .map((b) => ('text' in b ? b.text : ''))
+      .join('\n')
+
+    recordUsage(locationId, userId, 'chat_with_tools', totalIn, totalOut).catch(console.error)
+    return text
+  }
+
+  return 'Troppe iterazioni. Riprova con una richiesta più semplice.'
 }
 
 /**

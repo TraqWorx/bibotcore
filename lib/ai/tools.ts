@@ -1,0 +1,224 @@
+/**
+ * AI Tool definitions + executors for Claude tool_use.
+ * Each tool maps to an existing server action or Supabase operation.
+ */
+
+import { createAdminClient } from '@/lib/supabase-server'
+import { getGhlClient } from '@/lib/ghl/ghlClient'
+import { writeThroughContact, writeThroughOpportunity, writeThroughNote } from '@/lib/sync/writeThrough'
+
+// ── Tool definitions (sent to Claude) ────────────────────────
+
+export const AI_TOOLS = [
+  {
+    name: 'search_contacts',
+    description: 'Search contacts by name, email, phone, or tag. Returns matching contacts with their details.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        query: { type: 'string', description: 'Search term (name, email, phone)' },
+        tag: { type: 'string', description: 'Filter by tag name' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'add_tag_to_contact',
+    description: 'Add a tag to a contact. Requires contact email or name to find them, and the tag to add.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        contactEmail: { type: 'string', description: 'Contact email to find' },
+        contactName: { type: 'string', description: 'Contact name to find (if no email)' },
+        tag: { type: 'string', description: 'Tag to add' },
+      },
+      required: ['tag'],
+    },
+  },
+  {
+    name: 'remove_tag_from_contact',
+    description: 'Remove a tag from a contact.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        contactEmail: { type: 'string', description: 'Contact email' },
+        contactName: { type: 'string', description: 'Contact name (if no email)' },
+        tag: { type: 'string', description: 'Tag to remove' },
+      },
+      required: ['tag'],
+    },
+  },
+  {
+    name: 'update_contact_field',
+    description: 'Update a custom field value for a contact. Use the field name (not ID).',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        contactEmail: { type: 'string', description: 'Contact email' },
+        contactName: { type: 'string', description: 'Contact name (if no email)' },
+        fieldName: { type: 'string', description: 'Custom field name (e.g. "Gestore", "Scadenza")' },
+        value: { type: 'string', description: 'New value' },
+      },
+      required: ['fieldName', 'value'],
+    },
+  },
+  {
+    name: 'create_note',
+    description: 'Create a note on a contact.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        contactEmail: { type: 'string', description: 'Contact email' },
+        contactName: { type: 'string', description: 'Contact name (if no email)' },
+        body: { type: 'string', description: 'Note text' },
+      },
+      required: ['body'],
+    },
+  },
+  {
+    name: 'move_deal',
+    description: 'Move a deal/opportunity to a different pipeline stage.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        dealName: { type: 'string', description: 'Deal name to find' },
+        stageName: { type: 'string', description: 'Target stage name' },
+      },
+      required: ['dealName', 'stageName'],
+    },
+  },
+  {
+    name: 'update_deal_status',
+    description: 'Change a deal status to open, won, or lost.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        dealName: { type: 'string', description: 'Deal name' },
+        status: { type: 'string', enum: ['open', 'won', 'lost'], description: 'New status' },
+      },
+      required: ['dealName', 'status'],
+    },
+  },
+]
+
+// ── Tool executor ────────────────────────────────────────────
+
+export async function executeTool(
+  locationId: string,
+  toolName: string,
+  input: Record<string, string>,
+): Promise<string> {
+  const sb = createAdminClient()
+
+  switch (toolName) {
+    case 'search_contacts': {
+      const q = `%${input.query}%`
+      let query = sb.from('cached_contacts')
+        .select('ghl_id, first_name, last_name, email, phone, tags')
+        .eq('location_id', locationId)
+        .or(`first_name.ilike.${q},last_name.ilike.${q},email.ilike.${q},phone.ilike.${q}`)
+        .limit(10)
+      if (input.tag) query = query.contains('tags', [input.tag])
+      const { data } = await query
+      if (!data || data.length === 0) return 'Nessun contatto trovato.'
+      return data.map((c) => `${c.first_name ?? ''} ${c.last_name ?? ''} (${c.email ?? 'no email'}) - Tags: ${(c.tags ?? []).join(', ') || 'nessuno'}`).join('\n')
+    }
+
+    case 'add_tag_to_contact':
+    case 'remove_tag_from_contact': {
+      const contact = await findContact(sb, locationId, input.contactEmail, input.contactName)
+      if (!contact) return 'Contatto non trovato.'
+      const ghl = await getGhlClient(locationId)
+      const currentTags: string[] = contact.tags ?? []
+      const newTags = toolName === 'add_tag_to_contact'
+        ? [...new Set([...currentTags, input.tag])]
+        : currentTags.filter((t) => t.toLowerCase() !== input.tag.toLowerCase())
+      await ghl.contacts.update(contact.ghl_id, { tags: newTags })
+      await writeThroughContact(locationId, { id: contact.ghl_id, tags: newTags })
+      return toolName === 'add_tag_to_contact'
+        ? `Tag "${input.tag}" aggiunto a ${contact.first_name} ${contact.last_name}.`
+        : `Tag "${input.tag}" rimosso da ${contact.first_name} ${contact.last_name}.`
+    }
+
+    case 'update_contact_field': {
+      const contact = await findContact(sb, locationId, input.contactEmail, input.contactName)
+      if (!contact) return 'Contatto non trovato.'
+      const { data: fieldDef } = await sb.from('cached_custom_fields')
+        .select('field_id').eq('location_id', locationId).ilike('name', `%${input.fieldName}%`).limit(1).single()
+      if (!fieldDef) return `Campo "${input.fieldName}" non trovato.`
+      const ghl = await getGhlClient(locationId)
+      await ghl.contacts.update(contact.ghl_id, {
+        customFields: [{ id: fieldDef.field_id, field_value: input.value }],
+      })
+      await sb.from('cached_contact_custom_fields').upsert({
+        location_id: locationId, contact_ghl_id: contact.ghl_id,
+        field_id: fieldDef.field_id, value: input.value,
+      } as never, { onConflict: 'location_id,contact_ghl_id,field_id' })
+      return `Campo "${input.fieldName}" aggiornato a "${input.value}" per ${contact.first_name} ${contact.last_name}.`
+    }
+
+    case 'create_note': {
+      const contact = await findContact(sb, locationId, input.contactEmail, input.contactName)
+      if (!contact) return 'Contatto non trovato.'
+      const ghl = await getGhlClient(locationId)
+      const result = await ghl.notes.create(contact.ghl_id, input.body)
+      const note = result?.note ?? result
+      if (note?.id) await writeThroughNote(locationId, contact.ghl_id, note)
+      return `Nota creata per ${contact.first_name} ${contact.last_name}.`
+    }
+
+    case 'move_deal': {
+      const { data: deal } = await sb.from('cached_opportunities')
+        .select('ghl_id, pipeline_id').eq('location_id', locationId).ilike('name', `%${input.dealName}%`).limit(1).single()
+      if (!deal) return `Deal "${input.dealName}" non trovato.`
+      const { data: pipeline } = await sb.from('cached_pipelines')
+        .select('stages').eq('location_id', locationId).eq('ghl_id', deal.pipeline_id!).single()
+      const stages = (Array.isArray(pipeline?.stages) ? pipeline.stages : []) as { id: string; name: string }[]
+      const stage = stages.find((s) => s.name.toLowerCase().includes(input.stageName.toLowerCase()))
+      if (!stage) return `Stadio "${input.stageName}" non trovato. Stadi disponibili: ${stages.map(s => s.name).join(', ')}`
+      const ghl = await getGhlClient(locationId)
+      await ghl.opportunities.updateStage(deal.ghl_id, stage.id)
+      await writeThroughOpportunity(locationId, { id: deal.ghl_id, pipelineStageId: stage.id })
+      return `Deal "${input.dealName}" spostato a "${stage.name}".`
+    }
+
+    case 'update_deal_status': {
+      const { data: deal } = await sb.from('cached_opportunities')
+        .select('ghl_id').eq('location_id', locationId).ilike('name', `%${input.dealName}%`).limit(1).single()
+      if (!deal) return `Deal "${input.dealName}" non trovato.`
+      const ghl = await getGhlClient(locationId)
+      await ghl.opportunities.update(deal.ghl_id, { status: input.status })
+      await writeThroughOpportunity(locationId, { id: deal.ghl_id, status: input.status })
+      return `Deal "${input.dealName}" aggiornato a "${input.status}".`
+    }
+
+    default:
+      return `Tool "${toolName}" non riconosciuto.`
+  }
+}
+
+// ── Helpers ──────────────────────────────────────────────────
+
+async function findContact(
+  sb: ReturnType<typeof createAdminClient>,
+  locationId: string,
+  email?: string,
+  name?: string,
+) {
+  if (email) {
+    const { data } = await sb.from('cached_contacts')
+      .select('ghl_id, first_name, last_name, email, tags')
+      .eq('location_id', locationId).ilike('email', email).limit(1).single()
+    if (data) return data
+  }
+  if (name) {
+    const q = `%${name}%`
+    const { data } = await sb.from('cached_contacts')
+      .select('ghl_id, first_name, last_name, email, tags')
+      .eq('location_id', locationId)
+      .or(`first_name.ilike.${q},last_name.ilike.${q}`)
+      .limit(1).single()
+    if (data) return data
+  }
+  return null
+}

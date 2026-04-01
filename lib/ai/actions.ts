@@ -2,7 +2,7 @@
 
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { assertUserOwnsLocation } from '@/lib/location/getActiveLocation'
-import { summarizeContact, suggestReply, generateInsight, generateInsightFull, getAiUsageStats } from './claude'
+import { summarizeContact, suggestReply, generateInsight, generateInsightFull, chatWithTools, getAiUsageStats } from './claude'
 
 /**
  * Server action: Generate a contact summary.
@@ -107,7 +107,7 @@ export async function aiGenerateInsight(
     const { buildLocationContext } = await import('./buildContext')
     const fullContext = await buildLocationContext(locationId)
 
-    const insight = await generateInsightFull(locationId, user?.id ?? null, question, fullContext)
+    const insight = await chatWithTools(locationId, user?.id ?? null, question, fullContext)
 
     return { insight }
   } catch (err) {
