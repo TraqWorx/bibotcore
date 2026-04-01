@@ -185,12 +185,20 @@ export async function executeTool(
         : currentTags.filter((t) => t.toLowerCase() !== input.tag.toLowerCase())
       await ghl.contacts.update(contact.ghl_id, { tags: newTags })
       await writeThroughContact(locationId, { id: contact.ghl_id, tags: newTags })
-      // Ensure tag exists in cached_tags
+      // Ensure tag exists in GHL + cached_tags
       if (toolName === 'add_tag_to_contact') {
-        await sb.from('cached_tags').upsert({
-          ghl_id: `ai-${input.tag.toLowerCase().replace(/\s+/g, '-')}`,
-          location_id: locationId, name: input.tag, synced_at: new Date().toISOString(),
-        } as never, { onConflict: 'location_id,ghl_id' })
+        try {
+          const tagResult = await ghl.tags.create(input.tag)
+          const tagId = tagResult?.tag?.id ?? tagResult?.id ?? `ai-${Date.now()}`
+          await sb.from('cached_tags').upsert({
+            ghl_id: tagId, location_id: locationId, name: input.tag, synced_at: new Date().toISOString(),
+          } as never, { onConflict: 'location_id,ghl_id' })
+        } catch {
+          // Tag may already exist — add to cache anyway
+          await sb.from('cached_tags').upsert({
+            ghl_id: `ai-${Date.now()}`, location_id: locationId, name: input.tag, synced_at: new Date().toISOString(),
+          } as never, { onConflict: 'location_id,ghl_id' })
+        }
       }
       return toolName === 'add_tag_to_contact'
         ? `Tag "${input.tag}" aggiunto a ${contact.first_name} ${contact.last_name}.`

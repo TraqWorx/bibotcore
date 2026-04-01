@@ -41,14 +41,27 @@ export async function createBulkJob(input: BulkActionInput): Promise<{
 
   const jobId = job?.id ?? ''
 
-  // If adding a tag, ensure it exists in cached_tags
+  // If adding a tag, create it in GHL + cached_tags
   if (input.action === 'add_tag' && input.params.tag) {
-    await sb.from('cached_tags').upsert({
-      ghl_id: `ai-${input.params.tag.toLowerCase().replace(/\s+/g, '-')}`,
-      location_id: input.locationId,
-      name: input.params.tag,
-      synced_at: new Date().toISOString(),
-    } as never, { onConflict: 'location_id,ghl_id' })
+    try {
+      const ghl = await getGhlClient(input.locationId)
+      const result = await ghl.tags.create(input.params.tag)
+      const tagId = result?.tag?.id ?? result?.id ?? `ai-${Date.now()}`
+      await sb.from('cached_tags').upsert({
+        ghl_id: tagId,
+        location_id: input.locationId,
+        name: input.params.tag,
+        synced_at: new Date().toISOString(),
+      } as never, { onConflict: 'location_id,ghl_id' })
+    } catch {
+      // Tag may already exist in GHL — add to cache with temp ID
+      await sb.from('cached_tags').upsert({
+        ghl_id: `ai-${Date.now()}`,
+        location_id: input.locationId,
+        name: input.params.tag,
+        synced_at: new Date().toISOString(),
+      } as never, { onConflict: 'location_id,ghl_id' })
+    }
   }
 
   // Update Supabase cache immediately (fast — no GHL API calls)
