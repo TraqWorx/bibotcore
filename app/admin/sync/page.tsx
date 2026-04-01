@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ad } from '@/lib/admin/ui'
 
 interface LocationSync {
   location_id: string
@@ -56,27 +57,31 @@ export default function AdminSyncPage() {
   }
 
   if (loading) {
-    return <div className="p-8"><div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#2A00CC]" /></div>
+    return (
+      <div className="p-8">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-brand" />
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Sync Management</h1>
-          <p className="mt-1 text-sm text-gray-500">{locations.length} locations con connessione attiva</p>
+          <h1 className={ad.pageTitle}>Sync Management</h1>
+          <p className={ad.pageSubtitle}>{locations.length} locations con connessione attiva</p>
         </div>
       </div>
 
       {syncResult && (
-        <div className={`rounded-xl border p-4 text-sm ${syncResult.includes('Errore') ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+        <div className={`rounded-2xl border p-4 text-sm ${syncResult.includes('Errore') ? 'border-red-200 bg-red-50/80 text-red-800' : 'border-emerald-200 bg-emerald-50/80 text-emerald-900'}`}>
           {syncResult}
         </div>
       )}
 
       <div className="space-y-4">
         {locations.map((loc) => (
-          <div key={loc.location_id} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div key={loc.location_id} className={ad.panel}>
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="font-bold text-gray-900">{loc.name}</h3>
@@ -85,7 +90,7 @@ export default function AdminSyncPage() {
               <button
                 onClick={() => handleSync(loc.location_id)}
                 disabled={syncing === loc.location_id}
-                className="rounded-xl bg-[#2A00CC] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2200aa] disabled:opacity-50"
+                className={`${ad.btnPrimary} px-4 py-2 text-xs`}
               >
                 {syncing === loc.location_id ? (
                   <span className="flex items-center gap-2">

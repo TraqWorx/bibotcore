@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import BulkConnectButton from './_components/BulkConnectButton'
 import LocationsTable from './_components/LocationsTable'
 import SyncSubscriptionsButton from './_components/SyncSubscriptionsButton'
+import { ad } from '@/lib/admin/ui'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
@@ -166,8 +167,8 @@ export default async function LocationsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Locations</h1>
-          <p className="text-sm text-gray-400">{ghlLocations.length} total</p>
+          <h1 className={ad.pageTitle}>Locations</h1>
+          <p className={ad.pageSubtitle}>{ghlLocations.length} total</p>
         </div>
         <div className="flex items-center gap-3">
           <SyncSubscriptionsButton />
@@ -176,14 +177,14 @@ export default async function LocationsPage() {
       </div>
 
       {!agencyToken ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
-          <p className="text-sm text-red-500">
+        <div className={ad.panel}>
+          <p className="text-sm font-medium text-red-600">
             No GHL agency token configured. Set <code>GHL_AGENCY_TOKEN</code> in your environment variables.
           </p>
         </div>
       ) : ghlLocations.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
-          <p className="text-sm text-gray-400">No locations found in GHL agency.</p>
+        <div className={ad.panel}>
+          <p className="text-sm font-medium text-gray-500">No locations found in GHL agency.</p>
         </div>
       ) : (
         <LocationsTable rows={rows} designs={designsList} unconnectedLocations={unconnectedLocations} />

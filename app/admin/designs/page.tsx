@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import DesignsTable from './_components/DesignsTable'
 import CreateDesignButton from './_components/CreateDesignButton'
+import { ad } from '@/lib/admin/ui'
 
 export default async function AdminDesignsPage() {
   const supabase = createAdminClient()
@@ -18,12 +19,12 @@ export default async function AdminDesignsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Designs</h1>
+        <h1 className={ad.pageTitle}>Designs</h1>
         <CreateDesignButton />
       </div>
       {rows.length === 0 ? (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-6">
-          <p className="text-sm text-gray-400">No designs yet.</p>
+        <div className={ad.panel}>
+          <p className="text-sm font-medium text-gray-500">No designs yet.</p>
         </div>
       ) : (
         <DesignsTable rows={rows} />

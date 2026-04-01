@@ -12,7 +12,7 @@ export default function AdminNavClient({ navLinks }: { navLinks: NavLink[] }) {
   const [pendingHref, setPendingHref] = useState<string | null>(null)
 
   return (
-    <nav className="space-y-0.5">
+    <nav className="space-y-1">
       {navLinks.map((link) => {
         const isActive = link.href === '/admin'
           ? pathname === '/admin'
@@ -32,18 +32,16 @@ export default function AdminNavClient({ navLinks }: { navLinks: NavLink[] }) {
                 startTransition(() => { router.push(link.href) })
               })
             }}
-            className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
+            className={`flex items-center justify-between rounded-2xl px-3.5 py-2.5 text-sm font-semibold transition-colors ${
               active
-                ? 'bg-[rgba(0,240,255,0.15)] text-[#00F0FF] border border-[rgba(0,240,255,0.25)]'
-                : 'text-[rgba(255,255,255,0.65)] hover:text-white hover:bg-[rgba(255,255,255,0.07)]'
+                ? 'border border-brand/25 bg-brand/10 text-brand shadow-sm'
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
             }`}
           >
             <span>{link.label}</span>
             {link.count !== undefined && (
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
-                active
-                  ? 'bg-[rgba(0,240,255,0.2)] text-[#00F0FF]'
-                  : 'bg-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.5)]'
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${
+                active ? 'bg-brand/15 text-brand' : 'bg-gray-100 text-gray-500'
               }`}>
                 {link.count}
               </span>

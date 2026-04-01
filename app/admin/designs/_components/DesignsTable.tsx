@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { deleteDesign } from '../_actions'
 import DuplicateButton from './DuplicateButton'
+import { ad } from '@/lib/admin/ui'
 
 interface DesignRow {
   id: string
@@ -23,10 +24,10 @@ export default function DesignsTable({ rows }: { rows: DesignRow[] }) {
   }, [rows, search])
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div className={ad.tableShell}>
       {/* Filter bar */}
       <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50/50 px-4 py-3">
-        <div className="flex flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5">
+        <div className="flex flex-1 items-center gap-2 rounded-xl border border-gray-200/90 bg-white px-3 py-1.5 shadow-sm">
           <svg className="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clipRule="evenodd" />
           </svg>
@@ -52,7 +53,7 @@ export default function DesignsTable({ rows }: { rows: DesignRow[] }) {
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200">
+            <tr className={ad.tableHeadRow}>
               <th className="w-10 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">#</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Name</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Slug</th>
@@ -61,7 +62,7 @@ export default function DesignsTable({ rows }: { rows: DesignRow[] }) {
           </thead>
           <tbody>
             {filtered.map((row, i) => (
-              <tr key={row.id} className="border-b border-gray-100 last:border-0">
+              <tr key={row.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
                 <td className="px-4 py-3 text-xs text-gray-400 tabular-nums">{i + 1}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
                 <td className="px-4 py-3 font-mono text-xs text-gray-500">{row.slug}</td>
@@ -69,7 +70,7 @@ export default function DesignsTable({ rows }: { rows: DesignRow[] }) {
                   <div className="flex items-center justify-end gap-3">
                     <Link
                       href={`/admin/designs/${row.slug}/settings`}
-                      className="text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-800"
+                      className="text-xs font-bold text-brand underline-offset-4 transition-colors hover:underline"
                     >
                       Settings
                     </Link>

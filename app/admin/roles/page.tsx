@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ad } from '@/lib/admin/ui'
 
 interface LocationUser {
   userId: string
@@ -99,14 +100,18 @@ export default function AdminRolesPage() {
     : users
 
   if (loading) {
-    return <div className="p-8"><div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#2A00CC]" /></div>
+    return (
+      <div className="p-8">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-brand" />
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Gestione Ruoli</h1>
-        <p className="mt-1 text-sm text-gray-500">Gestisci i ruoli degli utenti per ogni location</p>
+        <h1 className={ad.pageTitle}>Gestione ruoli</h1>
+        <p className={ad.pageSubtitle}>Gestisci i ruoli degli utenti per ogni location.</p>
       </div>
 
       {message && (
@@ -120,7 +125,7 @@ export default function AdminRolesPage() {
         <select
           value={selectedLocation}
           onChange={(e) => setSelectedLocation(e.target.value)}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium outline-none focus:border-[#2A00CC]"
+          className={ad.input}
         >
           {locations.map((l) => (
             <option key={l.id} value={l.id}>{l.name}</option>
@@ -129,27 +134,27 @@ export default function AdminRolesPage() {
       </div>
 
       {/* Invite user */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-5">
-        <h3 className="text-sm font-bold text-gray-700 mb-3">Aggiungi Utente</h3>
-        <div className="flex gap-3">
+      <div className={ad.panel}>
+        <h3 className="mb-3 text-sm font-bold text-gray-900">Aggiungi utente</h3>
+        <div className="flex flex-wrap gap-3">
           <input
             type="email"
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
             placeholder="email@esempio.com"
-            className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC]"
+            className={`${ad.input} flex-1 min-w-[16rem]`}
           />
           <select
             value={inviteRole}
             onChange={(e) => setInviteRole(e.target.value)}
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none"
+            className={`${ad.input} w-auto`}
           >
             {ROLES.map((r) => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
           </select>
           <button
             onClick={handleInvite}
             disabled={inviting || !inviteEmail.trim()}
-            className="rounded-xl bg-[#2A00CC] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#2200aa] disabled:opacity-50"
+            className={ad.btnPrimary}
           >
             {inviting ? '...' : 'Aggiungi'}
           </button>
@@ -157,10 +162,10 @@ export default function AdminRolesPage() {
       </div>
 
       {/* Users table */}
-      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+      <div className={ad.tableShell}>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-100 bg-gray-50/50">
+            <tr className={ad.tableHeadRow}>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-widest text-gray-400">Email</th>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-widest text-gray-400">Ruolo</th>
               <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-widest text-gray-400">Azioni</th>

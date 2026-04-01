@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import InviteUserForm from './_components/InviteUserForm'
 import SyncUsersButton from './_components/SyncUsersButton'
 import UsersTable from './_components/UsersTable'
+import { ad } from '@/lib/admin/ui'
 
 export default async function AdminUsersPage() {
   const supabase = createAdminClient()
@@ -59,8 +60,8 @@ export default async function AdminUsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Users</h1>
-          <p className="text-sm text-gray-500">{allProfiles.length} total</p>
+          <h1 className={ad.pageTitle}>Users</h1>
+          <p className={ad.pageSubtitle}>{allProfiles.length} total</p>
         </div>
         <div className="flex items-center gap-2">
           <SyncUsersButton />
@@ -68,8 +69,8 @@ export default async function AdminUsersPage() {
         </div>
       </div>
       {rows.length === 0 ? (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-6">
-          <p className="text-sm text-gray-400">No users yet.</p>
+        <div className={ad.panel}>
+          <p className="text-sm font-medium text-gray-500">No users yet.</p>
         </div>
       ) : (
         <UsersTable rows={rows} />

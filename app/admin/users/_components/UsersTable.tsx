@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { deleteUser } from '../_actions'
+import { ad } from '@/lib/admin/ui'
 
 interface UserLocation {
   id: string
@@ -22,7 +23,7 @@ type SortDir = 'asc' | 'desc'
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) return <span className="ml-1 text-gray-300">↕</span>
-  return <span className="ml-1" style={{ color: '#2A00CC' }}>{dir === 'asc' ? '↑' : '↓'}</span>
+  return <span className="ml-1 text-brand">{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
 export default function UsersTable({ rows }: { rows: UserRow[] }) {
@@ -75,10 +76,10 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
   const thClass = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap'
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div className={ad.tableShell}>
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/50 px-4 py-3">
-        <div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5">
+        <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-gray-200/90 bg-white px-3 py-1.5 shadow-sm">
           <svg className="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clipRule="evenodd" />
           </svg>
@@ -97,7 +98,7 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 outline-none focus:ring-2 focus:ring-violet-500/20"
+          className="rounded-xl border border-gray-200/90 bg-white px-3 py-1.5 text-xs text-gray-700 outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
         >
           <option value="all">All Roles</option>
           {uniqueRoles.map((role) => (
@@ -108,7 +109,7 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
         <select
           value={locationFilter}
           onChange={(e) => setLocationFilter(e.target.value as 'all' | 'with' | 'without')}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 outline-none focus:ring-2 focus:ring-violet-500/20"
+          className="rounded-xl border border-gray-200/90 bg-white px-3 py-1.5 text-xs text-gray-700 outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
         >
           <option value="all">All Locations</option>
           <option value="with">Has Location</option>
@@ -126,7 +127,7 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200">
+            <tr className={ad.tableHeadRow}>
               <th className="w-10 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">#</th>
               <th className={thClass} onClick={() => toggleSort('email')}>
                 User <SortIcon active={sortCol === 'email'} dir={sortDir} />

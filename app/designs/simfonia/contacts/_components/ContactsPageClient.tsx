@@ -136,7 +136,7 @@ export default function ContactsPageClient(props: Props) {
       />
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[420px,1fr] lg:items-start">
-        <div className="lg:sticky lg:top-5">
+        <div className="lg:sticky lg:top-5 z-40 overflow-visible">
           <ContactsFilters
             locationId={locationId}
             categories={categories}

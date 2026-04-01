@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase-server'
 import { togglePackageField, togglePackageStatus, syncGhlPackages } from './_actions'
 import SyncButton from './_components/SyncButton'
+import { ad } from '@/lib/admin/ui'
 
 export default async function AdminPackagesPage() {
   const supabase = createAdminClient()
@@ -19,25 +20,25 @@ export default async function AdminPackagesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Packages</h1>
+        <h1 className={ad.pageTitle}>Packages</h1>
         <div className="flex items-center gap-3">
           <SyncButton syncAction={syncGhlPackages} />
           <Link
             href="/admin/packages/new"
-            className="rounded-lg bg-[#2A00CC] px-4 py-2 text-sm font-medium text-white transition-all duration-150 ease-out hover:bg-[#1A0099]"
+            className={ad.btnPrimary}
           >
             New Package
           </Link>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className={ad.tableShell}>
         {rows.length === 0 ? (
           <p className="p-6 text-sm text-gray-400">No packages yet.</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200">
+              <tr className={ad.tableHeadRow}>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Name</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Slug</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Price / mo</th>
@@ -49,7 +50,7 @@ export default async function AdminPackagesPage() {
             </thead>
             <tbody>
               {rows.map((pkg) => (
-                <tr key={pkg.id ?? pkg.slug} className="border-b border-gray-100 last:border-0">
+                <tr key={pkg.id ?? pkg.slug} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
                   <td className="px-4 py-3 font-medium text-gray-900">{pkg.name}</td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">{pkg.slug}</td>
                   <td className="px-4 py-3 text-gray-500">
@@ -109,7 +110,7 @@ export default async function AdminPackagesPage() {
                   <td className="px-4 py-3 text-right">
                     <Link
                       href={`/admin/packages/${pkg.slug}/edit`}
-                      className="text-xs font-medium text-gray-400 transition-colors hover:text-gray-900"
+                      className="text-xs font-bold text-brand underline-offset-4 transition-colors hover:underline"
                     >
                       Edit
                     </Link>

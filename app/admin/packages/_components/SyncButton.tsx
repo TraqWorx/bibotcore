@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ad } from '@/lib/admin/ui'
 
 export default function SyncButton({
   syncAction,
@@ -30,7 +31,7 @@ export default function SyncButton({
       <button
         onClick={handleSync}
         disabled={syncing}
-        className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-all duration-150 ease-out hover:bg-gray-50 disabled:opacity-40"
+        className={`${ad.btnSecondary} px-4 py-2 text-sm disabled:opacity-40`}
       >
         <svg
           width="14"

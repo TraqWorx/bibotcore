@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { deletePlanMapping } from './_actions'
 import AddMappingForm from './_components/AddMappingForm'
 import SyncPlansButton from './_components/SyncPlansButton'
+import { ad } from '@/lib/admin/ui'
 
 export default async function AdminPlanMappingPage() {
   const supabase = createAdminClient()
@@ -29,19 +30,19 @@ export default async function AdminPlanMappingPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Plan → Design Mapping</h1>
+        <h1 className={ad.pageTitle}>Plan → Design Mapping</h1>
         <SyncPlansButton />
       </div>
 
       <AddMappingForm designs={designs ?? []} plans={availablePlans} />
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className={ad.tableShell}>
         {mappedRows.length === 0 ? (
           <p className="p-6 text-sm text-gray-400">No plan mappings yet. Sync GHL Plans, then map each plan to a design.</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200">
+              <tr className={ad.tableHeadRow}>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Plan</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">GHL Plan ID</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Design</th>
@@ -50,7 +51,7 @@ export default async function AdminPlanMappingPage() {
             </thead>
             <tbody>
               {mappedRows.map((row) => (
-                <tr key={row.ghl_plan_id} className="border-b border-gray-100 last:border-0">
+                <tr key={row.ghl_plan_id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
                   <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">{row.ghl_plan_id}</td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">{row.mapping!.design_slug}</td>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { inviteUser } from '../_actions'
+import { ad } from '@/lib/admin/ui'
 
 export default function InviteUserForm() {
   const router = useRouter()
@@ -33,7 +34,7 @@ export default function InviteUserForm() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="rounded-lg bg-[#2A00CC] px-4 py-2 text-sm font-medium text-white hover:bg-[#1A0099] transition-colors"
+        className={ad.btnPrimary}
       >
         Invite User
       </button>
@@ -49,19 +50,19 @@ export default function InviteUserForm() {
         placeholder="user@example.com"
         required
         autoFocus
-        className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-300 w-56"
+        className={`${ad.input} w-64 py-2`}
       />
       <button
         type="submit"
         disabled={loading}
-        className="rounded-lg bg-[#2A00CC] px-4 py-2 text-sm font-medium text-white hover:bg-[#1A0099] disabled:opacity-50 transition-colors"
+        className={ad.btnPrimary}
       >
         {loading ? 'Sending…' : success ? 'Sent ✓' : 'Send Invite'}
       </button>
       <button
         type="button"
         onClick={() => { setOpen(false); setError(null) }}
-        className="text-sm text-gray-400 hover:text-gray-600"
+        className="text-sm font-medium text-gray-400 hover:text-gray-700"
       >
         Cancel
       </button>

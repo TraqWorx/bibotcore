@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import AdminNavClient from './_components/AdminNavClient'
 import LogoutButton from './_components/LogoutButton'
+import { ad } from '@/lib/admin/ui'
 
 const getAdminData = cache(async () => {
   const supabase = await createAuthClient()
@@ -35,40 +36,42 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!data) redirect('/login')
 
   return (
-    <div className="flex min-h-screen" style={{ background: '#f5f5f8' }}>
-      <aside
-        className="w-60 shrink-0 flex flex-col"
-        style={{ background: 'linear-gradient(180deg, #2A00CC 0%, #1A0099 100%)' }}
-      >
-        <div className="flex items-center gap-2.5 px-5 py-5 border-b border-[rgba(255,255,255,0.08)]">
-          <div
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-black"
-            style={{ background: 'rgba(0,240,255,0.2)', color: '#00F0FF', border: '1px solid rgba(0,240,255,0.3)' }}
-          >
-            Bi
+    <div className="min-h-screen bg-[#f5f5f8]">
+      <div className="mx-auto flex min-h-screen w-full max-w-[96rem] gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <aside className="hidden w-72 shrink-0 lg:block">
+          <div className="sticky top-6 space-y-4">
+            <div
+              className="overflow-hidden rounded-3xl border border-gray-200/70 bg-gradient-to-br from-white via-[color-mix(in_srgb,var(--brand)_4%,white)] to-[color-mix(in_srgb,var(--accent)_6%,white)] shadow-sm"
+            >
+              <div className="flex items-center gap-3 px-5 py-5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand/10 text-sm font-black text-brand ring-1 ring-brand/15">
+                  Bi
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-gray-900 leading-none">Bibot Core Admin</p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">Super admin</p>
+                </div>
+              </div>
+              <div className="border-t border-gray-200/60 px-3 py-4">
+                <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                  Piattaforma
+                </p>
+                <AdminNavClient navLinks={data.navLinks} />
+              </div>
+              <div className="flex items-center justify-between border-t border-gray-200/60 px-5 py-4">
+                <p className="text-[10px] text-gray-400">Bibot Core © 2026</p>
+                <LogoutButton />
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-bold text-white leading-none">Bibot Core Admin</p>
-            <p className="text-[10px] text-[rgba(0,240,255,0.7)] leading-none mt-0.5 uppercase tracking-wider">Super Admin</p>
+        </aside>
+
+        <main className="min-w-0 flex-1">
+          <div className={`${ad.card} ${ad.cardPadding}`}>
+            {children}
           </div>
-        </div>
-
-        <div className="flex-1 px-3 py-4">
-          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-[rgba(255,255,255,0.35)]">
-            Piattaforma
-          </p>
-          <AdminNavClient navLinks={data.navLinks} />
-        </div>
-
-        <div className="px-5 py-4 border-t border-[rgba(255,255,255,0.08)] flex items-center justify-between">
-          <p className="text-[10px] text-[rgba(255,255,255,0.25)]">Bibot Core © 2026</p>
-          <LogoutButton />
-        </div>
-      </aside>
-
-      <main className="flex-1 overflow-auto">
-        <div className="p-8 max-w-7xl mx-auto">{children}</div>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }

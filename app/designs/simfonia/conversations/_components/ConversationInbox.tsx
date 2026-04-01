@@ -250,7 +250,7 @@ export default function ConversationInbox({ conversations: initialConversations,
     : null
 
   return (
-    <div className={`flex min-h-[540px] flex-1 overflow-hidden ${sf.inbox}`}>
+    <div className={`flex h-[calc(100vh-12rem)] min-h-[400px] overflow-hidden ${sf.inbox}`}>
       {/* Left — conversation list */}
       <div className="flex w-80 shrink-0 flex-col border-r border-gray-100">
         {/* Search */}
@@ -333,7 +333,7 @@ export default function ConversationInbox({ conversations: initialConversations,
       </div>
 
       {/* Right — chat + notes */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         {!selectedId ? (
           <div className="flex flex-1 items-center justify-center">
             <div className="text-center">
@@ -408,7 +408,7 @@ export default function ConversationInbox({ conversations: initialConversations,
 
             <div className="relative flex flex-1 overflow-hidden min-h-0">
               {/* Messages area */}
-              <div className="flex flex-1 min-w-0 flex-col">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                 <div className="flex-1 overflow-y-auto p-5">
                   {messagesLoading ? (
                     <div className="flex items-center justify-center py-10">
