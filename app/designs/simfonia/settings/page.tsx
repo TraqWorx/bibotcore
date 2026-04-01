@@ -104,6 +104,21 @@ export default async function SettingsPage({
 
   const tabs = [
     {
+      id: 'generale',
+      label: 'Generale',
+      content: (
+        <div className="space-y-6">
+          <ThemeForm
+            locationId={locationId}
+            primaryColor={overrides.primaryColor ?? DEFAULT_THEME.primaryColor}
+            secondaryColor={overrides.secondaryColor ?? DEFAULT_THEME.secondaryColor}
+            logoUrl={overrides.logoUrl ?? ''}
+          />
+          <ClosedDaysForm locationId={locationId} initialDays={closedDays} />
+        </div>
+      ),
+    },
+    {
       id: 'obiettivi',
       label: 'Obiettivi',
       content: (
@@ -125,36 +140,25 @@ export default async function SettingsPage({
       ),
     },
     {
-      id: 'tags',
-      label: 'Tags',
+      id: 'contatti',
+      label: 'Contatti',
       content: (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-bold text-gray-800">Gestione Tags</h2>
-          <p className="mt-1 mb-5 text-sm text-gray-500">
-            Aggiungi o rimuovi tag GHL per questa location.
-          </p>
-          <TagsManager
-            locationId={locationId}
-            initialTags={locationTags}
-          />
-        </div>
-      ),
-    },
-    {
-      id: 'categorie-tags',
-      label: 'Categorie & Tag',
-      content: (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-bold text-gray-800">Tag per Categoria</h2>
-          <p className="mt-1 mb-5 text-sm text-gray-500">
-            Associa tag a ciascuna categoria. Solo i tag associati verranno mostrati nei filtri e nella creazione contatti.
-          </p>
-          <CategoryTagsForm
-            locationId={locationId}
-            categories={categories}
-            allTags={ghlTagsWithIds}
-            initialCategoryTags={categoryTagsMap}
-          />
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6">
+            <h2 className="text-base font-bold text-gray-800">Tags</h2>
+            <p className="mt-1 mb-5 text-sm text-gray-500">Gestisci i tag per questa location.</p>
+            <TagsManager locationId={locationId} initialTags={locationTags} />
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-6">
+            <h2 className="text-base font-bold text-gray-800">Tag per Categoria</h2>
+            <p className="mt-1 mb-5 text-sm text-gray-500">Associa tag alle categorie per filtri e creazione contatti.</p>
+            <CategoryTagsForm locationId={locationId} categories={categories} allTags={ghlTagsWithIds} initialCategoryTags={categoryTagsMap} />
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-6">
+            <h2 className="text-base font-bold text-gray-800">Campi Univoci</h2>
+            <p className="mt-1 mb-5 text-sm text-gray-500">Campi che devono avere valori unici tra i contatti (es. POD, PDR).</p>
+            <UniqueFieldsForm locationId={locationId} customFields={customFields} initialUniqueFieldIds={uniqueFieldIds} />
+          </div>
         </div>
       ),
     },
@@ -164,13 +168,8 @@ export default async function SettingsPage({
       content: (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <h2 className="text-base font-bold text-gray-800">Calcolatore Provvigioni</h2>
-          <p className="mt-1 mb-5 text-sm text-gray-500">
-            Configura i tipi di provvigione con importo fisso o percentuale.
-          </p>
-          <ProvvigioniForm
-            locationId={locationId}
-            initialRows={provvigioniRows}
-          />
+          <p className="mt-1 mb-5 text-sm text-gray-500">Configura i tipi di provvigione con importo fisso o percentuale.</p>
+          <ProvvigioniForm locationId={locationId} initialRows={provvigioniRows} />
         </div>
       ),
     },
@@ -178,47 +177,7 @@ export default async function SettingsPage({
       id: 'calendario',
       label: 'Calendario',
       content: (
-        <AvailabilityForm
-          locationId={locationId}
-          users={ghlUsers.map((u) => ({ id: u.id, name: u.name }))}
-          initialSlots={availabilitySlots}
-        />
-      ),
-    },
-    {
-      id: 'chiusure',
-      label: 'Chiusure',
-      content: (
-        <ClosedDaysForm locationId={locationId} initialDays={closedDays} />
-      ),
-    },
-    {
-      id: 'campi-univoci',
-      label: 'Campi Univoci',
-      content: (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-bold text-gray-800">Campi Univoci</h2>
-          <p className="mt-1 mb-5 text-sm text-gray-500">
-            Seleziona i campi personalizzati che devono avere valori unici tra i contatti (es. POD, PDR).
-          </p>
-          <UniqueFieldsForm
-            locationId={locationId}
-            customFields={customFields}
-            initialUniqueFieldIds={uniqueFieldIds}
-          />
-        </div>
-      ),
-    },
-    {
-      id: 'aspetto',
-      label: 'Aspetto',
-      content: (
-        <ThemeForm
-          locationId={locationId}
-          primaryColor={overrides.primaryColor ?? DEFAULT_THEME.primaryColor}
-          secondaryColor={overrides.secondaryColor ?? DEFAULT_THEME.secondaryColor}
-          logoUrl={overrides.logoUrl ?? ''}
-        />
+        <AvailabilityForm locationId={locationId} users={ghlUsers.map((u) => ({ id: u.id, name: u.name }))} initialSlots={availabilitySlots} />
       ),
     },
     {

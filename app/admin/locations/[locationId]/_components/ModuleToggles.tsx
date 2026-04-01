@@ -17,6 +17,7 @@ const MODULES: ModuleDef[] = [
   { key: 'calendar',      label: 'Calendario',     description: 'Appointments and scheduling' },
   { key: 'ai',            label: 'AI Assistant',   description: 'AI summaries, reply suggestions, Ask AI widget' },
   { key: 'automations',   label: 'Automazioni',    description: 'GHL workflow list (read-only)' },
+  { key: 'portal',        label: 'Portale Clienti', description: 'Portal login per i clienti della location' },
   { key: 'settings',      label: 'Impostazioni',   description: 'Location settings' },
 ]
 

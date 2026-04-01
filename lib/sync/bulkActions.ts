@@ -41,6 +41,16 @@ export async function createBulkJob(input: BulkActionInput): Promise<{
 
   const jobId = job?.id ?? ''
 
+  // If adding a tag, ensure it exists in cached_tags
+  if (input.action === 'add_tag' && input.params.tag) {
+    await sb.from('cached_tags').upsert({
+      ghl_id: `ai-${input.params.tag.toLowerCase().replace(/\s+/g, '-')}`,
+      location_id: input.locationId,
+      name: input.params.tag,
+      synced_at: new Date().toISOString(),
+    } as never, { onConflict: 'location_id,ghl_id' })
+  }
+
   // Update Supabase cache immediately (fast — no GHL API calls)
   let processed = 0
   let failed = 0

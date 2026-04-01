@@ -60,7 +60,7 @@ export default function TeamManager({ locationId }: { locationId: string }) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-gray-800">Team</h3>
-          <p className="text-xs text-gray-400">Gestisci i ruoli del tuo team. Sincronizzati da GHL.</p>
+          <p className="text-xs text-gray-400">Gestisci i ruoli del tuo team. Sincronizzati automaticamente.</p>
         </div>
         {message && <span className="text-xs font-medium text-green-600">{message}</span>}
       </div>

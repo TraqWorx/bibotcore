@@ -227,7 +227,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Nuovo Contatto</h1>
-        <p className="mt-0.5 text-sm text-gray-500">Crea un nuovo contatto in GHL</p>
+        <p className="mt-0.5 text-sm text-gray-500">Crea un nuovo contatto</p>
       </div>
 
       <form onSubmit={handleSubmit}>

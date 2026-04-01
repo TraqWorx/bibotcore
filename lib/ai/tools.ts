@@ -185,6 +185,13 @@ export async function executeTool(
         : currentTags.filter((t) => t.toLowerCase() !== input.tag.toLowerCase())
       await ghl.contacts.update(contact.ghl_id, { tags: newTags })
       await writeThroughContact(locationId, { id: contact.ghl_id, tags: newTags })
+      // Ensure tag exists in cached_tags
+      if (toolName === 'add_tag_to_contact') {
+        await sb.from('cached_tags').upsert({
+          ghl_id: `ai-${input.tag.toLowerCase().replace(/\s+/g, '-')}`,
+          location_id: locationId, name: input.tag, synced_at: new Date().toISOString(),
+        } as never, { onConflict: 'location_id,ghl_id' })
+      }
       return toolName === 'add_tag_to_contact'
         ? `Tag "${input.tag}" aggiunto a ${contact.first_name} ${contact.last_name}.`
         : `Tag "${input.tag}" rimosso da ${contact.first_name} ${contact.last_name}.`

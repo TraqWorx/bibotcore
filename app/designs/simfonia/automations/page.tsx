@@ -47,13 +47,13 @@ export default async function AutomationsPage({
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Automazioni</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Workflow attivi configurati in GoHighLevel
+          Workflow attivi configurati in Bibot
         </p>
       </div>
 
       {workflows.length === 0 ? (
         <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-sm">
-          <p className="text-sm text-gray-400">Nessun workflow trovato. Crea i workflow direttamente in GoHighLevel.</p>
+          <p className="text-sm text-gray-400">Nessun workflow trovato. Crea i workflow direttamente in Bibot.</p>
         </div>
       ) : (
         <>
@@ -122,7 +122,7 @@ export default async function AutomationsPage({
 
       <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
         <p className="text-xs text-gray-400">
-          Le automazioni vengono create e gestite direttamente in GoHighLevel. Questa pagina mostra solo lo stato attuale.
+          Le automazioni vengono create e gestite direttamente in Bibot. Questa pagina mostra solo lo stato attuale.
         </p>
       </div>
     </div>

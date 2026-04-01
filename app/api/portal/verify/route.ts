@@ -34,8 +34,18 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (!location) {
-    // Return generic error — don't reveal whether location exists
     return NextResponse.json({ error: 'Nessun account trovato' }, { status: 404 })
+  }
+
+  // Check if portal is enabled
+  const { data: moduleSettings } = await sb
+    .from('location_design_settings')
+    .select('module_overrides')
+    .eq('location_id', locationId)
+    .maybeSingle()
+  const overrides = (moduleSettings?.module_overrides ?? {}) as Record<string, { enabled?: boolean }>
+  if (overrides.portal?.enabled === false) {
+    return NextResponse.json({ error: 'Portale non attivo' }, { status: 403 })
   }
 
   // Check if this email exists as a contact in the cached contacts

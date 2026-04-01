@@ -20,6 +20,7 @@ export interface DesignModules {
   calendar?:       { enabled: boolean }
   ai?:             { enabled: boolean }
   automations?:    { enabled: boolean }
+  portal?:         { enabled: boolean }
   settings?:       { enabled: boolean }
 }
 

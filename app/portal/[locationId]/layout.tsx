@@ -23,6 +23,23 @@ export default async function PortalLayout({
   const sb = createAdminClient()
   const email = user.email?.toLowerCase()
 
+  // Check if portal is enabled for this location
+  const { data: moduleSettings } = await sb
+    .from('location_design_settings')
+    .select('module_overrides')
+    .eq('location_id', locationId)
+    .maybeSingle()
+  const overrides = (moduleSettings?.module_overrides ?? {}) as Record<string, { enabled?: boolean }>
+  if (overrides.portal?.enabled === false) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="max-w-sm rounded-2xl border border-gray-200 bg-white p-8 text-center">
+          <p className="text-sm text-gray-500">Il portale clienti non è attivo per questa location.</p>
+        </div>
+      </div>
+    )
+  }
+
   // Check if portal_users mapping exists for THIS location
   let { data: portalUser } = await sb
     .from('portal_users')

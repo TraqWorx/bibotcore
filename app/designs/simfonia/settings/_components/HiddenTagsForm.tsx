@@ -18,7 +18,7 @@ export default function HiddenTagsForm({ locationId, ghlTags, hiddenTags: initia
   const [success, setSuccess] = useState(false)
   const [search, setSearch] = useState('')
 
-  // All known tags (GHL + previously hidden that may no longer be in GHL)
+  // All known tags (GHL + previously hidden that may no longer be in Bibot)
   const allTags = [...new Set([...ghlTags, ...initialHidden])].sort()
 
   const filteredTags = search.trim()

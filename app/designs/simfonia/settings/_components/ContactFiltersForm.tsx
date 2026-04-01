@@ -64,7 +64,7 @@ export default function ContactFiltersForm({ locationId, ghlTags, selectedFilter
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-400">
-        Seleziona i tag GHL che vuoi mostrare come filtri nella pagina Contatti.
+        Seleziona i tag che vuoi mostrare come filtri nella pagina Contatti.
       </p>
 
       {allTags.length > 0 && (

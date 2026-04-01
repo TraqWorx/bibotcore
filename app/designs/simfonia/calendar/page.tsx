@@ -73,7 +73,7 @@ export default async function CalendarPage({
     if (msg.includes('401') || msg.includes('not authorized')) {
       return (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-10 text-center">
-          <p className="text-sm font-medium text-amber-800">Token GHL non autorizzato per questa funzione.</p>
+          <p className="text-sm font-medium text-amber-800">Connessione non autorizzata per questa funzione.</p>
           <p className="mt-1 text-xs text-amber-600">Riconnetti la location con gli scope aggiornati.</p>
         </div>
       )
