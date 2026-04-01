@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { darkenHex } from '@/lib/utils/colorUtils'
 import type { DesignTheme, DesignModules } from '@/lib/types/design'
+import BulkJobsIndicator from './BulkJobsIndicator'
 
 const MODULE_NAV = [
   { key: 'dashboard',      label: 'Dashboard',      path: '/designs/simfonia/dashboard' },
@@ -145,6 +146,9 @@ export default function GymSidebar({ theme, modules, locationId }: GymSidebarPro
           })}
         </nav>
       </div>
+
+      {/* Background jobs indicator — only shows when jobs are running */}
+      <BulkJobsIndicator locationId={locationId} />
 
       {/* Footer */}
       <div className="px-5 py-4 border-t border-[rgba(255,255,255,0.08)]">
