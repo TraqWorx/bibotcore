@@ -80,10 +80,15 @@ export default function AiChat({ locationId }: { locationId: string }) {
         </button>
       </div>
 
-      {/* Chat panel — positioned near the button */}
+      {/* Chat panel — clamped to stay on screen */}
       {open && (
         <div
-          style={{ position: 'fixed', left: pos.x, top: pos.y - 520, zIndex: 50 }}
+          style={{
+            position: 'fixed',
+            left: Math.min(pos.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 390),
+            top: Math.max(10, pos.y - 520),
+            zIndex: 50,
+          }}
           className="flex h-[500px] w-[380px] flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl"
         >
           {/* Header */}
