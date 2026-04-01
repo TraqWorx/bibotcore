@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import SegmentedControl from '../../_components/SegmentedControl'
 
 interface Tab {
   id: string
@@ -13,28 +14,28 @@ export default function SettingsTabs({ tabs }: { tabs: Tab[] }) {
 
   return (
     <div>
-      {/* Tab bar */}
-      <div className="flex gap-1 overflow-x-auto rounded-xl bg-gray-100 p-1">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold whitespace-nowrap"
-            style={
-              activeTab === tab.id
-                ? { background: '#2A00CC', color: 'white' }
-                : { background: 'transparent', color: '#6B7280' }
-            }
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        className="max-w-full"
+        tablist
+        tabIdPrefix="settings-tab"
+        ariaLabel="Sezioni impostazioni"
+        items={tabs.map((tab) => ({ value: tab.id, label: tab.label }))}
+        value={activeTab}
+        onChange={setActiveTab}
+        scrollable
+        equalWidth={false}
+        size="sm"
+      />
 
-      {/* Tab content — only active tab is mounted */}
-      <div className="mt-6">
+      <div className="mt-8">
         {tabs.map((tab) => (
-          <div key={tab.id} className={tab.id === activeTab ? '' : 'hidden'}>
+          <div
+            key={tab.id}
+            role="tabpanel"
+            id={`settings-panel-${tab.id}`}
+            aria-labelledby={`settings-tab-${tab.id}`}
+            hidden={tab.id !== activeTab}
+          >
             {tab.content}
           </div>
         ))}

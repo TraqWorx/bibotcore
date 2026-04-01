@@ -3,6 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveContactFilters } from '../_actions'
+import { sf } from '@/lib/simfonia/ui'
+
+const accentFill = {
+  background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+} as const
 
 interface Props {
   locationId: string
@@ -76,11 +81,11 @@ export default function ContactFiltersForm({ locationId, ghlTags, selectedFilter
                 key={tag}
                 type="button"
                 onClick={() => toggle(tag)}
-                className="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors capitalize"
-                style={isSelected
-                  ? { background: '#2A00CC', color: 'white', borderColor: '#2A00CC' }
-                  : { background: 'white', color: '#374151', borderColor: '#e5e7eb' }
-                }
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors capitalize ${
+                  isSelected
+                    ? 'border-brand bg-brand text-white shadow-sm'
+                    : 'border-gray-200/90 bg-white text-gray-700 hover:border-brand/30'
+                }`}
               >
                 {tag}
               </button>
@@ -111,20 +116,20 @@ export default function ContactFiltersForm({ locationId, ghlTags, selectedFilter
               if (e.key === 'Escape') setShowSuggestions(false)
             }}
             placeholder="Cerca o aggiungi tag..."
-            className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
+            className={`${sf.inputFull} flex-1`}
           />
           <button
             type="button"
             onClick={() => { addCustomTag(); setShowSuggestions(false) }}
             disabled={!customTag.trim()}
-            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
+            className={`${sf.secondaryBtn} px-4 py-2 text-sm disabled:opacity-40`}
           >
             Aggiungi
           </button>
         </div>
 
         {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute left-0 right-16 z-10 mt-1 max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+          <div className="absolute left-0 right-16 z-10 mt-1 max-h-48 overflow-y-auto rounded-2xl border border-gray-200/80 bg-white/95 py-1 shadow-lg backdrop-blur-md">
             {suggestions.map((tag) => (
               <button
                 key={tag}
@@ -135,7 +140,7 @@ export default function ContactFiltersForm({ locationId, ghlTags, selectedFilter
                   setCustomTag('')
                   setShowSuggestions(false)
                 }}
-                className="flex w-full items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 capitalize transition-colors"
+                className="flex w-full items-center px-4 py-2.5 text-sm capitalize text-gray-700 transition-colors hover:bg-brand/5"
               >
                 {tag}
               </button>
@@ -151,10 +156,10 @@ export default function ContactFiltersForm({ locationId, ghlTags, selectedFilter
         type="button"
         onClick={handleSave}
         disabled={saving}
-        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
-        style={{ background: '#00F0FF' }}
+        className={`${sf.btnSave} font-bold`}
+        style={accentFill}
       >
-        {saving ? 'Salvataggio...' : 'Salva Filtri'}
+        {saving ? 'Salvataggio…' : 'Salva filtri'}
       </button>
     </div>
   )

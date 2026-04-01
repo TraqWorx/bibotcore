@@ -227,7 +227,7 @@ function getCellValue(contact: Contact, col: ContactColumn, customFields?: Custo
     const initials = name.slice(0, 2).toUpperCase()
     return (
       <div className="flex items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#2A00CC] to-[#6366f1] text-[10px] font-bold text-white">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-indigo-500 text-[10px] font-bold text-white">
           {initials !== '—' ? initials : '?'}
         </span>
         <span className="font-semibold text-gray-900">{name}</span>
@@ -335,7 +335,7 @@ function ColumnFilterDropdown({
                 if (!next.from && !next.to) onUpdate(null)
                 else onUpdate(next)
               }}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
             />
           </div>
           <div>
@@ -348,7 +348,7 @@ function ColumnFilterDropdown({
                 if (!next.from && !next.to) onUpdate(null)
                 else onUpdate(next)
               }}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
             />
           </div>
         </div>
@@ -389,7 +389,7 @@ function ColumnFilterDropdown({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               autoFocus
-              className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+              className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
             />
           </div>
         )}
@@ -397,7 +397,7 @@ function ColumnFilterDropdown({
         {/* Selected count */}
         {selected.length > 0 && (
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-[#2A00CC]">{selected.length} selezionati</span>
+            <span className="text-[11px] font-semibold text-brand">{selected.length} selezionati</span>
             <button type="button" onClick={() => { onUpdate(null) }} className="text-[11px] font-medium text-red-500 hover:text-red-600">
               Deseleziona
             </button>
@@ -414,13 +414,13 @@ function ColumnFilterDropdown({
             return (
               <label
                 key={val}
-                className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-xs transition-colors ${isChecked ? 'bg-[rgba(42,0,204,0.06)]' : 'hover:bg-gray-50'}`}
+                className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-xs transition-colors ${isChecked ? 'bg-brand/5' : 'hover:bg-gray-50'}`}
               >
                 <input
                   type="checkbox"
                   checked={isChecked}
                   onChange={() => toggle(val)}
-                  className="h-3.5 w-3.5 rounded border-gray-300 text-[#2A00CC] focus:ring-[#2A00CC] focus:ring-offset-0"
+                  className="h-3.5 w-3.5 rounded border-gray-300 text-brand focus:ring-brand focus:ring-offset-0"
                 />
                 <span className={`truncate ${isChecked ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>{val}</span>
               </label>
@@ -449,7 +449,7 @@ function ColumnFilterDropdown({
           }}
           onKeyDown={(e) => { if (e.key === 'Enter') onClose() }}
           autoFocus
-          className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+          className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
         />
       </div>
       {tv && (
@@ -651,7 +651,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
 
   return (
     <>
-      <div className="overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-3xl border border-gray-200/70 bg-white/95 shadow-[0_4px_24px_-8px_rgba(15,23,42,0.08)] backdrop-blur-sm">
         {/* Active filters bar */}
         {activeFilterCount > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/50 px-4 py-2.5">
@@ -661,8 +661,8 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
             {Object.entries(columnFilters).filter(([, f]) => isFilterActive(f)).map(([colKey, f]) => {
               const col = columns.find(c => c.key === colKey)
               return (
-                <span key={colKey} className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(42,0,204,0.08)] px-2.5 py-1 text-[11px] font-semibold text-[#2A00CC]">
-                  <span className="text-[#2A00CC]/50">{col?.label}:</span> {filterSummary(f)}
+                <span key={colKey} className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-1 text-[11px] font-semibold text-brand">
+                  <span className="text-brand/50">{col?.label}:</span> {filterSummary(f)}
                   <button type="button" onClick={() => updateFilter(colKey, null)} className="ml-0.5 text-current opacity-50 hover:opacity-100">&times;</button>
                 </span>
               )
@@ -707,13 +707,13 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setActiveFilter(isOpen ? null : col.key) }}
-                          className={`inline-flex items-center gap-1 transition-colors ${hasFilter ? 'text-[#2A00CC]' : 'text-gray-400 hover:text-gray-600'}`}
+                          className={`inline-flex items-center gap-1 transition-colors ${hasFilter ? 'text-brand' : 'text-gray-400 hover:text-gray-600'}`}
                         >
                           {col.label}
                           <svg className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                           </svg>
-                          {hasFilter && <span className="h-1.5 w-1.5 rounded-full bg-[#2A00CC]" />}
+                          {hasFilter && <span className="h-1.5 w-1.5 rounded-full bg-brand" />}
                         </button>
                         {/* Filter dropdown */}
                         {isOpen && (
@@ -766,7 +766,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
                       <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                         <button
                           onClick={(e) => handleEdit(c.id, e)}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-[rgba(42,0,204,0.08)] hover:text-[#2A00CC]"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand/10 hover:text-brand"
                           title="Modifica"
                         >
                           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

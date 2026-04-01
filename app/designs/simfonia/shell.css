@@ -1,0 +1,14 @@
+/* Simfonia app shell — applied only under .simfonia-shell (see layout.tsx) */
+
+.simfonia-shell {
+  min-height: 100vh;
+  background-color: #e4e4ed;
+  background-image:
+    radial-gradient(ellipse 100% 70% at 100% -30%, color-mix(in srgb, var(--brand) 16%, transparent), transparent 52%),
+    radial-gradient(ellipse 90% 60% at -10% 110%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 48%),
+    linear-gradient(165deg, #f2f2f8 0%, #e8e8f0 45%, #e2e2ec 100%);
+}
+
+.simfonia-shell header.app-top-bar {
+  background: transparent;
+}

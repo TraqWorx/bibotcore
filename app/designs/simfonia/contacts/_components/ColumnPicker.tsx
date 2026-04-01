@@ -4,6 +4,11 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveContactColumns, type ContactColumn } from '../../settings/_actions'
 import { parseFieldCategory, isHiddenCategory, SHARED_CATEGORIES, getCategoriaField, discoverCategories, SWITCH_OUT_FIELD_NAME, CATEGORIA_FIELD_NAME, type CustomFieldDef } from '@/lib/utils/categoryFields'
+import { sf } from '@/lib/simfonia/ui'
+
+const accentFill = {
+  background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+} as const
 
 // All standard GHL contact fields
 const ALL_STANDARD_FIELDS: { key: string; label: string }[] = [
@@ -207,7 +212,7 @@ export default function ColumnPicker({ locationId, savedColumns, customFields, a
                     onClick={() => toggle(f.key, f.label, 'standard')}
                     className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                       selected
-                        ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.08)] text-[#2A00CC]'
+                        ? 'border-brand/35 bg-brand/10 text-brand'
                         : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                     }`}
                   >
@@ -231,7 +236,7 @@ export default function ColumnPicker({ locationId, savedColumns, customFields, a
                       onClick={() => toggle(catField.id, 'Categoria', 'custom')}
                       className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                         selected
-                          ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.08)] text-[#2A00CC]'
+                          ? 'border-brand/35 bg-brand/10 text-brand'
                           : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                       }`}
                     >
@@ -297,7 +302,7 @@ export default function ColumnPicker({ locationId, savedColumns, customFields, a
                             onClick={() => toggle(cf.id, displayName, 'custom')}
                             className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                               selected
-                                ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.08)] text-[#2A00CC]'
+                                ? 'border-brand/35 bg-brand/10 text-brand'
                                 : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                             }`}
                           >
@@ -324,7 +329,7 @@ export default function ColumnPicker({ locationId, savedColumns, customFields, a
                           onClick={() => toggle(cf.id, displayName, 'custom')}
                           className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                             selected
-                              ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.08)] text-[#2A00CC]'
+                              ? 'border-brand/35 bg-brand/10 text-brand'
                               : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                           }`}
                         >
@@ -344,10 +349,10 @@ export default function ColumnPicker({ locationId, savedColumns, customFields, a
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="w-full rounded-xl py-2 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
-              style={{ background: '#00F0FF' }}
+              className={`${sf.btnSave} py-2 text-sm font-bold`}
+              style={accentFill}
             >
-              {saving ? 'Salvataggio...' : 'Salva'}
+              {saving ? 'Salvataggio…' : 'Salva'}
             </button>
           </div>
         </div>

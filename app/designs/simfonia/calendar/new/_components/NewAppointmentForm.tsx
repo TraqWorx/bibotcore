@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import type { GhlCalendar, GhlContact } from '@/lib/ghl/ghlClient'
 import { createAppointment } from '../_actions'
+import { sf } from '@/lib/simfonia/ui'
 
 interface GhlUser { id: string; name: string }
 
@@ -39,8 +40,6 @@ export default function NewAppointmentForm({
   const [endTime, setEndTime] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-
-  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)]'
 
   // Get availability for selected user
   const userAvailability = useMemo(
@@ -113,12 +112,12 @@ export default function NewAppointmentForm({
   }
 
   return (
-    <div className="max-w-lg rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-6">
+    <div className={`${sf.formCard} max-w-lg`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Calendar */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Calendario *</label>
-          <select required className={inputClass} value={calendarId} onChange={(e) => setCalendarId(e.target.value)}>
+          <label className={sf.formLabel}>Calendario *</label>
+          <select required className={sf.inputFull} value={calendarId} onChange={(e) => setCalendarId(e.target.value)}>
             <option value="">Seleziona calendario</option>
             {calendars.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -129,9 +128,9 @@ export default function NewAppointmentForm({
         {/* Assigned user */}
         {users.length > 0 && (
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Collaboratore</label>
+            <label className={sf.formLabel}>Collaboratore</label>
             <select
-              className={inputClass}
+              className={sf.inputFull}
               value={assignedUserId}
               onChange={(e) => { setAssignedUserId(e.target.value); setDate(''); setStartTime(''); setEndTime(''); setError('') }}
             >
@@ -148,8 +147,8 @@ export default function NewAppointmentForm({
 
         {/* Contact */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Contatto</label>
-          <select className={inputClass} value={contactId} onChange={(e) => setContactId(e.target.value)}>
+          <label className={sf.formLabel}>Contatto</label>
+          <select className={sf.inputFull} value={contactId} onChange={(e) => setContactId(e.target.value)}>
             <option value="">Seleziona contatto (opzionale)</option>
             {contacts.map((c) => (
               <option key={c.id} value={c.id}>
@@ -161,11 +160,11 @@ export default function NewAppointmentForm({
 
         {/* Date */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Data *</label>
+          <label className={sf.formLabel}>Data *</label>
           <input
             required
             type="date"
-            className={`${inputClass} ${isDayUnavailable ? 'border-red-300 bg-red-50' : ''}`}
+            className={`${sf.inputFull} ${isDayUnavailable ? 'border-red-300 bg-red-50' : ''}`}
             value={date}
             onChange={(e) => { setDate(e.target.value); setError('') }}
           />
@@ -177,12 +176,12 @@ export default function NewAppointmentForm({
         {/* Time range */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Inizio *</label>
+            <label className={sf.formLabel}>Inizio *</label>
             <input
               required
               type="time"
               step="60"
-              className={inputClass}
+              className={sf.inputFull}
               value={startTime}
               min={selectedDayAvailability?.enabled ? selectedDayAvailability.start_time : undefined}
               max={selectedDayAvailability?.enabled ? selectedDayAvailability.end_time : undefined}
@@ -190,12 +189,12 @@ export default function NewAppointmentForm({
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Fine *</label>
+            <label className={sf.formLabel}>Fine *</label>
             <input
               required
               type="time"
               step="60"
-              className={inputClass}
+              className={sf.inputFull}
               value={endTime}
               min={selectedDayAvailability?.enabled ? selectedDayAvailability.start_time : undefined}
               max={selectedDayAvailability?.enabled ? selectedDayAvailability.end_time : undefined}
@@ -211,19 +210,18 @@ export default function NewAppointmentForm({
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex flex-wrap gap-3 pt-2">
           <button
             type="submit"
             disabled={saving || !!isDayUnavailable}
-            className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40"
-            style={{ background: '#2A00CC' }}
+            className={sf.btnBrand}
           >
-            {saving ? 'Salvataggio…' : 'Salva Appuntamento'}
+            {saving ? 'Salvataggio…' : 'Salva appuntamento'}
           </button>
           <button
             type="button"
             onClick={() => router.push(`/designs/simfonia/calendar?locationId=${locationId}`)}
-            className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
+            className={sf.secondaryBtn}
           >
             Annulla
           </button>

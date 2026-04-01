@@ -3,6 +3,7 @@ import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { getCategoryTags, getContactColumns, getLocationTags, type ContactColumn } from '../settings/_actions'
 import { getCustomFieldDefs } from '@/lib/data/contacts'
 import ContactsPageClient from './_components/ContactsPageClient'
+import { sf } from '@/lib/simfonia/ui'
 import {
   discoverCategories,
   getCategoriaField,
@@ -70,8 +71,9 @@ export default async function ContactsPage({
 
   if (!locationId) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-        <p className="text-sm text-gray-500">Nessuna location connessa.</p>
+      <div className={sf.emptyPanel}>
+        <p className="text-sm font-medium text-gray-500">Nessuna location connessa.</p>
+        <p className="mt-1 text-xs text-gray-400">Seleziona una location valida e riprova.</p>
       </div>
     )
   }

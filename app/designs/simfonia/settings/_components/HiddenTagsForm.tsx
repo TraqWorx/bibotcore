@@ -3,6 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveHiddenTags } from '../_actions'
+import { sf } from '@/lib/simfonia/ui'
+
+const accentFill = {
+  background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+} as const
 
 interface Props {
   locationId: string
@@ -85,7 +90,7 @@ export default function HiddenTagsForm({ locationId, ghlTags, hiddenTags: initia
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Cerca tag..."
-        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
+        className={sf.inputFull}
       />
 
       {/* All tags */}
@@ -121,10 +126,10 @@ export default function HiddenTagsForm({ locationId, ghlTags, hiddenTags: initia
         type="button"
         onClick={handleSave}
         disabled={saving}
-        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
-        style={{ background: '#00F0FF' }}
+        className={`${sf.btnSave} font-bold`}
+        style={accentFill}
       >
-        {saving ? 'Salvataggio...' : 'Salva Tag Nascosti'}
+        {saving ? 'Salvataggio…' : 'Salva tag nascosti'}
       </button>
     </div>
   )

@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
+import SimfoniaPageHeader from '../../_components/SimfoniaPageHeader'
 import NewAppointmentForm from './_components/NewAppointmentForm'
 
 export interface AvailabilitySlot {
@@ -40,8 +41,12 @@ export default async function NewAppointmentPage({
   const availability = (availabilityRows ?? []) as AvailabilitySlot[]
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Nuovo Appuntamento</h1>
+    <div className="space-y-8">
+      <SimfoniaPageHeader
+        eyebrow="Calendario"
+        title="Nuovo appuntamento"
+        description="Crea un appuntamento collegando calendario, collaboratore e contatto."
+      />
       <NewAppointmentForm
         calendars={calendars}
         contacts={contacts}

@@ -19,10 +19,10 @@ export default function AiReceptionistToggle({ locationId, initialEnabled }: { l
   }
 
   return (
-    <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
-      <div>
-        <h3 className="text-sm font-bold text-gray-800">AI Receptionist</h3>
-        <p className="text-xs text-gray-400">
+    <div className="flex flex-col gap-4 rounded-3xl border border-gray-200/70 bg-white/90 p-5 shadow-sm backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
+      <div className="min-w-0">
+        <h3 className="text-sm font-bold text-gray-900">AI receptionist</h3>
+        <p className="mt-1 text-xs leading-relaxed text-gray-500">
           Risponde automaticamente ai nuovi messaggi, chiede nome e motivo del contatto, e indirizza al collaboratore scelto.
         </p>
       </div>
@@ -30,13 +30,16 @@ export default function AiReceptionistToggle({ locationId, initialEnabled }: { l
         type="button"
         onClick={toggle}
         disabled={saving}
-        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent ${
+        className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors ${
           enabled ? 'bg-emerald-500' : 'bg-gray-200'
-        }`}
+        } disabled:opacity-50`}
+        aria-pressed={enabled}
       >
-        <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ${
-          enabled ? 'translate-x-5' : 'translate-x-0'
-        }`} />
+        <span
+          className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform ${
+            enabled ? 'translate-x-5' : 'translate-x-0.5'
+          }`}
+        />
       </button>
     </div>
   )

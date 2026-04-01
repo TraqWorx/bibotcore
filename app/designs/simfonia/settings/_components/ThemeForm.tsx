@@ -2,6 +2,11 @@
 
 import { useState } from 'react'
 import { saveThemeOverrides } from '../_actions'
+import { sf } from '@/lib/simfonia/ui'
+
+const accentFill = {
+  background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+} as const
 
 interface Props {
   locationId: string
@@ -31,61 +36,55 @@ export default function ThemeForm({ locationId, primaryColor: initPrimary, secon
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6">
-      <h2 className="text-base font-bold text-gray-800">Personalizzazione Visiva</h2>
-      <p className="mt-1 mb-5 text-sm text-gray-500">
+    <div className={sf.formCard}>
+      <h2 className={sf.formTitle}>Personalizzazione visiva</h2>
+      <p className={`${sf.formDesc} mb-5`}>
         Colori e logo per questa location. Lascia vuoto per usare i valori predefiniti del design.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
-              Colore Primario
-            </label>
+            <label className={sf.formLabel}>Colore primario</label>
             <input
               type="color"
               value={primaryColor}
               onChange={(e) => setPrimaryColor(e.target.value)}
-              className="h-10 w-full cursor-pointer rounded-xl border border-gray-200 p-1"
+              className="h-12 w-full cursor-pointer rounded-2xl border border-gray-200/90 bg-white p-1 shadow-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
-              Colore Secondario
-            </label>
+            <label className={sf.formLabel}>Colore secondario</label>
             <input
               type="color"
               value={secondaryColor}
               onChange={(e) => setSecondaryColor(e.target.value)}
-              className="h-10 w-full cursor-pointer rounded-xl border border-gray-200 p-1"
+              className="h-12 w-full cursor-pointer rounded-2xl border border-gray-200/90 bg-white p-1 shadow-sm"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
-            Logo URL
-          </label>
+          <label className={sf.formLabel}>Logo URL</label>
           <input
             type="url"
             placeholder="https://..."
             value={logoUrl}
             onChange={(e) => setLogoUrl(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
+            className={sf.inputFull}
           />
         </div>
 
-        {result?.error && <p className="text-sm text-red-600">{result.error}</p>}
-        {result?.ok && <p className="text-sm text-green-600">Salvato con successo.</p>}
+        {result?.error && <p className="text-sm font-medium text-red-600">{result.error}</p>}
+        {result?.ok && <p className="text-sm font-medium text-emerald-600">Salvato con successo.</p>}
 
         <button
           type="submit"
           disabled={saving}
-          className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
-          style={{ background: '#00F0FF' }}
+          className={`${sf.btnSave} font-bold`}
+          style={accentFill}
         >
-          {saving ? 'Salvataggio...' : 'Salva Personalizzazione'}
+          {saving ? 'Salvataggio…' : 'Salva personalizzazione'}
         </button>
       </form>
     </div>

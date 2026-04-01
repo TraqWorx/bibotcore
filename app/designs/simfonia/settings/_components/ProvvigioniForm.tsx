@@ -2,6 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { saveProvvigioni, type ProvvigioneRow } from '../_actions'
+import { sf } from '@/lib/simfonia/ui'
+
+const accentFill = {
+  background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+} as const
 
 interface Props {
   locationId: string
@@ -40,7 +45,7 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
     })
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors'
+  const inputClass = sf.inputSm + ' w-full'
 
   return (
     <div className="space-y-4">
@@ -49,7 +54,7 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
       )}
 
       {rows.map((row, i) => (
-        <div key={i} className="flex items-end gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-3">
+        <div key={i} className="flex flex-wrap items-end gap-3 rounded-2xl border border-gray-200/60 bg-gray-50/80 p-4 backdrop-blur-sm">
           <div className="flex-1">
             <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-400">Nome</label>
             <input
@@ -95,7 +100,7 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
       <button
         type="button"
         onClick={addRow}
-        className="rounded-xl border border-dashed border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-500 transition-colors hover:border-[#2A00CC] hover:text-[#2A00CC]"
+        className="rounded-2xl border border-dashed border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-500 transition-colors hover:border-brand/40 hover:text-brand"
       >
         + Aggiungi Provvigione
       </button>
@@ -110,10 +115,10 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
         type="button"
         onClick={handleSave}
         disabled={isPending}
-        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
-        style={{ background: '#00F0FF' }}
+        className={`${sf.btnSave} font-bold`}
+        style={accentFill}
       >
-        {isPending ? 'Salvataggio...' : 'Salva Provvigioni'}
+        {isPending ? 'Salvataggio…' : 'Salva provvigioni'}
       </button>
     </div>
   )

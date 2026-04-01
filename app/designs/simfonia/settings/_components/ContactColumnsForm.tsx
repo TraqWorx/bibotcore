@@ -3,6 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveContactColumns, type ContactColumn } from '../_actions'
+import { sf } from '@/lib/simfonia/ui'
+
+const accentFill = {
+  background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+} as const
 
 interface GhlCustomField {
   id: string
@@ -99,7 +104,7 @@ export default function ContactColumnsForm({ locationId, initialColumns, customF
           {columns.map((col, i) => (
             <div
               key={col.key}
-              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5"
+              className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200/80 bg-white/90 px-4 py-2.5 shadow-sm backdrop-blur-sm"
             >
               <div className="flex gap-1">
                 <button
@@ -161,8 +166,7 @@ export default function ContactColumnsForm({ locationId, initialColumns, customF
                 key={cf.id}
                 type="button"
                 onClick={() => addColumn({ key: cf.id, label: cf.name, type: 'custom' })}
-                className="rounded-full border border-[rgba(42,0,204,0.2)] bg-[rgba(42,0,204,0.05)] px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-[rgba(42,0,204,0.1)]"
-                style={{ color: '#2A00CC' }}
+                className="rounded-full border border-brand/30 bg-brand/5 px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/10"
               >
                 + {cf.name}
               </button>
@@ -178,10 +182,10 @@ export default function ContactColumnsForm({ locationId, initialColumns, customF
         type="button"
         onClick={handleSave}
         disabled={saving}
-        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
-        style={{ background: '#00F0FF' }}
+        className={`${sf.btnSave} font-bold`}
+        style={accentFill}
       >
-        {saving ? 'Salvataggio...' : 'Salva Colonne'}
+        {saving ? 'Salvataggio…' : 'Salva colonne'}
       </button>
     </div>
   )

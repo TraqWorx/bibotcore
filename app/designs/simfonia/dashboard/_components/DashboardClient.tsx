@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import useSWR from 'swr'
+import SimfoniaPageHeader from '../../_components/SimfoniaPageHeader'
+import { sf } from '@/lib/simfonia/ui'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -46,19 +48,16 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
 
   if (isLoading || !data) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Caricamento...</p>
-        </div>
+      <div className="space-y-8">
+        <SimfoniaPageHeader eyebrow="Home" title="Dashboard" description="Caricamento dati…" />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-28 animate-pulse rounded-2xl border border-gray-100 bg-gray-50" />
+            <div key={i} className={`${sf.statTile} h-32 animate-pulse bg-gray-100/80`} />
           ))}
         </div>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-48 animate-pulse rounded-2xl border border-gray-100 bg-gray-50" />
+            <div key={i} className={`${sf.statTile} h-44 animate-pulse bg-gray-100/80`} />
           ))}
         </div>
       </div>
@@ -101,37 +100,113 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
   const diff = pctContratti - pctTempo
   const perfStatus: 'green' | 'yellow' | 'red' = diff > 2 ? 'green' : diff >= -2 ? 'yellow' : 'red'
   const perfConfig = {
-    green:  { bg: '#f0fdf4', border: '#bbf7d0', text: '#166534', label: 'In Target' },
-    yellow: { bg: '#fffbeb', border: '#fde68a', text: '#92400e', label: 'Attenzione' },
-    red:    { bg: '#fef2f2', border: '#fecaca', text: '#991b1b', label: 'Sotto Target' },
+    green:  { panel: 'border-emerald-200/80 bg-emerald-50/80 text-emerald-900', pill: 'bg-emerald-200/80 text-emerald-900', label: 'In target' },
+    yellow: { panel: 'border-amber-200/80 bg-amber-50/80 text-amber-950', pill: 'bg-amber-200/80 text-amber-950', label: 'Attenzione' },
+    red:    { panel: 'border-red-200/80 bg-red-50/80 text-red-950', pill: 'bg-red-200/80 text-red-950', label: 'Sotto target' },
   }[perfStatus]
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-0.5 text-sm text-gray-500">
+    <div className="space-y-8">
+      <SimfoniaPageHeader
+        eyebrow="Home"
+        title="Dashboard"
+        description={
+          <>
             {isAdmin ? 'Panoramica operativa' : 'I tuoi risultati'} — {now.getFullYear()}
-          </p>
-        </div>
-        <Link href={`/designs/simfonia/contacts/new${q}`} className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black shadow-sm transition-colors hover:opacity-90" style={{ background: '#00F0FF' }}>
-          + Nuovo Contatto
+          </>
+        }
+        actions={
+          <Link
+            href={`/designs/simfonia/contacts/new${q}`}
+            className={sf.primaryBtn}
+            style={{
+              background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+            }}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Nuovo contatto
+          </Link>
+        }
+      />
+
+      {/* Quick actions */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Link
+          href={`/designs/simfonia/contacts${q}`}
+          className={`${sf.card} ${sf.cardPadding} group flex items-center justify-between gap-4 transition hover:border-brand/25 hover:bg-white`}
+        >
+          <div className="min-w-0">
+            <p className={sf.sectionLabel}>Anagrafica</p>
+            <p className="mt-2 text-base font-bold text-gray-900">Contatti</p>
+            <p className="mt-1 text-xs text-gray-500">Cerca e filtra contatti</p>
+          </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/10 text-brand transition group-hover:bg-brand/15">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+            </svg>
+          </span>
+        </Link>
+
+        <Link
+          href={`/designs/simfonia/pipeline${q}`}
+          className={`${sf.card} ${sf.cardPadding} group flex items-center justify-between gap-4 transition hover:border-brand/25 hover:bg-white`}
+        >
+          <div className="min-w-0">
+            <p className={sf.sectionLabel}>Vendite</p>
+            <p className="mt-2 text-base font-bold text-gray-900">Pipeline</p>
+            <p className="mt-1 text-xs text-gray-500">Trascina e gestisci opportunità</p>
+          </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/10 text-brand transition group-hover:bg-brand/15">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 14l3-3 4 4 6-6" />
+            </svg>
+          </span>
+        </Link>
+
+        <Link
+          href={`/designs/simfonia/calendar${q}`}
+          className={`${sf.card} ${sf.cardPadding} group flex items-center justify-between gap-4 transition hover:border-brand/25 hover:bg-white`}
+        >
+          <div className="min-w-0">
+            <p className={sf.sectionLabel}>Agenda</p>
+            <p className="mt-2 text-base font-bold text-gray-900">Calendario</p>
+            <p className="mt-1 text-xs text-gray-500">Controlla appuntamenti</p>
+          </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/10 text-brand transition group-hover:bg-brand/15">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75" />
+            </svg>
+          </span>
+        </Link>
+
+        <Link
+          href={`/designs/simfonia/settings${q}`}
+          className={`${sf.card} ${sf.cardPadding} group flex items-center justify-between gap-4 transition hover:border-brand/25 hover:bg-white`}
+        >
+          <div className="min-w-0">
+            <p className={sf.sectionLabel}>Impostazioni</p>
+            <p className="mt-2 text-base font-bold text-gray-900">Configurazione</p>
+            <p className="mt-1 text-xs text-gray-500">Tema, tag e regole</p>
+          </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand/10 text-brand transition group-hover:bg-brand/15">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12a7.5 7.5 0 0 1 14.658-2.186l1.06-.424a1.125 1.125 0 0 1 1.47.61l.75 1.81a1.125 1.125 0 0 1-.61 1.47l-1.06.424a7.53 7.53 0 0 1 0 2.592l1.06.424a1.125 1.125 0 0 1 .61 1.47l-.75 1.81a1.125 1.125 0 0 1-1.47.61l-1.06-.424A7.5 7.5 0 0 1 4.5 12Z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.375A3.375 3.375 0 1 0 12 8.625a3.375 3.375 0 0 0 0 6.75Z" />
+            </svg>
+          </span>
         </Link>
       </div>
 
       {/* Top row */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Contatti Totali</p>
-          <p className="mt-2 text-3xl font-black text-gray-900">{totalContacts.toLocaleString('it-IT')}</p>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-2">
+        <div className={sf.statTile}>
+          <p className={sf.sectionLabel}>Contatti totali</p>
+          <p className="mt-2 text-3xl font-black tabular-nums text-gray-900">{totalContacts.toLocaleString('it-IT')}</p>
         </div>
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Operatori</p>
-          <p className="mt-2 text-3xl font-black text-gray-900">{operators}</p>
-        </div>
-        <div className={`rounded-2xl border p-5 shadow-sm ${switchOutTotal > 0 ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-white'}`}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+        <div className={`${sf.statTile} ${switchOutTotal > 0 ? 'border-red-200/80 bg-red-50/90' : ''}`}>
+          <p className={sf.sectionLabel}>
             <span className="mr-1">&#x1F6A9;</span> Switch Out
           </p>
           <p className={`mt-2 text-3xl font-black ${switchOutTotal > 0 ? 'text-red-600' : 'text-gray-900'}`}>{switchOutTotal}</p>
@@ -146,28 +221,24 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
             </div>
           )}
         </div>
-        <Link href={`/designs/simfonia/calendar${q}`} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-colors">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Calendario</p>
-          <p className="mt-2 text-sm font-medium text-gray-600">Vedi appuntamenti</p>
-        </Link>
       </div>
 
       {/* Target annuale */}
       {isAdmin && (
         <>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-6 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Target Annuale</p>
-              <p className="mt-2 text-4xl font-black" style={{ color: '#2A00CC' }}>{targetAnnuale.toLocaleString('it-IT')}</p>
-              <p className="mt-1 text-xs text-gray-400">contratti obiettivo</p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className={`${sf.statTile} border-brand/20`}>
+              <p className={sf.sectionLabel}>Target annuale</p>
+              <p className="mt-2 text-4xl font-black tabular-nums text-brand">{targetAnnuale.toLocaleString('it-IT')}</p>
+              <p className="mt-1 text-xs text-gray-500">Contratti obiettivo</p>
             </div>
-            <div className="rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-6 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Contratti Chiusi</p>
-              <p className="mt-2 text-4xl font-black" style={{ color: '#2A00CC' }}>{contratti.toLocaleString('it-IT')}</p>
+            <div className={`${sf.statTile} border-brand/20`}>
+              <p className={sf.sectionLabel}>Contratti chiusi</p>
+              <p className="mt-2 text-4xl font-black tabular-nums text-brand">{contratti.toLocaleString('it-IT')}</p>
             </div>
-            <div className="rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-6 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">% Raggiunta</p>
-              <p className="mt-2 text-4xl font-black" style={{ color: '#2A00CC' }}>{pctContratti.toFixed(1)}%</p>
+            <div className={`${sf.statTile} border-brand/20`}>
+              <p className={sf.sectionLabel}>% Raggiunta</p>
+              <p className="mt-2 text-4xl font-black tabular-nums text-brand">{pctContratti.toFixed(1)}%</p>
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
                 <div className="h-full rounded-full transition-colors" style={{ width: `${Math.min(pctContratti, 100)}%`, background: perfStatus === 'green' ? '#16a34a' : perfStatus === 'yellow' ? '#d97706' : '#dc2626' }} />
               </div>
@@ -175,18 +246,18 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
             </div>
           </div>
 
-          <div className="rounded-2xl border p-5" style={{ background: perfConfig.bg, borderColor: perfConfig.border }}>
+          <div className={`rounded-3xl border p-6 shadow-sm backdrop-blur-sm ${perfConfig.panel}`}>
             <div className="flex items-center justify-between">
               <div>
-                <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider" style={{ background: perfConfig.border, color: perfConfig.text }}>{perfConfig.label}</span>
-                <p className="mt-2 text-sm font-medium" style={{ color: perfConfig.text }}>
+                <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${perfConfig.pill}`}>{perfConfig.label}</span>
+                <p className="mt-2 text-sm font-medium">
                   {pctContratti.toFixed(1)}% contratti vs {pctTempo}% tempo — differenza {diff > 0 ? '+' : ''}{diff.toFixed(1)}%
                 </p>
               </div>
               <div className="flex gap-6 text-right">
-                <div><p className="text-2xl font-bold" style={{ color: perfConfig.text }}>{wdPassed}</p><p className="text-xs" style={{ color: perfConfig.text, opacity: 0.7 }}>gg. passati</p></div>
-                <div><p className="text-2xl font-bold" style={{ color: perfConfig.text }}>{wdRemaining}</p><p className="text-xs" style={{ color: perfConfig.text, opacity: 0.7 }}>gg. rimanenti</p></div>
-                <div><p className="text-2xl font-bold" style={{ color: perfConfig.text }}>{pctTempo}%</p><p className="text-xs" style={{ color: perfConfig.text, opacity: 0.7 }}>anno trascorso</p></div>
+                <div><p className="text-2xl font-bold">{wdPassed}</p><p className="text-xs opacity-70">gg. passati</p></div>
+                <div><p className="text-2xl font-bold">{wdRemaining}</p><p className="text-xs opacity-70">gg. rimanenti</p></div>
+                <div><p className="text-2xl font-bold">{pctTempo}%</p><p className="text-xs opacity-70">anno trascorso</p></div>
               </div>
             </div>
           </div>
@@ -194,15 +265,24 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
       )}
 
       {/* Categories */}
-      <section>
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">Per Categoria</h2>
+      <section className={`${sf.panel}`}>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className={sf.sectionLabel}>Per categoria</h2>
+          <Link href={`/designs/simfonia/contacts${q}`} className="text-xs font-bold text-brand underline-offset-4 hover:underline">
+            Vai ai contatti
+          </Link>
+        </div>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {categoryData.map((cat) => {
             const style = CATEGORY_STYLES[cat.slug] ?? { border: 'border-gray-200', accent: 'text-gray-700', bg: 'bg-gray-50' }
             const pctOfTotal = totalContacts > 0 ? (cat.total / totalContacts) * 100 : 0
             return (
-              <Link key={cat.slug} href={`/designs/simfonia/contacts${q}&category=${cat.slug}`} className={`group rounded-2xl border ${style.border} bg-white p-5 shadow-sm hover:shadow-md transition-colors`}>
-                <p className={`text-xs font-semibold uppercase tracking-widest ${style.accent}`}>{cat.label}</p>
+              <Link
+                key={cat.slug}
+                href={`/designs/simfonia/contacts${q}&category=${cat.slug}`}
+                className={`group rounded-3xl border-2 ${style.border} bg-white/95 p-5 shadow-sm backdrop-blur-sm transition hover:border-brand/25 hover:shadow-md`}
+              >
+                <p className={`text-[11px] font-bold uppercase tracking-wider ${style.accent}`}>{cat.label}</p>
                 <div className="mt-3 flex items-baseline gap-1.5">
                   <span className={`text-3xl font-black tabular-nums ${style.accent}`}>{cat.total.toLocaleString('it-IT')}</span>
                   <span className="text-sm font-semibold tabular-nums text-gray-300">contatti</span>
@@ -215,7 +295,7 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
                   <div className="mt-3 space-y-1 border-t border-gray-100 pt-3">
                     {cat.providers.slice(0, 6).map((p) => (
                       <div key={p.provider} className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500 truncate mr-2">{p.provider}</span>
+                        <span className="mr-2 truncate text-gray-500">{p.provider}</span>
                         <span className="font-semibold tabular-nums text-gray-700">{p.count}</span>
                       </div>
                     ))}
@@ -229,33 +309,49 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
       </section>
 
       {/* Gare Mensili */}
-      {isAdmin && gareRows.length > 0 && (
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">
+      {isAdmin && (
+        <section className={sf.panel}>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className={sf.sectionLabel}>
               Gare — {now.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
             </h2>
-            <Link href={`/designs/simfonia/settings${q}`} className="text-xs font-medium underline" style={{ color: '#2A00CC' }}>Modifica obiettivi</Link>
+            <Link href={`/designs/simfonia/settings${q}`} className="text-xs font-bold text-brand underline-offset-4 hover:underline">
+              Modifica obiettivi
+            </Link>
           </div>
-          <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(gareRows.length, 4)}, minmax(0, 1fr))` }}>
-            {gareRows.map((g) => {
-              const attivato = 0 // Will be computed server-side in future
-              const pctRaggiunta = g.obiettivo > 0 ? (attivato / g.obiettivo) * 100 : 0
-              const isOnTrack = pctRaggiunta >= mwdPct
-              return (
-                <div key={g.categoria} className="rounded-2xl border bg-white p-5 shadow-sm" style={{ borderColor: isOnTrack ? '#bbf7d0' : '#fecaca' }}>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 capitalize">{g.categoria}</p>
-                  <div className="mt-3 flex items-baseline gap-1.5">
-                    <span className="text-3xl font-black tabular-nums text-gray-900">{attivato}</span>
-                    <span className="text-lg font-semibold tabular-nums text-gray-300">/ {g.obiettivo}</span>
+
+          {gareRows.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-white/60 px-8 py-10 text-center backdrop-blur-sm">
+              <p className="text-sm font-medium text-gray-500">Nessuna gara configurata.</p>
+              <p className="mt-1 text-xs text-gray-400">Imposta obiettivi in Impostazioni → Gare mensili.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(gareRows.length, 4)}, minmax(0, 1fr))` }}>
+              {gareRows.map((g) => {
+                const attivato = 0 // Will be computed server-side in future
+                const pctRaggiunta = g.obiettivo > 0 ? (attivato / g.obiettivo) * 100 : 0
+                const isOnTrack = pctRaggiunta >= mwdPct
+                return (
+                  <div
+                    key={g.categoria}
+                    className={`${sf.statTile} ${isOnTrack ? 'border-emerald-200/80' : 'border-red-200/80'}`}
+                  >
+                    <p className={`${sf.sectionLabel} capitalize`}>{g.categoria}</p>
+                    <div className="mt-3 flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black tabular-nums text-gray-900">{attivato}</span>
+                      <span className="text-lg font-semibold tabular-nums text-gray-300">/ {g.obiettivo}</span>
+                    </div>
+                    <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className={`h-full rounded-full transition-colors ${isOnTrack ? 'bg-emerald-500' : 'bg-red-500'}`}
+                        style={{ width: `${Math.min(pctRaggiunta, 100)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                    <div className="h-full rounded-full transition-colors" style={{ width: `${Math.min(pctRaggiunta, 100)}%`, background: isOnTrack ? '#16a34a' : '#dc2626' }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </section>
       )}
 

@@ -31,8 +31,20 @@ function contactDisplayName(contact?: Opportunity['contact']): string | null {
 }
 
 const STATUS_ZONES = [
-  { id: '__won__', label: 'Vinta', color: 'border-green-300 bg-green-50 text-green-700', activeColor: 'border-green-400 bg-green-100 ring-2 ring-green-300', status: 'won' },
-  { id: '__lost__', label: 'Persa', color: 'border-red-300 bg-red-50 text-red-700', activeColor: 'border-red-400 bg-red-100 ring-2 ring-red-300', status: 'lost' },
+  {
+    id: '__won__',
+    label: 'Vinta',
+    color: 'border-emerald-300/80 bg-emerald-50/90 text-emerald-800',
+    activeColor: 'border-emerald-400 bg-emerald-100 ring-2 ring-emerald-300/60',
+    status: 'won' as const,
+  },
+  {
+    id: '__lost__',
+    label: 'Persa',
+    color: 'border-red-300/80 bg-red-50/90 text-red-800',
+    activeColor: 'border-red-400 bg-red-100 ring-2 ring-red-300/60',
+    status: 'lost' as const,
+  },
 ] as const
 
 export default function PipelineBoard({
@@ -62,10 +74,8 @@ export default function PipelineBoard({
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
 
-    // Check if dropped on a status zone
     const statusZone = STATUS_ZONES.find((z) => z.id === destination.droppableId)
     if (statusZone) {
-      // Remove deal from board and update status
       setColumns((prev) =>
         prev.map((col) => ({
           ...col,
@@ -76,7 +86,6 @@ export default function PipelineBoard({
       return
     }
 
-    // Normal stage-to-stage move
     const sourceCol = columns.find((c) => c.id === source.droppableId)!
     const deal = sourceCol.deals[source.index]
 
@@ -106,18 +115,13 @@ export default function PipelineBoard({
 
   async function handleDelete(dealId: string, e: React.MouseEvent) {
     e.stopPropagation()
-    setColumns((prev) =>
-      prev.map((col) => ({ ...col, deals: col.deals.filter((d) => d.id !== dealId) }))
-    )
+    setColumns((prev) => prev.map((col) => ({ ...col, deals: col.deals.filter((d) => d.id !== dealId) })))
     await deleteOpportunity(dealId, locationId)
   }
 
   return (
-    <DragDropContext
-      onDragStart={() => setIsDragging(true)}
-      onDragEnd={onDragEnd}
-    >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+    <DragDropContext onDragStart={() => setIsDragging(true)} onDragEnd={onDragEnd}>
+      <div className="-mx-1 flex gap-5 overflow-x-auto px-1 pb-2 pt-1 scroll-smooth">
         {columns.map((stage) => {
           const stageTotal = stage.deals.reduce((sum, d) => sum + (d.monetaryValue ?? 0), 0)
           return (
@@ -126,70 +130,90 @@ export default function PipelineBoard({
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="w-[280px] shrink-0 rounded-2xl border border-[rgba(42,0,204,0.12)] bg-[#FAFAFF] p-3"
+                  className="flex w-[min(100vw-2rem,320px)] shrink-0 flex-col overflow-hidden rounded-3xl border border-gray-200/80 bg-gradient-to-b from-white via-white to-gray-50/90 shadow-[0_8px_30px_-12px_rgba(15,23,42,0.12)] ring-1 ring-black/[0.03] max-h-[calc(100vh-320px)]"
                 >
-                  {/* Stage header */}
-                  <div className="mb-3 flex items-start justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700">{stage.name}</h3>
-                      <p className="mt-0.5 text-xs text-gray-400">
-                        {stage.deals.length} opportunità
+                  <div className="sticky top-0 z-10 border-b border-gray-200/60 bg-white/85 p-4 backdrop-blur-md">
+                    <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-sm font-bold tracking-tight text-gray-900">
+                          {stage.name}
+                        </h3>
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-600">
+                          {stage.deals.length}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {stage.deals.length === 1 ? '1 opportunità' : `${stage.deals.length} opportunità`}
                         {stageTotal > 0 && (
-                          <span className="ml-1.5 font-medium text-gray-500">
-                            · €{stageTotal.toLocaleString()}
+                          <span className="ml-1.5 font-semibold tabular-nums text-gray-700">
+                            · €{stageTotal.toLocaleString('it-IT')}
                           </span>
                         )}
                       </p>
                     </div>
                     <Link
                       href={`/designs/simfonia/pipeline/new?pipelineId=${pipelineId}&stageId=${stage.id}&locationId=${locationId}`}
-                      className="flex h-6 w-6 items-center justify-center rounded-lg text-[#2A00CC] transition-colors duration-150 hover:bg-[rgba(42,0,204,0.08)]"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-brand transition-colors hover:bg-brand/10"
                       title="Aggiungi opportunità"
                     >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
+                        <path
+                          d="M7 1v12M1 7h12"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                        />
                       </svg>
                     </Link>
+                    </div>
                   </div>
 
-                  {stage.deals.map((deal, index) => {
-                    const contact = contactDisplayName(deal.contact)
-                    return (
-                      <Draggable key={deal.id} draggableId={deal.id} index={index}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            onClick={() => onDealClick?.(deal.id)}
-                            className={`group relative mb-2 cursor-pointer rounded-xl border p-3 text-sm transition-colors duration-150 ease-out ${
-                              snapshot.isDragging ? 'shadow-lg border-[rgba(42,0,204,0.2)] bg-white' : 'border-gray-200 bg-white hover:border-[rgba(42,0,204,0.2)] hover:shadow-sm'
-                            }`}
-                          >
-                            <p className="pr-6 font-medium leading-snug text-gray-900">{deal.name ?? '—'}</p>
-                            {contact && (
-                              <p className="mt-0.5 text-xs text-gray-400">{contact}</p>
-                            )}
-                            <p className="mt-1 text-xs font-medium" style={{ color: '#2A00CC' }}>
-                              €{(deal.monetaryValue ?? 0).toLocaleString()}
-                            </p>
-                            {/* Delete button on hover */}
-                            <button
-                              onClick={(e) => handleDelete(deal.id, e)}
-                              className="absolute right-2 top-2 hidden h-5 w-5 items-center justify-center rounded text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500 group-hover:flex"
-                              title="Delete"
+                  <div className="flex-1 overflow-y-auto p-4">
+                    {stage.deals.map((deal, index) => {
+                      const contact = contactDisplayName(deal.contact)
+                      return (
+                        <Draggable key={deal.id} draggableId={deal.id} index={index}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              onClick={() => onDealClick?.(deal.id)}
+                              className={`group relative mb-3 cursor-pointer rounded-2xl border p-3.5 text-sm transition-all duration-200 ease-out ${
+                                snapshot.isDragging
+                                  ? 'z-10 border-brand/30 bg-white shadow-xl shadow-brand/10 ring-2 ring-brand/20'
+                                  : 'border-gray-200/90 bg-white shadow-sm hover:border-brand/25 hover:shadow-md'
+                              }`}
                             >
-                              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                                <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                              </svg>
-                            </button>
-                          </div>
-                        )}
-                      </Draggable>
-                    )
-                  })}
+                              <p className="pr-7 font-semibold leading-snug text-gray-900">{deal.name ?? '—'}</p>
+                              {contact && <p className="mt-1 text-xs text-gray-500">{contact}</p>}
+                              <p className="mt-1.5 text-xs font-bold tabular-nums text-brand">
+                                €{(deal.monetaryValue ?? 0).toLocaleString('it-IT')}
+                              </p>
+                              <button
+                                onClick={(e) => handleDelete(deal.id, e)}
+                                className="absolute right-2.5 top-2.5 hidden h-7 w-7 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500 group-hover:flex"
+                                title="Elimina"
+                                type="button"
+                              >
+                                <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
+                                  <path
+                                    d="M1 1l8 8M9 1L1 9"
+                                    stroke="currentColor"
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
+                        </Draggable>
+                      )
+                    })}
 
-                  {provided.placeholder}
+                    {provided.placeholder}
+                  </div>
                 </div>
               )}
             </Droppable>
@@ -197,10 +221,11 @@ export default function PipelineBoard({
         })}
       </div>
 
-      {/* Won / Lost drop zones — visible while dragging */}
       <div
-        className={`mt-4 grid grid-cols-2 gap-4 transition-colors duration-200 ${
-          isDragging ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none h-0 mt-0 overflow-hidden'
+        className={`grid grid-cols-2 gap-4 transition-all duration-300 ${
+          isDragging
+            ? 'mt-6 opacity-100'
+            : 'pointer-events-none mt-0 h-0 overflow-hidden opacity-0'
         }`}
       >
         {STATUS_ZONES.map((zone) => (
@@ -209,7 +234,7 @@ export default function PipelineBoard({
               <div
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className={`flex items-center justify-center rounded-2xl border-2 border-dashed py-6 text-sm font-bold transition-colors ${
+                className={`flex min-h-[4.5rem] items-center justify-center rounded-3xl border-2 border-dashed px-4 py-6 text-sm font-bold transition-colors ${
                   snapshot.isDraggingOver ? zone.activeColor : zone.color
                 }`}
               >

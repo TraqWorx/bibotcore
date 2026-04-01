@@ -1,5 +1,6 @@
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import DashboardClient from './_components/DashboardClient'
+import { sf } from '@/lib/simfonia/ui'
 
 export default async function CrmDashboard({
   searchParams,
@@ -11,8 +12,9 @@ export default async function CrmDashboard({
 
   if (!locationId) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-        <p className="text-sm text-gray-500">Nessuna location connessa. Riconnetti il tuo account GHL.</p>
+      <div className={sf.emptyPanel}>
+        <p className="text-sm font-medium text-gray-500">Nessuna location connessa.</p>
+        <p className="mt-1 text-xs text-gray-400">Riconnetti il tuo account GHL o seleziona una location valida.</p>
       </div>
     )
   }

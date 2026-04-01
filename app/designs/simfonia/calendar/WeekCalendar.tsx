@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { sf } from '@/lib/simfonia/ui'
 
 interface CalendarEvent {
   id: string
@@ -48,7 +49,11 @@ const STATUS_STYLE: Record<string, { bg: string; text: string; border: string }>
   showed: { bg: '#ECFDF5', text: '#047857', border: '#A7F3D0' },
   cancelled: { bg: '#FEF2F2', text: '#DC2626', border: '#FECACA' },
   noshow: { bg: '#F3F4F6', text: '#6B7280', border: '#E5E7EB' },
-  new: { bg: '#EEF2FF', text: '#2A00CC', border: 'rgba(42,0,204,0.2)' },
+  new: {
+    bg: 'color-mix(in srgb, var(--brand) 10%, white)',
+    text: 'var(--brand)',
+    border: 'color-mix(in srgb, var(--brand) 22%, #e5e7eb)',
+  },
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -106,19 +111,19 @@ export default function WeekCalendar({
   return (
     <div className="flex gap-6">
       {/* Calendar */}
-      <div className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white">
+      <div className={sf.calendarWeek}>
         {/* Navigation header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
           <p className="text-sm font-semibold text-gray-900">{formatDateRange(monday, sunday)}</p>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setWeekOffset(0)}
-              className="rounded-xl px-4 py-1.5 text-xs font-semibold transition-colors duration-150 ease-out"
-              style={
+              className={`rounded-xl px-4 py-1.5 text-xs font-semibold transition-colors duration-150 ease-out ${
                 weekOffset === 0
-                  ? { background: '#2A00CC', color: 'white' }
-                  : { background: 'white', color: '#6B7280', border: '1px solid #E5E7EB' }
-              }
+                  ? 'bg-brand text-white shadow-sm'
+                  : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+              }`}
             >
               Oggi
             </button>
@@ -155,7 +160,7 @@ export default function WeekCalendar({
               <div
                 key={i}
                 className={`border-r border-gray-200 p-3 text-center last:border-r-0 ${
-                  isToday ? 'bg-[#2A00CC]' : ''
+                  isToday ? 'bg-brand' : ''
                 }`}
               >
                 <p className={`text-xs font-semibold uppercase tracking-wide ${isToday ? 'text-white/70' : 'text-gray-400'}`}>
@@ -166,12 +171,9 @@ export default function WeekCalendar({
                 </p>
                 {count > 0 && (
                   <span
-                    className="mt-0.5 inline-block rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={
-                      isToday
-                        ? { background: 'rgba(255,255,255,0.2)', color: 'white' }
-                        : { background: 'rgba(42,0,204,0.08)', color: '#2A00CC' }
-                    }
+                    className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      isToday ? 'bg-white/20 text-white' : 'bg-brand/10 text-brand'
+                    }`}
                   >
                     {count}
                   </span>
@@ -236,24 +238,23 @@ export default function WeekCalendar({
       {/* Operatori sidebar */}
       {users.length > 0 && (
         <div className="w-52 shrink-0">
-          <div className="rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-4">
+          <div className={`${sf.card} ${sf.cardPadding}`}>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
               {isAdmin ? 'Operatori' : 'Il mio calendario'}
             </h3>
             <div className="space-y-1">
               {isAdmin && (
                 <button
+                  type="button"
                   onClick={() => setSelectedUserId(null)}
-                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors"
-                  style={
-                    !selectedUserId
-                      ? { background: 'rgba(42,0,204,0.08)', color: '#2A00CC' }
-                      : { color: '#6B7280' }
-                  }
+                  className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
+                    !selectedUserId ? 'bg-brand/10 text-brand' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
                 >
                   <span
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                    style={{ background: !selectedUserId ? '#2A00CC' : '#9CA3AF' }}
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
+                      !selectedUserId ? 'bg-brand' : 'bg-gray-400'
+                    }`}
                   >
                     T
                   </span>
@@ -271,17 +272,16 @@ export default function WeekCalendar({
                 return (
                   <button
                     key={user.id}
-                    onClick={() => isAdmin ? setSelectedUserId(isActive ? null : user.id) : undefined}
-                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${!isAdmin ? 'cursor-default' : ''}`}
-                    style={
-                      isActive
-                        ? { background: 'rgba(42,0,204,0.08)', color: '#2A00CC' }
-                        : { color: '#6B7280' }
-                    }
+                    type="button"
+                    onClick={() => (isAdmin ? setSelectedUserId(isActive ? null : user.id) : undefined)}
+                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
+                      !isAdmin ? 'cursor-default' : ''
+                    } ${isActive ? 'bg-brand/10 text-brand' : 'text-gray-600 hover:bg-gray-50'}`}
                   >
                     <span
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                      style={{ background: isActive ? '#2A00CC' : '#9CA3AF' }}
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
+                        isActive ? 'bg-brand' : 'bg-gray-400'
+                      }`}
                     >
                       {initials}
                     </span>

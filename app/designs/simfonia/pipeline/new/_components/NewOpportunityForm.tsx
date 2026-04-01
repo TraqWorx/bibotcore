@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { GhlPipeline } from '@/lib/ghl/ghlClient'
 import { createOpportunity } from '../_actions'
+import { sf } from '@/lib/simfonia/ui'
 
 interface ContactOption {
   id: string
@@ -88,10 +89,10 @@ export default function NewOpportunityForm({ pipelines, contacts, locationId, pr
     }
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)]'
+  const inputClass = `w-full px-4 py-2.5 text-sm text-gray-900 ${sf.input}`
 
   return (
-    <div className="max-w-lg rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-6">
+    <div className={`max-w-lg ${sf.card} ${sf.cardPadding} border-brand/15`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Contact selector */}
         <div ref={dropdownRef} className="relative">
@@ -100,8 +101,7 @@ export default function NewOpportunityForm({ pipelines, contacts, locationId, pr
             <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-2.5">
               <div className="flex items-center gap-2">
                 <span
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                  style={{ background: '#2A00CC' }}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white"
                 >
                   {selectedContact.name.charAt(0).toUpperCase()}
                 </span>
@@ -141,8 +141,7 @@ export default function NewOpportunityForm({ pipelines, contacts, locationId, pr
                     className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors"
                   >
                     <span
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
-                      style={{ background: '#2A00CC' }}
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-[9px] font-bold text-white"
                     >
                       {c.name.charAt(0).toUpperCase()}
                     </span>
@@ -221,19 +220,18 @@ export default function NewOpportunityForm({ pipelines, contacts, locationId, pr
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
-        <div className="flex gap-2 pt-2">
+        <div className="flex flex-wrap gap-3 border-t border-gray-200/60 pt-5">
           <button
             type="submit"
             disabled={saving}
-            className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40"
-            style={{ background: '#2A00CC' }}
+            className="rounded-2xl bg-brand px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40"
           >
-            {saving ? 'Salvataggio…' : 'Salva Opportunità'}
+            {saving ? 'Salvataggio…' : 'Salva opportunità'}
           </button>
           <button
             type="button"
             onClick={() => router.push(`/designs/simfonia/pipeline?locationId=${locationId}`)}
-            className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
+            className={sf.secondaryBtn}
           >
             Annulla
           </button>

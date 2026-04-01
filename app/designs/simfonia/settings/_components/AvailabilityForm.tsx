@@ -2,6 +2,11 @@
 
 import { useState } from 'react'
 import { saveUserAvailability, type AvailabilitySlot } from '../_actions'
+import { sf } from '@/lib/simfonia/ui'
+
+const accentFill = {
+  background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+} as const
 
 const DAY_LABELS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica']
 
@@ -74,10 +79,10 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6">
-      <h2 className="text-base font-bold text-gray-800">Disponibilità Collaboratori</h2>
-      <p className="mt-0.5 mb-4 text-xs text-gray-400">
-        Configura giorni e orari disponibili per ogni collaboratore
+    <div className={sf.formCard}>
+      <h2 className={sf.formTitle}>Disponibilità collaboratori</h2>
+      <p className={`${sf.formDesc} mb-4`}>
+        Configura giorni e orari disponibili per ogni collaboratore.
       </p>
 
       {/* User selector */}
@@ -88,12 +93,11 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
               key={u.id}
               type="button"
               onClick={() => { setSelectedUserId(u.id); setResult(null) }}
-              className="rounded-full border px-3 py-1 text-xs font-semibold transition-colors"
-              style={
+              className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
                 selectedUserId === u.id
-                  ? { background: '#2A00CC', color: 'white', borderColor: '#2A00CC' }
-                  : { background: 'white', color: '#6B7280', borderColor: '#e5e7eb' }
-              }
+                  ? 'border-brand bg-brand text-white shadow-sm'
+                  : 'border-gray-200/90 bg-white text-gray-600 hover:border-brand/25'
+              }`}
             >
               {u.name}
             </button>
@@ -110,8 +114,10 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
             {userSlots.map((slot) => (
               <div
                 key={slot.day_of_week}
-                className={`flex items-center gap-3 rounded-xl border px-4 py-2.5 transition-colors ${
-                  slot.enabled ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-60'
+                className={`flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-2.5 transition-colors ${
+                  slot.enabled
+                    ? 'border-gray-200/80 bg-white/90 backdrop-blur-sm shadow-sm'
+                    : 'border-gray-100 bg-gray-50/80 opacity-60'
                 }`}
               >
                 {/* Toggle */}
@@ -120,7 +126,7 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
                     type="checkbox"
                     checked={slot.enabled}
                     onChange={(e) => updateSlot(slot.day_of_week, 'enabled', e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300"
+                    className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand/20"
                   />
                 </label>
 
@@ -135,7 +141,7 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
                   value={slot.start_time}
                   onChange={(e) => updateSlot(slot.day_of_week, 'start_time', e.target.value)}
                   disabled={!slot.enabled}
-                  className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm disabled:opacity-40"
+                  className={`${sf.inputSm} w-auto disabled:opacity-40`}
                 />
                 <span className="text-xs text-gray-400">—</span>
                 <input
@@ -143,7 +149,7 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
                   value={slot.end_time}
                   onChange={(e) => updateSlot(slot.day_of_week, 'end_time', e.target.value)}
                   disabled={!slot.enabled}
-                  className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm disabled:opacity-40"
+                  className={`${sf.inputSm} w-auto disabled:opacity-40`}
                 />
               </div>
             ))}
@@ -156,10 +162,10 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="mt-4 w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
-            style={{ background: '#00F0FF' }}
+            className={`${sf.btnSave} mt-4 font-bold`}
+            style={accentFill}
           >
-            {saving ? 'Salvataggio...' : 'Salva Disponibilità'}
+            {saving ? 'Salvataggio…' : 'Salva disponibilità'}
           </button>
         </>
       )}

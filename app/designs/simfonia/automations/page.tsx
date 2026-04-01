@@ -1,6 +1,8 @@
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { createAdminClient } from '@/lib/supabase-server'
 import { getGhlClient } from '@/lib/ghl/ghlClient'
+import SimfoniaPageHeader from '../_components/SimfoniaPageHeader'
+import { sf } from '@/lib/simfonia/ui'
 
 interface Workflow {
   id: string
@@ -18,8 +20,8 @@ export default async function AutomationsPage({
 
   if (!locationId) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-        <p className="text-sm text-gray-500">Nessuna location connessa.</p>
+      <div className={`${sf.emptyPanel}`}>
+        <p className="text-sm font-medium text-gray-500">Nessuna location connessa.</p>
       </div>
     )
   }
@@ -43,25 +45,26 @@ export default async function AutomationsPage({
   const draft = workflows.filter((w) => w.status === 'draft')
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Automazioni</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Workflow attivi configurati in Bibot
-        </p>
-      </div>
+    <div className="space-y-8">
+      <SimfoniaPageHeader
+        eyebrow="Workflow"
+        title="Automazioni"
+        description="Stato dei workflow GoHighLevel collegati a questa location (sola lettura)."
+      />
 
       {workflows.length === 0 ? (
-        <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-sm">
-          <p className="text-sm text-gray-400">Nessun workflow trovato. Crea i workflow direttamente in Bibot.</p>
+        <div className={`${sf.card} ${sf.cardPadding} text-center`}>
+          <p className="text-sm text-gray-500">
+            Nessun workflow trovato. Crealo e pubblicalo da Bibot.
+          </p>
         </div>
       ) : (
         <>
           {/* Active workflows */}
           {active.length > 0 && (
-            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-              <div className="border-b border-gray-100 bg-gray-50/50 px-5 py-3">
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+            <div className={`${sf.card} overflow-hidden p-0 shadow-md`}>
+              <div className="border-b border-gray-200/80 bg-gray-50/80 px-5 py-3.5 backdrop-blur-sm">
+                <h2 className={sf.sectionLabel}>
                   Attivi ({active.length})
                 </h2>
               </div>
@@ -90,9 +93,9 @@ export default async function AutomationsPage({
 
           {/* Draft workflows */}
           {draft.length > 0 && (
-            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-              <div className="border-b border-gray-100 bg-gray-50/50 px-5 py-3">
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+            <div className={`${sf.card} overflow-hidden p-0 shadow-md`}>
+              <div className="border-b border-gray-200/80 bg-gray-50/80 px-5 py-3.5 backdrop-blur-sm">
+                <h2 className={sf.sectionLabel}>
                   Bozze ({draft.length})
                 </h2>
               </div>
@@ -120,9 +123,9 @@ export default async function AutomationsPage({
         </>
       )}
 
-      <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
-        <p className="text-xs text-gray-400">
-          Le automazioni vengono create e gestite direttamente in Bibot. Questa pagina mostra solo lo stato attuale.
+      <div className={`${sf.cardMuted} px-5 py-4`}>
+        <p className="text-xs leading-relaxed text-gray-500">
+          Le automazioni si gestiscono in Bibot. Qui vedi solo uno snapshot dello stato.
         </p>
       </div>
     </div>

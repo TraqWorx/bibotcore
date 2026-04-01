@@ -2,6 +2,7 @@ import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { createAdminClient } from '@/lib/supabase-server'
 import { listPipelines } from '@/lib/data/pipelines'
 import NewOpportunityForm from './_components/NewOpportunityForm'
+import SimfoniaPageHeader from '../../_components/SimfoniaPageHeader'
 
 export default async function NewOpportunityPage({
   searchParams,
@@ -35,8 +36,12 @@ export default async function NewOpportunityPage({
   const preselectedStageId = typeof sp.stageId === 'string' ? sp.stageId : undefined
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Nuova Opportunità</h1>
+    <div className="space-y-8">
+      <SimfoniaPageHeader
+        eyebrow="Vendite"
+        title="Nuova opportunità"
+        description="Collega un contatto, scegli pipeline e stadio, oppure crea un deal rapido."
+      />
       <NewOpportunityForm
         pipelines={pipelines}
         contacts={contacts}

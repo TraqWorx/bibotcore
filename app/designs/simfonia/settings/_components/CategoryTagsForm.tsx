@@ -1,8 +1,13 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { saveCategoryTags, createLocationTag, deleteLocationTag } from '../_actions'
+import { saveCategoryTags, createLocationTag } from '../_actions'
 import { type CategoryDef } from '@/lib/utils/categoryFields'
+import { sf } from '@/lib/simfonia/ui'
+
+const accentFill = {
+  background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+} as const
 
 interface TagInfo {
   id: string
@@ -102,8 +107,8 @@ export default function CategoryTagsForm({ locationId, categories, allTags: init
         const selected = categoryTags[cat.label] ?? []
         const unselected = allTags.filter((t) => !selected.includes(t.name))
         return (
-          <div key={cat.slug} className="rounded-xl border border-gray-100 bg-white p-4">
-            <p className="mb-3 text-sm font-bold text-gray-700">{cat.label}</p>
+          <div key={cat.slug} className="rounded-2xl border border-gray-200/60 bg-white/90 p-4 shadow-sm backdrop-blur-sm">
+            <p className="mb-3 text-sm font-bold text-gray-900">{cat.label}</p>
 
             {/* Selected tags for this category */}
             {selected.length > 0 && (
@@ -111,7 +116,7 @@ export default function CategoryTagsForm({ locationId, categories, allTags: init
                 {selected.map((tagName) => (
                   <span
                     key={tagName}
-                    className="inline-flex items-center gap-1 rounded-full border border-[#2A00CC] bg-[rgba(42,0,204,0.08)] px-2.5 py-1 text-xs font-medium text-[#2A00CC]"
+                    className="inline-flex items-center gap-1 rounded-full border border-brand/35 bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand"
                   >
                     {tagName}
                     <button
@@ -134,7 +139,7 @@ export default function CategoryTagsForm({ locationId, categories, allTags: init
                     key={tag.id}
                     type="button"
                     onClick={() => toggleTag(cat.label, tag.name)}
-                    className="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-50 transition-colors"
+                    className="rounded-full border border-gray-200/90 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:border-brand/25 hover:bg-brand/5"
                   >
                     + {tag.name}
                   </button>
@@ -155,14 +160,13 @@ export default function CategoryTagsForm({ locationId, categories, allTags: init
                   }
                 }}
                 placeholder="Crea nuovo tag..."
-                className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+                className={`${sf.inputSm} flex-1 text-xs`}
               />
               <button
                 type="button"
                 onClick={() => handleCreateTag(cat.label)}
                 disabled={isPending}
-                className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50"
-                style={{ background: '#2A00CC' }}
+                className={`${sf.btnBrand} shrink-0 px-3 py-1.5 text-xs`}
               >
                 + Crea
               </button>
@@ -181,10 +185,10 @@ export default function CategoryTagsForm({ locationId, categories, allTags: init
         type="button"
         onClick={handleSave}
         disabled={isPending}
-        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
-        style={{ background: '#00F0FF' }}
+        className={`${sf.btnSave} font-bold`}
+        style={accentFill}
       >
-        {isPending ? 'Salvataggio...' : 'Salva Associazioni Tag'}
+        {isPending ? 'Salvataggio…' : 'Salva associazioni tag'}
       </button>
     </div>
   )

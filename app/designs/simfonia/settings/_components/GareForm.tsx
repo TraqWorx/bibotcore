@@ -2,6 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { saveGareMensili, type GaraRow } from '../_actions'
+import { sf } from '@/lib/simfonia/ui'
+
+const accentFill = {
+  background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+} as const
 
 interface Props {
   locationId: string
@@ -58,10 +63,10 @@ export default function GareForm({ locationId, month, initialRows, gestoriOption
       </div>
 
       {rows.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-gray-200">
+        <div className={sf.tableShell}>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
+              <tr className={sf.tableHeadRow}>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                   Gestore
                 </th>
@@ -75,7 +80,7 @@ export default function GareForm({ locationId, month, initialRows, gestoriOption
               {rows.map((row, i) => (
                 <tr key={row.tag} className="hover:bg-gray-50/50">
                   <td className="px-4 py-2.5">
-                    <span className="inline-flex items-center rounded-full border border-[rgba(42,0,204,0.2)] bg-[rgba(42,0,204,0.05)] px-3 py-1 text-xs font-semibold" style={{ color: '#2A00CC' }}>
+                    <span className="inline-flex items-center rounded-full border border-brand/25 bg-brand/5 px-3 py-1 text-xs font-semibold text-brand">
                       {row.categoria}
                     </span>
                   </td>
@@ -85,7 +90,7 @@ export default function GareForm({ locationId, month, initialRows, gestoriOption
                       min="0"
                       value={row.obiettivo}
                       onChange={(e) => updateObiettivo(i, parseInt(e.target.value) || 0)}
-                      className="w-24 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+                      className={`w-24 ${sf.inputSm} font-semibold`}
                     />
                   </td>
                   <td className="px-4 py-2 text-center">
@@ -118,10 +123,10 @@ export default function GareForm({ locationId, month, initialRows, gestoriOption
         type="button"
         onClick={handleSave}
         disabled={isPending}
-        className="w-full rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50"
-        style={{ background: '#00F0FF' }}
+        className={`${sf.btnSave} font-bold`}
+        style={accentFill}
       >
-        {isPending ? 'Salvataggio...' : 'Salva Gare'}
+        {isPending ? 'Salvataggio…' : 'Salva gare'}
       </button>
     </div>
   )
@@ -157,12 +162,12 @@ function GestoreSelector({ availableGestori, onSelect }: { availableGestori: str
             if (e.key === 'Escape') setOpen(false)
           }}
           placeholder="Cerca gestore per aggiungere gara..."
-          className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
+          className={`flex-1 ${sf.inputFull} py-2`}
         />
       </div>
 
       {open && filtered.length > 0 && (
-        <div className="absolute left-0 right-0 z-10 mt-1 max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+        <div className="absolute left-0 right-0 z-10 mt-1 max-h-48 overflow-y-auto rounded-2xl border border-gray-200/80 bg-white/95 shadow-xl backdrop-blur-sm">
           {filtered.map((g) => (
             <button
               key={g}
@@ -178,7 +183,7 @@ function GestoreSelector({ availableGestori, onSelect }: { availableGestori: str
       )}
 
       {open && query && filtered.length === 0 && (
-        <div className="absolute left-0 right-0 z-10 mt-1 rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
+        <div className="absolute left-0 right-0 z-10 mt-1 rounded-2xl border border-gray-200/80 bg-white/95 p-3 shadow-xl backdrop-blur-sm">
           <p className="text-xs text-gray-400">Nessun gestore trovato per &quot;{query}&quot;</p>
         </div>
       )}

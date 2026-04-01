@@ -22,6 +22,8 @@ import UniqueFieldsForm from './_components/UniqueFieldsForm'
 import TeamManager from './_components/TeamManager'
 import PortalSettingsForm from './_components/PortalSettingsForm'
 import AiReceptionistToggle from './_components/AiReceptionistToggle'
+import SimfoniaPageHeader from '../_components/SimfoniaPageHeader'
+import { sf } from '@/lib/simfonia/ui'
 
 interface GhlUser {
   id: string
@@ -126,9 +128,9 @@ export default async function SettingsPage({
       content: (
         <div className="space-y-6">
           <TargetForm locationId={locationId} currentTarget={currentTarget} />
-          <div className="rounded-2xl border border-gray-200 bg-white p-6">
-            <h2 className="text-base font-bold text-gray-800">Gare Mensili</h2>
-            <p className="mt-1 mb-5 text-sm text-gray-500">
+          <div className={sf.formCard}>
+            <h2 className={sf.formTitle}>Gare mensili</h2>
+            <p className={`${sf.formDesc} mb-5`}>
               Imposta gli obiettivi mensili per operatore/categoria.
             </p>
             <GareForm
@@ -146,19 +148,19 @@ export default async function SettingsPage({
       label: 'Contatti',
       content: (
         <div className="space-y-6">
-          <div className="rounded-2xl border border-gray-200 bg-white p-6">
-            <h2 className="text-base font-bold text-gray-800">Tags</h2>
-            <p className="mt-1 mb-5 text-sm text-gray-500">Gestisci i tag per questa location.</p>
+          <div className={sf.formCard}>
+            <h2 className={sf.formTitle}>Tag</h2>
+            <p className={`${sf.formDesc} mb-5`}>Gestisci i tag per questa location.</p>
             <TagsManager locationId={locationId} initialTags={locationTags} />
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-6">
-            <h2 className="text-base font-bold text-gray-800">Tag per Categoria</h2>
-            <p className="mt-1 mb-5 text-sm text-gray-500">Associa tag alle categorie per filtri e creazione contatti.</p>
+          <div className={sf.formCard}>
+            <h2 className={sf.formTitle}>Tag per categoria</h2>
+            <p className={`${sf.formDesc} mb-5`}>Associa tag alle categorie per filtri e creazione contatti.</p>
             <CategoryTagsForm locationId={locationId} categories={categories} allTags={ghlTagsWithIds} initialCategoryTags={categoryTagsMap} />
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-6">
-            <h2 className="text-base font-bold text-gray-800">Campi Univoci</h2>
-            <p className="mt-1 mb-5 text-sm text-gray-500">Campi che devono avere valori unici tra i contatti (es. POD, PDR).</p>
+          <div className={sf.formCard}>
+            <h2 className={sf.formTitle}>Campi univoci</h2>
+            <p className={`${sf.formDesc} mb-5`}>Campi che devono avere valori unici tra i contatti (es. POD, PDR).</p>
             <UniqueFieldsForm locationId={locationId} customFields={customFields} initialUniqueFieldIds={uniqueFieldIds} />
           </div>
         </div>
@@ -168,9 +170,9 @@ export default async function SettingsPage({
       id: 'provvigioni',
       label: 'Provvigioni',
       content: (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <h2 className="text-base font-bold text-gray-800">Calcolatore Provvigioni</h2>
-          <p className="mt-1 mb-5 text-sm text-gray-500">Configura i tipi di provvigione con importo fisso o percentuale.</p>
+        <div className={sf.formCard}>
+          <h2 className={sf.formTitle}>Calcolatore provvigioni</h2>
+          <p className={`${sf.formDesc} mb-5`}>Configura i tipi di provvigione con importo fisso o percentuale.</p>
           <ProvvigioniForm locationId={locationId} initialRows={provvigioniRows} />
         </div>
       ),
@@ -203,11 +205,12 @@ export default async function SettingsPage({
   ]
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Impostazioni</h1>
-        <p className="mt-0.5 text-sm text-gray-500">Configurazione per questa location</p>
-      </div>
+    <div className="max-w-4xl space-y-8">
+      <SimfoniaPageHeader
+        eyebrow="Configurazione"
+        title="Impostazioni"
+        description="Target, team, portale, tema e regole operative per questa location."
+      />
 
       <SettingsTabs tabs={tabs} />
     </div>

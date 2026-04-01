@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { sf } from '@/lib/simfonia/ui'
 
 interface UserRole {
   userId: string
@@ -52,7 +53,7 @@ export default function TeamManager({ locationId }: { locationId: string }) {
   }
 
   if (loading) {
-    return <div className="h-20 animate-pulse rounded-xl bg-gray-50" />
+    return <div className="h-20 animate-pulse rounded-2xl bg-gray-100/80" />
   }
 
   return (
@@ -68,18 +69,20 @@ export default function TeamManager({ locationId }: { locationId: string }) {
       {users.length === 0 ? (
         <p className="text-xs text-gray-400">Nessun membro del team trovato.</p>
       ) : (
-        <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
+        <div className={`${sf.tableShell} divide-y divide-gray-100/90`}>
           {users.map((u) => (
-            <div key={u.userId} className="flex items-center justify-between px-4 py-3">
-              <span className="text-sm font-medium text-gray-700">{u.email}</span>
+            <div key={u.userId} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
+              <span className="text-sm font-medium text-gray-800">{u.email}</span>
               <select
                 value={u.role}
                 onChange={(e) => handleRoleChange(u.userId, e.target.value)}
                 disabled={updating === u.userId}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold outline-none ${
-                  u.role === 'location_admin' ? 'border-purple-200 bg-purple-50 text-purple-700' :
-                  u.role === 'viewer' ? 'border-gray-200 bg-gray-50 text-gray-600' :
-                  'border-blue-200 bg-blue-50 text-blue-700'
+                className={`rounded-xl border px-3 py-1.5 text-xs font-semibold outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/15 ${
+                  u.role === 'location_admin'
+                    ? 'border-brand/30 bg-brand/8 text-brand'
+                    : u.role === 'viewer'
+                      ? 'border-gray-200/90 bg-gray-50/90 text-gray-600'
+                      : 'border-sky-200/80 bg-sky-50/90 text-sky-800'
                 }`}
               >
                 {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}

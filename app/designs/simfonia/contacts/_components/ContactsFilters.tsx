@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, useRef, useEffect } from 'react'
 import { type CategoryDef } from '@/lib/utils/categoryFields'
+import { sf } from '@/lib/simfonia/ui'
 
 interface Props {
   locationId: string
@@ -86,7 +87,7 @@ export default function ContactsFilters({
   const hasFilters = !!(activeCategory || activeTag || activeGestore || dateFrom || dateTo || scadenzaFrom || scadenzaTo || search)
 
   return (
-    <div className="space-y-3">
+    <div className={`${sf.panel} space-y-4`}>
       {/* Search bar */}
       <div className="relative">
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
@@ -100,7 +101,7 @@ export default function ContactsFilters({
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           placeholder="Cerca per nome, email, telefono..."
-          className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-24 text-sm outline-none transition-colors placeholder:text-gray-400 focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.1)]"
+          className={`w-full py-2.5 pl-10 pr-24 text-sm ${sf.input}`}
         />
         <div className="absolute inset-y-0 right-0 flex items-center gap-1 pr-1.5">
           {search && (
@@ -114,8 +115,9 @@ export default function ContactsFilters({
             </button>
           )}
           <button
+            type="button"
             onClick={handleSearch}
-            className="rounded-lg bg-[#2A00CC] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#2200aa]"
+            className="rounded-xl bg-brand px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:brightness-110"
           >
             Cerca
           </button>
@@ -132,7 +134,7 @@ export default function ContactsFilters({
                 onClick={() => navigate({ category: null, tag: null, gestore: null, scadenzaFrom: null, scadenzaTo: null })}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
                   selectedSlugs.length === 0
-                    ? 'border-[#2A00CC] bg-[#2A00CC] text-white shadow-sm'
+                    ? 'border-brand bg-brand text-white shadow-sm'
                     : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
                 }`}
               >
@@ -190,7 +192,7 @@ export default function ContactsFilters({
               onChange={(e) => navigate({ gestore: e.target.value || null })}
               className={`appearance-none rounded-full border py-1.5 pl-3 pr-7 text-xs font-semibold outline-none transition-colors ${
                 activeGestore
-                  ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.05)] text-[#2A00CC]'
+                  ? 'border-brand/35 bg-brand/5 text-brand'
                   : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
               }`}
             >
@@ -212,7 +214,7 @@ export default function ContactsFilters({
           onClick={() => setShowDates(!showDates)}
           className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
             dateFrom || dateTo || scadenzaFrom || scadenzaTo
-              ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.05)] text-[#2A00CC]'
+              ? 'border-brand/35 bg-brand/5 text-brand'
               : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
           }`}
         >
@@ -363,21 +365,21 @@ function DateRangeGroup({
             type="date"
             value={fromValue}
             onChange={(e) => onFromChange(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none transition-colors focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.1)]"
+            className="rounded-xl border border-gray-200/90 bg-white px-2.5 py-1.5 text-xs outline-none transition-colors focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
           />
           <span className="text-[10px] text-gray-400">—</span>
           <input
             type="date"
             value={toValue}
             onChange={(e) => onToChange(e.target.value)}
-            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none transition-colors focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.1)]"
+            className="rounded-xl border border-gray-200/90 bg-white px-2.5 py-1.5 text-xs outline-none transition-colors focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
           />
         </div>
       </div>
       <button
         onClick={onApply}
         disabled={!canApply}
-        className="rounded-lg bg-[#2A00CC] px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#2200aa] disabled:opacity-30"
+        className="rounded-xl bg-brand px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-30"
       >
         Applica
       </button>
@@ -440,7 +442,7 @@ function TagMultiSelect({
         onClick={() => setOpen(!open)}
         className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
           selectedTags.length > 0
-            ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.05)] text-[#2A00CC]'
+            ? 'border-brand/35 bg-brand/5 text-brand'
             : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
         }`}
       >
@@ -463,7 +465,7 @@ function TagMultiSelect({
               value={tagSearch}
               onChange={(e) => setTagSearch(e.target.value)}
               placeholder="Cerca tag..."
-              className="w-full rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1.5 text-xs outline-none placeholder:text-gray-400 focus:border-[#2A00CC]"
+              className="w-full rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-1.5 text-xs outline-none placeholder:text-gray-400 focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
               autoFocus
             />
           </div>
@@ -497,11 +499,11 @@ function TagMultiSelect({
                   }`}
                 >
                   <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[9px] transition-colors ${
-                    isSelected ? 'border-[#2A00CC] bg-[#2A00CC] text-white' : 'border-gray-300'
+                    isSelected ? 'border-brand bg-brand text-white' : 'border-gray-300'
                   }`}>
                     {isSelected ? '✓' : ''}
                   </span>
-                  <span className={isSelected ? 'text-[#2A00CC]' : 'text-gray-700'}>{tag}</span>
+                  <span className={isSelected ? 'text-brand' : 'text-gray-700'}>{tag}</span>
                 </button>
               )
             })}

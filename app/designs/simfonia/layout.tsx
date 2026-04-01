@@ -5,6 +5,7 @@ import { DEFAULT_THEME, DEFAULT_MODULES, type DesignTheme, type DesignModules } 
 import GymSidebar from './_components/GymSidebar'
 import LocationSwitcher from './_components/LocationSwitcher'
 import AiChat from './_components/AiChat'
+import './shell.css'
 
 /**
  * Cached layout data loader — React `cache()` deduplicates across
@@ -90,26 +91,25 @@ const getLayoutData = cache(async () => {
 export default async function CrmLayout({ children }: { children: React.ReactNode }) {
   const { locations, currentLocationId, finalTheme, finalModules } = await getLayoutData()
 
-  const cssVars = `:root { --brand: ${finalTheme.primaryColor}; --accent: ${finalTheme.secondaryColor}; }`
+  const cssVars = `:root { --brand: ${finalTheme.primaryColor}; --accent: ${finalTheme.secondaryColor}; --foreground: #0f0f1a; }`
 
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: cssVars }} />
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="simfonia-shell flex min-h-screen">
         <GymSidebar theme={finalTheme} modules={finalModules} locationId={currentLocationId} />
-        <div className="flex flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-gray-200 bg-white px-8 py-3">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+          <header className="app-top-bar flex items-center justify-between px-6 py-3.5 sm:px-8">
             <Suspense fallback={null}>
               <LocationSwitcher
                 locations={locations}
                 currentLocationId={currentLocationId}
               />
             </Suspense>
-            <div className="flex items-center gap-4">
-            </div>
+            <div className="flex items-center gap-4" />
           </header>
-          <main className="flex-1 p-8">
-            <div className="mx-auto max-w-7xl">{children}</div>
+          <main className="flex-1 px-5 py-7 sm:px-8 sm:py-10">
+            <div className="mx-auto w-full max-w-7xl">{children}</div>
           </main>
         </div>
       </div>

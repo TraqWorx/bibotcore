@@ -3,6 +3,7 @@ import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { createAdminClient } from '@/lib/supabase-server'
 import { getOpportunitiesByContact } from '@/lib/data/opportunities'
 import { listPipelines } from '@/lib/data/pipelines'
+import { sf } from '@/lib/simfonia/ui'
 
 interface CalendarEvent {
   id: string
@@ -23,7 +24,11 @@ export default async function ContactProfilePage({
   const sp = await searchParams
   const locationId = await getActiveLocation(sp).catch(() => null)
   if (!locationId) {
-    return <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center"><p className="text-sm text-gray-500">Location non trovata.</p></div>
+    return (
+      <div className={`${sf.emptyPanel}`}>
+        <p className="text-sm font-medium text-gray-500">Location non trovata.</p>
+      </div>
+    )
   }
 
   const sb = createAdminClient()
@@ -90,16 +95,19 @@ export default async function ContactProfilePage({
   }
 
   return (
-    <div className="space-y-6">
-      <Link href={`/designs/simfonia/contacts${q}`} className="inline-flex items-center gap-1 text-sm font-medium" style={{ color: '#2A00CC' }}>
+    <div className="space-y-8">
+      <Link
+        href={`/designs/simfonia/contacts${q}`}
+        className="inline-flex items-center gap-2 text-sm font-bold text-brand transition hover:underline hover:underline-offset-4"
+      >
         ← Contatti
       </Link>
 
       {/* Header */}
-      <div className="rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-6 shadow-sm">
+      <div className={`${sf.card} ${sf.cardPadding} border-brand/15`}>
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{fullName}</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">{fullName}</h1>
             <div className="mt-2 space-y-1 text-sm text-gray-500">
               {contact?.email && <p>✉ {contact.email}</p>}
               {contact?.phone && <p>📞 {contact.phone}</p>}
@@ -126,8 +134,8 @@ export default async function ContactProfilePage({
       {/* Custom fields */}
       {customFields.length > 0 && (
         <section>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">Campi Personalizzati</h2>
-          <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <h2 className={`mb-3 ${sf.sectionLabel}`}>Campi personalizzati</h2>
+          <div className={`${sf.card} overflow-hidden p-0`}>
             <dl className="divide-y divide-gray-50">
               {customFields.map((field) => (
                 <div key={field.id} className="flex items-center gap-4 px-5 py-3">
@@ -145,8 +153,8 @@ export default async function ContactProfilePage({
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Opportunities */}
         <section>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">Opportunità</h2>
-          <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <h2 className={`mb-3 ${sf.sectionLabel}`}>Opportunità</h2>
+          <div className={`${sf.card} overflow-hidden p-0`}>
             {cachedOpps.length === 0 ? (
               <p className="p-6 text-sm text-gray-400">Nessuna opportunità.</p>
             ) : (
@@ -178,8 +186,8 @@ export default async function ContactProfilePage({
 
         {/* Appointments */}
         <section>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">Appuntamenti</h2>
-          <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <h2 className={`mb-3 ${sf.sectionLabel}`}>Appuntamenti</h2>
+          <div className={`${sf.card} overflow-hidden p-0`}>
             {events.length === 0 ? (
               <p className="p-6 text-sm text-gray-400">Nessun appuntamento.</p>
             ) : (
@@ -221,10 +229,10 @@ export default async function ContactProfilePage({
       {/* Conversations */}
       {conversations.length > 0 && (
         <section>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-400">Messaggi recenti</h2>
-          <div className="space-y-2">
+          <h2 className={`mb-3 ${sf.sectionLabel}`}>Messaggi recenti</h2>
+          <div className="space-y-3">
             {conversations.map((conv) => (
-              <div key={conv.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div key={conv.id} className={`${sf.card} ${sf.cardPadding}`}>
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-sm text-gray-700">{conv.lastMessageBody ?? '—'}</p>
                   <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">

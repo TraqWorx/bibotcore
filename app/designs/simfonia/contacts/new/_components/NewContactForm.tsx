@@ -16,6 +16,9 @@ import {
   SHARED_CATEGORIES,
   type CustomFieldDef,
 } from '@/lib/utils/categoryFields'
+import SegmentedControl from '../../../_components/SegmentedControl'
+import SimfoniaPageHeader from '../../../_components/SimfoniaPageHeader'
+import { sf } from '@/lib/simfonia/ui'
 
 interface Props {
   locationId: string
@@ -213,7 +216,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
     }
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors'
+  const inputClass = `w-full px-4 py-2.5 text-sm ${sf.input}`
 
   const CATEGORY_ACCENT: Record<string, { bg: string; border: string; text: string; dot: string }> = {
     telefonia:       { bg: 'bg-blue-50',    border: 'border-blue-200',    text: 'text-blue-700',    dot: 'bg-blue-400' },
@@ -224,18 +227,19 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
   const DEFAULT_ACCENT = { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700', dot: 'bg-gray-400' }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Nuovo Contatto</h1>
-        <p className="mt-0.5 text-sm text-gray-500">Crea un nuovo contatto</p>
-      </div>
+    <div className="space-y-8">
+      <SimfoniaPageHeader
+        eyebrow="Anagrafica"
+        title="Nuovo contatto"
+        description="Compila i campi generali e assegna una o più categorie per salvare su GHL."
+      />
 
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-5">
           {/* LEFT PANEL — Dati Generali + Anagrafica (3 cols) */}
           <div className="lg:col-span-3 space-y-5">
-            <div className="rounded-2xl border border-gray-200/60 bg-white p-6 shadow-sm">
-              <h3 className="mb-4 text-sm font-bold text-gray-800">Dati Generali</h3>
+            <div className={`${sf.card} ${sf.cardPadding}`}>
+              <h3 className="mb-4 text-sm font-bold text-gray-800">Dati generali</h3>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -267,7 +271,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
 
             {/* Anagrafica card */}
             {anagraficaFields.length > 0 && (
-              <div className="rounded-2xl border border-gray-200/60 bg-white p-6 shadow-sm">
+              <div className={`${sf.card} ${sf.cardPadding}`}>
                 <h3 className="mb-4 text-sm font-bold text-gray-800">Anagrafica</h3>
                 <div className="space-y-4">
                   {anagraficaFields.map((cf) => {
@@ -297,7 +301,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
           {/* RIGHT PANEL — Categoria + Category fields (2 cols) */}
           <div className="lg:col-span-2 space-y-5">
             {/* Categoria picker card */}
-            <div className="rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-6 shadow-sm">
+            <div className={`${sf.card} ${sf.cardPadding} border-brand/15`}>
               <h3 className="mb-4 text-sm font-bold text-gray-800">Categoria *</h3>
               <div className="grid grid-cols-2 gap-2">
                 {categories.map((cat) => {
@@ -322,20 +326,23 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
 
             {/* Category-specific fields — appears when categories selected */}
             {selectedCategories.length > 0 && (
-              <div className="rounded-2xl border border-gray-200/60 bg-white p-6 shadow-sm space-y-4">
+              <div className={`${sf.card} ${sf.cardPadding} space-y-4`}>
                 {/* Category tabs */}
                 {selectedCategories.length > 1 && (
-                  <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
-                    {selectedCategories.map((slug) => {
-                      const cat = categories.find((c) => c.slug === slug)
-                      if (!cat) return null
-                      return (
-                        <button key={slug} type="button" onClick={() => setCfTab(cat.label)} className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap" style={cfTab === cat.label ? { background: '#2A00CC', color: 'white' } : { color: '#6B7280' }}>
-                          {cat.label}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <SegmentedControl
+                    size="sm"
+                    ariaLabel="Categoria campi"
+                    items={selectedCategories
+                      .map((slug) => {
+                        const cat = categories.find((c) => c.slug === slug)
+                        return cat ? { value: cat.label, label: cat.label } : null
+                      })
+                      .filter((x): x is { value: string; label: string } => x !== null)}
+                    value={cfTab ?? categories.find((c) => selectedCategories.includes(c.slug))?.label ?? ''}
+                    onChange={(v) => setCfTab(v)}
+                    scrollable={selectedCategories.length > 3}
+                    equalWidth={false}
+                  />
                 )}
 
                 {/* Dropdown fields */}
@@ -398,13 +405,13 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
                           <label className="block text-xs font-semibold uppercase tracking-widest text-gray-400">Tag</label>
                           <div className="flex flex-wrap gap-1.5">
                             {tags.filter((t) => catTags.includes(t)).map((tag) => (
-                              <span key={tag} className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: '#2A00CC', color: 'white' }}>
+                              <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-brand px-2.5 py-0.5 text-xs font-semibold text-white">
                                 {tag}
                                 <button type="button" onClick={() => setTags((prev) => prev.filter((t) => t !== tag))} className="ml-0.5 text-current opacity-50 hover:opacity-100">&times;</button>
                               </span>
                             ))}
                             {catTags.filter((t) => !tags.includes(t)).map((tag) => (
-                              <button key={tag} type="button" onClick={() => toggleTag(tag)} className="rounded-full border border-dashed border-gray-300 bg-white px-2.5 py-0.5 text-[11px] font-medium text-gray-500 transition-colors hover:border-[#2A00CC] hover:text-[#2A00CC]">
+                              <button key={tag} type="button" onClick={() => toggleTag(tag)} className="rounded-full border border-dashed border-gray-300 bg-white px-2.5 py-0.5 text-[11px] font-medium text-gray-500 transition-colors hover:border-brand/40 hover:text-brand">
                                 + {tag}
                               </button>
                             ))}
@@ -417,7 +424,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
                               onChange={(e) => setNewTag(e.target.value)}
                               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addNewTag() } }}
                               placeholder="Aggiungi tag..."
-                              className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
+                              className="flex-1 rounded-xl border border-gray-200/90 bg-white px-3 py-1.5 text-xs outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
                             />
                             <button
                               type="button"
@@ -463,25 +470,27 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-6 flex items-center gap-3">
+        <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-gray-200/60 pt-6">
           {error && (
-            <p className="flex-1 text-sm font-medium text-red-600">{error}</p>
+            <p className="min-w-0 flex-1 text-sm font-medium text-red-600">{error}</p>
           )}
-          <div className={`flex gap-3 ${error ? '' : 'ml-auto'}`}>
+          <div className={`flex flex-wrap gap-3 ${error ? '' : 'ml-auto'}`}>
             <button
               type="button"
               onClick={() => router.push(`/designs/simfonia/contacts?locationId=${locationId}`)}
-              className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
+              className={sf.secondaryBtn}
             >
               Annulla
             </button>
             <button
               type="submit"
               disabled={saving || selectedCategories.length === 0}
-              className="rounded-xl px-8 py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50 shadow-sm"
-              style={{ background: '#00F0FF' }}
+              className={`${sf.primaryBtn} px-8 disabled:opacity-45`}
+              style={{
+                background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+              }}
             >
-              {saving ? 'Salvataggio...' : 'Crea Contatto'}
+              {saving ? 'Salvataggio…' : 'Crea contatto'}
             </button>
           </div>
         </div>

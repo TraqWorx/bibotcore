@@ -11,6 +11,8 @@ import {
   createTask,
   completeTask,
 } from './_actions'
+import SegmentedControl from '../_components/SegmentedControl'
+import { sf } from '@/lib/simfonia/ui'
 
 type Tab = 'details' | 'messages' | 'notes' | 'tasks' | 'activity'
 
@@ -69,7 +71,7 @@ interface DealData {
 }
 
 const USER_COLORS = [
-  '#2A00CC', '#e11d48', '#059669', '#d97706', '#7c3aed',
+  'var(--brand)', '#e11d48', '#059669', '#d97706', '#7c3aed',
   '#0891b2', '#c026d3', '#dc2626', '#4f46e5', '#0d9488',
 ]
 function getUserColor(userId: string): string {
@@ -114,7 +116,7 @@ function formatTime(d: string) {
   return date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
 }
 
-const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors'
+const inputClass = sf.inputFull
 
 export default function DealDrawer({
   dealId,
@@ -331,8 +333,7 @@ export default function DealDrawer({
             <div className="flex items-center gap-5">
               {/* Avatar */}
               <div
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-bold text-white shadow-sm"
-                style={{ background: 'linear-gradient(135deg, #2A00CC 0%, #5B3AFF 100%)' }}
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-violet-600 text-lg font-bold text-white shadow-sm"
               >
                 {initials}
               </div>
@@ -360,29 +361,24 @@ export default function DealDrawer({
 
           {/* Tabs */}
           {!loading && data?.opportunity && (
-            <div className="mt-5 flex gap-1 rounded-xl bg-gray-100/80 p-1">
-              {TABS.map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors ${
-                    tab === t.key
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {t.icon}
-                  {t.label}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              className="mt-6"
+              tablist
+              tabIdPrefix="deal-tab"
+              ariaLabel="Sezioni opportunità"
+              stackedIcons
+              scrollable
+              items={TABS.map((t) => ({ value: t.key, label: t.label, icon: t.icon }))}
+              value={tab}
+              onChange={setTab}
+            />
           )}
         </div>
 
         {/* Content */}
         {loading ? (
           <div className="flex flex-1 items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#2A00CC]" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-brand" />
           </div>
         ) : data?.opportunity ? (
           <div className={`flex-1 ${tab === 'messages' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
@@ -424,12 +420,12 @@ export default function DealDrawer({
                   {saveError && <p className="mt-3 text-xs font-medium text-red-600">{saveError}</p>}
                   {saveSuccess && <p className="mt-3 text-xs font-medium text-emerald-600">Salvato!</p>}
                   <button
+                    type="button"
                     onClick={handleSaveDetails}
                     disabled={saving}
-                    className="mt-4 w-full rounded-xl py-2.5 text-sm font-bold text-white transition-colors hover:opacity-90 disabled:opacity-40"
-                    style={{ background: '#2A00CC' }}
+                    className="mt-4 w-full rounded-2xl bg-brand py-2.5 text-sm font-bold text-white transition-colors hover:brightness-110 disabled:opacity-40"
                   >
-                    {saving ? 'Salvataggio...' : 'Salva Modifiche'}
+                    {saving ? 'Salvataggio…' : 'Salva modifiche'}
                   </button>
                 </div>
 
@@ -439,8 +435,7 @@ export default function DealDrawer({
                     <p className="mb-3 text-xs font-bold uppercase tracking-widest text-gray-400">Contatto</p>
                     <div className="flex items-center gap-4">
                       <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white"
-                        style={{ background: 'linear-gradient(135deg, #2A00CC 0%, #5B3AFF 100%)' }}
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-violet-600 text-xs font-bold text-white"
                       >
                         {[data.contact.firstName?.[0], data.contact.lastName?.[0]].filter(Boolean).join('').toUpperCase() || '?'}
                       </div>
@@ -489,10 +484,9 @@ export default function DealDrawer({
                               <div
                                 className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
                                   isOutbound
-                                    ? 'rounded-tr-sm text-white'
+                                    ? 'rounded-tr-sm bg-brand text-white'
                                     : 'rounded-tl-sm bg-gray-100 text-gray-900'
                                 }`}
-                                style={isOutbound ? { background: '#2A00CC' } : undefined}
                               >
                                 <p className="leading-snug whitespace-pre-wrap">{msg.body ?? ''}</p>
                                 {msg.dateAdded && (
@@ -564,14 +558,13 @@ export default function DealDrawer({
                             const result = await aiSuggestReply(locationId, data.contact!.id!, data.conversation?.type ?? 'SMS', data.messages.slice(-10).map((m) => ({ direction: m.direction ?? 'inbound', body: m.body ?? '' })))
                             if (result.reply) setMessage(result.reply)
                           }}
-                          className="flex items-center justify-center rounded-xl h-8 w-8 bg-[rgba(42,0,204,0.08)] hover:bg-[rgba(42,0,204,0.15)]"
-                          style={{ color: '#2A00CC' }}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand transition-colors hover:bg-brand/15"
                           title="Suggerisci risposta AI"
                         >
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
                         </button>
                       )}
-                      <button onClick={handleSend} disabled={sending || !message.trim()} className="rounded-xl px-5 py-1.5 text-sm font-semibold text-white disabled:opacity-40" style={{ background: '#2A00CC' }}>
+                      <button type="button" onClick={handleSend} disabled={sending || !message.trim()} className="rounded-xl bg-brand px-5 py-1.5 text-sm font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-40">
                         {sending ? '...' : 'Invia'}
                       </button>
                     </div>
@@ -593,10 +586,10 @@ export default function DealDrawer({
                       onChange={(e) => setNoteText(e.target.value)}
                     />
                     <button
+                      type="button"
                       onClick={handleAddNote}
                       disabled={savingNote || !noteText.trim()}
-                      className="mt-2 w-full rounded-xl py-2 text-sm font-bold text-white transition-colors hover:opacity-90 disabled:opacity-40"
-                      style={{ background: '#2A00CC' }}
+                      className="mt-2 w-full rounded-2xl bg-brand py-2 text-sm font-bold text-white transition-colors hover:brightness-110 disabled:opacity-40"
                     >
                       {savingNote ? 'Salvataggio...' : 'Aggiungi Nota'}
                     </button>
@@ -624,10 +617,10 @@ export default function DealDrawer({
                             />
                             <div className="mt-2 flex gap-2">
                               <button
+                                type="button"
                                 onClick={handleSaveEditNote}
                                 disabled={savingEdit || !editingNoteBody.trim()}
-                                className="flex-1 rounded-xl py-2 text-xs font-bold text-white disabled:opacity-40"
-                                style={{ background: '#2A00CC' }}
+                                className="flex-1 rounded-xl bg-brand py-2 text-xs font-bold text-white hover:brightness-110 disabled:opacity-40"
                               >
                                 {savingEdit ? '...' : 'Salva'}
                               </button>
@@ -708,10 +701,10 @@ export default function DealDrawer({
                       onChange={(e) => setTaskDue(e.target.value)}
                     />
                     <button
+                      type="button"
                       onClick={handleAddTask}
                       disabled={savingTask || !taskTitle.trim()}
-                      className="w-full rounded-xl py-2 text-sm font-bold text-white transition-colors hover:opacity-90 disabled:opacity-40"
-                      style={{ background: '#2A00CC' }}
+                      className="w-full rounded-2xl bg-brand py-2 text-sm font-bold text-white transition-colors hover:brightness-110 disabled:opacity-40"
                     >
                       {savingTask ? 'Creazione...' : 'Aggiungi Attività'}
                     </button>
@@ -735,7 +728,7 @@ export default function DealDrawer({
                             className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
                               done
                                 ? 'border-emerald-500 bg-emerald-500'
-                                : 'border-gray-300 hover:border-[#2A00CC]'
+                                : 'border-gray-300 hover:border-brand/50'
                             }`}
                           >
                             {done && (
@@ -773,9 +766,9 @@ export default function DealDrawer({
                     <p className="text-sm text-gray-400">Nessuna attività registrata.</p>
                   </div>
                 ) : (
-                  <ol className="relative ml-3 border-l-2 border-[rgba(42,0,204,0.12)]">
+                  <ol className="relative ml-3 border-l-2 border-brand/15">
                     {activityItems.map((item, i) => {
-                      const iconBg = item.type === 'message' ? '#2A00CC' : item.type === 'appointment' ? '#059669' : '#6366f1'
+                      const iconBg = item.type === 'message' ? 'var(--brand)' : item.type === 'appointment' ? '#059669' : '#6366f1'
                       return (
                         <li key={i} className="mb-6 ml-6">
                           <div

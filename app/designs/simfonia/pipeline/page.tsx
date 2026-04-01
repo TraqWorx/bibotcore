@@ -1,5 +1,6 @@
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import PipelineClient from './_components/PipelineClient'
+import { sf } from '@/lib/simfonia/ui'
 
 export default async function PipelinePage({
   searchParams,
@@ -10,8 +11,8 @@ export default async function PipelinePage({
 
   if (!locationId) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-        <p className="text-sm text-gray-500">Nessuna location connessa.</p>
+      <div className={`${sf.emptyPanel}`}>
+        <p className="text-sm font-medium text-gray-500">Nessuna location connessa.</p>
       </div>
     )
   }

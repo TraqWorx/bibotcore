@@ -26,6 +26,12 @@ import {
   SHARED_CATEGORIES,
   type CustomFieldDef,
 } from '@/lib/utils/categoryFields'
+import SegmentedControl from '../../_components/SegmentedControl'
+import { sf } from '@/lib/simfonia/ui'
+
+const accentFill = {
+  background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+} as const
 
 const TAG_COLORS: Record<string, string> = {
   energia:      'bg-amber-50 text-amber-700',
@@ -292,7 +298,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
     })
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)] transition-colors'
+  const inputClass = sf.inputFull
 
   const TABS = [
     { key: 'info' as const, label: 'Dettagli', icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg> },
@@ -332,8 +338,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
             <div className="flex items-center gap-5">
               {/* Avatar */}
               <div
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-bold text-white shadow-sm"
-                style={{ background: 'linear-gradient(135deg, #2A00CC 0%, #5B3AFF 100%)' }}
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-violet-600 text-lg font-bold text-white shadow-sm"
               >
                 {initials}
               </div>
@@ -365,42 +370,38 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
 
           {/* Tabs */}
           {!loading && contact && (
-            <div className="mt-5 flex gap-1 rounded-xl bg-gray-100/80 p-1">
-              {TABS.map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
-                  className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
-                    tab === t.key
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {t.icon}
-                  {t.label}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              className="mt-5"
+              tablist
+              tabIdPrefix="contact-tab"
+              ariaLabel="Sezioni contatto"
+              stackedIcons
+              scrollable
+              items={TABS.map((t) => ({ value: t.key, label: t.label, icon: t.icon }))}
+              value={tab}
+              onChange={setTab}
+            />
           )}
         </div>
 
         {/* Content */}
         {loading ? (
           <div className="flex flex-1 items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#2A00CC]" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-brand" />
           </div>
         ) : contact ? (
           <div className={`flex-1 ${tab === 'messages' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
             {tab === 'info' ? (
               <div className="space-y-5 p-6">
                 {/* AI Summary */}
-                <div className="rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-4 shadow-sm">
+                <div className="rounded-2xl border border-brand/15 bg-white p-4 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-[#2A00CC]">AI Riepilogo</p>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-brand">AI Riepilogo</p>
                     <button
+                      type="button"
                       onClick={handleAiSummary}
                       disabled={aiLoading}
-                      className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#2A00CC] to-[#6366f1] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:shadow-md disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand to-indigo-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:shadow-md disabled:opacity-50"
                     >
                       {aiLoading ? (
                         <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -501,25 +502,18 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                       {tabGroups.length > 0 && (
                         <div className="rounded-2xl border border-gray-200/60 bg-white p-5 shadow-sm space-y-4">
                           {tabGroups.length > 1 && (
-                            <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
-                              {tabGroups.map(([groupName]) => {
-                                const catSlug = groupName.toLowerCase().replace(/\s+/g, '').replace(/à/g, 'a')
-                                const accent = CATEGORY_ACCENT[catSlug]
-                                return (
-                                  <button
-                                    key={groupName}
-                                    type="button"
-                                    onClick={() => setInfoCfTab(groupName)}
-                                    className={`flex-1 rounded-lg px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
-                                      infoCfTab === groupName ? 'bg-white shadow-sm' : ''
-                                    }`}
-                                    style={infoCfTab === groupName ? { color: '#2A00CC' } : { color: '#6B7280' }}
-                                  >
-                                    {groupName}
-                                  </button>
-                                )
-                              })}
-                            </div>
+                            <SegmentedControl
+                              size="sm"
+                              ariaLabel="Categorie campi"
+                              items={tabGroups.map(([groupName]) => ({
+                                value: groupName,
+                                label: groupName,
+                              }))}
+                              value={infoCfTab ?? tabGroups[0][0]}
+                              onChange={(v) => setInfoCfTab(v)}
+                              scrollable={tabGroups.length > 3}
+                              equalWidth={false}
+                            />
                           )}
 
                           {tabGroups
@@ -706,7 +700,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                   }
 
                   return (
-                    <div className="rounded-2xl border border-[rgba(42,0,204,0.12)] bg-white p-6 shadow-sm space-y-5">
+                    <div className="space-y-5 rounded-2xl border border-brand/15 bg-white p-6 shadow-sm">
                       {/* Categoria picker with colored pills */}
                       {categoriaField && (
                         <div>
@@ -747,19 +741,15 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
 
                       {/* Category tabs */}
                       {selectedCatLabels.length > 1 && (
-                        <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
-                          {selectedCatLabels.map((label) => (
-                            <button
-                              key={label}
-                              type="button"
-                              onClick={() => setEditCfTab(label)}
-                              className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap"
-                              style={editCfTab === label ? { background: '#2A00CC', color: 'white' } : { color: '#6B7280' }}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
+                        <SegmentedControl
+                          size="sm"
+                          ariaLabel="Categorie in modifica"
+                          items={selectedCatLabels.map((label) => ({ value: label, label }))}
+                          value={editCfTab ?? selectedCatLabels[0]}
+                          onChange={(v) => setEditCfTab(v)}
+                          scrollable={selectedCatLabels.length > 3}
+                          equalWidth={false}
+                        />
                       )}
 
                       {/* Dropdown fields */}
@@ -875,13 +865,13 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                               {(catSelectedTags.length > 0 || catAvailableTags.length > 0) && (
                                 <div className="flex flex-wrap gap-1.5">
                                   {catSelectedTags.map((tag) => (
-                                    <span key={tag} className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: '#2A00CC', color: 'white' }}>
+                                    <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-brand px-2.5 py-0.5 text-xs font-semibold text-white">
                                       {tag}
                                       <button type="button" onClick={() => setEditTags((prev) => prev.filter((t) => t !== tag))} className="ml-0.5 text-current opacity-50 hover:opacity-100">&times;</button>
                                     </span>
                                   ))}
                                   {catAvailableTags.map((tag) => (
-                                    <button key={tag} type="button" onClick={() => setEditTags((prev) => [...prev, tag])} className="rounded-full border border-dashed border-gray-300 bg-white px-2.5 py-0.5 text-[11px] font-medium text-gray-500 transition-colors hover:border-[#2A00CC] hover:text-[#2A00CC]">
+                                    <button key={tag} type="button" onClick={() => setEditTags((prev) => [...prev, tag])} className="rounded-full border border-dashed border-gray-300 bg-white px-2.5 py-0.5 text-[11px] font-medium text-gray-500 transition-colors hover:border-brand/40 hover:text-brand">
                                       + {tag}
                                     </button>
                                   ))}
@@ -895,7 +885,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                                   onChange={(e) => setNewTag(e.target.value)}
                                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const t = newTag.trim(); if (t && !editTags.includes(t)) { setEditTags((prev) => [...prev, t]); setNewTag('') } } }}
                                   placeholder="Aggiungi tag..."
-                                  className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)] transition-colors"
+                                  className="flex-1 rounded-xl border border-gray-200/90 bg-white px-3 py-1.5 text-xs outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
                                 />
                                 <button
                                   type="button"
@@ -956,10 +946,10 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     type="button"
                     onClick={handleEditSave}
                     disabled={editSaving}
-                    className="flex-1 rounded-xl py-2.5 text-sm font-bold text-black transition-colors hover:opacity-90 disabled:opacity-50 shadow-sm"
-                    style={{ background: '#00F0FF' }}
+                    className={`${sf.btnSave} flex-1 font-bold shadow-sm`}
+                    style={accentFill}
                   >
-                    {editSaving ? 'Salvataggio...' : 'Salva Modifiche'}
+                    {editSaving ? 'Salvataggio…' : 'Salva modifiche'}
                   </button>
                 </div>
 
@@ -1006,7 +996,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                 <div className="flex-1 overflow-y-auto p-6">
                   {messagesLoading ? (
                     <div className="flex items-center justify-center py-10">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-[#2A00CC]" />
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-brand" />
                     </div>
                   ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -1030,10 +1020,9 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                             <div
                               className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm ${
                                 isOutbound
-                                  ? 'rounded-tr-sm text-white'
+                                  ? 'rounded-tr-sm bg-brand text-white'
                                   : 'rounded-tl-sm bg-gray-100 text-gray-900'
                               }`}
-                              style={isOutbound ? { background: '#2A00CC' } : undefined}
                             >
                               <p className="leading-snug whitespace-pre-wrap">{body}</p>
                               {msg.dateAdded && (
@@ -1068,7 +1057,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !sending) { e.preventDefault(); handleSend() } }}
                     placeholder="Scrivi un messaggio..."
                     rows={3}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none resize-y min-h-[70px] max-h-[160px] focus:border-[#2A00CC] focus:ring-2 focus:ring-[rgba(42,0,204,0.15)]"
+                    className={`${sf.input} w-full resize-y px-4 py-3 text-sm min-h-[70px] max-h-[160px]`}
                   />
                   <div className="flex items-center justify-end gap-2 mt-2">
                     {message.trim() && (
@@ -1082,14 +1071,13 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                           const result = await aiSuggestReply(locationId, contactId, 'SMS', messages.slice(-10).map((m) => ({ direction: m.direction ?? 'inbound', body: m.body ?? '' })))
                           if (result.reply) setMessage(result.reply)
                         }}
-                        className="flex items-center justify-center rounded-xl h-8 w-8 bg-[rgba(42,0,204,0.08)] hover:bg-[rgba(42,0,204,0.15)]"
-                        style={{ color: '#2A00CC' }}
+                        className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand transition-colors hover:bg-brand/15"
                         title="Suggerisci risposta AI"
                       >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
                       </button>
                     )}
-                    <button onClick={handleSend} disabled={sending || !message.trim()} className="rounded-xl px-5 py-1.5 text-sm font-semibold text-white disabled:opacity-40" style={{ background: '#2A00CC' }}>
+                    <button type="button" onClick={handleSend} disabled={sending || !message.trim()} className="rounded-xl bg-brand px-5 py-1.5 text-sm font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-40">
                       {sending ? '...' : 'Invia'}
                     </button>
                   </div>

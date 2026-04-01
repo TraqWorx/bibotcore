@@ -16,10 +16,11 @@ import {
   type LocationUser,
 } from '../_actions'
 import { aiSuggestReply } from '@/lib/ai/actions'
+import { sf } from '@/lib/simfonia/ui'
 
 /** Deterministic color for a user ID */
 const USER_COLORS = [
-  '#2A00CC', '#e11d48', '#059669', '#d97706', '#7c3aed',
+  'var(--brand)', '#e11d48', '#059669', '#d97706', '#7c3aed',
   '#0891b2', '#c026d3', '#dc2626', '#4f46e5', '#0d9488',
 ]
 function getUserColor(userId: string): string {
@@ -249,7 +250,7 @@ export default function ConversationInbox({ conversations: initialConversations,
     : null
 
   return (
-    <div className="flex flex-1 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+    <div className={`flex min-h-[540px] flex-1 overflow-hidden ${sf.inbox}`}>
       {/* Left — conversation list */}
       <div className="flex w-80 shrink-0 flex-col border-r border-gray-100">
         {/* Search */}
@@ -259,7 +260,7 @@ export default function ConversationInbox({ conversations: initialConversations,
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cerca conversazione..."
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+            className={`${sf.input} w-full bg-gray-50/90 px-3 py-2 text-sm`}
           />
         </div>
 
@@ -273,13 +274,14 @@ export default function ConversationInbox({ conversations: initialConversations,
                 key={conv.id}
                 onClick={() => { setSelectedId(conv.id); setMessages([]); setSendResult(null); setShowNotes(false) }}
                 className={`flex w-full items-start gap-3 border-b border-gray-50 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${
-                  selectedId === conv.id ? 'bg-[rgba(42,0,204,0.04)]' : ''
+                  selectedId === conv.id ? 'bg-brand/5' : ''
                 }`}
               >
                 {/* Avatar */}
                 <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                  style={{ background: conv.unreadCount > 0 ? '#2A00CC' : '#9ca3af' }}
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
+                    conv.unreadCount > 0 ? 'bg-brand' : 'bg-gray-400'
+                  }`}
                 >
                   {conv.contactName.slice(0, 2).toUpperCase()}
                 </div>
@@ -306,8 +308,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                       </span>
                       {conv.unreadCount > 0 && (
                         <span
-                          className="flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white"
-                          style={{ background: '#2A00CC' }}
+                          className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-bold text-white"
                         >
                           {conv.unreadCount}
                         </span>
@@ -351,8 +352,7 @@ export default function ConversationInbox({ conversations: initialConversations,
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <div className="flex items-center gap-3">
                 <div
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white"
-                  style={{ background: '#2A00CC' }}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-xs font-bold text-white"
                 >
                   {selected?.contactName.slice(0, 2).toUpperCase()}
                 </div>
@@ -371,7 +371,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                     value={selected?.assignedTo ?? ''}
                     onChange={(e) => handleAssign(e.target.value)}
                     disabled={assigning}
-                    className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-2 pr-7 text-xs text-gray-600 outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)] disabled:opacity-50"
+                    className={`${sf.input} h-8 rounded-xl bg-gray-50/90 px-2 pr-7 text-xs text-gray-600 disabled:opacity-50`}
                   >
                     <option value="">Non assegnato</option>
                     {users.map((u) => (
@@ -383,9 +383,9 @@ export default function ConversationInbox({ conversations: initialConversations,
                 {/* Notes toggle */}
                 <button
                   onClick={() => setShowNotes(!showNotes)}
-                  className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors ${
+                  className={`flex h-8 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-colors ${
                     showNotes
-                      ? 'border-[#2A00CC] bg-[rgba(42,0,204,0.06)] text-[#2A00CC]'
+                      ? 'border-brand/35 bg-brand/5 text-brand'
                       : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100'
                   }`}
                 >
@@ -398,7 +398,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                   </svg>
                   Note
                   {notes.length > 0 && (
-                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#2A00CC] px-1 text-[9px] font-bold text-white">
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold text-white">
                       {notes.length}
                     </span>
                   )}
@@ -412,7 +412,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                 <div className="flex-1 overflow-y-auto p-5">
                   {messagesLoading ? (
                     <div className="flex items-center justify-center py-10">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-[#2A00CC]" />
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-brand" />
                     </div>
                   ) : messages.length === 0 ? (
                     <p className="py-10 text-center text-sm text-gray-400">Nessun messaggio.</p>
@@ -428,10 +428,9 @@ export default function ConversationInbox({ conversations: initialConversations,
                             <div
                               className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm ${
                                 isOutbound
-                                  ? 'rounded-tr-sm text-white'
+                                  ? 'rounded-tr-sm bg-brand text-white'
                                   : 'rounded-tl-sm bg-gray-100 text-gray-900'
                               }`}
-                              style={isOutbound ? { background: '#2A00CC' } : undefined}
                             >
                               <p className="leading-snug whitespace-pre-wrap">{msg.body}</p>
                               {msg.dateAdded && (
@@ -459,7 +458,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !sending) { e.preventDefault(); handleSend() } }}
                     placeholder="Scrivi un messaggio..."
                     rows={3}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none resize-y min-h-[70px] max-h-[200px] focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+                    className={`${sf.input} w-full resize-y px-4 py-3 text-sm min-h-[70px] max-h-[200px]`}
                   />
                   <div className="flex items-center justify-between mt-2">
                     <div />
@@ -478,18 +477,17 @@ export default function ConversationInbox({ conversations: initialConversations,
                             setAiSuggesting(false)
                           }}
                           disabled={aiSuggesting}
-                          className="flex items-center justify-center rounded-xl h-8 w-8 bg-[rgba(42,0,204,0.08)] hover:bg-[rgba(42,0,204,0.15)] disabled:opacity-40"
-                          style={{ color: '#2A00CC' }}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand transition-colors hover:bg-brand/15 disabled:opacity-40"
                           title="Suggerisci risposta AI"
                         >
                           {aiSuggesting ? (
-                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#2A00CC] border-t-transparent" />
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand border-t-transparent" />
                           ) : (
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
                           )}
                         </button>
                       )}
-                      <button onClick={handleSend} disabled={sending || !messageText.trim()} className="rounded-xl px-5 py-1.5 text-sm font-semibold text-white disabled:opacity-40" style={{ background: '#2A00CC' }}>
+                      <button onClick={handleSend} disabled={sending || !messageText.trim()} className="rounded-xl bg-brand px-5 py-1.5 text-sm font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-40">
                         {sending ? '...' : 'Invia'}
                       </button>
                     </div>
@@ -517,13 +515,12 @@ export default function ConversationInbox({ conversations: initialConversations,
                       onChange={(e) => setNewNote(e.target.value)}
                       placeholder="Aggiungi una nota..."
                       rows={3}
-                      className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+                      className={`${sf.input} w-full resize-none px-3 py-2 text-xs`}
                     />
                     <button
                       onClick={handleSaveNote}
                       disabled={savingNote || !newNote.trim()}
-                      className="mt-1.5 w-full rounded-lg py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-40"
-                      style={{ background: '#2A00CC' }}
+                      className="mt-1.5 w-full rounded-xl bg-brand py-1.5 text-xs font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-40"
                     >
                       {savingNote ? 'Salvataggio...' : 'Salva Nota'}
                     </button>
@@ -533,7 +530,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                   <div className="flex-1 overflow-y-auto p-3">
                     {notesLoading ? (
                       <div className="flex items-center justify-center py-6">
-                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-[#2A00CC]" />
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-brand" />
                       </div>
                     ) : notes.length === 0 ? (
                       <p className="py-6 text-center text-xs text-gray-400">Nessuna nota per questo contatto.</p>
@@ -547,15 +544,14 @@ export default function ConversationInbox({ conversations: initialConversations,
                                   value={editingNoteBody}
                                   onChange={(e) => setEditingNoteBody(e.target.value)}
                                   rows={3}
-                                  className="w-full resize-none rounded border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-[#2A00CC]"
+                                  className={`${sf.input} w-full resize-none px-2 py-1.5 text-xs rounded-lg`}
                                   autoFocus
                                 />
                                 <div className="mt-1.5 flex gap-1.5">
                                   <button
                                     onClick={handleSaveEditNote}
                                     disabled={savingEdit || !editingNoteBody.trim()}
-                                    className="flex-1 rounded py-1 text-[10px] font-semibold text-white disabled:opacity-40"
-                                    style={{ background: '#2A00CC' }}
+                                    className="flex-1 rounded-lg bg-brand py-1 text-[10px] font-semibold text-white hover:brightness-110 disabled:opacity-40"
                                   >
                                     {savingEdit ? '...' : 'Salva'}
                                   </button>

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { aiGenerateInsight } from '@/lib/ai/actions'
+import { sf } from '@/lib/simfonia/ui'
 
 interface Message {
   role: 'user' | 'ai'
@@ -72,7 +73,8 @@ export default function AiChat({ locationId }: { locationId: string }) {
       >
         <button
           onClick={() => setOpen(!open)}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#2A00CC] to-[#6366f1] text-white shadow-lg hover:shadow-xl"
+          className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_12px_40px_-8px_color-mix(in_srgb,var(--brand)_55%,transparent)] ring-2 ring-white/30 transition hover:brightness-110"
+          style={{ background: 'linear-gradient(145deg, var(--brand) 0%, color-mix(in srgb, var(--brand) 65%, #6366f1) 100%)' }}
           title="Chiedi all'AI"
         >
           {open ? (
@@ -96,22 +98,25 @@ export default function AiChat({ locationId }: { locationId: string }) {
             top: Math.min(pos.y + 60, (typeof window !== 'undefined' ? window.innerHeight : 800) - 510),
             zIndex: 50,
           }}
-          className="flex h-[500px] w-[380px] flex-col rounded-2xl border border-gray-200 bg-white shadow-2xl"
+          className={`flex h-[500px] w-[380px] flex-col overflow-hidden ${sf.inbox} shadow-2xl`}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div className="flex items-center justify-between border-b border-gray-200/70 bg-white/80 px-5 py-4 backdrop-blur-md">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#2A00CC] to-[#6366f1]">
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm"
+                style={{ background: 'linear-gradient(145deg, var(--brand) 0%, color-mix(in srgb, var(--brand) 70%, #6366f1) 100%)' }}
+              >
                 <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-bold text-gray-900">AI Assistant</p>
-                <p className="text-[10px] text-gray-400">Chiedi qualsiasi cosa sui tuoi dati</p>
+                <p className="text-sm font-bold text-gray-900">AI assistant</p>
+                <p className="text-[10px] text-gray-500">Interroga i dati della location</p>
               </div>
             </div>
-            <button onClick={() => setOpen(false)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <button type="button" onClick={() => setOpen(false)} className="rounded-xl p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -119,7 +124,7 @@ export default function AiChat({ locationId }: { locationId: string }) {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-gray-50/40 to-white/30 p-4">
             {messages.length === 0 && !loading && (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center">
@@ -133,7 +138,7 @@ export default function AiChat({ locationId }: { locationId: string }) {
                       <button
                         key={q}
                         onClick={() => setInput(q)}
-                        className="block w-full rounded-lg border border-gray-100 px-3 py-2 text-left text-xs text-gray-500 hover:bg-gray-50"
+                        className="block w-full rounded-xl border border-gray-200/80 bg-white/80 px-3 py-2.5 text-left text-xs font-medium text-gray-600 shadow-sm transition hover:border-brand/25 hover:bg-white"
                       >
                         {q}
                       </button>
@@ -145,9 +150,12 @@ export default function AiChat({ locationId }: { locationId: string }) {
 
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${
-                  m.role === 'user' ? 'bg-[#2A00CC] text-white' : 'bg-gray-100 text-gray-800'
-                }`}>
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 shadow-sm ${
+                    m.role === 'user' ? 'text-white' : 'border border-gray-200/80 bg-white text-gray-800'
+                  }`}
+                  style={m.role === 'user' ? { background: 'linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 75%, #6366f1))' } : undefined}
+                >
                   <p className="text-sm whitespace-pre-wrap">{m.text}</p>
                 </div>
               </div>
@@ -169,7 +177,7 @@ export default function AiChat({ locationId }: { locationId: string }) {
           </div>
 
           {/* Input */}
-          <div className="border-t border-gray-100 p-3">
+          <div className="border-t border-gray-200/70 bg-white/90 p-3 backdrop-blur-md">
             <div className="flex gap-2">
               <input
                 type="text"
@@ -177,12 +185,13 @@ export default function AiChat({ locationId }: { locationId: string }) {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 placeholder="Chiedi qualcosa..."
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC]"
+                className={`flex-1 px-4 py-2.5 text-sm ${sf.input}`}
               />
               <button
+                type="button"
                 onClick={handleSend}
                 disabled={loading || !input.trim()}
-                className="rounded-xl bg-[#2A00CC] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+                className="rounded-2xl bg-brand px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40"
               >
                 Invia
               </button>

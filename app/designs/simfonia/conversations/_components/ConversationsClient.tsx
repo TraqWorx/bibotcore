@@ -1,6 +1,8 @@
 'use client'
 
 import useSWR from 'swr'
+import SimfoniaPageHeader from '../../_components/SimfoniaPageHeader'
+import { sf } from '@/lib/simfonia/ui'
 import ConversationInbox from './ConversationInbox'
 import type { ConversationItem, LocationUser } from '../_actions'
 
@@ -17,13 +19,17 @@ export default function ConversationsClient({ locationId }: { locationId: string
   const currentUserEmail: string = data?.currentUserEmail ?? ''
 
   return (
-    <div className="flex h-[calc(100vh-2rem)] flex-col gap-4 p-6">
-      <h1 className="text-2xl font-bold text-gray-900">Conversazioni</h1>
+    <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-6">
+      <SimfoniaPageHeader
+        eyebrow="Messaggistica"
+        title="Conversazioni"
+        description="Inbox unificata: SMS, email, WhatsApp e altro da GHL."
+      />
       {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
+        <div className={`flex flex-1 items-center justify-center ${sf.emptyPanel} min-h-[320px]`}>
           <div className="text-center">
-            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#2A00CC]" />
-            <p className="mt-3 text-sm text-gray-400">Caricamento conversazioni...</p>
+            <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-brand" />
+            <p className="mt-4 text-sm font-medium text-gray-500">Caricamento conversazioni…</p>
           </div>
         </div>
       ) : (

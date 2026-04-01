@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 import WeekCalendar from './WeekCalendar'
+import SimfoniaPageHeader from '../_components/SimfoniaPageHeader'
+import { sf } from '@/lib/simfonia/ui'
 
 interface GhlUser {
   id: string
@@ -34,8 +36,8 @@ export default async function CalendarPage({
 
   if (!locationId) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-        <p className="text-sm text-gray-500">Nessuna location connessa.</p>
+      <div className={`${sf.emptyPanel}`}>
+        <p className="text-sm font-medium text-gray-500">Nessuna location connessa.</p>
       </div>
     )
   }
@@ -72,9 +74,9 @@ export default async function CalendarPage({
     const msg = err instanceof Error ? err.message : ''
     if (msg.includes('401') || msg.includes('not authorized')) {
       return (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-10 text-center">
-          <p className="text-sm font-medium text-amber-800">Connessione non autorizzata per questa funzione.</p>
-          <p className="mt-1 text-xs text-amber-600">Riconnetti la location con gli scope aggiornati.</p>
+        <div className="rounded-3xl border border-amber-200/80 bg-amber-50/80 p-10 text-center shadow-sm backdrop-blur-sm">
+          <p className="text-sm font-semibold text-amber-900">Connessione non autorizzata per questa funzione.</p>
+          <p className="mt-1 text-xs text-amber-700">Riconnetti la location con gli scope aggiornati.</p>
         </div>
       )
     }
@@ -104,29 +106,39 @@ export default async function CalendarPage({
   }[]
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Calendario</h1>
-          <p className="mt-0.5 text-sm text-gray-500">
-            {events.length} appuntamenti
-          </p>
-        </div>
-        <Link
-          href={`/designs/simfonia/calendar/new?locationId=${locationId}`}
-          className="rounded-xl px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:opacity-90"
-          style={{ background: '#00F0FF' }}
-        >
-          + Nuovo Appuntamento
-        </Link>
-      </div>
-
-      <WeekCalendar
-        events={events}
-        users={users}
-        isAdmin={isAdmin}
-        currentUserId={currentGhlUser?.id ?? null}
+    <div className="space-y-8">
+      <SimfoniaPageHeader
+        eyebrow="Agenda"
+        title="Calendario"
+        description={
+          <>
+            <span className="font-semibold text-gray-800">{events.length}</span> appuntamenti in cache per questa location.
+          </>
+        }
+        actions={
+          <Link
+            href={`/designs/simfonia/calendar/new?locationId=${locationId}`}
+            className={sf.primaryBtn}
+            style={{
+              background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+            }}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Nuovo appuntamento
+          </Link>
+        }
       />
+
+      <div className="rounded-3xl border border-gray-200/70 bg-white/85 p-4 shadow-sm backdrop-blur-md sm:p-5">
+        <WeekCalendar
+          events={events}
+          users={users}
+          isAdmin={isAdmin}
+          currentUserId={currentGhlUser?.id ?? null}
+        />
+      </div>
     </div>
   )
 }
