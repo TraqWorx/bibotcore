@@ -21,6 +21,7 @@ import ClosedDaysForm from './_components/ClosedDaysForm'
 import UniqueFieldsForm from './_components/UniqueFieldsForm'
 import TeamManager from './_components/TeamManager'
 import PortalSettingsForm from './_components/PortalSettingsForm'
+import AiReceptionistToggle from './_components/AiReceptionistToggle'
 
 interface GhlUser {
   id: string
@@ -75,7 +76,7 @@ export default async function SettingsPage({
   const [settingsRes, themeRes, gareRows, locationTags, provvigioniRows, availabilitySlots, ghlUsers, customFields, categoryTagsMap, closedDays, uniqueFieldIds] = await Promise.all([
     supabase
       .from('location_settings')
-      .select('target_annuale, portal_icon_url, portal_welcome_message, portal_auto_invite')
+      .select('target_annuale, portal_icon_url, portal_welcome_message, portal_auto_invite, ai_receptionist')
       .eq('location_id', locationId)
       .single(),
     supabase
@@ -115,6 +116,7 @@ export default async function SettingsPage({
             logoUrl={overrides.logoUrl ?? ''}
           />
           <ClosedDaysForm locationId={locationId} initialDays={closedDays} />
+          <AiReceptionistToggle locationId={locationId} initialEnabled={(settingsRes.data as Record<string, unknown>)?.ai_receptionist as boolean ?? false} />
         </div>
       ),
     },

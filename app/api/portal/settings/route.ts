@@ -12,18 +12,17 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { locationId, iconUrl, welcomeMessage, autoInvite } = body
+  const { locationId, iconUrl, welcomeMessage, autoInvite, aiReceptionist } = body
 
   if (!locationId) return NextResponse.json({ error: 'locationId required' }, { status: 400 })
 
   const sb = createAdminClient()
-  const { error } = await sb.from('location_settings').upsert({
-    location_id: locationId,
-    portal_icon_url: iconUrl || null,
-    portal_welcome_message: welcomeMessage || null,
-    portal_auto_invite: autoInvite ?? false,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'location_id' })
+  const update: Record<string, unknown> = { location_id: locationId, updated_at: new Date().toISOString() }
+  if (iconUrl !== undefined) update.portal_icon_url = iconUrl || null
+  if (welcomeMessage !== undefined) update.portal_welcome_message = welcomeMessage || null
+  if (autoInvite !== undefined) update.portal_auto_invite = autoInvite
+  if (aiReceptionist !== undefined) update.ai_receptionist = aiReceptionist
+  const { error } = await sb.from('location_settings').upsert(update, { onConflict: 'location_id' })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })

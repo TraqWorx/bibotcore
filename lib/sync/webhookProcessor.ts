@@ -89,6 +89,19 @@ export async function processWebhookEvent(
 
   if (CONVERSATION_EVENTS.some((e) => eventType.includes(e) || eventType === e)) {
     await processConversationEvent(locationId, eventType, data)
+    // Trigger AI receptionist on inbound messages
+    if (eventType === 'InboundMessage' || eventType === 'inbound_message') {
+      const convoId = (data.conversationId ?? data.conversation_id ?? data.id) as string | undefined
+      const contactGhlId = (data.contactId ?? data.contact_id) as string | undefined
+      const body = (data.body ?? data.message) as string | undefined
+      if (convoId && contactGhlId && body) {
+        import('@/lib/ai/receptionist').then(({ handleInboundMessage }) => {
+          handleInboundMessage(locationId, convoId, contactGhlId, body).catch((err) =>
+            console.error('[receptionist] error:', err)
+          )
+        })
+      }
+    }
     return { processed: true, entity: 'conversation' }
   }
 
