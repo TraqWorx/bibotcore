@@ -543,37 +543,41 @@ export default function DealDrawer({
                           <path d="M5 10c.8 1.2 2 1.8 3 1.8s2.2-.6 3-1.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                         </svg>
                       </button>
-                      <textarea
-                        ref={messageInputRef as unknown as React.RefObject<HTMLTextAreaElement>}
-                        className={`flex-1 resize-none overflow-hidden ${inputClass}`}
-                        placeholder="Scrivi un messaggio..."
-                        value={message}
-                        rows={1}
-                        onChange={(e) => { setMessage(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }}
-                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !sending) { e.preventDefault(); handleSend() } }}
-                      />
-                      {data.messages.length > 0 && data.contact?.id && (
-                        <button
-                          onClick={async () => {
-                            const { aiSuggestReply } = await import('@/lib/ai/actions')
-                            const result = await aiSuggestReply(locationId, data.contact!.id!, data.conversation?.type ?? 'SMS', data.messages.slice(-10).map((m) => ({ direction: m.direction ?? 'inbound', body: m.body ?? '' })))
-                            if (result.reply) setMessage(result.reply)
-                          }}
-                          className="flex items-center justify-center rounded-xl border border-[rgba(42,0,204,0.2)] w-10 shrink-0 hover:bg-[rgba(42,0,204,0.05)]"
-                          style={{ color: '#2A00CC' }}
-                          title="Suggerisci risposta AI"
-                        >
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                    </div>
+                    <textarea
+                      ref={messageInputRef as unknown as React.RefObject<HTMLTextAreaElement>}
+                      className={`w-full resize-y min-h-[70px] max-h-[160px] ${inputClass}`}
+                      placeholder="Scrivi un messaggio..."
+                      value={message}
+                      rows={3}
+                      onChange={(e) => setMessage(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !sending) { e.preventDefault(); handleSend() } }}
+                    />
+                    <div className="flex items-center justify-between mt-2">
+                      <div className="flex items-center gap-1">
+                        {data.messages.length > 0 && data.contact?.id && (
+                          <button
+                            onClick={async () => {
+                              const { aiSuggestReply } = await import('@/lib/ai/actions')
+                              const result = await aiSuggestReply(locationId, data.contact!.id!, data.conversation?.type ?? 'SMS', data.messages.slice(-10).map((m) => ({ direction: m.direction ?? 'inbound', body: m.body ?? '' })))
+                              if (result.reply) setMessage(result.reply)
+                            }}
+                            className="flex items-center justify-center rounded-lg h-8 w-8 hover:bg-[rgba(42,0,204,0.05)]"
+                            style={{ color: '#2A00CC' }}
+                            title="Suggerisci risposta AI"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {message.trim() && (
+                          <button onClick={() => setMessage('')} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50">Cancella</button>
+                        )}
+                        <button onClick={handleSend} disabled={sending || !message.trim()} className="rounded-xl px-5 py-1.5 text-sm font-semibold text-white disabled:opacity-40" style={{ background: '#2A00CC' }}>
+                          {sending ? '...' : 'Invia'}
                         </button>
-                      )}
-                      <button
-                        onClick={handleSend}
-                        disabled={sending || !message.trim()}
-                        className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40"
-                        style={{ background: '#2A00CC' }}
-                      >
-                        {sending ? '...' : 'Invia'}
-                      </button>
+                      </div>
                     </div>
                   </div>
                 )}

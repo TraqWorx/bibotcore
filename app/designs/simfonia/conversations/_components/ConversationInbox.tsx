@@ -453,50 +453,47 @@ export default function ConversationInbox({ conversations: initialConversations,
                   {sendResult && (
                     <p className="text-xs font-medium text-red-600">{sendResult}</p>
                   )}
-                  <div className="flex gap-2">
-                    <textarea
-                      value={messageText}
-                      onChange={(e) => { setMessageText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !sending) { e.preventDefault(); handleSend() } }}
-                      placeholder="Scrivi un messaggio..."
-                      rows={1}
-                      className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none resize-none overflow-hidden focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
-                    />
-                    {messages.length > 0 && (
-                      <button
-                        onClick={async () => {
-                          if (!selected || aiSuggesting) return
-                          setAiSuggesting(true)
-                          const result = await aiSuggestReply(
-                            locationId, selected.contactId, selected.type,
-                            messages.slice(-10).map((m) => ({ direction: m.direction, body: m.body })),
-                          )
-                          if (result.reply) setMessageText(result.reply)
-                          if (result.error) setSendResult(result.error)
-                          setAiSuggesting(false)
-                        }}
-                        disabled={aiSuggesting}
-                        className="flex items-center justify-center rounded-xl border border-[rgba(42,0,204,0.2)] w-10 transition-colors hover:bg-[rgba(42,0,204,0.05)] disabled:opacity-40"
-                        style={{ color: '#2A00CC' }}
-                        title="Suggerisci risposta AI"
-                      >
-                        {aiSuggesting ? (
-                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#2A00CC] border-t-transparent" />
-                        ) : (
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                          </svg>
-                        )}
+                  <textarea
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !sending) { e.preventDefault(); handleSend() } }}
+                    placeholder="Scrivi un messaggio..."
+                    rows={3}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none resize-y min-h-[70px] max-h-[200px] focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+                  />
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-1">
+                      {messages.length > 0 && (
+                        <button
+                          onClick={async () => {
+                            if (!selected || aiSuggesting) return
+                            setAiSuggesting(true)
+                            const result = await aiSuggestReply(locationId, selected.contactId, selected.type, messages.slice(-10).map((m) => ({ direction: m.direction, body: m.body })))
+                            if (result.reply) setMessageText(result.reply)
+                            if (result.error) setSendResult(result.error)
+                            setAiSuggesting(false)
+                          }}
+                          disabled={aiSuggesting}
+                          className="flex items-center justify-center rounded-lg h-8 w-8 hover:bg-[rgba(42,0,204,0.05)] disabled:opacity-40"
+                          style={{ color: '#2A00CC' }}
+                          title="Suggerisci risposta AI"
+                        >
+                          {aiSuggesting ? (
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#2A00CC] border-t-transparent" />
+                          ) : (
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {messageText.trim() && (
+                        <button onClick={() => setMessageText('')} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50">Cancella</button>
+                      )}
+                      <button onClick={handleSend} disabled={sending || !messageText.trim()} className="rounded-xl px-5 py-1.5 text-sm font-semibold text-white disabled:opacity-40" style={{ background: '#2A00CC' }}>
+                        {sending ? '...' : 'Invia'}
                       </button>
-                    )}
-                    <button
-                      onClick={handleSend}
-                      disabled={sending || !messageText.trim()}
-                      className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-40"
-                      style={{ background: '#2A00CC' }}
-                    >
-                      {sending ? '...' : 'Invia'}
-                    </button>
+                    </div>
                   </div>
                 </div>
               </div>
