@@ -449,19 +449,12 @@ export default function ConversationInbox({ conversations: initialConversations,
                 </div>
 
                 {/* Send */}
-                <div className="border-t border-gray-100 p-4">
+                <div className="border-t border-gray-100 p-4 space-y-2">
                   {sendResult && (
-                    <p className="mb-2 text-xs font-medium text-red-600">{sendResult}</p>
+                    <p className="text-xs font-medium text-red-600">{sendResult}</p>
                   )}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && !sending && handleSend()}
-                      placeholder="Scrivi un messaggio..."
-                      className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
-                    />
+                  {/* AI suggest button — above input */}
+                  {messages.length > 0 && (
                     <button
                       onClick={async () => {
                         if (!selected || aiSuggesting) return
@@ -476,19 +469,30 @@ export default function ConversationInbox({ conversations: initialConversations,
                         if (result.error) setSendResult(result.error)
                         setAiSuggesting(false)
                       }}
-                      disabled={aiSuggesting || messages.length === 0}
-                      className="rounded-xl border border-[rgba(42,0,204,0.2)] px-3 py-2.5 text-sm font-medium transition-colors hover:bg-[rgba(42,0,204,0.05)] disabled:opacity-40"
+                      disabled={aiSuggesting}
+                      className="flex items-center gap-1.5 self-start rounded-lg border border-[rgba(42,0,204,0.15)] px-2.5 py-1 text-[11px] font-medium transition-colors hover:bg-[rgba(42,0,204,0.05)] disabled:opacity-40"
                       style={{ color: '#2A00CC' }}
-                      title="Suggerisci risposta con AI"
                     >
                       {aiSuggesting ? (
-                        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#2A00CC] border-t-transparent" />
+                        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#2A00CC] border-t-transparent" />
                       ) : (
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                         </svg>
                       )}
+                      Suggerisci risposta
                     </button>
+                  )}
+                  {/* Input + Send */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !sending && handleSend()}
+                      placeholder="Scrivi un messaggio..."
+                      className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-[#2A00CC] focus:ring-1 focus:ring-[rgba(42,0,204,0.15)]"
+                    />
                     <button
                       onClick={handleSend}
                       disabled={sending || !messageText.trim()}
