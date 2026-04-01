@@ -101,6 +101,53 @@ export const AI_TOOLS = [
     },
   },
   {
+    name: 'create_contact',
+    description: 'Create a new contact. Requires at least a first name.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        firstName: { type: 'string', description: 'First name' },
+        lastName: { type: 'string', description: 'Last name' },
+        email: { type: 'string', description: 'Email' },
+        phone: { type: 'string', description: 'Phone number' },
+        tags: { type: 'string', description: 'Comma-separated tags to add' },
+      },
+      required: ['firstName'],
+    },
+  },
+  {
+    name: 'create_opportunity',
+    description: 'Create a new deal/opportunity in a pipeline.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: { type: 'string', description: 'Deal name' },
+        pipelineName: { type: 'string', description: 'Pipeline name' },
+        stageName: { type: 'string', description: 'Stage name' },
+        contactEmail: { type: 'string', description: 'Contact email to link' },
+        contactName: { type: 'string', description: 'Contact name to link' },
+        monetaryValue: { type: 'number', description: 'Deal value in EUR' },
+      },
+      required: ['name', 'pipelineName', 'stageName'],
+    },
+  },
+  {
+    name: 'create_appointment',
+    description: 'Create a new appointment/calendar event.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Appointment title' },
+        contactEmail: { type: 'string', description: 'Contact email' },
+        contactName: { type: 'string', description: 'Contact name' },
+        date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+        time: { type: 'string', description: 'Start time in HH:MM format (24h)' },
+        durationMinutes: { type: 'number', description: 'Duration in minutes (default 30)' },
+      },
+      required: ['title', 'date', 'time'],
+    },
+  },
+  {
     name: 'bulk_add_tag',
     description: 'Add a tag to multiple contacts matching a filter. Can filter by: tag, custom field value, deal monetary value (min/max), category. Returns how many contacts were updated.',
     input_schema: {
@@ -172,6 +219,91 @@ export async function executeTool(
       const { data } = await query
       if (!data || data.length === 0) return 'Nessun contatto trovato.'
       return data.map((c) => `${c.first_name ?? ''} ${c.last_name ?? ''} (${c.email ?? 'no email'}) - Tags: ${(c.tags ?? []).join(', ') || 'nessuno'}`).join('\n')
+    }
+
+    case 'create_contact': {
+      const ghl = await getGhlClient(locationId)
+      const payload: Record<string, unknown> = { firstName: input.firstName }
+      if (input.lastName) payload.lastName = input.lastName
+      if (input.email) payload.email = input.email
+      if (input.phone) payload.phone = input.phone
+      if (input.tags) payload.tags = input.tags.split(',').map((t: string) => t.trim())
+      const result = await ghl.contacts.create(payload)
+      const contact = (result as { contact: Record<string, unknown> }).contact
+      if (contact?.id) {
+        await writeThroughContact(locationId, contact)
+      }
+      return `Contatto "${input.firstName} ${input.lastName ?? ''}" creato con successo.`
+    }
+
+    case 'create_opportunity': {
+      const ghl = await getGhlClient(locationId)
+      // Find pipeline and stage
+      const { data: pipeline } = await sb.from('cached_pipelines')
+        .select('ghl_id, stages').eq('location_id', locationId)
+        .ilike('name', `%${input.pipelineName}%`).limit(1).single()
+      if (!pipeline) return `Pipeline "${input.pipelineName}" non trovata.`
+      const stages = (Array.isArray(pipeline.stages) ? pipeline.stages : []) as { id: string; name: string }[]
+      const stage = stages.find((s) => s.name.toLowerCase().includes(input.stageName.toLowerCase()))
+      if (!stage) return `Stadio "${input.stageName}" non trovato. Disponibili: ${stages.map(s => s.name).join(', ')}`
+      // Find contact if specified
+      let contactId: string | undefined
+      if (input.contactEmail || input.contactName) {
+        const contact = await findContact(sb, locationId, input.contactEmail, input.contactName)
+        if (contact) contactId = contact.ghl_id
+      }
+      const oppData: Record<string, unknown> = {
+        name: input.name,
+        pipelineId: pipeline.ghl_id,
+        pipelineStageId: stage.id,
+      }
+      if (contactId) oppData.contactId = contactId
+      if (input.monetaryValue) oppData.monetaryValue = Number(input.monetaryValue)
+      const result = await ghl.opportunities.create(oppData as { name: string; pipelineId: string; pipelineStageId: string; contactId?: string; monetaryValue?: number })
+      const opp = result?.opportunity ?? result
+      if (opp?.id) {
+        await writeThroughOpportunity(locationId, opp as Record<string, unknown>)
+      }
+      return `Opportunità "${input.name}" creata in ${input.pipelineName} → ${stage.name}${input.monetaryValue ? ` (€${input.monetaryValue})` : ''}.`
+    }
+
+    case 'create_appointment': {
+      const ghl = await getGhlClient(locationId)
+      // Find contact if specified
+      let contactId: string | undefined
+      if (input.contactEmail || input.contactName) {
+        const contact = await findContact(sb, locationId, input.contactEmail, input.contactName)
+        if (contact) contactId = contact.ghl_id
+      }
+      // Find first calendar
+      const { data: calendars } = await sb.from('cached_calendars')
+        .select('ghl_id').eq('location_id', locationId).limit(1)
+      const calendarId = calendars?.[0]?.ghl_id
+      if (!calendarId) return 'Nessun calendario trovato per questa location.'
+      const duration = Number(input.durationMinutes) || 30
+      const startTime = new Date(`${input.date}T${input.time}:00`).toISOString()
+      const endTime = new Date(new Date(startTime).getTime() + duration * 60000).toISOString()
+      try {
+        const result = await ghl.calendarEvents.create({
+          title: input.title,
+          startTime,
+          endTime,
+          calendarId,
+          contactId,
+        })
+        const eventId = result?.id ?? result?.event?.id
+        if (eventId) {
+          await sb.from('cached_calendar_events').upsert({
+            ghl_id: eventId, location_id: locationId, calendar_id: calendarId,
+            contact_ghl_id: contactId ?? null, title: input.title,
+            start_time: startTime, end_time: endTime, appointment_status: 'confirmed',
+            synced_at: new Date().toISOString(),
+          } as never, { onConflict: 'location_id,ghl_id' })
+        }
+        return `Appuntamento "${input.title}" creato per ${input.date} alle ${input.time}.`
+      } catch (err) {
+        return `Errore creazione appuntamento: ${err instanceof Error ? err.message : String(err)}`
+      }
     }
 
     case 'add_tag_to_contact':
