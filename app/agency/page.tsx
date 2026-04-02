@@ -238,7 +238,7 @@ export default async function AgencyPage({
 
         {/* Monthly revenue */}
         <div className={ad.panel}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Entrate Mensili</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Spese Mensili</p>
           {monthlyRevenue != null ? (
             <>
               <p className="mt-2 text-3xl font-bold text-gray-900">
