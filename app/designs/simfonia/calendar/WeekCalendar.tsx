@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react'
 import { sf } from '@/lib/simfonia/ui'
 
+type ViewMode = 'week' | 'month'
+
 interface CalendarEvent {
   id: string
   title?: string
@@ -10,6 +12,9 @@ interface CalendarEvent {
   endTime?: string
   appointmentStatus?: string
   assignedUserId?: string
+  contactName?: string | null
+  contactEmail?: string | null
+  contactPhone?: string | null
 }
 
 interface User {
@@ -75,8 +80,11 @@ export default function WeekCalendar({
   isAdmin: boolean
   currentUserId: string | null
 }) {
+  const [viewMode, setViewMode] = useState<ViewMode>('week')
   const [weekOffset, setWeekOffset] = useState(0)
+  const [monthOffset, setMonthOffset] = useState(0)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(isAdmin ? null : currentUserId)
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const today = useMemo(() => new Date(), [])
 
   const monday = useMemo(() => {
@@ -108,19 +116,53 @@ export default function WeekCalendar({
       .sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime()),
   }))
 
+  // Month view data
+  const monthDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1)
+  const monthDays = useMemo(() => {
+    const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1)
+    const startDay = first.getDay() === 0 ? 6 : first.getDay() - 1 // Monday-based
+    const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate()
+    const cells: (Date | null)[] = []
+    for (let i = 0; i < startDay; i++) cells.push(null)
+    for (let i = 1; i <= daysInMonth; i++) cells.push(new Date(monthDate.getFullYear(), monthDate.getMonth(), i))
+    while (cells.length % 7 !== 0) cells.push(null)
+    return cells
+  }, [monthDate])
+
+  const monthEvents = filteredEvents
+
   return (
     <div className="flex gap-6">
       {/* Calendar */}
-      <div className={sf.calendarWeek}>
+      <div className={`flex-1 min-w-0 ${sf.calendarWeek}`}>
         {/* Navigation header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
-          <p className="text-sm font-semibold text-gray-900">{formatDateRange(monday, sunday)}</p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-semibold text-gray-900">
+              {viewMode === 'week' ? formatDateRange(monday, sunday) : new Date(today.getFullYear(), today.getMonth() + monthOffset).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
+            </p>
+            {/* View toggle */}
+            <div className="flex items-center rounded-lg border border-gray-200 bg-white overflow-hidden">
+              <button
+                onClick={() => setViewMode('week')}
+                className={`h-7 px-2.5 text-[11px] font-medium ${viewMode === 'week' ? 'bg-brand/10 text-brand' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                Settimana
+              </button>
+              <button
+                onClick={() => setViewMode('month')}
+                className={`h-7 px-2.5 text-[11px] font-medium ${viewMode === 'month' ? 'bg-brand/10 text-brand' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                Mese
+              </button>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setWeekOffset(0)}
+              onClick={() => { setWeekOffset(0); setMonthOffset(0) }}
               className={`rounded-xl px-4 py-1.5 text-xs font-semibold transition-colors duration-150 ease-out ${
-                weekOffset === 0
+                weekOffset === 0 && monthOffset === 0
                   ? 'bg-brand text-white shadow-sm'
                   : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
               }`}
@@ -129,9 +171,9 @@ export default function WeekCalendar({
             </button>
             <div className="flex items-center rounded-xl border border-gray-200">
               <button
-                onClick={() => setWeekOffset((w) => w - 1)}
+                onClick={() => viewMode === 'week' ? setWeekOffset((w) => w - 1) : setMonthOffset((m) => m - 1)}
                 className="flex h-8 w-8 items-center justify-center text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 rounded-l-xl"
-                aria-label="Settimana precedente"
+                aria-label="Precedente"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -139,9 +181,9 @@ export default function WeekCalendar({
               </button>
               <div className="h-4 w-px bg-gray-200" />
               <button
-                onClick={() => setWeekOffset((w) => w + 1)}
+                onClick={() => viewMode === 'week' ? setWeekOffset((w) => w + 1) : setMonthOffset((m) => m + 1)}
                 className="flex h-8 w-8 items-center justify-center text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 rounded-r-xl"
-                aria-label="Settimana successiva"
+                aria-label="Successiva"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M5 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -151,7 +193,8 @@ export default function WeekCalendar({
           </div>
         </div>
 
-        {/* Day headers */}
+        {/* Week view */}
+        {viewMode === 'week' && <>
         <div className="grid grid-cols-7 border-b border-gray-200">
           {days.map((day, i) => {
             const isToday = isSameDay(day, today)
@@ -183,7 +226,6 @@ export default function WeekCalendar({
           })}
         </div>
 
-        {/* Event columns */}
         <div className="grid min-h-[420px] grid-cols-7">
           {eventsByDay.map(({ events: dayEvents }, i) => (
             <div key={i} className="space-y-1.5 border-r border-gray-200 p-2 last:border-r-0">
@@ -196,7 +238,8 @@ export default function WeekCalendar({
                   return (
                     <div
                       key={event.id}
-                      className="rounded-xl border p-2.5 text-xs transition-colors duration-150 hover:shadow-sm"
+                      onClick={() => setSelectedEvent(event)}
+                      className="cursor-pointer rounded-xl border p-2.5 text-xs transition-all duration-150 hover:shadow-md"
                       style={
                         style
                           ? { background: style.bg, color: style.text, borderColor: style.border }
@@ -204,25 +247,17 @@ export default function WeekCalendar({
                       }
                     >
                       <p className="truncate font-semibold">{event.title ?? 'Appuntamento'}</p>
+                      {event.contactName && (
+                        <p className="mt-0.5 truncate opacity-80">{event.contactName}</p>
+                      )}
                       {event.startTime && (
-                        <p className="mt-0.5 opacity-70">
-                          {new Date(event.startTime).toLocaleTimeString('it-IT', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                          {event.endTime && (
-                            <>
-                              {' – '}
-                              {new Date(event.endTime).toLocaleTimeString('it-IT', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </>
-                          )}
+                        <p className="mt-0.5 opacity-60">
+                          {new Date(event.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                          {event.endTime && ` – ${new Date(event.endTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`}
                         </p>
                       )}
                       {event.appointmentStatus && (
-                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-60">
+                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-50">
                           {STATUS_LABELS[status] ?? status}
                         </p>
                       )}
@@ -233,11 +268,113 @@ export default function WeekCalendar({
             </div>
           ))}
         </div>
+        </>}
+
+        {/* Month view */}
+        {viewMode === 'month' && (
+          <>
+            <div className="grid grid-cols-7 border-b border-gray-200">
+              {DAY_NAMES.map((d) => (
+                <div key={d} className="border-r border-gray-200 p-2 text-center last:border-r-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{d}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {monthDays.map((day, i) => {
+                if (!day) return <div key={i} className="min-h-[80px] border-b border-r border-gray-100 bg-gray-50/30 last:border-r-0" />
+                const isToday = isSameDay(day, today)
+                const dayEvts = monthEvents.filter((e) => e.startTime && isSameDay(new Date(e.startTime), day))
+                return (
+                  <div key={i} className={`min-h-[80px] border-b border-r border-gray-100 p-1 last:border-r-0 ${isToday ? 'bg-brand/5' : ''}`}>
+                    <p className={`text-[11px] font-bold ${isToday ? 'text-brand' : 'text-gray-500'}`}>{day.getDate()}</p>
+                    {dayEvts.slice(0, 2).map((e) => {
+                      const s = STATUS_STYLE[e.appointmentStatus ?? '']
+                      return (
+                        <div
+                          key={e.id}
+                          onClick={() => setSelectedEvent(e)}
+                          className="mt-0.5 cursor-pointer truncate rounded px-1 py-0.5 text-[9px] font-medium"
+                          style={s ? { background: s.bg, color: s.text } : { background: '#f3f4f6', color: '#6b7280' }}
+                        >
+                          {e.startTime && new Date(e.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}{' '}
+                          {e.contactName ?? e.title ?? ''}
+                        </div>
+                      )
+                    })}
+                    {dayEvts.length > 2 && (
+                      <p className="mt-0.5 text-[9px] text-gray-400">+{dayEvts.length - 2} altri</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Operatori sidebar */}
-      {users.length > 0 && (
-        <div className="w-52 shrink-0">
+      {/* Right sidebar: Operators + Event detail */}
+      <div className="w-56 shrink-0 space-y-4">
+        {/* Event detail */}
+        {selectedEvent && (
+          <div className={`${sf.card} ${sf.cardPadding}`}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Dettaglio</h3>
+              <button onClick={() => setSelectedEvent(null)} className="text-gray-400 hover:text-gray-600">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-2.5">
+              <p className="text-sm font-bold text-gray-900">{selectedEvent.title ?? 'Appuntamento'}</p>
+              {selectedEvent.contactName && (
+                <div>
+                  <p className="text-[10px] text-gray-400">Contatto</p>
+                  <p className="text-xs font-medium text-gray-700">{selectedEvent.contactName}</p>
+                </div>
+              )}
+              {selectedEvent.contactEmail && (
+                <div>
+                  <p className="text-[10px] text-gray-400">Email</p>
+                  <p className="text-xs text-gray-600">{selectedEvent.contactEmail}</p>
+                </div>
+              )}
+              {selectedEvent.contactPhone && (
+                <div>
+                  <p className="text-[10px] text-gray-400">Telefono</p>
+                  <p className="text-xs text-gray-600">{selectedEvent.contactPhone}</p>
+                </div>
+              )}
+              {selectedEvent.startTime && (
+                <div>
+                  <p className="text-[10px] text-gray-400">Data e ora</p>
+                  <p className="text-xs font-medium text-gray-700">
+                    {new Date(selectedEvent.startTime).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    {new Date(selectedEvent.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                    {selectedEvent.endTime && ` – ${new Date(selectedEvent.endTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`}
+                  </p>
+                </div>
+              )}
+              {selectedEvent.appointmentStatus && (
+                <div>
+                  <p className="text-[10px] text-gray-400">Stato</p>
+                  <span className={`inline-block mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    selectedEvent.appointmentStatus === 'confirmed' || selectedEvent.appointmentStatus === 'showed' ? 'bg-emerald-50 text-emerald-700' :
+                    selectedEvent.appointmentStatus === 'cancelled' ? 'bg-red-50 text-red-600' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                    {STATUS_LABELS[selectedEvent.appointmentStatus] ?? selectedEvent.appointmentStatus}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+          {users.length > 0 && (
           <div className={`${sf.card} ${sf.cardPadding}`}>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
               {isAdmin ? 'Operatori' : 'Il mio calendario'}
@@ -291,8 +428,8 @@ export default function WeekCalendar({
               })}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

@@ -50,17 +50,28 @@ export default async function CalendarPage({
   let authUser: { id: string; email?: string } | null = null
 
   try {
-    // Read calendar events from Supabase cache
-    const { data: cachedEvents } = await supabase
-      .from('cached_calendar_events')
-      .select('ghl_id, calendar_id, contact_ghl_id, title, start_time, end_time, appointment_status')
-      .eq('location_id', locationId)
+    // Read calendar events + contacts from cache
+    const [{ data: cachedEvents }, { data: cachedContacts }] = await Promise.all([
+      supabase.from('cached_calendar_events')
+        .select('ghl_id, calendar_id, contact_ghl_id, title, start_time, end_time, appointment_status')
+        .eq('location_id', locationId),
+      supabase.from('cached_contacts')
+        .select('ghl_id, first_name, last_name, email, phone')
+        .eq('location_id', locationId),
+    ])
+    const contactMap = new Map((cachedContacts ?? []).map((c) => [c.ghl_id, c]))
     const calData = {
-      events: (cachedEvents ?? []).map((e) => ({
-        id: e.ghl_id, calendarId: e.calendar_id, contactId: e.contact_ghl_id,
-        title: e.title, startTime: e.start_time, endTime: e.end_time,
-        appointmentStatus: e.appointment_status,
-      })),
+      events: (cachedEvents ?? []).map((e) => {
+        const contact = e.contact_ghl_id ? contactMap.get(e.contact_ghl_id) : null
+        return {
+          id: e.ghl_id, calendarId: e.calendar_id, contactId: e.contact_ghl_id,
+          title: e.title, startTime: e.start_time, endTime: e.end_time,
+          appointmentStatus: e.appointment_status,
+          contactName: contact ? [contact.first_name, contact.last_name].filter(Boolean).join(' ') : null,
+          contactEmail: contact?.email ?? null,
+          contactPhone: contact?.phone ?? null,
+        }
+      }),
     } as Record<string, unknown>
 
     const [users, { data: { user } }] = await Promise.all([
