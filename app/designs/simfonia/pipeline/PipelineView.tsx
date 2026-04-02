@@ -79,7 +79,7 @@ export default function PipelineView({
       </div>
 
       {/* Toolbar */}
-      <div className="shrink-0 border-b border-gray-200/70 bg-white/80 px-5 py-2.5 backdrop-blur-md">
+      <div className="shrink-0 mx-5 mb-3 rounded-2xl border border-gray-200/80 bg-white/90 px-5 py-2.5 shadow-sm backdrop-blur-md">
         <div className="flex items-center justify-between gap-4">
           {/* Left: Pipeline tabs */}
           <div className="flex items-center gap-1">
@@ -111,12 +111,12 @@ export default function PipelineView({
                 placeholder="Cerca deal..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-8 w-48 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-sm outline-none placeholder:text-gray-400 focus:border-brand/40 focus:ring-1 focus:ring-brand/15"
+                className="h-8 w-48 rounded-xl border border-gray-200 bg-white pl-8 pr-3 text-sm outline-none placeholder:text-gray-400 focus:border-brand/40 focus:ring-1 focus:ring-brand/15"
               />
             </div>
 
             {/* Filter */}
-            <div className="flex items-center rounded-lg border border-gray-200 bg-white overflow-hidden">
+            <div className="flex items-center rounded-xl border border-gray-200 bg-white overflow-hidden">
               {(['all', 'open', 'won', 'lost'] as Filter[]).map((f) => {
                 const labels: Record<Filter, string> = { all: 'Tutti', open: 'Aperte', won: 'Vinte', lost: 'Perse' }
                 return (

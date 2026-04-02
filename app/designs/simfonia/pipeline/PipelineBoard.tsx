@@ -142,22 +142,22 @@ export default function PipelineBoard({
         {/* Scroll arrows */}
         <button
           onClick={() => scrollBoard('left')}
-          className="absolute left-0 top-1/2 z-20 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg border border-gray-200 text-gray-600 hover:bg-white hover:text-gray-900"
+          className="absolute left-1 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-xl bg-white shadow-md border border-gray-200/80 text-gray-500 hover:text-gray-900 hover:shadow-lg"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
         </button>
         <button
           onClick={() => scrollBoard('right')}
-          className="absolute right-0 top-1/2 z-20 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg border border-gray-200 text-gray-600 hover:bg-white hover:text-gray-900"
+          className="absolute right-1 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-xl bg-white shadow-md border border-gray-200/80 text-gray-500 hover:text-gray-900 hover:shadow-lg"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
           </svg>
         </button>
 
-        <div ref={scrollRef} className="flex h-full gap-3 overflow-x-auto px-12 pb-2 pt-1 scroll-smooth scrollbar-hide">
+        <div ref={scrollRef} className="flex h-full gap-3 overflow-x-auto px-10 pb-2 pt-1 scroll-smooth" style={{ scrollbarWidth: 'none' }}>
         {columns.map((stage) => {
           const stageTotal = stage.deals.reduce((sum, d) => sum + (d.monetaryValue ?? 0), 0)
           return (
