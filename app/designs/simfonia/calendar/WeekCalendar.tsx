@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { sf } from '@/lib/simfonia/ui'
 
 type ViewMode = 'week' | 'month'
@@ -69,6 +70,15 @@ const STATUS_LABELS: Record<string, string> = {
   new: 'Nuovo',
 }
 
+/** Left accent on event cards (booking-app style) */
+const STATUS_ACCENT: Record<string, string> = {
+  confirmed: 'border-l-emerald-500',
+  showed: 'border-l-emerald-500',
+  cancelled: 'border-l-red-400',
+  noshow: 'border-l-gray-400',
+  new: 'border-l-[var(--brand)]',
+}
+
 export default function WeekCalendar({
   events,
   users,
@@ -132,194 +142,247 @@ export default function WeekCalendar({
   const monthEvents = filteredEvents
 
   return (
-    <div className="flex gap-6">
-      {/* Calendar */}
-      <div className={`flex-1 min-w-0 ${sf.calendarWeek}`}>
-        {/* Navigation header */}
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
-          <div className="flex items-center gap-3">
-            <p className="text-sm font-semibold text-gray-900">
-              {viewMode === 'week' ? formatDateRange(monday, sunday) : new Date(today.getFullYear(), today.getMonth() + monthOffset).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+      {/* Main calendar — booking-style soft shell */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-gradient-to-b from-gray-50/90 via-white to-white ring-1 ring-gray-200/60 shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_12px_40px_-24px_rgba(15,23,42,0.12)]">
+        {/* Navigation */}
+        <div className="flex flex-col gap-4 border-b border-gray-200/60 bg-white/40 px-4 py-4 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
+          <div className="min-w-0 space-y-2">
+            <p className="truncate text-lg font-bold tracking-tight text-gray-900 sm:text-xl">
+              {viewMode === 'week'
+                ? formatDateRange(monday, sunday)
+                : new Date(today.getFullYear(), today.getMonth() + monthOffset).toLocaleDateString('it-IT', {
+                    month: 'long',
+                    year: 'numeric',
+                  })}
             </p>
-            {/* View toggle */}
-            <div className="flex items-center rounded-lg border border-gray-200 bg-white overflow-hidden">
-              <button
-                onClick={() => setViewMode('week')}
-                className={`h-7 px-2.5 text-[11px] font-medium ${viewMode === 'week' ? 'bg-brand/10 text-brand' : 'text-gray-500 hover:bg-gray-50'}`}
-              >
-                Settimana
-              </button>
-              <button
-                onClick={() => setViewMode('month')}
-                className={`h-7 px-2.5 text-[11px] font-medium ${viewMode === 'month' ? 'bg-brand/10 text-brand' : 'text-gray-500 hover:bg-gray-50'}`}
-              >
-                Mese
-              </button>
+            <p className="text-xs font-medium text-gray-400">
+              {viewMode === 'week' ? 'Vista settimanale' : 'Vista mensile'}
+            </p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <div className="inline-flex items-center rounded-full border border-gray-200/90 bg-white/90 p-0.5 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('week')}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                    viewMode === 'week'
+                      ? 'bg-gray-900 text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  Settimana
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('month')}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                    viewMode === 'month'
+                      ? 'bg-gray-900 text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  Mese
+                </button>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
-              onClick={() => { setWeekOffset(0); setMonthOffset(0) }}
-              className={`rounded-xl px-4 py-1.5 text-xs font-semibold transition-colors duration-150 ease-out ${
+              onClick={() => {
+                setWeekOffset(0)
+                setMonthOffset(0)
+              }}
+              className={`rounded-full px-4 py-2 text-xs font-bold transition-all ${
                 weekOffset === 0 && monthOffset === 0
-                  ? 'bg-brand text-white shadow-sm'
-                  : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                  ? 'bg-brand text-white shadow-md shadow-brand/25'
+                  : 'border border-gray-200/90 bg-white text-gray-600 shadow-sm hover:bg-gray-50'
               }`}
             >
               Oggi
             </button>
-            <div className="flex items-center rounded-xl border border-gray-200">
+            <div className="flex items-center gap-1 rounded-full border border-gray-200/90 bg-white p-1 shadow-sm">
               <button
-                onClick={() => viewMode === 'week' ? setWeekOffset((w) => w - 1) : setMonthOffset((m) => m - 1)}
-                className="flex h-8 w-8 items-center justify-center text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 rounded-l-xl"
+                type="button"
+                onClick={() => (viewMode === 'week' ? setWeekOffset((w) => w - 1) : setMonthOffset((m) => m - 1))}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
                 aria-label="Precedente"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <ChevronLeft className="h-4 w-4" strokeWidth={2} />
               </button>
-              <div className="h-4 w-px bg-gray-200" />
               <button
-                onClick={() => viewMode === 'week' ? setWeekOffset((w) => w + 1) : setMonthOffset((m) => m + 1)}
-                className="flex h-8 w-8 items-center justify-center text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 rounded-r-xl"
+                type="button"
+                onClick={() => (viewMode === 'week' ? setWeekOffset((w) => w + 1) : setMonthOffset((m) => m + 1))}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
                 aria-label="Successiva"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M5 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <ChevronRight className="h-4 w-4" strokeWidth={2} />
               </button>
             </div>
           </div>
         </div>
 
         {/* Week view */}
-        {viewMode === 'week' && <>
-        <div className="grid grid-cols-7 border-b border-gray-200">
-          {days.map((day, i) => {
-            const isToday = isSameDay(day, today)
-            const count = eventsByDay[i].events.length
-            return (
-              <div
-                key={i}
-                className={`border-r border-gray-200 p-3 text-center last:border-r-0 ${
-                  isToday ? 'bg-brand' : ''
-                }`}
-              >
-                <p className={`text-xs font-semibold uppercase tracking-wide ${isToday ? 'text-white/70' : 'text-gray-400'}`}>
-                  {DAY_NAMES[i]}
-                </p>
-                <p className={`mt-0.5 text-lg font-bold ${isToday ? 'text-white' : 'text-gray-900'}`}>
-                  {day.getDate()}
-                </p>
-                {count > 0 && (
-                  <span
-                    className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
-                      isToday ? 'bg-white/20 text-white' : 'bg-brand/10 text-brand'
+        {viewMode === 'week' && (
+          <>
+            <div className="grid grid-cols-7 gap-2 p-3 sm:gap-3 sm:p-4">
+              {days.map((day, i) => {
+                const isToday = isSameDay(day, today)
+                const count = eventsByDay[i].events.length
+                return (
+                  <div
+                    key={i}
+                    className={`rounded-2xl px-2 py-3 text-center shadow-sm transition-shadow sm:px-3 sm:py-3.5 ${
+                      isToday
+                        ? 'bg-brand text-white ring-2 ring-brand/30 ring-offset-2 ring-offset-gray-50/80 shadow-md shadow-brand/20'
+                        : 'border border-gray-100/90 bg-white/90 text-gray-900 hover:border-gray-200'
                     }`}
                   >
-                    {count}
-                  </span>
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        <div className="grid min-h-[420px] grid-cols-7">
-          {eventsByDay.map(({ events: dayEvents }, i) => (
-            <div key={i} className="space-y-1.5 border-r border-gray-200 p-2 last:border-r-0">
-              {dayEvents.length === 0 ? (
-                <p className="mt-8 text-center text-xs text-gray-200">—</p>
-              ) : (
-                dayEvents.map((event) => {
-                  const status = event.appointmentStatus ?? ''
-                  const style = STATUS_STYLE[status]
-                  return (
-                    <div
-                      key={event.id}
-                      onClick={() => setSelectedEvent(event)}
-                      className="cursor-pointer rounded-xl border p-2.5 text-xs transition-all duration-150 hover:shadow-md"
-                      style={
-                        style
-                          ? { background: style.bg, color: style.text, borderColor: style.border }
-                          : { background: 'white', color: '#374151', borderColor: '#E5E7EB' }
-                      }
+                    <p
+                      className={`text-[10px] font-bold uppercase tracking-[0.14em] sm:text-[11px] ${
+                        isToday ? 'text-white/80' : 'text-gray-400'
+                      }`}
                     >
-                      <p className="truncate font-semibold">{event.title ?? 'Appuntamento'}</p>
-                      {event.contactName && (
-                        <p className="mt-0.5 truncate opacity-80">{event.contactName}</p>
-                      )}
-                      {event.startTime && (
-                        <p className="mt-0.5 opacity-60">
-                          {new Date(event.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                          {event.endTime && ` – ${new Date(event.endTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`}
-                        </p>
-                      )}
-                      {event.appointmentStatus && (
-                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-50">
-                          {STATUS_LABELS[status] ?? status}
-                        </p>
-                      )}
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          ))}
-        </div>
-        </>}
-
-        {/* Month view */}
-        {viewMode === 'month' && (
-          <>
-            <div className="grid grid-cols-7 border-b border-gray-200">
-              {DAY_NAMES.map((d) => (
-                <div key={d} className="border-r border-gray-200 p-2 text-center last:border-r-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{d}</p>
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7">
-              {monthDays.map((day, i) => {
-                if (!day) return <div key={i} className="min-h-[80px] border-b border-r border-gray-100 bg-gray-50/30 last:border-r-0" />
-                const isToday = isSameDay(day, today)
-                const dayEvts = monthEvents.filter((e) => e.startTime && isSameDay(new Date(e.startTime), day))
-                return (
-                  <div key={i} className={`min-h-[80px] border-b border-r border-gray-100 p-1 last:border-r-0 ${isToday ? 'bg-brand/5' : ''}`}>
-                    <p className={`text-[11px] font-bold ${isToday ? 'text-brand' : 'text-gray-500'}`}>{day.getDate()}</p>
-                    {dayEvts.slice(0, 2).map((e) => {
-                      const s = STATUS_STYLE[e.appointmentStatus ?? '']
-                      return (
-                        <div
-                          key={e.id}
-                          onClick={() => setSelectedEvent(e)}
-                          className="mt-0.5 cursor-pointer truncate rounded px-1 py-0.5 text-[9px] font-medium"
-                          style={s ? { background: s.bg, color: s.text } : { background: '#f3f4f6', color: '#6b7280' }}
-                        >
-                          {e.startTime && new Date(e.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}{' '}
-                          {e.contactName ?? e.title ?? ''}
-                        </div>
-                      )
-                    })}
-                    {dayEvts.length > 2 && (
-                      <p className="mt-0.5 text-[9px] text-gray-400">+{dayEvts.length - 2} altri</p>
+                      {DAY_NAMES[i]}
+                    </p>
+                    <p className={`mt-1 text-xl font-bold tabular-nums sm:text-2xl ${isToday ? 'text-white' : 'text-gray-900'}`}>
+                      {day.getDate()}
+                    </p>
+                    {count > 0 && (
+                      <span
+                        className={`mt-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          isToday ? 'bg-white/25 text-white' : 'bg-brand/12 text-brand'
+                        }`}
+                      >
+                        {count}
+                      </span>
                     )}
                   </div>
                 )
               })}
             </div>
+
+            <div className="grid min-h-[440px] grid-cols-7 gap-2 px-3 pb-4 sm:gap-3 sm:px-4 sm:pb-5">
+              {eventsByDay.map(({ events: dayEvents }, i) => (
+                <div
+                  key={i}
+                  className="flex flex-col gap-2 rounded-2xl border border-gray-100/90 bg-white/70 p-2 shadow-[0_8px_30px_-18px_rgba(15,23,42,0.08)] sm:p-2.5"
+                >
+                  {dayEvents.length === 0 ? (
+                    <div className="flex flex-1 flex-col items-center justify-center py-10">
+                      <span className="text-[11px] font-medium text-gray-200">Libero</span>
+                    </div>
+                  ) : (
+                    dayEvents.map((event) => {
+                      const status = event.appointmentStatus ?? ''
+                      const style = STATUS_STYLE[status]
+                      const accent = STATUS_ACCENT[status] ?? 'border-l-gray-300'
+                      return (
+                        <button
+                          key={event.id}
+                          type="button"
+                          onClick={() => setSelectedEvent(event)}
+                          className={`w-full cursor-pointer rounded-xl border-y border-r border-gray-100/80 border-l-[3px] bg-white/95 p-2.5 text-left text-xs shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-200/80 hover:shadow-md sm:p-3 ${accent}`}
+                          style={style ? { background: style.bg, color: style.text } : { color: '#374151' }}
+                        >
+                          <p className="truncate font-bold leading-tight">{event.title ?? 'Appuntamento'}</p>
+                          {event.contactName && <p className="mt-1 truncate text-[11px] font-medium opacity-85">{event.contactName}</p>}
+                          {event.startTime && (
+                            <p className="mt-1.5 text-[11px] font-semibold tabular-nums opacity-70">
+                              {new Date(event.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                              {event.endTime &&
+                                ` – ${new Date(event.endTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`}
+                            </p>
+                          )}
+                          {event.appointmentStatus && (
+                            <p className="mt-2 text-[9px] font-bold uppercase tracking-wider opacity-55">
+                              {STATUS_LABELS[status] ?? status}
+                            </p>
+                          )}
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              ))}
+            </div>
           </>
+        )}
+
+        {/* Month view */}
+        {viewMode === 'month' && (
+          <div className="p-3 sm:p-4">
+            <div className="grid grid-cols-7 gap-1.5 pb-3">
+              {DAY_NAMES.map((d) => (
+                <div key={d} className="py-2 text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400">{d}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1.5">
+              {monthDays.map((day, i) => {
+                if (!day)
+                  return (
+                    <div
+                      key={i}
+                      className="min-h-[88px] rounded-xl bg-gray-50/40 ring-1 ring-gray-100/80"
+                    />
+                  )
+                const isToday = isSameDay(day, today)
+                const dayEvts = monthEvents.filter((e) => e.startTime && isSameDay(new Date(e.startTime), day))
+                return (
+                  <div
+                    key={i}
+                    className={`flex min-h-[88px] flex-col rounded-xl p-1.5 ring-1 transition-shadow sm:p-2 ${
+                      isToday
+                        ? 'bg-brand/5 ring-brand/25 shadow-sm'
+                        : 'bg-white/80 ring-gray-100/90 hover:ring-gray-200'
+                    }`}
+                  >
+                    <p
+                      className={`mb-1 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
+                        isToday ? 'bg-brand text-white shadow-sm' : 'text-gray-600'
+                      }`}
+                    >
+                      {day.getDate()}
+                    </p>
+                    <div className="min-h-0 flex-1 space-y-1">
+                      {dayEvts.slice(0, 2).map((e) => {
+                        const s = STATUS_STYLE[e.appointmentStatus ?? '']
+                        const ac = STATUS_ACCENT[e.appointmentStatus ?? ''] ?? 'border-l-gray-300'
+                        return (
+                          <button
+                            key={e.id}
+                            type="button"
+                            onClick={() => setSelectedEvent(e)}
+                            className={`w-full cursor-pointer truncate rounded-lg border-y border-r border-gray-100/80 border-l-2 py-1 pl-1.5 pr-1 text-left text-[9px] font-semibold leading-tight shadow-sm ${ac}`}
+                            style={s ? { background: s.bg, color: s.text } : { background: '#f9fafb', color: '#6b7280' }}
+                          >
+                            {e.startTime &&
+                              new Date(e.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}{' '}
+                            {e.contactName ?? e.title ?? ''}
+                          </button>
+                        )
+                      })}
+                      {dayEvts.length > 2 && (
+                        <p className="text-[9px] font-semibold text-gray-400">+{dayEvts.length - 2}</p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Right sidebar: Operators + Event detail */}
-      <div className="w-56 shrink-0 space-y-4">
+      {/* Sidebar — team & detail */}
+      <aside className="w-full shrink-0 space-y-4 lg:sticky lg:top-6 lg:w-[280px]">
         {/* Event detail */}
         {selectedEvent && (
-          <div className={`${sf.card} ${sf.cardPadding}`}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Dettaglio</h3>
+          <div className={`${sf.card} ${sf.cardPadding} ring-1 ring-gray-100/80 shadow-[0_12px_40px_-20px_rgba(15,23,42,0.12)]`}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className={sf.sectionLabel}>Dettaglio</h3>
               <button onClick={() => setSelectedEvent(null)} className="text-gray-400 hover:text-gray-600">
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -375,21 +438,23 @@ export default function WeekCalendar({
         )}
 
           {users.length > 0 && (
-          <div className={`${sf.card} ${sf.cardPadding}`}>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <div className={`${sf.card} ${sf.cardPadding} ring-1 ring-gray-100/80`}>
+            <h3 className={`mb-4 ${sf.sectionLabel}`}>
               {isAdmin ? 'Operatori' : 'Il mio calendario'}
             </h3>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {isAdmin && (
                 <button
                   type="button"
                   onClick={() => setSelectedUserId(null)}
-                  className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
-                    !selectedUserId ? 'bg-brand/10 text-brand' : 'text-gray-600 hover:bg-gray-50'
+                  className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left text-sm font-semibold transition-all ${
+                    !selectedUserId
+                      ? 'border-brand/20 bg-brand/10 text-brand shadow-sm ring-2 ring-brand/15'
+                      : 'border-transparent text-gray-600 hover:border-gray-100 hover:bg-gray-50/80'
                   }`}
                 >
                   <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm ${
                       !selectedUserId ? 'bg-brand' : 'bg-gray-400'
                     }`}
                   >
@@ -411,12 +476,16 @@ export default function WeekCalendar({
                     key={user.id}
                     type="button"
                     onClick={() => (isAdmin ? setSelectedUserId(isActive ? null : user.id) : undefined)}
-                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
+                    className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left text-sm font-semibold transition-all ${
                       !isAdmin ? 'cursor-default' : ''
-                    } ${isActive ? 'bg-brand/10 text-brand' : 'text-gray-600 hover:bg-gray-50'}`}
+                    } ${
+                      isActive
+                        ? 'border-brand/20 bg-brand/10 text-brand shadow-sm ring-2 ring-brand/15'
+                        : 'border-transparent text-gray-600 hover:border-gray-100 hover:bg-gray-50/80'
+                    }`}
                   >
                     <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm ${
                         isActive ? 'bg-brand' : 'bg-gray-400'
                       }`}
                     >
@@ -429,7 +498,7 @@ export default function WeekCalendar({
             </div>
           </div>
         )}
-      </div>
+      </aside>
     </div>
   )
 }

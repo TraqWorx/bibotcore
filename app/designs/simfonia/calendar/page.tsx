@@ -117,7 +117,7 @@ export default async function CalendarPage({
   }[]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       <SimfoniaPageHeader
         eyebrow="Agenda"
         title="Calendario"
@@ -142,7 +142,7 @@ export default async function CalendarPage({
         }
       />
 
-      <div className="rounded-3xl border border-gray-200/70 bg-white/85 p-4 shadow-sm backdrop-blur-md sm:p-5">
+      <div className={`${sf.card} p-4 sm:p-5`}>
         <WeekCalendar
           events={events}
           users={users}
