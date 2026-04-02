@@ -23,7 +23,7 @@ export default function ConversationsClient({ locationId }: { locationId: string
       <SimfoniaPageHeader
         eyebrow="Messaggistica"
         title="Conversazioni"
-        description="Inbox unificata: SMS, email, WhatsApp e altro da GHL."
+        description="Inbox unificata: SMS, email, WhatsApp e altro."
       />
       {isLoading ? (
         <div className={`flex flex-1 items-center justify-center ${sf.emptyPanel} min-h-[320px]`}>

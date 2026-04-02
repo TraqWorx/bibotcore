@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import SimfoniaPageHeader from '../_components/SimfoniaPageHeader'
 import PipelineBoard from './PipelineBoard'
 import DealDrawer from './DealDrawer'
 import { updateOpportunity } from './_actions'
@@ -68,6 +69,15 @@ export default function PipelineView({
 
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col overflow-hidden">
+      {/* Page header */}
+      <div className="shrink-0 px-5 pt-5 pb-3">
+        <SimfoniaPageHeader
+          eyebrow="Vendite"
+          title="Pipeline"
+          description="Gestisci le opportunità, trascina le card tra gli stage e monitora i risultati."
+        />
+      </div>
+
       {/* Toolbar */}
       <div className="shrink-0 border-b border-gray-200/70 bg-white/80 px-5 py-2.5 backdrop-blur-md">
         <div className="flex items-center justify-between gap-4">
