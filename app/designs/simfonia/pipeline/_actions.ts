@@ -46,11 +46,10 @@ export async function updateOpportunity(
 
 export async function getDealData(dealId: string, locationId: string) {
   await assertUserOwnsLocation(locationId)
-  const ghl = await getGhlClient(locationId)
   const supabase = createAdminClient()
 
   try {
-    // Get opportunity — try cache first, fall back to GHL
+    // Get opportunity from cache
     let opportunity: Record<string, unknown> | null = null
     const { data: cachedOpp } = await supabase
       .from('cached_opportunities')
@@ -70,8 +69,12 @@ export async function getDealData(dealId: string, locationId: string) {
         status: cachedOpp.status,
       }
     } else {
-      const oppData = await ghl.opportunities.get(dealId)
-      opportunity = oppData?.opportunity ?? null
+      // Fallback to GHL
+      try {
+        const ghl = await getGhlClient(locationId)
+        const oppData = await ghl.opportunities.get(dealId)
+        opportunity = oppData?.opportunity ?? null
+      } catch { /* ignore */ }
     }
 
     let contact = null
@@ -82,37 +85,31 @@ export async function getDealData(dealId: string, locationId: string) {
     let appointments: { id: string; title?: string; startTime?: string; appointmentStatus?: string }[] = []
     let users: { id: string; name: string }[] = []
 
-    // Fetch users in parallel (still from GHL — not cached)
-    const usersPromise = (async () => {
-      try {
-        const token = await getGhlTokenForLocation(locationId)
-        const res = await fetch(`${BASE_URL}/users/?locationId=${locationId}`, {
-          headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
-        })
-        if (!res.ok) return []
-        const data = await res.json()
-        return ((data?.users ?? []) as { id: string; name?: string; firstName?: string; lastName?: string; email?: string }[]).map((u) => ({
-          id: u.id,
-          name: u.name ?? ([u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id),
-        }))
-      } catch { return [] }
-    })()
-
     const contactId = (opportunity as Record<string, unknown>)?.contactId as string | undefined
 
     if (contactId) {
-      // Fetch contact from cache, conversations/messages from GHL (messages aren't cached)
-      const [cachedContact, convData, cachedNotes, cachedTasks, apptData, usersResult] = await Promise.allSettled([
-        supabase.from('cached_contacts').select('*').eq('location_id', locationId).eq('ghl_id', contactId).single(),
-        ghl.conversations.byContact(contactId),
-        supabase.from('cached_notes').select('*').eq('location_id', locationId).eq('contact_ghl_id', contactId),
-        supabase.from('cached_tasks').select('*').eq('location_id', locationId).eq('contact_ghl_id', contactId),
-        ghl.calendarEvents.byContact(contactId),
-        usersPromise,
+      // Fetch ALL from cache in parallel
+      const [
+        cachedContact,
+        cachedConvo,
+        cachedNotes,
+        cachedTasks,
+        cachedEvents,
+        cachedUsers,
+        noteAuthors,
+      ] = await Promise.all([
+        supabase.from('cached_contacts').select('ghl_id, first_name, last_name, email, phone, company_name, tags, raw').eq('location_id', locationId).eq('ghl_id', contactId).maybeSingle(),
+        supabase.from('cached_conversations').select('ghl_id, type').eq('location_id', locationId).eq('contact_ghl_id', contactId).limit(1).maybeSingle(),
+        supabase.from('cached_notes').select('ghl_id, body, date_added, created_by').eq('location_id', locationId).eq('contact_ghl_id', contactId).order('date_added', { ascending: false }),
+        supabase.from('cached_tasks').select('ghl_id, title, due_date, completed').eq('location_id', locationId).eq('contact_ghl_id', contactId),
+        supabase.from('cached_calendar_events').select('ghl_id, title, start_time, appointment_status').eq('location_id', locationId).eq('contact_ghl_id', contactId).order('start_time', { ascending: false }),
+        supabase.from('cached_ghl_users').select('ghl_id, name, first_name, last_name, email').eq('location_id', locationId),
+        supabase.from('note_authors').select('note_id, author_user_id').eq('location_id', locationId).eq('contact_id', contactId),
       ])
 
-      if (cachedContact.status === 'fulfilled' && cachedContact.value.data) {
-        const c = cachedContact.value.data
+      // Contact
+      if (cachedContact.data) {
+        const c = cachedContact.data
         contact = c.raw ?? {
           id: c.ghl_id, firstName: c.first_name, lastName: c.last_name,
           email: c.email, phone: c.phone, companyName: c.company_name,
@@ -120,53 +117,95 @@ export async function getDealData(dealId: string, locationId: string) {
         }
       }
 
-      if (convData.status === 'fulfilled') {
-        conversation = convData.value?.conversations?.[0] ?? null
-        if (conversation?.id) {
-          try {
-            const msgData = await ghl.conversations.messages(conversation.id)
+      // Conversation + messages
+      const convoId = cachedConvo.data?.ghl_id
+      if (convoId) {
+        conversation = { id: convoId, type: cachedConvo.data?.type }
+        // Try GHL for real-time messages, fall back to cached
+        try {
+          const ghl = await getGhlClient(locationId)
+          const msgData = await ghl.conversations.messages(convoId)
+          const nested = msgData?.messages
+          const rawMsgs = Array.isArray(nested) ? nested : nested?.messages ?? []
+          messages = Array.isArray(rawMsgs) ? rawMsgs : []
+        } catch {
+          const { data: cachedMsgs } = await supabase.from('cached_messages')
+            .select('ghl_id, body, direction, date_added')
+            .eq('location_id', locationId).eq('conversation_id', convoId)
+            .order('date_added', { ascending: true })
+          messages = (cachedMsgs ?? []).map((m) => ({
+            id: m.ghl_id, body: m.body ?? '', direction: m.direction ?? '', dateAdded: m.date_added ?? '',
+          }))
+        }
+      } else {
+        // No cached conversation — try GHL
+        try {
+          const ghl = await getGhlClient(locationId)
+          const convData = await ghl.conversations.byContact(contactId)
+          const conv = convData?.conversations?.[0]
+          if (conv?.id) {
+            conversation = { id: conv.id, type: conv.type }
+            const msgData = await ghl.conversations.messages(conv.id)
             const nested = msgData?.messages
             const rawMsgs = Array.isArray(nested) ? nested : nested?.messages ?? []
             messages = Array.isArray(rawMsgs) ? rawMsgs : []
-          } catch { /* ignore */ }
-        }
-      }
-
-      if (cachedNotes.status === 'fulfilled') {
-        const rows = cachedNotes.value.data ?? []
-        notes = rows.map((n) => ({
-          id: n.ghl_id, body: n.body ?? '', dateAdded: n.date_added ?? '', createdBy: n.created_by ?? '',
-        }))
-      }
-      if (cachedTasks.status === 'fulfilled') {
-        const rows = cachedTasks.value.data ?? []
-        tasks = rows.map((t) => ({
-          id: t.ghl_id, title: t.title ?? '', dueDate: t.due_date ?? '',
-          completed: t.completed ?? false,
-        }))
-      }
-      if (apptData.status === 'fulfilled') { const r = apptData.value?.events; appointments = Array.isArray(r) ? r : [] }
-      if (usersResult.status === 'fulfilled') users = usersResult.value
-
-      // Merge note authors from Supabase
-      if (notes.length > 0) {
-        try {
-          const { data: authorData } = await supabase
-            .from('note_authors')
-            .select('note_id, author_user_id')
-            .eq('location_id', locationId)
-            .eq('contact_id', contactId)
-          if (authorData) {
-            const authorMap = new Map(authorData.map((a: { note_id: string; author_user_id: string }) => [a.note_id, a.author_user_id]))
-            notes = notes.map((n) => ({
-              ...n,
-              createdBy: authorMap.get(n.id) ?? n.createdBy ?? '',
-            }))
           }
+        } catch { /* GHL down */ }
+      }
+
+      // Notes with authors
+      notes = (cachedNotes.data ?? []).map((n) => ({
+        id: n.ghl_id, body: n.body ?? '', dateAdded: n.date_added ?? '', createdBy: n.created_by ?? '',
+      }))
+      // If no cached notes, try GHL
+      if (notes.length === 0) {
+        try {
+          const ghl = await getGhlClient(locationId)
+          const noteData = await ghl.notes.list(contactId)
+          const raw = noteData?.notes ?? []
+          notes = (Array.isArray(raw) ? raw : []).map((n: Record<string, unknown>) => ({
+            id: String(n.id ?? ''), body: String(n.body ?? ''), dateAdded: String(n.dateAdded ?? ''), createdBy: String(n.userId ?? ''),
+          }))
         } catch { /* ignore */ }
       }
+      if (noteAuthors.data && notes.length > 0) {
+        const authorMap = new Map(noteAuthors.data.map((a: { note_id: string; author_user_id: string }) => [a.note_id, a.author_user_id]))
+        notes = notes.map((n) => ({ ...n, createdBy: authorMap.get(n.id) ?? n.createdBy ?? '' }))
+      }
+
+      // Tasks — if no cache, try GHL
+      tasks = (cachedTasks.data ?? []).map((t) => ({
+        id: t.ghl_id, title: t.title ?? '', dueDate: t.due_date ?? '', completed: t.completed ?? false,
+      }))
+      if (tasks.length === 0) {
+        try {
+          const ghl = await getGhlClient(locationId)
+          const taskData = await ghl.tasks.list(contactId)
+          const raw = taskData?.tasks ?? []
+          tasks = (Array.isArray(raw) ? raw : []).map((t: Record<string, unknown>) => ({
+            id: String(t.id ?? ''), title: String(t.title ?? ''), dueDate: String(t.dueDate ?? ''), completed: t.completed === true,
+          }))
+        } catch { /* ignore */ }
+      }
+
+      // Appointments
+      appointments = (cachedEvents.data ?? []).map((e) => ({
+        id: e.ghl_id, title: e.title ?? '', startTime: e.start_time ?? '', appointmentStatus: e.appointment_status ?? '',
+      }))
+
+      // Users
+      users = (cachedUsers.data ?? []).map((u) => ({
+        id: u.ghl_id,
+        name: u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email || u.ghl_id,
+      }))
     } else {
-      users = await usersPromise
+      // No contact — just get users
+      const { data: cachedUsers } = await supabase.from('cached_ghl_users')
+        .select('ghl_id, name, first_name, last_name, email').eq('location_id', locationId)
+      users = (cachedUsers ?? []).map((u) => ({
+        id: u.ghl_id,
+        name: u.name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email || u.ghl_id,
+      }))
     }
 
     return { opportunity, contact, conversation, messages, notes, tasks, appointments, users }
@@ -178,7 +217,6 @@ export async function getDealData(dealId: string, locationId: string) {
     }
   }
 }
-
 
 export async function deleteOpportunity(
   opportunityId: string,
@@ -272,7 +310,6 @@ export async function completeTask(
   }
 }
 
-// Map GHL conversation type to valid message type
 function resolveMessageType(convType?: string): string {
   if (!convType) return 'SMS'
   const t = convType.toUpperCase()
