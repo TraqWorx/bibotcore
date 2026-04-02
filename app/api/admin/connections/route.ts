@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase-server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 async function getAuthenticatedAdmin() {
   const cookieStore = await cookies()
@@ -24,7 +20,8 @@ async function getAuthenticatedAdmin() {
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) return null
 
-  const { data: profile } = await supabase
+  const sb = createAdminClient()
+  const { data: profile } = await sb
     .from('profiles')
     .select('role')
     .eq('id', user.id)
@@ -35,6 +32,7 @@ async function getAuthenticatedAdmin() {
 }
 
 export async function GET() {
+  const supabase = createAdminClient()
   const user = await getAuthenticatedAdmin()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

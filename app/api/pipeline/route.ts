@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { assertLocationAccess } from '@/lib/auth/assertLocationAccess'
 import { createServerClient } from '@supabase/ssr'
 import { createAdminClient } from '@/lib/supabase-server'
 

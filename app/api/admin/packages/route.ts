@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
+import { createAdminClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 async function getAuthenticatedAdmin() {
   const cookieStore = await cookies()
@@ -24,7 +19,8 @@ async function getAuthenticatedAdmin() {
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) return null
 
-  const { data: profile } = await supabase
+  const sb = createAdminClient()
+  const { data: profile } = await sb
     .from('profiles')
     .select('role')
     .eq('id', user.id)
@@ -42,8 +38,8 @@ export async function GET() {
 
   const [{ data: packages, error: packagesError }, { data: connections, error: connectionsError }] =
     await Promise.all([
-      supabase.from('packages').select('slug, name, auto_install'),
-      supabase.from('ghl_connections').select('package_slug, status, location_id'),
+      createAdminClient().from('packages').select('slug, name, auto_install'),
+      createAdminClient().from('ghl_connections').select('package_slug, status, location_id'),
     ])
 
   if (packagesError) {

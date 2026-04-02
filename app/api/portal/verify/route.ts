@@ -34,10 +34,10 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (!location) {
-    return NextResponse.json({ error: 'Nessun account trovato' }, { status: 404 })
+    return NextResponse.json({ error: 'Accesso non disponibile' }, { status: 404 })
   }
 
-  // Check if portal is enabled
+  // Check if portal is enabled — same generic error to prevent enumeration
   const { data: moduleSettings } = await sb
     .from('location_design_settings')
     .select('module_overrides')
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     .maybeSingle()
   const overrides = (moduleSettings?.module_overrides ?? {}) as Record<string, { enabled?: boolean }>
   if (overrides.portal?.enabled === false) {
-    return NextResponse.json({ error: 'Portale non attivo' }, { status: 403 })
+    return NextResponse.json({ error: 'Accesso non disponibile' }, { status: 404 })
   }
 
   // Check if this email exists as a contact in the cached contacts
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (!contact) {
-    return NextResponse.json({ error: 'Nessun account trovato con questa email' }, { status: 404 })
+    return NextResponse.json({ error: 'Accesso non disponibile' }, { status: 404 })
   }
 
   // Do NOT return contactGhlId — portal layout will resolve it after auth

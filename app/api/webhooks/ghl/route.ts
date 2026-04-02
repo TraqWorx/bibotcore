@@ -13,12 +13,18 @@ import { processWebhookEvent } from '@/lib/sync/webhookProcessor'
  * - all events: persisted to ghl_webhook_events
  */
 export async function POST(req: Request) {
-  // ── Authenticate webhook request ────────────────────────────────────────
+  // ── Authenticate webhook request (mandatory in production) ───────────────
   const webhookSecret = process.env.WEBHOOK_SECRET
+  if (!webhookSecret && process.env.NODE_ENV === 'production') {
+    console.error('[ghl-webhook] WEBHOOK_SECRET not set in production')
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
+  }
   if (webhookSecret) {
+    // Check header first, then query param as fallback
+    const headerSecret = req.headers.get('x-webhook-secret')
     const url = new URL(req.url)
-    const secret = url.searchParams.get('secret')
-    if (secret !== webhookSecret) {
+    const querySecret = url.searchParams.get('secret')
+    if (headerSecret !== webhookSecret && querySecret !== webhookSecret) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
   }
