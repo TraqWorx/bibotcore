@@ -79,12 +79,6 @@ export default function PipelineBoard({
   const [isDragging, setIsDragging] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  function scrollBoard(direction: 'left' | 'right') {
-    if (!scrollRef.current) return
-    const amount = 320
-    scrollRef.current.scrollBy({ left: direction === 'right' ? amount : -amount, behavior: 'smooth' })
-  }
-
   async function onDragEnd(result: DropResult) {
     setIsDragging(false)
     const { source, destination, draggableId } = result
@@ -138,26 +132,7 @@ export default function PipelineBoard({
 
   return (
     <DragDropContext onDragStart={() => setIsDragging(true)} onDragEnd={onDragEnd}>
-      <div className="relative h-full">
-        {/* Scroll arrows */}
-        <button
-          onClick={() => scrollBoard('left')}
-          className="absolute left-1 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-xl bg-white shadow-md border border-gray-200/80 text-gray-500 hover:text-gray-900 hover:shadow-lg"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-        </button>
-        <button
-          onClick={() => scrollBoard('right')}
-          className="absolute right-1 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-xl bg-white shadow-md border border-gray-200/80 text-gray-500 hover:text-gray-900 hover:shadow-lg"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-          </svg>
-        </button>
-
-        <div ref={scrollRef} className="flex h-full gap-3 overflow-x-auto px-10 pb-2 pt-1 scroll-smooth" style={{ scrollbarWidth: 'none' }}>
+      <div ref={scrollRef} data-pipeline-scroll className="flex h-full gap-3 overflow-x-auto pb-2 pt-1 scroll-smooth" style={{ scrollbarWidth: 'none' }}>
         {columns.map((stage) => {
           const stageTotal = stage.deals.reduce((sum, d) => sum + (d.monetaryValue ?? 0), 0)
           return (
@@ -288,7 +263,6 @@ export default function PipelineBoard({
             </Droppable>
           )
         })}
-      </div>
       </div>
 
       <div
