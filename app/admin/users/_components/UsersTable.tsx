@@ -32,6 +32,8 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
   const [locationFilter, setLocationFilter] = useState<'all' | 'with' | 'without'>('all')
   const [sortCol, setSortCol] = useState<SortCol>('email')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   const uniqueRoles = useMemo(
     () => [...new Set(rows.map((r) => r.role).filter(Boolean))] as string[],
@@ -72,6 +74,17 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
       return sortDir === 'asc' ? cmp : -cmp
     })
   }, [rows, search, roleFilter, locationFilter, sortCol, sortDir])
+
+  // Reset to first page when filters/sort change
+  // (keeps pagination from landing on empty pages after narrowing results)
+  useMemo(() => { setPage(1) }, [search, roleFilter, locationFilter, sortCol, sortDir])
+
+  const total = filtered.length
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const safePage = Math.min(page, totalPages)
+  const startIdx = (safePage - 1) * pageSize
+  const endIdx = Math.min(total, startIdx + pageSize)
+  const pageRows = filtered.slice(startIdx, endIdx)
 
   const thClass = 'px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500 cursor-pointer select-none hover:text-gray-900 whitespace-nowrap'
 
@@ -122,102 +135,149 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
       </div>
 
       {/* Table */}
-      {filtered.length === 0 ? (
+      {total === 0 ? (
         <p className="p-6 text-sm text-gray-400">No results match your filters.</p>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className={ad.tableHeadRow}>
-              <th className="w-10 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">#</th>
-              <th className={thClass} onClick={() => toggleSort('email')}>
-                User <SortIcon active={sortCol === 'email'} dir={sortDir} />
-              </th>
-              <th className={thClass} onClick={() => toggleSort('role')}>
-                Role <SortIcon active={sortCol === 'role'} dir={sortDir} />
-              </th>
-              <th className={thClass} onClick={() => toggleSort('location')}>
-                Locations <SortIcon active={sortCol === 'location'} dir={sortDir} />
-              </th>
-              <th className={thClass} onClick={() => toggleSort('joined')}>
-                Joined <SortIcon active={sortCol === 'joined'} dir={sortDir} />
-              </th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row, i) => (
-              <tr key={row.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                <td className="px-4 py-3 text-xs text-gray-400 tabular-nums">{i + 1}</td>
-                <td className="px-4 py-3">
-                  <div className="font-semibold text-gray-900">{row.email ?? '—'}</div>
-                  <div className="mt-0.5 font-mono text-[10px] text-gray-400">{row.id}</div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${
-                    row.role === 'super_admin'
-                      ? 'border-purple-200 bg-purple-50/80 text-purple-800'
-                      : 'border-gray-200 bg-gray-50 text-gray-600'
-                  }`}>
-                    {row.role ?? 'user'}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  {row.locations.length === 0 ? (
-                    <span className="text-gray-300">—</span>
-                  ) : row.locations.length === 1 ? (
-                    <div className="min-w-0">
-                      <div className="truncate font-medium text-gray-700">{row.locations[0].name}</div>
-                      <div className="mt-0.5 truncate font-mono text-[10px] text-gray-400">{row.locations[0].id}</div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-1">
-                      <span className="rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand">
-                        {row.locations.length} locations
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[920px] text-sm">
+              <thead>
+                <tr className={ad.tableHeadRow}>
+                  <th className="w-10 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">#</th>
+                  <th className={thClass} onClick={() => toggleSort('email')}>
+                    User <SortIcon active={sortCol === 'email'} dir={sortDir} />
+                  </th>
+                  <th className={thClass} onClick={() => toggleSort('role')}>
+                    Role <SortIcon active={sortCol === 'role'} dir={sortDir} />
+                  </th>
+                  <th className={thClass} onClick={() => toggleSort('location')}>
+                    Locations <SortIcon active={sortCol === 'location'} dir={sortDir} />
+                  </th>
+                  <th className={thClass} onClick={() => toggleSort('joined')}>
+                    Joined <SortIcon active={sortCol === 'joined'} dir={sortDir} />
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-gray-400 whitespace-nowrap">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((row, i) => (
+                  <tr key={row.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
+                    <td className="px-4 py-3 text-xs text-gray-400 tabular-nums">{startIdx + i + 1}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-gray-900">{row.email ?? '—'}</div>
+                      <div className="mt-0.5 font-mono text-[10px] text-gray-400">{row.id}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+                        row.role === 'super_admin'
+                          ? 'border-purple-200 bg-purple-50/80 text-purple-800'
+                          : 'border-gray-200 bg-gray-50 text-gray-600'
+                      }`}>
+                        {row.role ?? 'user'}
                       </span>
-                      <span className="text-xs text-gray-400 truncate max-w-[200px]">
-                        {row.locations.map((l) => l.name).join(', ')}
-                      </span>
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-xs text-gray-400">
-                  {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : '—'}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex items-center justify-end gap-3">
-                    {row.role !== 'super_admin' && (
-                      <Link
-                        href={`/agency?as=${row.id}`}
-                        target="_blank"
-                        className="text-xs font-bold text-brand underline-offset-4 transition-colors hover:underline"
-                      >
-                        Login
-                      </Link>
-                    )}
-                    {row.role !== 'super_admin' && (
-                      <Link
-                        href={`/admin/users/${row.id}`}
-                        className="text-xs font-semibold text-gray-600 transition-colors hover:text-gray-900"
-                      >
-                        View →
-                      </Link>
-                    )}
-                    {row.role !== 'super_admin' && (
-                      <form action={deleteUser.bind(null, row.id) as unknown as string}>
-                        <button
-                          type="submit"
-                          className="text-xs font-medium text-gray-400 transition-colors hover:text-red-600"
-                        >
-                          Delete
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.locations.length === 0 ? (
+                        <span className="text-gray-300">—</span>
+                      ) : row.locations.length === 1 ? (
+                        <div className="min-w-0">
+                          <div className="truncate font-medium text-gray-700">{row.locations[0].name}</div>
+                          <div className="mt-0.5 truncate font-mono text-[10px] text-gray-400">{row.locations[0].id}</div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          <span className="rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand">
+                            {row.locations.length} locations
+                          </span>
+                          <span className="text-xs text-gray-400 truncate max-w-[200px]">
+                            {row.locations.map((l) => l.name).join(', ')}
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-400">
+                      {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2 flex-nowrap">
+                        {row.role !== 'super_admin' && (
+                          <Link
+                            href={`/agency?as=${row.id}`}
+                            target="_blank"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-brand/25 bg-brand/5 px-3 py-1.5 text-xs font-bold text-brand shadow-sm transition hover:bg-brand/10"
+                          >
+                            Login
+                          </Link>
+                        )}
+                        {row.role !== 'super_admin' && (
+                          <Link
+                            href={`/admin/users/${row.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200/90 bg-white/90 px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-white"
+                          >
+                            View
+                          </Link>
+                        )}
+                        {row.role !== 'super_admin' && (
+                          <form action={deleteUser.bind(null, row.id) as unknown as string}>
+                            <button
+                              type="submit"
+                              className="inline-flex items-center rounded-xl border border-red-200 bg-red-50/40 px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-50"
+                            >
+                              Delete
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-white/70 px-4 py-3">
+            <div className="text-xs text-gray-500">
+              Showing <span className="font-semibold text-gray-900">{startIdx + 1}</span>–<span className="font-semibold text-gray-900">{endIdx}</span> of{' '}
+              <span className="font-semibold text-gray-900">{total}</span>
+              {totalPages > 1 && (
+                <>
+                  {' '}• Page <span className="font-semibold text-gray-900">{safePage}</span> / <span className="font-semibold text-gray-900">{totalPages}</span>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}
+                className="rounded-xl border border-gray-200/90 bg-white px-2.5 py-1.5 text-xs text-gray-700 outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
+                aria-label="Rows per page"
+              >
+                {[10, 25, 50, 100].map((n) => (
+                  <option key={n} value={n}>{n}/page</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage <= 1}
+                className={`${ad.btnSecondary} px-2.5 py-1.5 text-xs disabled:opacity-40`}
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage >= totalPages}
+                className={`${ad.btnSecondary} px-2.5 py-1.5 text-xs disabled:opacity-40`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

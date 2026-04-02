@@ -189,31 +189,31 @@ export default async function AgencyPage({
       {previewUserEmail && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/25 bg-brand/10 px-5 py-3">
           <p className="text-sm font-medium text-gray-900">
-            Viewing as <span className="font-semibold">{previewUserEmail}</span>
+            Visualizzando come <span className="font-semibold">{previewUserEmail}</span>
           </p>
           <a href="/admin/users" className="text-xs font-bold text-brand underline-offset-4 hover:underline">
-            Back to Users
+            Torna agli Utenti
           </a>
         </div>
       )}
 
       {/* Header */}
       <div>
-        <h1 className={ad.pageTitle}>My Locations</h1>
-        <p className={ad.pageSubtitle}>Select a location to open its CRM.</p>
+        <h1 className={ad.pageTitle}>Le Mie Location</h1>
+        <p className={ad.pageSubtitle}>Seleziona una location per aprire il CRM.</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         {/* Total locations */}
         <div className={ad.panel}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Locations</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Location Totali</p>
           <p className="mt-2 text-3xl font-bold text-gray-900">{rows.length}</p>
         </div>
 
         {/* Per design */}
         <div className={ad.panel}>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">By Design</p>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">Per Design</p>
           {Object.keys(designCounts).length === 0 ? (
             <p className="text-sm text-gray-300">—</p>
           ) : (
@@ -238,38 +238,38 @@ export default async function AgencyPage({
 
         {/* Monthly revenue */}
         <div className={ad.panel}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Monthly Revenue</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Entrate Mensili</p>
           {monthlyRevenue != null ? (
             <>
               <p className="mt-2 text-3xl font-bold text-gray-900">
                 €{monthlyRevenue.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
               <p className="mt-1 text-xs text-gray-400">
-                from {billedCount} billed location{billedCount !== 1 ? 's' : ''}
+                da {billedCount} location fatturate
               </p>
             </>
           ) : (
             <>
               <p className="mt-2 text-2xl font-bold text-gray-300">—</p>
-              <p className="mt-1 text-xs text-gray-400">No pricing data available</p>
+              <p className="mt-1 text-xs text-gray-400">Nessun dato disponibile</p>
             </>
           )}
         </div>
 
         {/* Total revenue since added */}
         <div className={ad.panel}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Revenue</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Totale Pagato</p>
           {totalRevenue > 0 ? (
             <>
               <p className="mt-2 text-3xl font-bold text-emerald-600">
                 €{totalRevenue.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
-              <p className="mt-1 text-xs text-gray-400">since locations were added</p>
+              <p className="mt-1 text-xs text-gray-400">dalla data di attivazione</p>
             </>
           ) : (
             <>
               <p className="mt-2 text-2xl font-bold text-gray-300">—</p>
-              <p className="mt-1 text-xs text-gray-400">No billing history</p>
+              <p className="mt-1 text-xs text-gray-400">Nessuno storico pagamenti</p>
             </>
           )}
         </div>
@@ -278,9 +278,9 @@ export default async function AgencyPage({
       {/* Location list */}
       {rows.length === 0 ? (
         <div className={`${ad.panel} p-10 text-center`}>
-          <p className="text-sm font-medium text-gray-900">No locations found</p>
+          <p className="text-sm font-medium text-gray-900">Nessuna location trovata</p>
           <p className="mt-1 text-sm text-gray-500">
-            Your account is not associated with any connected locations yet.
+            Il tuo account non è ancora associato a nessuna location.
           </p>
         </div>
       ) : (
@@ -290,10 +290,10 @@ export default async function AgencyPage({
               <tr className={ad.tableHeadRow}>
                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Location</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Design</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Plan</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Price</th>
-                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Months</th>
-                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Total Paid</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Piano</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Prezzo</th>
+                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Mesi</th>
+                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Totale Pagato</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>

@@ -601,6 +601,21 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
 
   const activeFilterCount = Object.values(columnFilters).filter(isFilterActive).length
 
+  // Pagination (client-side)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [activeFilterCount, localContacts.length, columns])
+
+  const total = filteredContacts.length
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const safePage = Math.min(page, totalPages)
+  const startIdx = (safePage - 1) * pageSize
+  const endIdx = Math.min(total, startIdx + pageSize)
+  const pageContacts = filteredContacts.slice(startIdx, endIdx)
+
   function updateFilter(colKey: string, f: ColumnFilter | null) {
     setColumnFilters((prev) => {
       const next = { ...prev }
@@ -687,8 +702,9 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto">
-            <table className="w-full text-sm">
+          <>
+            <div className="overflow-x-auto max-h-[calc(100vh-330px)] overflow-y-auto">
+              <table className="w-full text-sm">
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-gray-200/60 bg-gray-50">
                   <th className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400 w-12 bg-gray-50 border-r border-gray-200/40">
@@ -741,7 +757,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
                 </tr>
               </thead>
               <tbody>
-                {filteredContacts.map((c, index) => (
+                {pageContacts.map((c, index) => (
                   <tr
                     key={c.id}
                     className="group cursor-pointer border-b border-gray-100/70 bg-white transition-colors duration-150 hover:bg-indigo-50/30"
@@ -749,7 +765,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
                   >
                     <td className="px-3 py-3.5 text-center border-r border-gray-100/60">
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-gray-100/80 text-[10px] font-bold tabular-nums text-gray-400">
-                        {index + 1}
+                        {startIdx + index + 1}
                       </span>
                     </td>
                     {columns.map((col, colIdx) => (
@@ -798,8 +814,50 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+              </table>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-white/70 px-4 py-3">
+              <div className="text-xs text-gray-500">
+                Showing <span className="font-semibold text-gray-900">{startIdx + 1}</span>–<span className="font-semibold text-gray-900">{endIdx}</span> of{' '}
+                <span className="font-semibold text-gray-900">{total}</span>
+                {totalPages > 1 && (
+                  <>
+                    {' '}• Page <span className="font-semibold text-gray-900">{safePage}</span> / <span className="font-semibold text-gray-900">{totalPages}</span>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={pageSize}
+                  onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}
+                  className="rounded-xl border border-gray-200/90 bg-white px-2.5 py-1.5 text-xs text-gray-700 outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
+                  aria-label="Rows per page"
+                >
+                  {[10, 25, 50, 100].map((n) => (
+                    <option key={n} value={n}>{n}/page</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  className="inline-flex items-center justify-center rounded-xl border border-gray-200/90 bg-white/90 px-2.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-white disabled:opacity-40"
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  className="inline-flex items-center justify-center rounded-xl border border-gray-200/90 bg-white/90 px-2.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-white disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 

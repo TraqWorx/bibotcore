@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase-server'
+import { ad } from '@/lib/admin/ui'
 
 export default async function AdminUserDetailPage({
   params,
@@ -85,7 +86,7 @@ export default async function AdminUserDetailPage({
       <div>
         <Link
           href="/admin/users"
-          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          className="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors"
         >
           ← Back to Users
         </Link>
@@ -94,13 +95,13 @@ export default async function AdminUserDetailPage({
       {/* User header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">{profile.email ?? '—'}</h1>
+          <h1 className={ad.pageTitle}>{profile.email ?? '—'}</h1>
           <div className="mt-1 flex items-center gap-3">
             <span
-              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+              className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold ${
                 profile.role === 'super_admin'
-                  ? 'bg-purple-50 text-purple-700'
-                  : 'bg-gray-100 text-gray-600'
+                  ? 'border-purple-200 bg-purple-50/80 text-purple-800'
+                  : 'border-gray-200 bg-gray-50 text-gray-600'
               }`}
             >
               {profile.role ?? 'user'}
@@ -116,7 +117,7 @@ export default async function AdminUserDetailPage({
       {/* Stat cards */}
       <div className="grid grid-cols-3 gap-4">
         {statCards.map((card) => (
-          <div key={card.label} className="rounded-xl border border-gray-200 bg-white p-6">
+          <div key={card.label} className={ad.panel}>
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{card.label}</p>
             <p className="mt-2 text-2xl font-semibold text-gray-900">{card.value}</p>
             {card.sub && <p className="mt-0.5 text-xs text-gray-400">{card.sub}</p>}
@@ -130,13 +131,13 @@ export default async function AdminUserDetailPage({
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
             Locations ({locationIds.length})
           </h2>
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className={ad.tableShell}>
             {locationIds.length === 0 ? (
               <p className="p-4 text-sm text-gray-400">No locations connected.</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200">
+                  <tr className={ad.tableHeadRow}>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Location</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Plan</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Price</th>
@@ -146,16 +147,17 @@ export default async function AdminUserDetailPage({
                   {locationIds.map((loc) => {
                     const plan = planByLocationId[loc]
                     return (
-                      <tr key={loc} className="border-b border-gray-100 last:border-0">
+                      <tr key={loc} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
                         <td className="px-4 py-3">
-                          <Link href={`/admin/locations/${loc}`} className="font-medium text-gray-900 hover:text-violet-700 transition-colors">
+                          <Link href={`/admin/locations/${loc}`} className="font-semibold text-brand hover:underline transition-colors">
                             {nameByLocationId[loc] ?? loc}
                           </Link>
+                          <div className="mt-0.5 font-mono text-[10px] text-gray-400">{loc}</div>
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500">
                           {plan?.planName ?? <span className="text-gray-300">—</span>}
                         </td>
-                        <td className="px-4 py-3 text-right text-xs font-semibold" style={{ color: plan?.price != null ? '#0e9f6e' : undefined }}>
+                        <td className={`px-4 py-3 text-right text-xs font-bold tabular-nums ${plan?.price != null ? 'text-emerald-700' : 'text-gray-400'}`}>
                           {plan?.price != null
                             ? `€${plan.price.toLocaleString('it-IT')}/mo`
                             : <span className="text-gray-300">—</span>}
@@ -174,13 +176,13 @@ export default async function AdminUserDetailPage({
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
             Installs ({allInstalls.length})
           </h2>
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className={ad.tableShell}>
             {allInstalls.length === 0 ? (
               <p className="p-4 text-sm text-gray-400">No installs yet.</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200">
+                  <tr className={ad.tableHeadRow}>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Location</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Design</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
@@ -189,17 +191,17 @@ export default async function AdminUserDetailPage({
                 </thead>
                 <tbody>
                   {allInstalls.map((install) => (
-                    <tr key={install.id} className="border-b border-gray-100 last:border-0">
+                    <tr key={install.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
                       <td className="px-4 py-3 text-sm text-gray-900">
                         {nameByLocationId[install.location_id] ?? install.location_id}
                       </td>
                       <td className="px-4 py-3 text-gray-500">{install.design_slug ?? '—'}</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${
                             install.status === 'active'
-                              ? 'bg-green-50 text-green-700'
-                              : 'bg-yellow-50 text-yellow-700'
+                              ? 'border-emerald-200 bg-emerald-50/80 text-emerald-800'
+                              : 'border-amber-200 bg-amber-50/80 text-amber-800'
                           }`}
                         >
                           {install.status}
