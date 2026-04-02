@@ -131,9 +131,7 @@ export default function PipelineBoard({
 
   return (
     <DragDropContext onDragStart={() => setIsDragging(true)} onDragEnd={onDragEnd}>
-      {/* Scroll hint for non-trackpad users */}
-      <div className="relative h-full">
-      <div className="-mx-1 flex h-full gap-4 overflow-x-auto px-1 pb-2 pt-1 scroll-smooth snap-x">
+      <div className="relative flex h-full gap-3 px-1 pb-2 pt-1">
         {columns.map((stage) => {
           const stageTotal = stage.deals.reduce((sum, d) => sum + (d.monetaryValue ?? 0), 0)
           return (
@@ -142,7 +140,7 @@ export default function PipelineBoard({
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="flex w-[min(100vw-2rem,300px)] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm max-h-full"
+                  className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm max-h-full"
                 >
                   <div className="sticky top-0 z-10 border-b border-gray-200/60 bg-white/85 p-4 backdrop-blur-md">
                     <div className="flex items-start justify-between gap-2">
@@ -264,7 +262,6 @@ export default function PipelineBoard({
             </Droppable>
           )
         })}
-      </div>
       </div>
 
       <div
