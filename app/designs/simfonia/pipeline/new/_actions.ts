@@ -5,6 +5,7 @@ import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { assertUserOwnsLocation } from '@/lib/location/getActiveLocation'
 import { trackEvent } from '@/lib/analytics'
 import { translateGhlError } from '@/lib/utils/ghlErrors'
+import { writeThroughOpportunity } from '@/lib/sync/writeThrough'
 
 export async function createOpportunity(data: {
   name: string
@@ -16,13 +17,17 @@ export async function createOpportunity(data: {
   try {
     await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
-    await ghl.opportunities.create({
+    const result = await ghl.opportunities.create({
       name: data.name.trim(),
       pipelineId: data.pipelineId,
       pipelineStageId: data.pipelineStageId,
       ...(data.contactId ? { contactId: data.contactId } : {}),
       monetaryValue: data.monetaryValue ?? 0,
     })
+    const opp = result?.opportunity ?? result
+    if (opp?.id) {
+      await writeThroughOpportunity(ghl.locationId, opp as Record<string, unknown>)
+    }
     await trackEvent(locationId, 'opportunity_created')
   } catch (err) {
     console.error('Create opportunity failed:', err)
