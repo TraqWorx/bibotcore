@@ -16,7 +16,17 @@ interface Opportunity {
   pipelineStageId?: string
   monetaryValue?: number
   status?: string
-  contact?: { name?: string; firstName?: string; lastName?: string }
+  assignedTo?: string | null
+  lastUpdated?: string
+  contact?: {
+    name?: string | null
+    firstName?: string | null
+    lastName?: string | null
+    email?: string | null
+    phone?: string | null
+    company?: string | null
+    tags?: string[]
+  } | null
 }
 
 interface StageWithDeals extends Stage {
@@ -121,7 +131,9 @@ export default function PipelineBoard({
 
   return (
     <DragDropContext onDragStart={() => setIsDragging(true)} onDragEnd={onDragEnd}>
-      <div className="-mx-1 flex gap-5 overflow-x-auto px-1 pb-2 pt-1 scroll-smooth">
+      {/* Scroll hint for non-trackpad users */}
+      <div className="relative h-full">
+      <div className="-mx-1 flex h-full gap-4 overflow-x-auto px-1 pb-2 pt-1 scroll-smooth snap-x">
         {columns.map((stage) => {
           const stageTotal = stage.deals.reduce((sum, d) => sum + (d.monetaryValue ?? 0), 0)
           return (
@@ -130,7 +142,7 @@ export default function PipelineBoard({
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="flex w-[min(100vw-2rem,320px)] shrink-0 flex-col overflow-hidden rounded-3xl border border-gray-200/80 bg-gradient-to-b from-white via-white to-gray-50/90 shadow-[0_8px_30px_-12px_rgba(15,23,42,0.12)] ring-1 ring-black/[0.03] max-h-[calc(100vh-320px)]"
+                  className="flex w-[min(100vw-2rem,300px)] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm max-h-full"
                 >
                   <div className="sticky top-0 z-10 border-b border-gray-200/60 bg-white/85 p-4 backdrop-blur-md">
                     <div className="flex items-start justify-between gap-2">
@@ -186,26 +198,59 @@ export default function PipelineBoard({
                                   : 'border-gray-200/90 bg-white shadow-sm hover:border-brand/25 hover:shadow-md'
                               }`}
                             >
-                              <p className="pr-7 font-semibold leading-snug text-gray-900">{deal.name ?? '—'}</p>
-                              {contact && <p className="mt-1 text-xs text-gray-500">{contact}</p>}
-                              <p className="mt-1.5 text-xs font-bold tabular-nums text-brand">
-                                €{(deal.monetaryValue ?? 0).toLocaleString('it-IT')}
-                              </p>
-                              <button
-                                onClick={(e) => handleDelete(deal.id, e)}
-                                className="absolute right-2.5 top-2.5 hidden h-7 w-7 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500 group-hover:flex"
-                                title="Elimina"
-                                type="button"
-                              >
-                                <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
-                                  <path
-                                    d="M1 1l8 8M9 1L1 9"
-                                    stroke="currentColor"
-                                    strokeWidth="1.5"
-                                    strokeLinecap="round"
-                                  />
-                                </svg>
-                              </button>
+                              {/* Header: name + delete */}
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="font-semibold leading-snug text-gray-900">{deal.name ?? '—'}</p>
+                                <button
+                                  onClick={(e) => handleDelete(deal.id, e)}
+                                  className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500 group-hover:flex"
+                                  title="Elimina"
+                                  type="button"
+                                >
+                                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                    <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                  </svg>
+                                </button>
+                              </div>
+
+                              {/* Contact info */}
+                              {contact && (
+                                <div className="mt-1.5 space-y-0.5">
+                                  <p className="text-xs font-medium text-gray-700">{contact}</p>
+                                  {deal.contact?.company && (
+                                    <p className="text-[10px] text-gray-400">{deal.contact.company}</p>
+                                  )}
+                                  {deal.contact?.email && (
+                                    <p className="text-[10px] text-gray-400 truncate">{deal.contact.email}</p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Value */}
+                              <div className="mt-2 flex items-center justify-between">
+                                <span className="text-xs font-bold tabular-nums text-brand">
+                                  €{(deal.monetaryValue ?? 0).toLocaleString('it-IT')}
+                                </span>
+                                {deal.assignedTo && (
+                                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500 truncate max-w-[100px]">
+                                    {deal.assignedTo}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Tags */}
+                              {deal.contact?.tags && deal.contact.tags.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {deal.contact.tags.slice(0, 3).map((tag) => (
+                                    <span key={tag} className="rounded-full bg-brand/8 px-1.5 py-0.5 text-[9px] font-semibold text-brand/70">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                  {deal.contact.tags.length > 3 && (
+                                    <span className="text-[9px] text-gray-400">+{deal.contact.tags.length - 3}</span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                         </Draggable>
@@ -219,6 +264,7 @@ export default function PipelineBoard({
             </Droppable>
           )
         })}
+      </div>
       </div>
 
       <div
