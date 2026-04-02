@@ -167,57 +167,52 @@ export default function PipelineView({
         </div>
       </div>
 
-      {/* Board */}
-      <div className="flex flex-1 min-h-0 items-stretch gap-2 px-2 pb-3">
-        {/* Left arrow */}
-        {stages.length > 0 && filter !== 'won' && filter !== 'lost' && (
+      {/* Scroll arrows — small circular, between toolbar and board */}
+      {stages.length > 0 && filter !== 'won' && filter !== 'lost' && (
+        <div className="shrink-0 flex items-center justify-between px-5 pb-1">
           <button
             onClick={() => scrollBoard('left')}
-            className="flex shrink-0 w-8 items-center justify-center rounded-xl border border-gray-200/80 bg-white text-gray-400 shadow-sm hover:text-gray-900 hover:shadow-md"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm hover:text-gray-900 hover:shadow-md"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
             </svg>
           </button>
-        )}
-
-        {/* Board area */}
-        <div ref={boardScrollRef} className="flex-1 min-w-0 overflow-hidden">
-          {stages.length === 0 ? (
-            <p className="text-sm text-gray-500 pt-4">Nessuno stage trovato.</p>
-          ) : filter === 'won' || filter === 'lost' ? (
-            <div className="h-full overflow-y-auto">
-              <WonLostList
-                opportunities={pipelineOpps}
-                filter={filter}
-                stages={stages}
-                onDealClick={setActiveDealId}
-                onReopen={handleReopen}
-                reopeningId={reopeningId}
-              />
-            </div>
-          ) : (
-            <PipelineBoard
-              key={selectedId}
-              pipelineId={selectedId}
-              stages={stages}
-              opportunities={pipelineOpps}
-              onDealClick={setActiveDealId}
-              locationId={locationId}
-            />
-          )}
-        </div>
-
-        {/* Right arrow */}
-        {stages.length > 0 && filter !== 'won' && filter !== 'lost' && (
           <button
             onClick={() => scrollBoard('right')}
-            className="flex shrink-0 w-8 items-center justify-center rounded-xl border border-gray-200/80 bg-white text-gray-400 shadow-sm hover:text-gray-900 hover:shadow-md"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm hover:text-gray-900 hover:shadow-md"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
             </svg>
           </button>
+        </div>
+      )}
+
+      {/* Board */}
+      <div ref={boardScrollRef} className="flex-1 min-h-0 overflow-hidden px-5 pb-3">
+        {stages.length === 0 ? (
+          <p className="text-sm text-gray-500 pt-4">Nessuno stage trovato.</p>
+        ) : filter === 'won' || filter === 'lost' ? (
+          <div className="h-full overflow-y-auto">
+            <WonLostList
+              opportunities={pipelineOpps}
+              filter={filter}
+              stages={stages}
+              onDealClick={setActiveDealId}
+              onReopen={handleReopen}
+              reopeningId={reopeningId}
+            />
+          </div>
+        ) : (
+          <PipelineBoard
+            key={selectedId}
+            pipelineId={selectedId}
+            stages={stages}
+            opportunities={pipelineOpps}
+            onDealClick={setActiveDealId}
+            locationId={locationId}
+          />
         )}
       </div>
 
