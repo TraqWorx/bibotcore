@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { moveOpportunity, updateOpportunity, deleteOpportunity } from './_actions'
@@ -77,6 +77,13 @@ export default function PipelineBoard({
     }))
   )
   const [isDragging, setIsDragging] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  function scrollBoard(direction: 'left' | 'right') {
+    if (!scrollRef.current) return
+    const amount = 320
+    scrollRef.current.scrollBy({ left: direction === 'right' ? amount : -amount, behavior: 'smooth' })
+  }
 
   async function onDragEnd(result: DropResult) {
     setIsDragging(false)
@@ -131,7 +138,26 @@ export default function PipelineBoard({
 
   return (
     <DragDropContext onDragStart={() => setIsDragging(true)} onDragEnd={onDragEnd}>
-      <div className="relative flex h-full gap-3 px-1 pb-2 pt-1">
+      <div className="relative h-full">
+        {/* Scroll arrows */}
+        <button
+          onClick={() => scrollBoard('left')}
+          className="absolute left-0 top-1/2 z-20 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg border border-gray-200 text-gray-600 hover:bg-white hover:text-gray-900"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+        </button>
+        <button
+          onClick={() => scrollBoard('right')}
+          className="absolute right-0 top-1/2 z-20 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg border border-gray-200 text-gray-600 hover:bg-white hover:text-gray-900"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </button>
+
+        <div ref={scrollRef} className="flex h-full gap-3 overflow-x-auto px-12 pb-2 pt-1 scroll-smooth scrollbar-hide">
         {columns.map((stage) => {
           const stageTotal = stage.deals.reduce((sum, d) => sum + (d.monetaryValue ?? 0), 0)
           return (
@@ -140,7 +166,7 @@ export default function PipelineBoard({
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm max-h-full"
+                  className="flex w-[280px] shrink-0 flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm max-h-full"
                 >
                   <div className="sticky top-0 z-10 border-b border-gray-200/60 bg-white/85 p-4 backdrop-blur-md">
                     <div className="flex items-start justify-between gap-2">
@@ -262,6 +288,7 @@ export default function PipelineBoard({
             </Droppable>
           )
         })}
+      </div>
       </div>
 
       <div
