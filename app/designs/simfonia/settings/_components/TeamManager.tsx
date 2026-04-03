@@ -34,7 +34,7 @@ export default function TeamManager({ locationId }: { locationId: string }) {
 
   useEffect(() => {
     void loadRoles(false)
-  }, [locationId, loadRoles])
+  }, [locationId])
 
   async function handleRoleChange(userId: string, newRole: string) {
     setUpdating(userId)

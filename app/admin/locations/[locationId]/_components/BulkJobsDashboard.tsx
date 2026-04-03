@@ -41,7 +41,7 @@ export default function BulkJobsDashboard({ locationId }: { locationId: string }
 
   useEffect(() => {
     void loadJobs(false)
-  }, [locationId, loadJobs])
+  }, [locationId])
 
   const hasRunning = useMemo(
     () => jobs.some((j) => j.status === 'running' || j.status === 'syncing' || j.status === 'pending'),
@@ -51,7 +51,7 @@ export default function BulkJobsDashboard({ locationId }: { locationId: string }
     if (!hasRunning) return
     const interval = setInterval(() => { void loadJobs(false) }, 5000)
     return () => clearInterval(interval)
-  }, [hasRunning, loadJobs, locationId])
+  }, [hasRunning, locationId])
 
   if (loading) return null
   if (jobs.length === 0) return null

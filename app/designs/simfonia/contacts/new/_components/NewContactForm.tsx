@@ -11,7 +11,6 @@ import {
   getFieldsForCategory,
   parseFieldCategory,
   filterVisibleFields,
-  parseCategoriaValue,
   isSwitchOutOn,
   SHARED_CATEGORIES,
   type CustomFieldDef,
@@ -46,14 +45,6 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
   // Discover categories dynamically from the Categoria dropdown field
   const categories = useMemo(() => discoverCategories(customFields), [customFields])
   const categoriaField = useMemo(() => getCategoriaField(customFields), [customFields])
-
-  // Resolved selected category labels
-  const selectedCatLabels = useMemo(() =>
-    selectedCategories
-      .map((slug) => categories.find((c) => c.slug === slug)?.label)
-      .filter((l): l is string => !!l),
-    [selectedCategories, categories]
-  )
 
   // Get dropdown (SINGLE_OPTIONS) fields grouped by category
   const dropdownFieldsByCategory = useMemo(() => {
@@ -118,7 +109,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
       if (displayName.toLowerCase().includes('switch out')) return false
       return true
     })
-  }, [customFields, selectedCategories, dropdownFieldIds, soFieldIds])
+  }, [customFields, dropdownFieldIds, soFieldIds])
   const anagraficaFieldIds = useMemo(() => new Set(anagraficaFields.map((f) => f.id)), [anagraficaFields])
 
   // Per-category custom fields (excluding Anagrafica, dropdowns, Switch Out)
@@ -162,7 +153,11 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
           .filter((l): l is string => !!l)
         setCfValues((p) => ({ ...p, [categoriaField.id]: labels.join(',') }))
       }
-      setFieldErrors((p) => { const { category, ...rest } = p; return rest })
+      setFieldErrors((p) => {
+        const nextErrors = { ...p }
+        delete nextErrors.category
+        return nextErrors
+      })
       // Auto-select first category tab
       if (next.length > 0) {
         const firstLabel = categories.find((c) => c.slug === next[0])?.label ?? null
@@ -244,7 +239,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-gray-400">Nome *</label>
-                    <input type="text" className={`${inputClass} ${fieldErrors.firstName ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}`} placeholder="Nome" value={firstName} onChange={(e) => { setFirstName(e.target.value); setFieldErrors((p) => { const { firstName, ...rest } = p; return rest }) }} />
+                    <input type="text" className={`${inputClass} ${fieldErrors.firstName ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}`} placeholder="Nome" value={firstName} onChange={(e) => { setFirstName(e.target.value); setFieldErrors((p) => { const nextErrors = { ...p }; delete nextErrors.firstName; return nextErrors }) }} />
                     {fieldErrors.firstName && <p className="mt-1 text-xs font-medium text-red-500">{fieldErrors.firstName}</p>}
                   </div>
                   <div>

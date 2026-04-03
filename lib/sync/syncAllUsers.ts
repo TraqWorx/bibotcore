@@ -5,7 +5,6 @@
  */
 
 import { createAdminClient } from '@/lib/supabase-server'
-import { syncLocationUsers } from '@/lib/ghl/provisionLocation'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'

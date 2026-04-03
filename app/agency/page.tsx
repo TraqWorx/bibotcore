@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import OpenCrmButton from './locations/_components/OpenCrmButton'
 import { ad } from '@/lib/admin/ui'
@@ -191,9 +192,9 @@ export default async function AgencyPage({
           <p className="text-sm font-medium text-gray-900">
             Visualizzando come <span className="font-semibold">{previewUserEmail}</span>
           </p>
-          <a href="/admin/users" className="text-xs font-bold text-brand underline-offset-4 hover:underline">
+          <Link href="/admin/users" className="text-xs font-bold text-brand underline-offset-4 hover:underline">
             Torna agli Utenti
-          </a>
+          </Link>
         </div>
       )}
 

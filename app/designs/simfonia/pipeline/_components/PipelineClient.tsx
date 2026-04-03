@@ -1,10 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import Link from 'next/link'
 import useSWR from 'swr'
 import PipelineView from '../PipelineView'
-import { sf } from '@/lib/simfonia/ui'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 

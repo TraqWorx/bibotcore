@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { savePlanPrice } from '../_actions'
-import { ad } from '@/lib/admin/ui'
 
 export default function PlanPriceInput({ ghlPlanId, current }: { ghlPlanId: string; current: number | null }) {
   const [value, setValue] = useState(current != null ? String(current) : '')

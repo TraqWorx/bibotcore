@@ -1,11 +1,16 @@
 'use client'
 
 import { useState, useEffect, useTransition, useRef, useMemo, useDeferredValue, memo } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import ContactDrawer from './ContactDrawer'
 import { deleteContact } from '../_actions'
-import { parseFieldCategory, isSwitchOutOn } from '@/lib/utils/categoryFields'
+import { isSwitchOutOn } from '@/lib/utils/categoryFields'
 import type { ContactColumn } from '../../settings/_actions'
+
+const ContactDrawer = dynamic(() => import('./ContactDrawer'), {
+  ssr: false,
+  loading: () => null,
+})
 
 type Contact = Record<string, unknown> & { id: string }
 
@@ -116,7 +121,7 @@ function filterSummary(f: ColumnFilter): string {
 }
 
 function fmtDateShort(iso: string) {
-  const [y, m, d] = iso.split('-')
+  const [, m, d] = iso.split('-')
   return `${d}/${m}`
 }
 
@@ -497,38 +502,51 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
     return map
   }, [columns, customFields])
 
-  // Build unique values per column for multi-select filters
-  const uniqueValuesPerColumn = useMemo(() => {
-    const map: Record<string, string[]> = {}
+  const columnsByKey = useMemo(() => {
+    const map: Record<string, ContactColumn> = {}
     for (const col of columns) {
-      if (columnFilterKinds[col.key] !== 'multi') continue
-      const valSet = new Set<string>()
-      for (const c of localContacts) {
-        if (col.type === 'custom') {
-          const raw = getCustomFieldValue(c, col.key)
-          if (raw) {
-            // Categoria and other comma-separated fields
-            if (col.label === 'Categoria' || raw.includes(',')) {
-              raw.split(',').map(s => s.trim()).filter(Boolean).forEach(v => valSet.add(v))
-            } else {
-              valSet.add(raw)
-            }
-          }
-        } else if (col.key === 'tags') {
-          const tags = Array.isArray(c.tags) ? c.tags as string[] : []
-          tags.forEach(t => valSet.add(t))
-        } else if (col.key === 'dnd') {
-          if (c.dnd) valSet.add('Si')
-          else valSet.add('No')
-        } else {
-          const val = c[col.key]
-          if (val !== null && val !== undefined && val !== '') valSet.add(String(val))
-        }
-      }
-      map[col.key] = Array.from(valSet).sort((a, b) => a.localeCompare(b, 'it'))
+      map[col.key] = col
     }
     return map
-  }, [localContacts, columns, columnFilterKinds])
+  }, [columns])
+
+  const activeFilterValues = useMemo(() => {
+    if (!activeFilter) return []
+    const col = columnsByKey[activeFilter]
+    if (!col || columnFilterKinds[activeFilter] !== 'multi') return []
+
+    const valSet = new Set<string>()
+    for (const c of localContacts) {
+      if (col.type === 'custom') {
+        const raw = getCustomFieldValue(c, col.key)
+        if (!raw) continue
+        if (col.label === 'Categoria' || raw.includes(',')) {
+          raw.split(',').map((s) => s.trim()).filter(Boolean).forEach((v) => valSet.add(v))
+        } else {
+          valSet.add(raw)
+        }
+        continue
+      }
+
+      if (col.key === 'tags') {
+        const tags = Array.isArray(c.tags) ? (c.tags as string[]) : []
+        tags.forEach((t) => valSet.add(t))
+        continue
+      }
+
+      if (col.key === 'dnd') {
+        valSet.add(c.dnd ? 'Si' : 'No')
+        continue
+      }
+
+      const val = c[col.key]
+      if (val !== null && val !== undefined && val !== '') {
+        valSet.add(String(val))
+      }
+    }
+
+    return Array.from(valSet).sort((a, b) => a.localeCompare(b, 'it'))
+  }, [activeFilter, columnsByKey, columnFilterKinds, localContacts])
 
   // Apply filters to contacts
   const filteredContacts = useMemo(() => {
@@ -536,7 +554,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
     if (activeFilters.length === 0) return localContacts
     return localContacts.filter((contact) => {
       return activeFilters.every(([colKey, filter]) => {
-        const col = columns.find((c) => c.key === colKey)
+        const col = columnsByKey[colKey]
         if (!col) return true
 
         if (filter.type === 'text') {
@@ -597,7 +615,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
         return true
       })
     })
-  }, [localContacts, columnFilters, columns])
+  }, [localContacts, columnFilters, columnsByKey])
 
   const activeFilterCount = Object.values(columnFilters).filter(isFilterActive).length
 
@@ -739,7 +757,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
                             <ColumnFilterDropdown
                               col={col}
                               filter={columnFilters[col.key]}
-                              uniqueValues={uniqueValuesPerColumn[col.key] ?? []}
+                              uniqueValues={activeFilter === col.key ? activeFilterValues : []}
                               kind={kind}
                               onUpdate={(f) => updateFilter(col.key, f)}
                               onClose={() => setActiveFilter(null)}

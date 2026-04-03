@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
 import { getCategoryTags, getContactColumns, getLocationTags, type ContactColumn } from '../settings/_actions'
 import { getCustomFieldDefs } from '@/lib/data/contacts'

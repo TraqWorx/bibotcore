@@ -28,7 +28,17 @@ export default function RolesManager({ locationId, locationName: _locationName }
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => { void loadRoles(false) }, 0)
+    async function loadInitialRoles() {
+      const res = await fetch('/api/admin/roles')
+      if (!res.ok) return
+      const data = await res.json()
+      setUsers((data.users ?? []).filter((u: { locationId: string }) => u.locationId === locationId))
+      setLoading(false)
+    }
+
+    const timer = setTimeout(() => {
+      void loadInitialRoles()
+    }, 0)
     return () => clearTimeout(timer)
   }, [locationId])
 

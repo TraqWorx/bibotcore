@@ -1,5 +1,4 @@
 import { getActiveLocation } from '@/lib/location/getActiveLocation'
-import { createAdminClient } from '@/lib/supabase-server'
 import { getGhlClient } from '@/lib/ghl/ghlClient'
 import SimfoniaPageHeader from '../_components/SimfoniaPageHeader'
 import { sf } from '@/lib/simfonia/ui'

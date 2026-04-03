@@ -97,7 +97,6 @@ export default async function SettingsPage({
     getUniqueFields(locationId),
   ])
 
-  const ghlTags = locationTags.map((t) => t.name)
   const ghlTagsWithIds = locationTags.map((t) => ({ id: t.id, name: t.name }))
   const categories = discoverCategories(customFields)
   const gestoriOptions = getAllGestoreOptions(customFields, categories)

@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { setLocationPlan } from '../_actions'
-import { ad } from '@/lib/admin/ui'
 
 interface Props {
   locationId: string

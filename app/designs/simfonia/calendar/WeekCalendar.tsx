@@ -127,8 +127,8 @@ export default function WeekCalendar({
   }))
 
   // Month view data
-  const monthDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1)
   const monthDays = useMemo(() => {
+    const monthDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1)
     const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1)
     const startDay = first.getDay() === 0 ? 6 : first.getDay() - 1 // Monday-based
     const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate()
@@ -137,7 +137,7 @@ export default function WeekCalendar({
     for (let i = 1; i <= daysInMonth; i++) cells.push(new Date(monthDate.getFullYear(), monthDate.getMonth(), i))
     while (cells.length % 7 !== 0) cells.push(null)
     return cells
-  }, [monthDate])
+  }, [monthOffset, today])
 
   const monthEvents = filteredEvents
 

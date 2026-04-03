@@ -17,10 +17,7 @@ export default function AiChat({ locationId }: { locationId: string }) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Draggable position
-  const [pos, setPos] = useState(() => ({
-    x: 270,
-    y: typeof window === 'undefined' ? 700 : window.innerHeight - 80,
-  }))
+  const [pos, setPos] = useState({ x: 270, y: 700 })
   const dragging = useRef(false)
   const dragOffset = useRef({ x: 0, y: 0 })
 

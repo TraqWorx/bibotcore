@@ -11,11 +11,6 @@ interface Profile {
   created_at: string | null
 }
 
-interface LocationRole {
-  userId: string
-  role: string
-}
-
 const CRM_ROLES = ['location_admin', 'team_member', 'viewer'] as const
 
 function formatDate(iso: string) {
@@ -44,7 +39,21 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => { void loadRoles(false) }, 0)
+    async function loadInitialRoles() {
+      const res = await fetch('/api/admin/roles')
+      if (!res.ok) return
+      const data = await res.json()
+      const map = new Map<string, string>()
+      for (const u of (data.users ?? []) as { userId: string; locationId: string; role: string }[]) {
+        if (u.locationId === locationId) map.set(u.userId, u.role)
+      }
+      setRoles(map)
+      setLoading(false)
+    }
+
+    const timer = setTimeout(() => {
+      void loadInitialRoles()
+    }, 0)
     return () => clearTimeout(timer)
   }, [locationId])
 

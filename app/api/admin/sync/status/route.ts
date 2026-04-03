@@ -35,7 +35,7 @@ export async function GET() {
   // Fetch location names, sync statuses, and counts in parallel
   const [{ data: names }, { data: statuses }, ...countResults] = await Promise.all([
     sb.from('locations').select('location_id, name').in('location_id', locationIds),
-    sb.from('sync_status').select('*').in('location_id', locationIds),
+    sb.from('sync_status').select('location_id, entity_type, status, last_synced_at, started_at, completed_at, error').in('location_id', locationIds),
     // Count cached entities per location
     ...['cached_contacts', 'cached_opportunities', 'cached_pipelines', 'cached_conversations', 'cached_custom_fields', 'cached_tags', 'cached_ghl_users', 'cached_calendar_events', 'cached_notes', 'cached_tasks'].map((table) =>
       sb.from(table).select('location_id', { count: 'exact', head: true }).in('location_id', locationIds)

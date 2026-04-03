@@ -41,7 +41,21 @@ export default function AdminRolesPage() {
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => { void loadData(false) }, 0)
+    async function loadInitialData() {
+      const res = await fetch('/api/admin/roles')
+      if (!res.ok) return
+      const data = await res.json()
+      setUsers(data.users ?? [])
+      setLocations(data.locations ?? [])
+      if (data.locations?.length > 0) {
+        setSelectedLocation((current) => current || data.locations[0].id)
+      }
+      setLoading(false)
+    }
+
+    const timer = setTimeout(() => {
+      void loadInitialData()
+    }, 0)
     return () => clearTimeout(timer)
   }, [])
 

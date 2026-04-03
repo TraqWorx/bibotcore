@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 import { sf } from '@/lib/simfonia/ui'
 
@@ -73,10 +74,13 @@ export default function PortalSettingsForm({ locationId, portalUrl, initialIconU
         </p>
         <div className="mt-3 flex items-center gap-4">
           {iconUrl && (
-            <img
+            <Image
               src={iconUrl}
               alt="Portal icon"
+              width={64}
+              height={64}
               className="h-16 w-16 rounded-2xl border border-gray-200/80 object-cover shadow-sm"
+              unoptimized
             />
           )}
           <input

@@ -30,7 +30,7 @@ export default function BulkJobsIndicator({ locationId }: { locationId: string }
     void loadJobs()
     const interval = setInterval(() => { void loadJobs() }, 5000)
     return () => clearInterval(interval)
-  }, [locationId, loadJobs])
+  }, [locationId])
 
   if (jobs.length === 0) return null
 

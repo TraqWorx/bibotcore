@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useTransition } from 'react'
+import { useState, useEffect, useRef, useTransition, useMemo, useCallback } from 'react'
 import {
   getDealData,
   sendMessage,
@@ -164,7 +164,7 @@ export default function DealDrawer({
   const [taskDue, setTaskDue] = useState('')
   const [savingTask, startSaveTask] = useTransition()
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     const d = await getDealData(dealId, locationId) as DealData
     setData(d)
@@ -173,11 +173,11 @@ export default function DealDrawer({
     setEditStageId(d.opportunity?.pipelineStageId ?? '')
     setEditStatus(d.opportunity?.status ?? 'open')
     setLoading(false)
-  }
+  }, [dealId, locationId])
 
   useEffect(() => {
-    load()
-  }, [dealId]) // eslint-disable-line react-hooks/exhaustive-deps
+    void load()
+  }, [load])
 
   useEffect(() => {
     if (tab === 'messages') {
@@ -278,28 +278,47 @@ export default function DealDrawer({
     await completeTask(data.contact.id, taskId, locationId)
   }
 
-  const contactName = [data?.contact?.firstName, data?.contact?.lastName].filter(Boolean).join(' ') || null
-  const initials = [data?.contact?.firstName?.[0], data?.contact?.lastName?.[0]].filter(Boolean).join('').toUpperCase() || data?.opportunity?.name?.slice(0, 2).toUpperCase() || '?'
+  const contactName = useMemo(
+    () => [data?.contact?.firstName, data?.contact?.lastName].filter(Boolean).join(' ') || null,
+    [data?.contact?.firstName, data?.contact?.lastName]
+  )
+  const initials = useMemo(
+    () =>
+      [data?.contact?.firstName?.[0], data?.contact?.lastName?.[0]].filter(Boolean).join('').toUpperCase() ||
+      data?.opportunity?.name?.slice(0, 2).toUpperCase() ||
+      '?',
+    [data?.contact?.firstName, data?.contact?.lastName, data?.opportunity?.name]
+  )
   const statusColor = STATUS_COLORS[editStatus] ?? STATUS_COLORS.open
 
-  // Build activity timeline
-  const activityItems = [
-    ...(data?.opportunity?.createdAt
-      ? [{ type: 'created', date: data.opportunity.createdAt, label: 'Opportunità creata', body: undefined as string | undefined }]
-      : []),
-    ...(data?.messages ?? []).map((m) => ({
-      type: 'message' as const,
-      date: m.dateAdded ?? '',
-      label: m.direction === 'inbound' ? 'Messaggio dal contatto' : 'Messaggio inviato',
-      body: m.body,
-    })),
-    ...(data?.appointments ?? []).map((a) => ({
-      type: 'appointment' as const,
-      date: a.startTime ?? '',
-      label: a.title ?? 'Appuntamento',
-      body: undefined as string | undefined,
-    })),
-  ].filter((a) => a.date).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  const sortedMessages = useMemo(
+    () => [...(data?.messages ?? [])].sort((a, b) => new Date(a.dateAdded ?? 0).getTime() - new Date(b.dateAdded ?? 0).getTime()),
+    [data?.messages]
+  )
+
+  const activityItems = useMemo(
+    () =>
+      [
+        ...(data?.opportunity?.createdAt
+          ? [{ type: 'created', date: data.opportunity.createdAt, label: 'Opportunità creata', body: undefined as string | undefined }]
+          : []),
+        ...(data?.messages ?? []).map((m) => ({
+          type: 'message' as const,
+          date: m.dateAdded ?? '',
+          label: m.direction === 'inbound' ? 'Messaggio dal contatto' : 'Messaggio inviato',
+          body: m.body,
+        })),
+        ...(data?.appointments ?? []).map((a) => ({
+          type: 'appointment' as const,
+          date: a.startTime ?? '',
+          label: a.title ?? 'Appuntamento',
+          body: undefined as string | undefined,
+        })),
+      ]
+        .filter((a) => a.date)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [data?.appointments, data?.messages, data?.opportunity?.createdAt]
+  )
 
   return (
     <>
@@ -475,9 +494,7 @@ export default function DealDrawer({
                     <p className="py-10 text-center text-sm text-gray-400">Nessun messaggio.</p>
                   ) : (
                     <div className="space-y-2">
-                      {[...data.messages]
-                        .sort((a, b) => new Date(a.dateAdded ?? 0).getTime() - new Date(b.dateAdded ?? 0).getTime())
-                        .map((msg) => {
+                      {sortedMessages.map((msg) => {
                           const isOutbound = msg.direction !== 'inbound'
                           return (
                             <div key={msg.id} className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}>

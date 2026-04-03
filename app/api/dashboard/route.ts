@@ -36,7 +36,6 @@ export async function GET(req: NextRequest) {
 
   // ALL queries in one parallel batch
   const [
-    { data: profile },
     { count: totalContacts },
     { data: allCfValues },
     customFields,
@@ -44,18 +43,19 @@ export async function GET(req: NextRequest) {
     settingsRes,
     { data: gareRows },
     { data: closedDaysData },
+    { data: designSettings },
   ] = await Promise.all([
-    sb.from('profiles').select('role').eq('id', access.userId).single(),
-    sb.from('cached_contacts').select('*', { count: 'exact', head: true }).eq('location_id', locationId),
+    sb.from('cached_contacts').select('ghl_id', { count: 'exact', head: true }).eq('location_id', locationId),
     sb.from('cached_contact_custom_fields').select('contact_ghl_id, field_id, value').eq('location_id', locationId),
     getCustomFieldDefs(locationId),
     sb.from('cached_ghl_users').select('ghl_id, name, first_name, last_name, email, role').eq('location_id', locationId),
     sb.from('location_settings').select('target_annuale').eq('location_id', locationId).single(),
     sb.from('gare_mensili').select('categoria, obiettivo, tag').eq('location_id', locationId).eq('month', currentMonth).order('categoria'),
     sb.from('location_settings').select('closed_days').eq('location_id', locationId).single(),
+    sb.from('location_design_settings').select('module_overrides').eq('location_id', locationId).maybeSingle(),
   ])
 
-  const isSuperAdmin = profile?.role === 'super_admin'
+  const isSuperAdmin = access.isSuperAdmin
   const currentGhlUser = (ghlUsers ?? []).find((u) => u.email?.toLowerCase() === access.email.toLowerCase())
   const isGhlAdmin = currentGhlUser?.role === 'admin'
   const isAdmin = isSuperAdmin || isGhlAdmin
@@ -135,13 +135,6 @@ export async function GET(req: NextRequest) {
         }
       })
     : []
-
-  // Check if AI module is enabled
-  const { data: designSettings } = await sb
-    .from('location_design_settings')
-    .select('module_overrides')
-    .eq('location_id', locationId)
-    .maybeSingle()
 
   const moduleOverrides = (designSettings?.module_overrides ?? {}) as Record<string, { enabled?: boolean }>
   const aiEnabled = moduleOverrides.ai?.enabled !== false // default on

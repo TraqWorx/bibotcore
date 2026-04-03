@@ -13,9 +13,9 @@ const getAdminData = cache(async () => {
   const admin = createAdminClient()
   const [{ data: profile }, { count: userCount }, { count: locationCount }, { count: designCount }] = await Promise.all([
     admin.from('profiles').select('role').eq('id', user.id).single(),
-    admin.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'super_admin'),
-    admin.from('ghl_connections').select('*', { count: 'exact', head: true }),
-    admin.from('designs').select('*', { count: 'exact', head: true }),
+    admin.from('profiles').select('id', { count: 'exact', head: true }).neq('role', 'super_admin'),
+    admin.from('ghl_connections').select('location_id', { count: 'exact', head: true }),
+    admin.from('designs').select('slug', { count: 'exact', head: true }),
   ])
 
   if (profile?.role !== 'super_admin') return null

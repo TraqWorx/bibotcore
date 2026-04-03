@@ -27,7 +27,17 @@ export default function SyncStatus({ locationId }: { locationId: string }) {
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => { void loadStatus(false) }, 0)
+    async function loadInitialStatus() {
+      const res = await fetch(`/api/admin/sync?locationId=${locationId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      setStatuses(data.statuses ?? [])
+      setLoading(false)
+    }
+
+    const timer = setTimeout(() => {
+      void loadInitialStatus()
+    }, 0)
     return () => clearTimeout(timer)
   }, [locationId])
 

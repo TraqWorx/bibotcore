@@ -44,7 +44,7 @@ export default async function ContactProfilePage({
     { data: cachedCalendars },
     { data: cachedConvos },
   ] = await Promise.all([
-    sb.from('cached_contacts').select('*').eq('location_id', locationId).eq('ghl_id', contactId).single(),
+    sb.from('cached_contacts').select('first_name, last_name, email, phone, address1, city, tags, company_name').eq('location_id', locationId).eq('ghl_id', contactId).single(),
     sb.from('cached_contact_custom_fields').select('field_id, value').eq('location_id', locationId).eq('contact_ghl_id', contactId),
     sb.from('cached_custom_fields').select('field_id, name').eq('location_id', locationId),
     getOpportunitiesByContact(locationId, contactId),

@@ -23,12 +23,10 @@ const getLayoutData = cache(async () => {
   if (user) {
     const supabase = createAdminClient()
 
-    const [{ data: profile }, { data: connections }, { data: profileLocs }, { data: allInstalls }, { data: allLocationNames }, cookieStore] = await Promise.all([
+    const [{ data: profile }, { data: connections }, { data: profileLocs }, cookieStore] = await Promise.all([
       supabase.from('profiles').select('role, location_id').eq('id', user.id).single(),
       supabase.from('ghl_connections').select('location_id').order('location_id'),
       supabase.from('profile_locations').select('location_id').eq('user_id', user.id),
-      supabase.from('installs').select('location_id, design_slug').not('design_slug', 'is', null),
-      supabase.from('locations').select('location_id, name'),
       cookies(),
     ])
 
@@ -46,14 +44,21 @@ const getLayoutData = cache(async () => {
       }
     }
 
+    const [{ data: installs }, { data: locationNames }] = locationIds.length > 0
+      ? await Promise.all([
+          supabase.from('installs').select('location_id, design_slug').in('location_id', locationIds).not('design_slug', 'is', null),
+          supabase.from('locations').select('location_id, name').in('location_id', locationIds),
+        ])
+      : [{ data: [] }, { data: [] }]
+
     const designByLocation: Record<string, string | null> = {}
-    for (const i of allInstalls ?? []) {
-      if (locationIds.includes(i.location_id)) designByLocation[i.location_id] = i.design_slug
+    for (const i of installs ?? []) {
+      designByLocation[i.location_id] = i.design_slug
     }
 
     const locationIdsWithDesign = locationIds.filter((id) => designByLocation[id])
     const nameById: Record<string, string> = {}
-    for (const r of allLocationNames ?? []) nameById[r.location_id] = r.name
+    for (const r of locationNames ?? []) nameById[r.location_id] = r.name
 
     locations = locationIdsWithDesign.map((id) => ({
       location_id: id,

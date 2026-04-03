@@ -21,16 +21,6 @@ interface Props {
   initialSlots: AvailabilitySlot[]
 }
 
-function defaultSlotsForUser(userId: string): AvailabilitySlot[] {
-  return Array.from({ length: 7 }, (_, i) => ({
-    ghl_user_id: userId,
-    day_of_week: i,
-    start_time: '09:00',
-    end_time: '18:00',
-    enabled: i < 5, // Mon-Fri enabled by default
-  }))
-}
-
 export default function AvailabilityForm({ locationId, users, initialSlots }: Props) {
   const [selectedUserId, setSelectedUserId] = useState(users[0]?.id ?? '')
   const [allSlots, setAllSlots] = useState<AvailabilitySlot[]>(() => {

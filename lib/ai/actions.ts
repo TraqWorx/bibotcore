@@ -2,7 +2,7 @@
 
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { assertUserOwnsLocation } from '@/lib/location/getActiveLocation'
-import { summarizeContact, suggestReply, generateInsight, generateInsightFull, chatWithTools, getAiUsageStats } from './claude'
+import { summarizeContact, suggestReply, chatWithTools, getAiUsageStats } from './claude'
 
 /**
  * Server action: Generate a contact summary.
@@ -21,7 +21,7 @@ export async function aiSummarizeContact(
 
     // Fetch contact from cache
     const [{ data: contact }, { data: customFields }, { data: opportunities }, { data: fieldDefs }] = await Promise.all([
-      sb.from('cached_contacts').select('*').eq('location_id', locationId).eq('ghl_id', contactGhlId).single(),
+      sb.from('cached_contacts').select('first_name, last_name, email, phone, tags').eq('location_id', locationId).eq('ghl_id', contactGhlId).single(),
       sb.from('cached_contact_custom_fields').select('field_id, value').eq('location_id', locationId).eq('contact_ghl_id', contactGhlId),
       sb.from('cached_opportunities').select('name, status, monetary_value').eq('location_id', locationId).eq('contact_ghl_id', contactGhlId),
       sb.from('cached_custom_fields').select('field_id, name').eq('location_id', locationId),

@@ -5,7 +5,6 @@ import type { NextRequest } from 'next/server'
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // ✅ Allow public routes INCLUDING redirect
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/redirect') ||
@@ -17,7 +16,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  let res = NextResponse.next({
+  const res = NextResponse.next({
     request: { headers: req.headers },
   })
 
@@ -44,9 +43,7 @@ export async function middleware(req: NextRequest) {
 
   if (!session) {
     const loginUrl = req.nextUrl.clone()
-    // Portal users get redirected to portal login
     if (pathname.startsWith('/portal/')) {
-      // Extract locationId from /portal/[locationId]/...
       const segments = pathname.split('/')
       const portalLocationId = segments[2] ?? ''
       loginUrl.pathname = '/portal/login'
@@ -57,11 +54,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // For /designs/* routes: inject locationId + check OAuth status
   if (pathname.startsWith('/designs')) {
     let locationId: string | null = req.nextUrl.searchParams.get('locationId')
 
-    // Inject locationId if missing
     if (!locationId) {
       const { data: install } = await supabase
         .from('installs')
@@ -77,8 +72,6 @@ export async function middleware(req: NextRequest) {
         return NextResponse.redirect(redirectUrl)
       }
     }
-
-    // OAuth check moved to page-level — no longer blocking middleware
   }
 
   return res

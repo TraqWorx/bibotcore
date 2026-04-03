@@ -24,8 +24,9 @@ export async function GET(req: NextRequest) {
   // Verify portal user owns this conversation
   const { data: portalUser } = await sb
     .from('portal_users')
-    .select('contact_ghl_id')
+    .select('contact_ghl_id, location_id')
     .eq('auth_user_id', user.id)
+    .eq('location_id', locationId)
     .single()
 
   if (!portalUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

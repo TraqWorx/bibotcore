@@ -21,6 +21,7 @@ export default async function PortalHomePage({
     .from('portal_users')
     .select('contact_ghl_id')
     .eq('auth_user_id', user.id)
+    .eq('location_id', locationId)
     .single()
 
   if (!portalUser) redirect(`/portal/login?locationId=${locationId}`)
@@ -35,12 +36,12 @@ export default async function PortalHomePage({
     { data: fieldDefs },
   ] = await Promise.all([
     sb.from('cached_contacts')
-      .select('*')
+      .select('first_name, last_name, email, phone, company_name, tags')
       .eq('location_id', locationId)
       .eq('ghl_id', contactGhlId)
       .single(),
     sb.from('cached_opportunities')
-      .select('*')
+      .select('ghl_id, name, status, monetary_value')
       .eq('location_id', locationId)
       .eq('contact_ghl_id', contactGhlId)
       .order('synced_at', { ascending: false }),

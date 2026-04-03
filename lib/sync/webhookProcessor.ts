@@ -185,13 +185,12 @@ async function processContactEvent(locationId: string, eventType: string, data: 
 
         if (settings?.portal_auto_invite) {
           const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://core.bibotcrm.it'
-          const portalUrl = `${appUrl}/portal/${locationId}`
-          const welcomeMsg = settings.portal_welcome_message ?? 'Benvenuto! Accedi al tuo portale clienti.'
+          const welcomeMessage = settings.portal_welcome_message ?? 'Benvenuto! Accedi al tuo portale clienti.'
 
           // Create Supabase auth user and send magic link as invite
           const { error: inviteErr } = await sb.auth.admin.inviteUserByEmail(email, {
             redirectTo: `${appUrl}/api/auth/callback?redirectTo=/portal/${locationId}`,
-            data: { portal_location: locationId },
+            data: { portal_location: locationId, portal_welcome_message: welcomeMessage },
           })
 
           if (inviteErr && !inviteErr.message.toLowerCase().includes('already')) {

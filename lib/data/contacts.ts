@@ -8,7 +8,6 @@ import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import {
   type CustomFieldDef,
   parseCategoriaValue,
-  CATEGORIA_FIELD_NAME,
 } from '@/lib/utils/categoryFields'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'

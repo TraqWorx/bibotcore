@@ -72,17 +72,17 @@ export default async function AdminPage() {
     { count: everSubscribedCount },
   ] = await Promise.all([
     fetchGhlLocations(),
-    supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'super_admin'),
-    supabase.from('installs').select('*', { count: 'exact', head: true }),
-    supabase.from('installs').select('*', { count: 'exact', head: true }).gte('installed_at', todayStr),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).neq('role', 'super_admin'),
+    supabase.from('installs').select('id', { count: 'exact', head: true }),
+    supabase.from('installs').select('id', { count: 'exact', head: true }).gte('installed_at', todayStr),
     supabase.from('installs').select('installed_at').order('installed_at'),
     supabase.from('installs').select('id, location_id, design_slug, installed_at, user_id').order('installed_at', { ascending: false }).limit(7),
     supabase.from('locations').select('location_id, name'),
     supabase.from('installs').select('design_slug, location_id'),
     supabase.from('locations').select('location_id, ghl_plan_id, ghl_date_added, subscribed_at, churned_at'),
     supabase.from('ghl_plans').select('ghl_plan_id, name, price_monthly'),
-    supabase.from('locations').select('*', { count: 'exact', head: true }).not('churned_at', 'is', null),
-    supabase.from('locations').select('*', { count: 'exact', head: true }).not('subscribed_at', 'is', null),
+    supabase.from('locations').select('location_id', { count: 'exact', head: true }).not('churned_at', 'is', null),
+    supabase.from('locations').select('location_id', { count: 'exact', head: true }).not('subscribed_at', 'is', null),
   ])
 
   // totalLocationsCount computed below after locationPlanMap is built

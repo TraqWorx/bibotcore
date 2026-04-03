@@ -1,7 +1,6 @@
 'use server'
 
 import { getGhlClient } from '@/lib/ghl/ghlClient'
-import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { assertUserOwnsLocation } from '@/lib/location/getActiveLocation'
 import { createAdminClient } from '@/lib/supabase-server'
 import {
@@ -11,8 +10,6 @@ import {
   writeThroughNoteDelete,
   writeThroughTask,
 } from '@/lib/sync/writeThrough'
-
-const BASE_URL = 'https://services.leadconnectorhq.com'
 
 export async function moveOpportunity(
   opportunityId: string,
@@ -53,7 +50,7 @@ export async function getDealData(dealId: string, locationId: string) {
     let opportunity: Record<string, unknown> | null = null
     const { data: cachedOpp } = await supabase
       .from('cached_opportunities')
-      .select('*')
+      .select('ghl_id, name, pipeline_id, pipeline_stage_id, contact_ghl_id, monetary_value, status, created_at')
       .eq('location_id', locationId)
       .eq('ghl_id', dealId)
       .single()
@@ -67,6 +64,7 @@ export async function getDealData(dealId: string, locationId: string) {
         contactId: cachedOpp.contact_ghl_id,
         monetaryValue: cachedOpp.monetary_value,
         status: cachedOpp.status,
+        createdAt: cachedOpp.created_at,
       }
     } else {
       // Fallback to GHL
@@ -100,11 +98,11 @@ export async function getDealData(dealId: string, locationId: string) {
       ] = await Promise.all([
         supabase.from('cached_contacts').select('ghl_id, first_name, last_name, email, phone, company_name, tags, raw').eq('location_id', locationId).eq('ghl_id', contactId).maybeSingle(),
         supabase.from('cached_conversations').select('ghl_id, type').eq('location_id', locationId).eq('contact_ghl_id', contactId).limit(1).maybeSingle(),
-        supabase.from('cached_notes').select('ghl_id, body, date_added, created_by').eq('location_id', locationId).eq('contact_ghl_id', contactId).order('date_added', { ascending: false }),
-        supabase.from('cached_tasks').select('ghl_id, title, due_date, completed').eq('location_id', locationId).eq('contact_ghl_id', contactId),
+        supabase.from('cached_notes').select('ghl_id, body, date_added, created_by').eq('location_id', locationId).eq('contact_ghl_id', contactId).order('date_added', { ascending: false }).limit(50),
+        supabase.from('cached_tasks').select('ghl_id, title, due_date, completed').eq('location_id', locationId).eq('contact_ghl_id', contactId).limit(50),
         supabase.from('cached_calendar_events').select('ghl_id, title, start_time, appointment_status').eq('location_id', locationId).eq('contact_ghl_id', contactId).order('start_time', { ascending: false }),
         supabase.from('cached_ghl_users').select('ghl_id, name, first_name, last_name, email').eq('location_id', locationId),
-        supabase.from('note_authors').select('note_id, author_user_id').eq('location_id', locationId).eq('contact_id', contactId),
+        supabase.from('note_authors').select('note_id, author_user_id').eq('location_id', locationId).eq('contact_id', contactId).limit(50),
       ])
 
       // Contact
@@ -133,6 +131,7 @@ export async function getDealData(dealId: string, locationId: string) {
             .select('ghl_id, body, direction, date_added')
             .eq('location_id', locationId).eq('conversation_id', convoId)
             .order('date_added', { ascending: true })
+            .limit(100)
           messages = (cachedMsgs ?? []).map((m) => ({
             id: m.ghl_id, body: m.body ?? '', direction: m.direction ?? '', dateAdded: m.date_added ?? '',
           }))

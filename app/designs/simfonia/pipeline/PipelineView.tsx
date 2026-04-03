@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -14,9 +15,13 @@ import {
 } from 'lucide-react'
 import SimfoniaPageHeader from '../_components/SimfoniaPageHeader'
 import PipelineBoard from './PipelineBoard'
-import DealDrawer from './DealDrawer'
 import { updateOpportunity } from './_actions'
 import { sf } from '@/lib/simfonia/ui'
+
+const DealDrawer = dynamic(() => import('./DealDrawer'), {
+  ssr: false,
+  loading: () => null,
+})
 
 interface Stage { id: string; name: string }
 interface Pipeline { id: string; name: string; stages: Stage[] }

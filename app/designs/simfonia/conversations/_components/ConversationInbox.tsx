@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useTransition } from 'react'
+import { useState, useEffect, useRef, useTransition, useDeferredValue, useMemo } from 'react'
 import {
   getConversationMessages,
   sendMessage,
@@ -96,6 +96,7 @@ export default function ConversationInbox({ conversations: initialConversations,
   const [sending, startSend] = useTransition()
   const [sendResult, setSendResult] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const deferredSearchQuery = useDeferredValue(searchQuery)
   const [aiSuggesting, setAiSuggesting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -122,6 +123,7 @@ export default function ConversationInbox({ conversations: initialConversations,
     let prevCount = 0
 
     function loadMessages(showSpinner: boolean) {
+      if (document.hidden) return
       if (showSpinner) setMessagesLoading(true)
       getConversationMessages(locationId, selectedId!).then((data) => {
         if (cancelled) return
@@ -146,6 +148,7 @@ export default function ConversationInbox({ conversations: initialConversations,
   // Poll conversation list every 10s — preserve local assignedTo overrides
   useEffect(() => {
     const interval = setInterval(() => {
+      if (document.hidden) return
       getConversations(locationId).then((data) => {
         if (data.length > 0) {
           setConversations((prev) => {
@@ -254,16 +257,16 @@ export default function ConversationInbox({ conversations: initialConversations,
     })
   }
 
-  const filtered = searchQuery
-    ? conversations.filter((c) =>
-        c.contactName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.lastMessageBody.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : conversations
+  const usersById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users])
 
-  const assignedUser = selected?.assignedTo
-    ? users.find((u) => u.id === selected.assignedTo)
-    : null
+  const filtered = useMemo(() => {
+    const query = deferredSearchQuery.trim().toLowerCase()
+    if (!query) return conversations
+    return conversations.filter((c) =>
+      c.contactName.toLowerCase().includes(query) ||
+      c.lastMessageBody.toLowerCase().includes(query)
+    )
+  }, [conversations, deferredSearchQuery])
 
   return (
     <div className={`flex flex-1 min-h-0 overflow-hidden ${sf.inbox}`}>
@@ -333,7 +336,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                   </div>
                   {/* Show assigned user badge with unique color */}
                   {conv.assignedTo && (() => {
-                    const user = users.find((u) => u.id === conv.assignedTo)
+                    const user = usersById.get(conv.assignedTo)
                     const color = getUserColor(conv.assignedTo)
                     return (
                       <p className="mt-0.5 truncate text-[10px] font-semibold" style={{ color }}>

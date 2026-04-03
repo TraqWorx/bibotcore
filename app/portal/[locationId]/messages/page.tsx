@@ -17,6 +17,7 @@ export default async function PortalMessagesPage({
     .from('portal_users')
     .select('contact_ghl_id')
     .eq('auth_user_id', user.id)
+    .eq('location_id', locationId)
     .single()
 
   if (!portalUser) redirect(`/portal/login?locationId=${locationId}`)

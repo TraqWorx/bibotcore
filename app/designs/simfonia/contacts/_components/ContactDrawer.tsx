@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   getContactDetail,
@@ -74,7 +74,6 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
   const [sendResult, setSendResult] = useState<string | null>(null)
   const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
-  const [conversationId, setConversationId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Edit state
@@ -111,6 +110,10 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
   // Delete state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, startDelete] = useTransition()
+  const customFieldDefMap = useMemo(
+    () => new Map(customFieldDefs.map((definition) => [definition.id, definition])),
+    [customFieldDefs]
+  )
 
   useEffect(() => {
     if (!contactId) {
@@ -143,41 +146,35 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
       }
       setLoading(false)
     })
-  }, [contactId, locationId])
+  }, [contactId, initialTab, locationId])
+
+  const loadMessages = useCallback(async (showSpinner: boolean) => {
+    if (tab !== 'messages' || !contactId) return 0
+    if (showSpinner) setMessagesLoading(true)
+    try {
+      const data = await getConversationMessages(locationId, contactId)
+      setMessages(data.messages)
+      if (showSpinner || data.messages.length > 0) {
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+      }
+      return data.messages.length
+    } finally {
+      if (showSpinner) setMessagesLoading(false)
+    }
+  }, [contactId, locationId, tab])
 
   // Load messages when switching to messages tab + poll every 3s
   useEffect(() => {
     if (tab !== 'messages' || !contactId) return
-    let cancelled = false
 
-    let prevCount = 0
+    void loadMessages(true)
+    const interval = setInterval(() => {
+      if (document.hidden) return
+      void loadMessages(false)
+    }, 3000)
 
-    function loadMessages(showSpinner: boolean) {
-      if (showSpinner) setMessagesLoading(true)
-      getConversationMessages(locationId, contactId!).then((data) => {
-        if (cancelled) return
-        if (data.messages.length > 0 || showSpinner) {
-          setMessages(data.messages)
-        }
-        setConversationId(data.conversationId)
-        if (showSpinner) {
-          setMessagesLoading(false)
-        }
-        if (showSpinner || data.messages.length > prevCount) {
-          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
-        }
-        prevCount = data.messages.length
-      }).catch(() => {
-        if (!cancelled && showSpinner) setMessagesLoading(false)
-      })
-    }
-
-    loadMessages(true)
-    const interval = setInterval(() => loadMessages(false), 3000)
-    return () => { cancelled = true; clearInterval(interval) }
-  }, [tab, contactId, locationId])
-
-  if (!contactId) return null
+    return () => clearInterval(interval)
+  }, [contactId, loadMessages, tab])
 
   const fullName = contact
     ? [contact.firstName, contact.lastName].filter(Boolean).join(' ') || '—'
@@ -187,10 +184,130 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
     ? [contact.firstName?.[0], contact.lastName?.[0]].filter(Boolean).join('').toUpperCase() || '?'
     : ''
 
-  const customFields = (contact?.customFields ?? []).filter((f) => {
-    const val = f.value ?? f.field_value ?? f.fieldValue ?? ''
-    return val !== ''
-  })
+  const customFields = useMemo(
+    () => (contact?.customFields ?? []).filter((field) => {
+      const value = field.value ?? field.field_value ?? field.fieldValue ?? ''
+      return value !== ''
+    }),
+    [contact?.customFields]
+  )
+
+  const infoFieldGroups = useMemo(() => {
+    const groups = new Map<string, typeof customFields>()
+    const switchOutByCategory = new Map<string, boolean>()
+    const alwaysVisible = new Set(['Anagrafica', 'Altro'])
+
+    for (const field of customFields) {
+      const definition = customFieldDefMap.get(field.id)
+      const { category, displayName } = parseFieldCategory(definition?.name ?? field.name ?? '')
+      const groupName = category ?? 'Altro'
+      if (isHiddenCategory(groupName)) continue
+
+      if (displayName.toLowerCase().includes('switch out')) {
+        const value = field.value ?? field.field_value ?? field.fieldValue ?? ''
+        switchOutByCategory.set(groupName, isSwitchOutOn(value))
+        continue
+      }
+
+      if (!groups.has(groupName)) groups.set(groupName, [])
+      groups.get(groupName)!.push(field)
+    }
+
+    const allGroups = Array.from(groups.entries())
+    return {
+      alwaysGroups: allGroups.filter(([groupName]) => alwaysVisible.has(groupName)),
+      tabGroups: allGroups.filter(([groupName]) => !alwaysVisible.has(groupName)),
+      switchOutByCategory,
+    }
+  }, [customFieldDefMap, customFields])
+
+  useEffect(() => {
+    if (infoFieldGroups.tabGroups.length === 0) {
+      if (infoCfTab) setInfoCfTab(null)
+      return
+    }
+
+    if (!infoCfTab || !infoFieldGroups.tabGroups.some(([groupName]) => groupName === infoCfTab)) {
+      setInfoCfTab(infoFieldGroups.tabGroups[0][0])
+    }
+  }, [infoCfTab, infoFieldGroups.tabGroups])
+
+  const visibleEditFields = useMemo(
+    () => filterVisibleFields(customFieldDefs, false),
+    [customFieldDefs]
+  )
+
+  const anagraficaFields = useMemo(
+    () => visibleEditFields.filter((field) => {
+      const { category, displayName } = parseFieldCategory(field.name)
+      if (!category || !SHARED_CATEGORIES.includes(category)) return false
+      return !displayName.toLowerCase().includes('switch out')
+    }),
+    [visibleEditFields]
+  )
+
+  const categoryConfig = useMemo(() => {
+    const categories = discoverCategories(customFieldDefs)
+    const categoriaField = getCategoriaField(customFieldDefs)
+    const selectedLabels = categoriaField ? parseCategoriaValue(editCfValues[categoriaField.id] ?? '') : []
+
+    const dropdownSeen = new Set<string>()
+    const dropdownGroups = selectedLabels
+      .map((label) => {
+        const fields = getDropdownFields(customFieldDefs, label).filter((field) => !dropdownSeen.has(field.id))
+        for (const field of fields) dropdownSeen.add(field.id)
+        return fields.length > 0 ? { label, fields } : null
+      })
+      .filter((group): group is { label: string; fields: CustomFieldDef[] } => group !== null)
+
+    const sharedFieldIds = new Set(
+      visibleEditFields
+        .filter((field) => {
+          const { category } = parseFieldCategory(field.name)
+          return Boolean(category && SHARED_CATEGORIES.includes(category))
+        })
+        .map((field) => field.id)
+    )
+
+    const categoryGroups = selectedLabels.map((label) => {
+      const switchOutField = getFieldsForCategory(customFieldDefs, label).find((field) => {
+        const { displayName } = parseFieldCategory(field.name)
+        return displayName.toLowerCase().includes('switch out')
+      })
+
+      const fields = getFieldsForCategory(visibleEditFields, label).filter((field) => (
+        !dropdownSeen.has(field.id) &&
+        !sharedFieldIds.has(field.id) &&
+        field.id !== switchOutField?.id
+      ))
+
+      const categoryTagNames = categoryTags[label] ?? []
+      return {
+        label,
+        fields,
+        switchOutField,
+        switchOutEnabled: switchOutField ? isSwitchOutOn(editCfValues[switchOutField.id]) : false,
+        categoryTagNames,
+        selectedTags: editTags.filter((tag) => categoryTagNames.includes(tag)),
+        availableCategoryTags: availableTags.filter((tag) => categoryTagNames.includes(tag) && !editTags.includes(tag)),
+      }
+    })
+
+    return { categories, categoriaField, selectedLabels, dropdownGroups, categoryGroups }
+  }, [availableTags, categoryTags, customFieldDefs, editCfValues, editTags, visibleEditFields])
+
+  useEffect(() => {
+    if (categoryConfig.selectedLabels.length === 0) {
+      if (editCfTab) setEditCfTab(null)
+      return
+    }
+
+    if (!editCfTab || !categoryConfig.selectedLabels.includes(editCfTab)) {
+      setEditCfTab(categoryConfig.selectedLabels[0])
+    }
+  }, [categoryConfig.selectedLabels, editCfTab])
+
+  if (!contactId) return null
 
   function handleSend() {
     if (!message.trim() || !contactId) return
@@ -201,8 +318,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
       } else {
         setSendResult('Messaggio inviato')
         setMessage('')
-        const data = await getConversationMessages(locationId, contactId)
-        setMessages(data.messages)
+        await loadMessages(true)
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
           setSendResult(null)
@@ -300,7 +416,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
 
   const inputClass = sf.inputFull
 
-  const TABS = [
+  const tabs = [
     { key: 'info' as const, label: 'Dettagli', icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg> },
     { key: 'edit' as const, label: 'Modifica', icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg> },
     { key: 'messages' as const, label: 'Messaggi', icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" /></svg> },
@@ -377,7 +493,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
               ariaLabel="Sezioni contatto"
               stackedIcons
               scrollable
-              items={TABS.map((t) => ({ value: t.key, label: t.label, icon: t.icon }))}
+              items={tabs.map((t) => ({ value: t.key, label: t.label, icon: t.icon }))}
               value={tab}
               onChange={setTab}
             />
@@ -432,49 +548,11 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
 
                 {/* Custom fields — Anagrafica/Altro always visible, categories as tabs */}
                 {customFields.length > 0 && (() => {
-                  const defMap = new Map(customFieldDefs.map((d) => [d.id, d]))
-                  const ALWAYS_VISIBLE = ['Anagrafica', 'Altro']
-
-                  const groups = new Map<string, typeof customFields>()
-                  for (const field of customFields) {
-                    const def = defMap.get(field.id)
-                    const { category, displayName } = parseFieldCategory(def?.name ?? field.name ?? '')
-                    const key = category ?? 'Altro'
-                    if (isHiddenCategory(key)) continue
-                    if (displayName.toLowerCase().includes('switch out')) continue
-                    if (!groups.has(key)) groups.set(key, [])
-                    groups.get(key)!.push(field)
-                  }
-
-                  const alwaysGroups = Array.from(groups.entries()).filter(([k]) => ALWAYS_VISIBLE.includes(k))
-                  const tabGroups = Array.from(groups.entries()).filter(([k]) => !ALWAYS_VISIBLE.includes(k))
-
-                  if (tabGroups.length > 0 && !infoCfTab) {
-                    setTimeout(() => setInfoCfTab(tabGroups[0][0]), 0)
-                  }
-
-                  const getSoForCategory = (catName: string) => {
-                    for (const field of customFields) {
-                      const def = defMap.get(field.id)
-                      const { category, displayName } = parseFieldCategory(def?.name ?? field.name ?? '')
-                      if (category === catName && displayName.toLowerCase().includes('switch out')) {
-                        const val = field.value ?? field.field_value ?? field.fieldValue ?? ''
-                        return isSwitchOutOn(val)
-                      }
-                    }
-                    return false
-                  }
-
-                  const getTagsForCategory = (catLabel: string) => {
-                    const associated = categoryTags[catLabel] ?? []
-                    return (contact.tags ?? []).filter((t) => associated.includes(t))
-                  }
-
                   const renderFieldGroup = (fields: typeof customFields) => (
                     <div className="divide-y divide-gray-50">
                       {fields.map((field) => {
                         const val = field.value ?? field.field_value ?? field.fieldValue ?? ''
-                        const def = defMap.get(field.id)
+                        const def = customFieldDefMap.get(field.id)
                         const { displayName } = parseFieldCategory(def?.name ?? field.name ?? field.key ?? field.id)
                         return (
                           <div key={field.id} className="flex items-start gap-4 py-3 px-1">
@@ -491,7 +569,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                   return (
                     <>
                       {/* Always-visible groups (Anagrafica, Altro) */}
-                      {alwaysGroups.map(([groupName, fields]) => (
+                      {infoFieldGroups.alwaysGroups.map(([groupName, fields]) => (
                         <div key={groupName} className="rounded-2xl border border-gray-200/60 bg-white p-5 shadow-sm">
                           <h3 className="mb-3 text-sm font-bold text-gray-800">{groupName}</h3>
                           {renderFieldGroup(fields)}
@@ -499,40 +577,41 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                       ))}
 
                       {/* Category tab bar + content */}
-                      {tabGroups.length > 0 && (
+                      {infoFieldGroups.tabGroups.length > 0 && (
                         <div className="rounded-2xl border border-gray-200/60 bg-white p-5 shadow-sm space-y-4">
-                          {tabGroups.length > 1 && (
+                          {infoFieldGroups.tabGroups.length > 1 && (
                             <SegmentedControl
                               size="sm"
                               ariaLabel="Categorie campi"
-                              items={tabGroups.map(([groupName]) => ({
+                              items={infoFieldGroups.tabGroups.map(([groupName]) => ({
                                 value: groupName,
                                 label: groupName,
                               }))}
-                              value={infoCfTab ?? tabGroups[0][0]}
+                              value={infoCfTab ?? infoFieldGroups.tabGroups[0][0]}
                               onChange={(v) => setInfoCfTab(v)}
-                              scrollable={tabGroups.length > 3}
+                              scrollable={infoFieldGroups.tabGroups.length > 3}
                               equalWidth={false}
                             />
                           )}
 
-                          {tabGroups
-                            .filter(([groupName]) => tabGroups.length <= 1 || groupName === infoCfTab)
+                          {infoFieldGroups.tabGroups
+                            .filter(([groupName]) => infoFieldGroups.tabGroups.length <= 1 || groupName === infoCfTab)
                             .map(([groupName, fields]) => (
                             <div key={groupName}>
-                              {getSoForCategory(groupName) && (
+                              {infoFieldGroups.switchOutByCategory.get(groupName) && (
                                 <div className="mb-4 flex items-center gap-2.5 rounded-xl border-2 border-red-300 bg-red-50 px-4 py-3">
                                   <span className="text-lg">&#x1F6A9;</span>
                                   <span className="text-sm font-bold text-red-700">Switch Out — {groupName}</span>
                                 </div>
                               )}
-                              {tabGroups.length <= 1 && (
+                              {infoFieldGroups.tabGroups.length <= 1 && (
                                 <h3 className="mb-3 text-sm font-bold text-gray-800">{groupName}</h3>
                               )}
                               {renderFieldGroup(fields)}
                               {/* Per-category tags */}
                               {(() => {
-                                const catTags = getTagsForCategory(groupName)
+                                const associated = categoryTags[groupName] ?? []
+                                const catTags = (contact.tags ?? []).filter((tag) => associated.includes(tag))
                                 if (catTags.length === 0) return null
                                 return (
                                   <div className="mt-4 pt-3 border-t border-gray-100">
@@ -637,13 +716,6 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
 
                 {/* Anagrafica card */}
                 {(() => {
-                  const filtered = filterVisibleFields(customFieldDefs, false)
-                  const anagraficaFields = filtered.filter((f) => {
-                    const { category, displayName } = parseFieldCategory(f.name)
-                    if (!category || !SHARED_CATEGORIES.includes(category)) return false
-                    if (displayName.toLowerCase().includes('switch out')) return false
-                    return true
-                  })
                   if (anagraficaFields.length === 0) return null
                   return (
                     <div className="rounded-2xl border border-gray-200/60 bg-white p-6 shadow-sm">
@@ -680,34 +752,15 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
 
                 {/* Categoria + Category fields card */}
                 {(() => {
-                  const categories = discoverCategories(customFieldDefs)
-                  const categoriaField = getCategoriaField(customFieldDefs)
-                  const selectedCatLabels = categoriaField
-                    ? parseCategoriaValue(editCfValues[categoriaField.id] ?? '')
-                    : []
-                  const globalSeen = new Set<string>()
-                  const ddGroups = selectedCatLabels
-                    .map((label) => {
-                      const fields = getDropdownFields(customFieldDefs, label)
-                        .filter((df) => !globalSeen.has(df.id))
-                      for (const f of fields) globalSeen.add(f.id)
-                      return fields.length > 0 ? { label, fields } : null
-                    })
-                    .filter((g): g is { label: string; fields: CustomFieldDef[] } => g !== null)
-
-                  if (selectedCatLabels.length > 1 && !editCfTab) {
-                    setTimeout(() => setEditCfTab(selectedCatLabels[0]), 0)
-                  }
-
                   return (
                     <div className="space-y-5 rounded-2xl border border-brand/15 bg-white p-6 shadow-sm">
                       {/* Categoria picker with colored pills */}
-                      {categoriaField && (
+                      {categoryConfig.categoriaField && (
                         <div>
                           <h3 className="mb-3 text-sm font-bold text-gray-800">Categoria</h3>
                           <div className="grid grid-cols-2 gap-2">
-                            {categories.map((cat) => {
-                              const isChecked = selectedCatLabels.includes(cat.label)
+                            {categoryConfig.categories.map((cat) => {
+                              const isChecked = categoryConfig.selectedLabels.includes(cat.label)
                               const accent = CATEGORY_ACCENT[cat.slug] ?? DEFAULT_ACCENT
                               return (
                                 <label
@@ -721,9 +774,9 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                                     checked={isChecked}
                                     onChange={() => {
                                       const next = isChecked
-                                        ? selectedCatLabels.filter((l) => l !== cat.label)
-                                        : [...selectedCatLabels, cat.label]
-                                      setEditCfValues((p) => ({ ...p, [categoriaField.id]: next.join(',') }))
+                                        ? categoryConfig.selectedLabels.filter((l) => l !== cat.label)
+                                        : [...categoryConfig.selectedLabels, cat.label]
+                                      setEditCfValues((p) => ({ ...p, [categoryConfig.categoriaField!.id]: next.join(',') }))
                                       if (next.length > 0 && !next.includes(editCfTab ?? '')) {
                                         setEditCfTab(next[0])
                                       }
@@ -740,24 +793,24 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                       )}
 
                       {/* Category tabs */}
-                      {selectedCatLabels.length > 1 && (
+                      {categoryConfig.selectedLabels.length > 1 && (
                         <SegmentedControl
                           size="sm"
                           ariaLabel="Categorie in modifica"
-                          items={selectedCatLabels.map((label) => ({ value: label, label }))}
-                          value={editCfTab ?? selectedCatLabels[0]}
+                          items={categoryConfig.selectedLabels.map((label) => ({ value: label, label }))}
+                          value={editCfTab ?? categoryConfig.selectedLabels[0]}
                           onChange={(v) => setEditCfTab(v)}
-                          scrollable={selectedCatLabels.length > 3}
+                          scrollable={categoryConfig.selectedLabels.length > 3}
                           equalWidth={false}
                         />
                       )}
 
                       {/* Dropdown fields */}
-                      {ddGroups
-                        .filter((g) => selectedCatLabels.length <= 1 || g.label === editCfTab)
+                      {categoryConfig.dropdownGroups
+                        .filter((group) => categoryConfig.selectedLabels.length <= 1 || group.label === editCfTab)
                         .map((group) => (
                         <div key={group.label} className="space-y-4">
-                          {selectedCatLabels.length <= 1 && ddGroups.length > 0 && (
+                          {categoryConfig.selectedLabels.length <= 1 && categoryConfig.dropdownGroups.length > 0 && (
                             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">{group.label}</p>
                           )}
                           {group.fields.map((df) =>
@@ -784,55 +837,14 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
 
                       {/* Category custom fields + tags + Switch Out */}
                       {(() => {
-                        const catField = getCategoriaField(customFieldDefs)
-                        const catLabels = catField ? parseCategoriaValue(editCfValues[catField.id] ?? '') : []
-                        if (catLabels.length === 0) return null
+                        if (categoryConfig.selectedLabels.length === 0) return null
 
-                        const ddFieldIds = new Set<string>()
-                        for (const label of catLabels) {
-                          for (const f of getDropdownFields(customFieldDefs, label)) ddFieldIds.add(f.id)
-                        }
-                        const filtered = filterVisibleFields(customFieldDefs, false)
-                        const soFieldForCategory = (catLabel: string): CustomFieldDef | undefined =>
-                          getFieldsForCategory(customFieldDefs, catLabel).find((f) => {
-                            const { displayName } = parseFieldCategory(f.name)
-                            return displayName.toLowerCase().includes('switch out')
-                          })
-                        const soFieldIds = new Set<string>()
-                        for (const label of catLabels) {
-                          const so = soFieldForCategory(label)
-                          if (so) soFieldIds.add(so.id)
-                        }
-                        const anagraficaFieldIds = new Set(
-                          filtered.filter((f) => {
-                            const { category } = parseFieldCategory(f.name)
-                            return category && SHARED_CATEGORIES.includes(category)
-                          }).map((f) => f.id)
-                        )
-
-                        const globalSeen2 = new Set<string>()
-                        const groups = catLabels
-                          .map((label) => {
-                            const fields = getFieldsForCategory(filtered, label)
-                              .filter((f) => !ddFieldIds.has(f.id) && !soFieldIds.has(f.id) && !anagraficaFieldIds.has(f.id) && !globalSeen2.has(f.id))
-                            for (const f of fields) {
-                              const { category } = parseFieldCategory(f.name)
-                              if (category && category !== label) globalSeen2.add(f.id)
-                            }
-                            return { label, fields }
-                          })
-
-                        return groups
-                          .filter((g) => catLabels.length <= 1 || g.label === editCfTab)
+                        return categoryConfig.categoryGroups
+                          .filter((group) => categoryConfig.selectedLabels.length <= 1 || group.label === editCfTab)
                           .map((group) => {
-                            const soField = soFieldForCategory(group.label)
-                            const soIsOn = soField ? isSwitchOutOn(editCfValues[soField.id]) : false
-                            const catTagNames = categoryTags[group.label] ?? []
-                            const catSelectedTags = editTags.filter((t) => catTagNames.includes(t))
-                            const catAvailableTags = (availableTags ?? []).filter((t) => catTagNames.includes(t) && !editTags.includes(t))
                             return (
                           <div key={group.label} className="space-y-4 border-t border-gray-100 pt-4">
-                            {catLabels.length <= 1 && group.fields.length > 0 && (
+                            {categoryConfig.selectedLabels.length <= 1 && group.fields.length > 0 && (
                               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">{group.label}</p>
                             )}
                             {group.fields.map((cf) => {
@@ -862,15 +874,15 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                             {/* Per-category tags */}
                             <div className="space-y-2 pt-2">
                               <label className="block text-xs font-semibold uppercase tracking-widest text-gray-400">Tag</label>
-                              {(catSelectedTags.length > 0 || catAvailableTags.length > 0) && (
+                              {(group.selectedTags.length > 0 || group.availableCategoryTags.length > 0) && (
                                 <div className="flex flex-wrap gap-1.5">
-                                  {catSelectedTags.map((tag) => (
+                                  {group.selectedTags.map((tag) => (
                                     <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-brand px-2.5 py-0.5 text-xs font-semibold text-white">
                                       {tag}
                                       <button type="button" onClick={() => setEditTags((prev) => prev.filter((t) => t !== tag))} className="ml-0.5 text-current opacity-50 hover:opacity-100">&times;</button>
                                     </span>
                                   ))}
-                                  {catAvailableTags.map((tag) => (
+                                  {group.availableCategoryTags.map((tag) => (
                                     <button key={tag} type="button" onClick={() => setEditTags((prev) => [...prev, tag])} className="rounded-full border border-dashed border-gray-300 bg-white px-2.5 py-0.5 text-[11px] font-medium text-gray-500 transition-colors hover:border-brand/40 hover:text-brand">
                                       + {tag}
                                     </button>
@@ -897,9 +909,9 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                                 </button>
                               </div>
                               {/* Show manually added tags (not in category suggestions) */}
-                              {editTags.filter((t) => !catTagNames.includes(t)).length > 0 && (
+                              {editTags.filter((tag) => !group.categoryTagNames.includes(tag)).length > 0 && (
                                 <div className="flex flex-wrap gap-1.5">
-                                  {editTags.filter((t) => !catTagNames.includes(t)).map((tag) => (
+                                  {editTags.filter((tag) => !group.categoryTagNames.includes(tag)).map((tag) => (
                                     <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-gray-700 px-2.5 py-0.5 text-xs font-semibold text-white">
                                       {tag}
                                       <button type="button" onClick={() => setEditTags((prev) => prev.filter((t) => t !== tag))} className="ml-0.5 text-current opacity-50 hover:opacity-100">&times;</button>
@@ -909,12 +921,12 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                               )}
                             </div>
                             {/* Per-category Switch Out toggle */}
-                            {soField && (
-                              <label className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition-colors ${soIsOn ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                                <input type="checkbox" checked={soIsOn} onChange={(e) => setEditCfValues((p) => ({ ...p, [soField.id]: e.target.checked ? 'Si' : 'No' }))} className="sr-only" />
-                                <span className={`text-lg ${soIsOn ? '' : 'opacity-30'}`}>&#x1F6A9;</span>
+                            {group.switchOutField && (
+                              <label className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition-colors ${group.switchOutEnabled ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                                <input type="checkbox" checked={group.switchOutEnabled} onChange={(e) => setEditCfValues((p) => ({ ...p, [group.switchOutField!.id]: e.target.checked ? 'Si' : 'No' }))} className="sr-only" />
+                                <span className={`text-lg ${group.switchOutEnabled ? '' : 'opacity-30'}`}>&#x1F6A9;</span>
                                 <div>
-                                  <span className={`text-sm font-bold ${soIsOn ? 'text-red-700' : 'text-gray-500'}`}>Switch Out</span>
+                                  <span className={`text-sm font-bold ${group.switchOutEnabled ? 'text-red-700' : 'text-gray-500'}`}>Switch Out</span>
                                   <p className="text-[11px] text-gray-400">{group.label}</p>
                                 </div>
                               </label>

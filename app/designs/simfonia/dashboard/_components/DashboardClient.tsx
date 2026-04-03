@@ -65,11 +65,10 @@ export default function DashboardClient({ locationId }: { locationId: string }) 
   }
 
   const {
-    totalContacts, operators, targetAnnuale, categoryData, switchOutTotal,
+    totalContacts, targetAnnuale, categoryData, switchOutTotal,
     isAdmin, gareRows, closedDays: closedDaysArr,
   } = data as {
     totalContacts: number
-    operators: number
     targetAnnuale: number
     categoryData: CategoryData[]
     switchOutTotal: number
