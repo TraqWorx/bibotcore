@@ -12,6 +12,10 @@ async function ghlGet(path: string, token: string) {
 }
 
 export async function GET() {
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_DEBUG_GHL_SUBS !== 'true') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   const authClient = await createAuthClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })

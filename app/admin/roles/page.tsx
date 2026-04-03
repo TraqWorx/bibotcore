@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ad } from '@/lib/admin/ui'
 
 interface LocationUser {
@@ -26,38 +26,26 @@ export default function AdminRolesPage() {
   const [inviteRole, setInviteRole] = useState<string>('team_member')
   const [inviting, setInviting] = useState(false)
 
-  async function loadData(showLoading = true) {
+  const loadData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
     const res = await fetch('/api/admin/roles')
     if (res.ok) {
       const data = await res.json()
       setUsers(data.users ?? [])
       setLocations(data.locations ?? [])
-      if (!selectedLocation && data.locations?.length > 0) {
-        setSelectedLocation(data.locations[0].id)
-      }
-    }
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    async function loadInitialData() {
-      const res = await fetch('/api/admin/roles')
-      if (!res.ok) return
-      const data = await res.json()
-      setUsers(data.users ?? [])
-      setLocations(data.locations ?? [])
       if (data.locations?.length > 0) {
         setSelectedLocation((current) => current || data.locations[0].id)
       }
-      setLoading(false)
     }
+    setLoading(false)
+  }, [])
 
+  useEffect(() => {
     const timer = setTimeout(() => {
-      void loadInitialData()
+      void loadData(false)
     }, 0)
     return () => clearTimeout(timer)
-  }, [])
+  }, [loadData])
 
   async function handleRoleChange(userId: string, locationId: string, newRole: string) {
     setUpdating(userId)

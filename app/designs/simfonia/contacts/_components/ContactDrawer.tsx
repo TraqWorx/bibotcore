@@ -75,6 +75,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
   const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Edit state
   const [editData, setEditData] = useState<Record<string, string>>({})
@@ -155,7 +156,13 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
       const data = await getConversationMessages(locationId, contactId)
       setMessages(data.messages)
       if (showSpinner || data.messages.length > 0) {
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+        if (messagesScrollTimeoutRef.current) {
+          clearTimeout(messagesScrollTimeoutRef.current)
+        }
+        messagesScrollTimeoutRef.current = setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+          messagesScrollTimeoutRef.current = null
+        }, 50)
       }
       return data.messages.length
     } finally {
@@ -173,7 +180,13 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
       void loadMessages(false)
     }, 3000)
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      if (messagesScrollTimeoutRef.current) {
+        clearTimeout(messagesScrollTimeoutRef.current)
+        messagesScrollTimeoutRef.current = null
+      }
+    }
   }, [contactId, loadMessages, tab])
 
   const fullName = contact
