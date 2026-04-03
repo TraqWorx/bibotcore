@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search,
   SlidersHorizontal,
@@ -14,9 +13,13 @@ import {
   GitBranch,
 } from 'lucide-react'
 import SimfoniaPageHeader from '../_components/SimfoniaPageHeader'
-import PipelineBoard from './PipelineBoard'
 import { updateOpportunity } from './_actions'
 import { sf } from '@/lib/simfonia/ui'
+
+const PipelineBoard = dynamic(() => import('./PipelineBoard'), {
+  ssr: false,
+  loading: () => null,
+})
 
 const DealDrawer = dynamic(() => import('./DealDrawer'), {
   ssr: false,
@@ -63,6 +66,7 @@ export default function PipelineView({
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
   const filterMenuRef = useRef<HTMLDivElement>(null)
   const boardScrollRef = useRef<HTMLDivElement>(null)
+  const deferredSearch = useDeferredValue(search)
 
   useEffect(() => {
     if (!filterMenuOpen) return
@@ -81,40 +85,67 @@ export default function PipelineView({
     el.scrollBy({ left: direction === 'right' ? 300 : -300, behavior: 'smooth' })
   }
 
-  const pipeline = pipelines.find((p) => p.id === selectedId)
+  const pipeline = useMemo(
+    () => pipelines.find((item) => item.id === selectedId),
+    [pipelines, selectedId]
+  )
   const stages = pipeline?.stages ?? []
 
-  const stageMap: Record<string, string> = {}
-  for (const p of pipelines) for (const s of p.stages) stageMap[s.id] = s.name
+  const stageMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const currentPipeline of pipelines) {
+      for (const stage of currentPipeline.stages) {
+        map[stage.id] = stage.name
+      }
+    }
+    return map
+  }, [pipelines])
 
-  const pipelineOpps = opportunities
-    .filter((o) => o.pipelineId === selectedId)
-    .filter((o) => filter === 'all' || o.status?.toLowerCase() === filter)
-    .filter((o) => {
-      if (!search.trim()) return true
-      const q = search.toLowerCase()
-      return (
-        o.name?.toLowerCase().includes(q) ||
-        o.contact?.name?.toLowerCase().includes(q) ||
-        o.contact?.firstName?.toLowerCase().includes(q) ||
-        o.contact?.lastName?.toLowerCase().includes(q)
-      )
-    })
+  const selectedPipelineOpps = useMemo(
+    () => opportunities.filter((opportunity) => opportunity.pipelineId === selectedId),
+    [opportunities, selectedId]
+  )
 
-  const openOpps = opportunities.filter(
-    (o) => o.pipelineId === selectedId && (o.status ?? 'open').toLowerCase() === 'open',
+  const normalizedSearch = deferredSearch.trim().toLowerCase()
+
+  const pipelineOpps = useMemo(
+    () =>
+      selectedPipelineOpps
+        .filter((opportunity) => filter === 'all' || opportunity.status?.toLowerCase() === filter)
+        .filter((opportunity) => {
+          if (!normalizedSearch) return true
+          return (
+            opportunity.name?.toLowerCase().includes(normalizedSearch) ||
+            opportunity.contact?.name?.toLowerCase().includes(normalizedSearch) ||
+            opportunity.contact?.firstName?.toLowerCase().includes(normalizedSearch) ||
+            opportunity.contact?.lastName?.toLowerCase().includes(normalizedSearch)
+          )
+        }),
+    [filter, normalizedSearch, selectedPipelineOpps]
   )
-  const openValue = openOpps.reduce((s, o) => s + (o.monetaryValue ?? 0), 0)
-  const wonOpps = opportunities.filter(
-    (o) => o.pipelineId === selectedId && o.status?.toLowerCase() === 'won',
+
+  const openOpps = useMemo(
+    () => selectedPipelineOpps.filter((opportunity) => (opportunity.status ?? 'open').toLowerCase() === 'open'),
+    [selectedPipelineOpps]
   )
-  const wonValue = wonOpps.reduce((s, o) => s + (o.monetaryValue ?? 0), 0)
+  const openValue = useMemo(
+    () => openOpps.reduce((sum, opportunity) => sum + (opportunity.monetaryValue ?? 0), 0),
+    [openOpps]
+  )
+  const wonOpps = useMemo(
+    () => selectedPipelineOpps.filter((opportunity) => opportunity.status?.toLowerCase() === 'won'),
+    [selectedPipelineOpps]
+  )
+  const wonValue = useMemo(
+    () => wonOpps.reduce((sum, opportunity) => sum + (opportunity.monetaryValue ?? 0), 0),
+    [wonOpps]
+  )
 
   async function handleReopen(oppId: string, stageId: string) {
     setReopeningId(oppId)
     await updateOpportunity(oppId, { status: 'open', pipelineStageId: stageId }, locationId)
     setReopeningId(null)
-    window.location.reload()
+    setFilter('open')
   }
 
   const q = `?locationId=${locationId}`
@@ -198,11 +229,7 @@ export default function PipelineView({
                 </span>
                 {p.name}
                 {selectedId === p.id && (
-                  <motion.div
-                    layoutId="sf-pipeline-tab-indicator"
-                    className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-brand"
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                  />
+                  <span className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-brand" />
                 )}
               </button>
             ))}
@@ -311,27 +338,12 @@ export default function PipelineView({
       )}
 
       <main ref={boardScrollRef} className="min-h-0 flex-1 overflow-hidden p-5 sm:p-6">
-        <AnimatePresence mode="wait">
-          {stages.length === 0 ? (
-            <motion.p
-              key="empty-stages"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="pt-4 text-sm text-gray-500"
-            >
+        {stages.length === 0 ? (
+            <p className="pt-4 text-sm text-gray-500">
               Nessuno stage trovato.
-            </motion.p>
+            </p>
           ) : filter === 'won' || filter === 'lost' ? (
-            <motion.div
-              key={`wonlost-${selectedId}-${filter}`}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.18 }}
-              className="h-full overflow-y-auto"
-            >
+            <div className="h-full overflow-y-auto">
               <WonLostList
                 opportunities={pipelineOpps}
                 filter={filter}
@@ -340,31 +352,17 @@ export default function PipelineView({
                 onReopen={handleReopen}
                 reopeningId={reopeningId}
               />
-            </motion.div>
+            </div>
           ) : showGroupedList ? (
-            <motion.div
-              key={`list-${selectedId}-${filter}`}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.18 }}
-              className="h-full overflow-y-auto"
-            >
+            <div className="h-full overflow-y-auto">
               <GroupedDealList
                 stages={stages}
                 opportunities={pipelineOpps}
                 onDealClick={setActiveDealId}
               />
-            </motion.div>
+            </div>
           ) : showBoard ? (
-            <motion.div
-              key={`board-${selectedId}-${filter}`}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.18 }}
-              className="h-full min-h-[200px]"
-            >
+            <div className="h-full min-h-[200px]">
               <PipelineBoard
                 pipelineId={selectedId}
                 stages={stages}
@@ -372,9 +370,8 @@ export default function PipelineView({
                 onDealClick={setActiveDealId}
                 locationId={locationId}
               />
-            </motion.div>
+            </div>
           ) : null}
-        </AnimatePresence>
       </main>
       </div>
 
