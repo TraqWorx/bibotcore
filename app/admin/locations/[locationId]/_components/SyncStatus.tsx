@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ad } from '@/lib/admin/ui'
 
 interface EntityStatus {
@@ -16,7 +16,7 @@ export default function SyncStatus({ locationId }: { locationId: string }) {
   const [syncing, setSyncing] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
-  async function loadStatus(showLoading = true) {
+  const loadStatus = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
     const res = await fetch(`/api/admin/sync?locationId=${locationId}`)
     if (res.ok) {
@@ -24,22 +24,14 @@ export default function SyncStatus({ locationId }: { locationId: string }) {
       setStatuses(data.statuses ?? [])
     }
     setLoading(false)
-  }
+  }, [locationId])
 
   useEffect(() => {
-    async function loadInitialStatus() {
-      const res = await fetch(`/api/admin/sync?locationId=${locationId}`)
-      if (!res.ok) return
-      const data = await res.json()
-      setStatuses(data.statuses ?? [])
-      setLoading(false)
-    }
-
     const timer = setTimeout(() => {
-      void loadInitialStatus()
+      void loadStatus(false)
     }, 0)
     return () => clearTimeout(timer)
-  }, [locationId])
+  }, [loadStatus])
 
   async function handleSync() {
     setSyncing(true)

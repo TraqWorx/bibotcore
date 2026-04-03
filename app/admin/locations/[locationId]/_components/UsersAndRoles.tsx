@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import LoginAsButton from './LoginAsButton'
 import { ad } from '@/lib/admin/ui'
 
@@ -24,7 +24,7 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
   const [message, setMessage] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
 
-  async function loadRoles(showLoading = true) {
+  const loadRoles = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
     const res = await fetch('/api/admin/roles')
     if (res.ok) {
@@ -36,26 +36,14 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
       setRoles(map)
     }
     setLoading(false)
-  }
+  }, [locationId])
 
   useEffect(() => {
-    async function loadInitialRoles() {
-      const res = await fetch('/api/admin/roles')
-      if (!res.ok) return
-      const data = await res.json()
-      const map = new Map<string, string>()
-      for (const u of (data.users ?? []) as { userId: string; locationId: string; role: string }[]) {
-        if (u.locationId === locationId) map.set(u.userId, u.role)
-      }
-      setRoles(map)
-      setLoading(false)
-    }
-
     const timer = setTimeout(() => {
-      void loadInitialRoles()
+      void loadRoles(false)
     }, 0)
     return () => clearTimeout(timer)
-  }, [locationId])
+  }, [loadRoles])
 
   async function handleRoleChange(userId: string, newRole: string) {
     setUpdating(userId)

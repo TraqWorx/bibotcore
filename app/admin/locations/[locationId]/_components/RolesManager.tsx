@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ad } from '@/lib/admin/ui'
 
 interface UserRole {
@@ -17,7 +17,7 @@ export default function RolesManager({ locationId, locationName: _locationName }
   const [updating, setUpdating] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
-  async function loadRoles(showLoading = true) {
+  const loadRoles = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
     const res = await fetch('/api/admin/roles')
     if (res.ok) {
@@ -25,22 +25,14 @@ export default function RolesManager({ locationId, locationName: _locationName }
       setUsers((data.users ?? []).filter((u: { locationId: string }) => u.locationId === locationId))
     }
     setLoading(false)
-  }
+  }, [locationId])
 
   useEffect(() => {
-    async function loadInitialRoles() {
-      const res = await fetch('/api/admin/roles')
-      if (!res.ok) return
-      const data = await res.json()
-      setUsers((data.users ?? []).filter((u: { locationId: string }) => u.locationId === locationId))
-      setLoading(false)
-    }
-
     const timer = setTimeout(() => {
-      void loadInitialRoles()
+      void loadRoles(false)
     }, 0)
     return () => clearTimeout(timer)
-  }, [locationId])
+  }, [loadRoles])
 
   async function handleRoleChange(userId: string, newRole: string) {
     setUpdating(userId)

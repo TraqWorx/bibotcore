@@ -29,6 +29,16 @@ export default function AiChat({ locationId }: { locationId: string }) {
   }, [pos, open])
 
   useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setPos((prev) => {
+        if (prev.y !== 700) return prev
+        return { ...prev, y: Math.max(80, window.innerHeight - 80) }
+      })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
+
+  useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
       if (!dragging.current) return
       setPos({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y })
