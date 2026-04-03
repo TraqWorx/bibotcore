@@ -70,10 +70,6 @@ export default function PipelineView({
     return () => document.removeEventListener('mousedown', onPointerDown)
   }, [filterMenuOpen])
 
-  useEffect(() => {
-    if (filter === 'won' || filter === 'lost') setViewMode('list')
-  }, [filter])
-
   function scrollBoard(direction: 'left' | 'right') {
     const el = boardScrollRef.current?.querySelector('[data-pipeline-scroll]') as HTMLElement
     if (!el) return
@@ -239,6 +235,7 @@ export default function PipelineView({
                       type="button"
                       onClick={() => {
                         setFilter(f)
+                        if (f === 'won' || f === 'lost') setViewMode('list')
                         setFilterMenuOpen(false)
                       }}
                       className={`flex w-full items-center px-3 py-2 text-left text-sm ${

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { assertLocationAccess } from '@/lib/auth/assertLocationAccess'
-import { createServerClient } from '@supabase/ssr'
+import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import { createAdminClient } from '@/lib/supabase-server'
 import {
   discoverCategories,
@@ -20,16 +19,16 @@ export const dynamic = 'force-dynamic'
  * Returns category breakdowns, operator counts, gare data — all pre-computed.
  */
 export async function GET(req: NextRequest) {
-  const authClient = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll() { return req.cookies.getAll() }, setAll() {} } },
-  )
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const locationId = req.nextUrl.searchParams.get('locationId')
   if (!locationId) return NextResponse.json({ error: 'locationId required' }, { status: 400 })
+
+  const access = await getLocationAccess(req, locationId)
+  if (access.status === 'unauthenticated') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (access.status === 'forbidden') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const sb = createAdminClient()
   const now = new Date()
@@ -46,7 +45,7 @@ export async function GET(req: NextRequest) {
     { data: gareRows },
     { data: closedDaysData },
   ] = await Promise.all([
-    sb.from('profiles').select('role').eq('id', user.id).single(),
+    sb.from('profiles').select('role').eq('id', access.userId).single(),
     sb.from('cached_contacts').select('*', { count: 'exact', head: true }).eq('location_id', locationId),
     sb.from('cached_contact_custom_fields').select('contact_ghl_id, field_id, value').eq('location_id', locationId),
     getCustomFieldDefs(locationId),
@@ -57,7 +56,7 @@ export async function GET(req: NextRequest) {
   ])
 
   const isSuperAdmin = profile?.role === 'super_admin'
-  const currentGhlUser = (ghlUsers ?? []).find((u) => u.email?.toLowerCase() === user.email?.toLowerCase())
+  const currentGhlUser = (ghlUsers ?? []).find((u) => u.email?.toLowerCase() === access.email.toLowerCase())
   const isGhlAdmin = currentGhlUser?.role === 'admin'
   const isAdmin = isSuperAdmin || isGhlAdmin
 

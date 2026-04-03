@@ -1,27 +1,33 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import Image from 'next/image'
+import { useEffect, useState } from 'react'
 import { requestMagicLink } from './_actions'
+
+function getInitialUrlError() {
+  if (typeof window === 'undefined') return null
+  const hash = window.location.hash
+  if (!hash) return null
+  const params = new URLSearchParams(hash.slice(1))
+  const code = params.get('error_code')
+  const desc = params.get('error_description')?.replace(/\+/g, ' ')
+  if (code === 'otp_expired' || code === 'access_denied') {
+    return desc ?? 'Your login link has expired. Request a new one below.'
+  }
+  return desc ?? null
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [isError, setIsError] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [urlError, setUrlError] = useState<string | null>(null)
+  const [urlError, setUrlError] = useState<string | null>(() => getInitialUrlError())
 
   // Parse error from Supabase redirect hash (e.g. expired magic link)
   useEffect(() => {
     const hash = window.location.hash
     if (!hash) return
-    const params = new URLSearchParams(hash.slice(1))
-    const code = params.get('error_code')
-    const desc = params.get('error_description')
-    if (code === 'otp_expired' || code === 'access_denied') {
-      setUrlError(desc ? desc.replace(/\+/g, ' ') : 'Your login link has expired. Request a new one below.')
-    } else if (desc) {
-      setUrlError(desc.replace(/\+/g, ' '))
-    }
     // Clean the hash from URL without reload
     history.replaceState(null, '', window.location.pathname + window.location.search)
   }, [])
@@ -72,9 +78,11 @@ export default function LoginPage() {
         >
           {/* Logo */}
           <div className="flex flex-col items-center gap-3">
-            <img
+            <Image
               src="/bibot-logo.svg"
               alt="Bibot Core"
+              width={64}
+              height={64}
               className="h-16 w-16 rounded-2xl"
               style={{ boxShadow: '0 0 32px rgba(42,0,204,0.5)' }}
             />

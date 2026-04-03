@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { sf } from '@/lib/simfonia/ui'
 
 interface UserRole {
@@ -22,19 +22,19 @@ export default function TeamManager({ locationId }: { locationId: string }) {
   const [updating, setUpdating] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
-    async function loadRoles() {
-    setLoading(true)
+  const loadRoles = useEffectEvent(async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     const res = await fetch('/api/admin/roles')
     if (res.ok) {
       const data = await res.json()
       setUsers((data.users ?? []).filter((u: { locationId: string }) => u.locationId === locationId))
     }
     setLoading(false)
-  }
+  })
 
-  useEffect(() => { loadRoles() }, [locationId])
-
-
+  useEffect(() => {
+    void loadRoles(false)
+  }, [locationId, loadRoles])
 
   async function handleRoleChange(userId: string, newRole: string) {
     setUpdating(userId)

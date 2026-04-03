@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 
 interface Job {
   id: string
@@ -14,7 +14,7 @@ export default function BulkJobsIndicator({ locationId }: { locationId: string }
   const [jobs, setJobs] = useState<Job[]>([])
   const [open, setOpen] = useState(false)
 
-    async function loadJobs() {
+  const loadJobs = useEffectEvent(async () => {
     try {
       const res = await fetch(`/api/admin/bulk-jobs?locationId=${locationId}`)
       if (!res.ok) return
@@ -24,15 +24,13 @@ export default function BulkJobsIndicator({ locationId }: { locationId: string }
       )
       setJobs(active)
     } catch { /* ignore */ }
-  }
+  })
 
   useEffect(() => {
-    loadJobs()
-    const interval = setInterval(loadJobs, 5000)
+    void loadJobs()
+    const interval = setInterval(() => { void loadJobs() }, 5000)
     return () => clearInterval(interval)
-  }, [locationId])
-
-
+  }, [locationId, loadJobs])
 
   if (jobs.length === 0) return null
 

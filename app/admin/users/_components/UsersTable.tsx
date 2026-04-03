@@ -47,6 +47,7 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
       setSortCol(col)
       setSortDir('asc')
     }
+    setPage(1)
   }
 
   const filtered = useMemo(() => {
@@ -75,10 +76,6 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
     })
   }, [rows, search, roleFilter, locationFilter, sortCol, sortDir])
 
-  // Reset to first page when filters/sort change
-  // (keeps pagination from landing on empty pages after narrowing results)
-  useMemo(() => { setPage(1) }, [search, roleFilter, locationFilter, sortCol, sortDir])
-
   const total = filtered.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -100,17 +97,17 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
             type="text"
             placeholder="Search by email or location…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
           />
           {search && (
-            <button onClick={() => setSearch('')} className="text-base leading-none text-gray-400 hover:text-gray-600">×</button>
+            <button onClick={() => { setSearch(''); setPage(1) }} className="text-base leading-none text-gray-400 hover:text-gray-600">×</button>
           )}
         </div>
 
         <select
           value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
+          onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}
           className="rounded-xl border border-gray-200/90 bg-white px-3 py-1.5 text-xs text-gray-700 outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
         >
           <option value="all">All Roles</option>
@@ -121,7 +118,7 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
 
         <select
           value={locationFilter}
-          onChange={(e) => setLocationFilter(e.target.value as 'all' | 'with' | 'without')}
+          onChange={(e) => { setLocationFilter(e.target.value as 'all' | 'with' | 'without'); setPage(1) }}
           className="rounded-xl border border-gray-200/90 bg-white px-3 py-1.5 text-xs text-gray-700 outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
         >
           <option value="all">All Locations</option>

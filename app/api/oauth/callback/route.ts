@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { runDesignInstaller } from '@/lib/designInstaller/runDesignInstaller'
+import { verifyOAuthState } from '@/lib/ghl/oauthState'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,12 +13,17 @@ const supabase = createClient(
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code')
   const rawState = req.nextUrl.searchParams.get('state') ?? ''
-  const isAdminFlow = rawState.endsWith('|admin')
-  const stateValue = isAdminFlow ? rawState.slice(0, -6) : rawState
+  const state = verifyOAuthState(rawState)
 
   if (!code) {
     return NextResponse.json(
       { error: 'Missing authorization code' },
+      { status: 400 }
+    )
+  }
+  if (!state) {
+    return NextResponse.json(
+      { error: 'Invalid or expired OAuth state' },
       { status: 400 }
     )
   }
@@ -46,11 +52,10 @@ export async function GET(req: NextRequest) {
 
     const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString()
 
-    // Admin flow: stateValue IS the designSlug; look up package from design
-    // Regular flow: stateValue IS the packageSlug (backward compat)
-    let packageSlug: string = isAdminFlow ? 'unknown' : stateValue
-    let designSlug: string | null = isAdminFlow ? stateValue : null
-    let autoInstall: boolean | null = isAdminFlow ? true : null
+    const isAdminFlow = state.flow === 'admin_design_install'
+    let packageSlug: string = state.flow === 'package_install' ? state.packageSlug : 'unknown'
+    let designSlug: string | null = state.flow === 'admin_design_install' ? state.designSlug : null
+    let autoInstall: boolean | null = state.flow === 'admin_design_install' ? true : null
 
     if (isAdminFlow && designSlug) {
       const { data: designRow } = await supabase

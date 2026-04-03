@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { assertLocationAccess } from '@/lib/auth/assertLocationAccess'
-import { createServerClient } from '@supabase/ssr'
+import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import { createAdminClient } from '@/lib/supabase-server'
 import { parseCategoriaValue } from '@/lib/utils/categoryFields'
 
@@ -15,18 +14,17 @@ const PAGE_SIZE = 50
  *   gestoreFieldId, gestore, dateFrom, dateTo, scadenzaFieldIds, scadenzaFrom, scadenzaTo
  */
 export async function GET(req: NextRequest) {
-  // Auth
-  const authClient = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll() { return req.cookies.getAll() }, setAll() {} } },
-  )
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const sp = req.nextUrl.searchParams
   const locationId = sp.get('locationId')
   if (!locationId) return NextResponse.json({ error: 'locationId required' }, { status: 400 })
+
+  const access = await getLocationAccess(req, locationId)
+  if (access.status === 'unauthenticated') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (access.status === 'forbidden') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const page = Math.max(1, parseInt(sp.get('page') ?? '1'))
   const search = sp.get('search') ?? null

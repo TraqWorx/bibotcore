@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { ad } from '@/lib/admin/ui'
 
@@ -41,6 +41,15 @@ interface Props {
 type SortCol = 'name' | 'dateAdded' | 'connected' | 'users' | 'design' | 'plan' | 'price' | 'totalPaid' | 'totalPaidVat'
 type SortDir = 'asc' | 'desc'
 
+interface HeaderCellProps {
+  col: SortCol
+  children: React.ReactNode
+  sortCol: SortCol
+  sortDir: SortDir
+  onToggle: (col: SortCol) => void
+  align?: 'right'
+}
+
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) return <span className="ml-0.5 text-gray-300">↕</span>
   return <span className="ml-0.5 text-brand">{dir === 'asc' ? '↑' : '↓'}</span>
@@ -50,6 +59,18 @@ function formatDate(iso: string | null): string {
   if (!iso) return '—'
   const d = new Date(iso)
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function HeaderCell({ col, children, sortCol, sortDir, onToggle, align }: HeaderCellProps) {
+  return (
+    <th
+      onClick={() => onToggle(col)}
+      className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 cursor-pointer select-none hover:text-gray-600 whitespace-nowrap transition-colors ${align === 'right' ? 'text-right' : 'text-left'}`}
+    >
+      {children}
+      <SortIcon active={sortCol === col} dir={sortDir} />
+    </th>
+  )
 }
 
 export default function LocationsTable({ rows, designs, unconnectedLocations }: Props) {
@@ -84,6 +105,7 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
       setSortCol(col)
       setSortDir('asc')
     }
+    setPage(1)
   }
 
   const filtered = useMemo(() => {
@@ -125,9 +147,6 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
     })
   }, [rows, search, connectedFilter, usersFilter, designFilter, planFilter, dateFrom, dateTo, sortCol, sortDir])
 
-  // Reset to first page when filters/sort change
-  useEffect(() => { setPage(1) }, [search, connectedFilter, usersFilter, designFilter, planFilter, dateFrom, dateTo, sortCol, sortDir])
-
   const total = filtered.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -137,16 +156,6 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
 
   const hasDateFilter = dateFrom || dateTo
   const selectClass = 'rounded-xl border border-gray-200/90 bg-white px-3 py-1.5 text-xs text-gray-700 outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10'
-
-  const TH = ({ col, children, align }: { col: SortCol; children: React.ReactNode; align?: 'right' }) => (
-    <th
-      onClick={() => toggleSort(col)}
-      className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 cursor-pointer select-none hover:text-gray-600 whitespace-nowrap transition-colors ${align === 'right' ? 'text-right' : 'text-left'}`}
-    >
-      {children}
-      <SortIcon active={sortCol === col} dir={sortDir} />
-    </th>
-  )
 
   return (
     <div className={ad.tableShell}>
@@ -160,27 +169,27 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
             type="text"
             placeholder="Search…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             className="flex-1 bg-transparent text-xs outline-none placeholder:text-gray-400"
           />
           {search && (
-            <button onClick={() => setSearch('')} className="text-sm leading-none text-gray-400 hover:text-gray-600">×</button>
+            <button onClick={() => { setSearch(''); setPage(1) }} className="text-sm leading-none text-gray-400 hover:text-gray-600">×</button>
           )}
         </div>
 
-        <select value={connectedFilter} onChange={(e) => setConnectedFilter(e.target.value as 'all' | 'yes' | 'no')} className={selectClass}>
+        <select value={connectedFilter} onChange={(e) => { setConnectedFilter(e.target.value as 'all' | 'yes' | 'no'); setPage(1) }} className={selectClass}>
           <option value="all">All Status</option>
           <option value="yes">Connected</option>
           <option value="no">Not Connected</option>
         </select>
 
-        <select value={usersFilter} onChange={(e) => setUsersFilter(e.target.value as 'all' | 'with' | 'without')} className={selectClass}>
+        <select value={usersFilter} onChange={(e) => { setUsersFilter(e.target.value as 'all' | 'with' | 'without'); setPage(1) }} className={selectClass}>
           <option value="all">All Users</option>
           <option value="with">Has Users</option>
           <option value="without">No Users</option>
         </select>
 
-        <select value={designFilter} onChange={(e) => setDesignFilter(e.target.value)} className={selectClass}>
+        <select value={designFilter} onChange={(e) => { setDesignFilter(e.target.value); setPage(1) }} className={selectClass}>
           <option value="all">All Designs</option>
           <option value="__none__">No Design</option>
           {uniqueDesigns.map((slug) => (
@@ -188,7 +197,7 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
           ))}
         </select>
 
-        <select value={planFilter} onChange={(e) => setPlanFilter(e.target.value)} className={selectClass}>
+        <select value={planFilter} onChange={(e) => { setPlanFilter(e.target.value); setPage(1) }} className={selectClass}>
           <option value="all">All Plans</option>
           <option value="__none__">No Plan</option>
           {uniquePlans.map((p) => (
@@ -200,11 +209,11 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
           <svg className="h-3.5 w-3.5 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75z" clipRule="evenodd" />
           </svg>
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-[112px] bg-transparent text-xs text-gray-600 outline-none" title="From date" />
+          <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1) }} className="w-[112px] bg-transparent text-xs text-gray-600 outline-none" title="From date" />
           <span className="text-gray-300">–</span>
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-[112px] bg-transparent text-xs text-gray-600 outline-none" title="To date" />
+          <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1) }} className="w-[112px] bg-transparent text-xs text-gray-600 outline-none" title="To date" />
           {hasDateFilter && (
-            <button onClick={() => { setDateFrom(''); setDateTo('') }} className="ml-1 text-sm leading-none text-gray-400 hover:text-gray-600">×</button>
+            <button onClick={() => { setDateFrom(''); setDateTo(''); setPage(1) }} className="ml-1 text-sm leading-none text-gray-400 hover:text-gray-600">×</button>
           )}
         </div>
 
@@ -223,15 +232,15 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
               <thead>
                 <tr className={ad.tableHeadRow}>
                   <th className="w-9 px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-gray-400">#</th>
-                  <TH col="name">Location</TH>
-                  <TH col="dateAdded">Added</TH>
-                  <TH col="connected">Status</TH>
-                  <TH col="users">Users</TH>
-                  <TH col="design">Design</TH>
-                  <TH col="plan">Plan</TH>
-                  <TH col="price" align="right">Price</TH>
-                  <TH col="totalPaid" align="right">Total Paid</TH>
-                  <TH col="totalPaidVat" align="right">+ VAT 22%</TH>
+                  <HeaderCell col="name" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Location</HeaderCell>
+                  <HeaderCell col="dateAdded" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Added</HeaderCell>
+                  <HeaderCell col="connected" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Status</HeaderCell>
+                  <HeaderCell col="users" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Users</HeaderCell>
+                  <HeaderCell col="design" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Design</HeaderCell>
+                  <HeaderCell col="plan" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Plan</HeaderCell>
+                  <HeaderCell col="price" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort} align="right">Price</HeaderCell>
+                  <HeaderCell col="totalPaid" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort} align="right">Total Paid</HeaderCell>
+                  <HeaderCell col="totalPaidVat" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort} align="right">+ VAT 22%</HeaderCell>
                   <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-wide text-gray-400 whitespace-nowrap">Actions</th>
                 </tr>
               </thead>

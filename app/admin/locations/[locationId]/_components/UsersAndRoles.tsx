@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import LoginAsButton from './LoginAsButton'
 import { ad } from '@/lib/admin/ui'
 
@@ -29,10 +29,8 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
   const [message, setMessage] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
 
-  useEffect(() => { loadRoles() }, [locationId])
-
-  async function loadRoles() {
-    setLoading(true)
+  async function loadRoles(showLoading = true) {
+    if (showLoading) setLoading(true)
     const res = await fetch('/api/admin/roles')
     if (res.ok) {
       const data = await res.json()
@@ -44,6 +42,11 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
     }
     setLoading(false)
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => { void loadRoles(false) }, 0)
+    return () => clearTimeout(timer)
+  }, [locationId])
 
   async function handleRoleChange(userId: string, newRole: string) {
     setUpdating(userId)
@@ -90,7 +93,7 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
               })
               if (res.ok) {
                 setMessage('Utenti sincronizzati')
-                loadRoles()
+                void loadRoles(false)
                 // Reload page to refresh server-rendered profiles
                 window.location.reload()
               } else {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { ad } from '@/lib/admin/ui'
 
 interface Job {
@@ -29,36 +29,40 @@ export default function BulkJobsDashboard({ locationId }: { locationId: string }
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(false)
 
-    async function loadJobs() {
+  const loadJobs = useEffectEvent(async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     const res = await fetch(`/api/admin/bulk-jobs?locationId=${locationId}`)
     if (res.ok) {
       const data = await res.json()
       setJobs(data.jobs ?? [])
     }
     setLoading(false)
-  }
-
-  useEffect(() => { loadJobs() }, [locationId])
+  })
 
   useEffect(() => {
-    const hasRunning = jobs.some((j) => j.status === 'running' || j.status === 'syncing' || j.status === 'pending')
-    if (hasRunning) setExpanded(true)
+    void loadJobs(false)
+  }, [locationId, loadJobs])
+
+  const hasRunning = useMemo(
+    () => jobs.some((j) => j.status === 'running' || j.status === 'syncing' || j.status === 'pending'),
+    [jobs]
+  )
+  useEffect(() => {
     if (!hasRunning) return
-    const interval = setInterval(loadJobs, 5000)
+    const interval = setInterval(() => { void loadJobs(false) }, 5000)
     return () => clearInterval(interval)
-  }, [jobs, locationId])
-
-
+  }, [hasRunning, loadJobs, locationId])
 
   if (loading) return null
   if (jobs.length === 0) return null
 
   const activeCount = jobs.filter((j) => j.status !== 'completed' && j.status !== 'failed').length
+  const isExpanded = expanded || hasRunning
 
   return (
     <div className={ad.panel}>
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => setExpanded(!isExpanded)}
         className="flex w-full items-center justify-between"
       >
         <div className="flex items-center gap-2">
@@ -71,12 +75,12 @@ export default function BulkJobsDashboard({ locationId }: { locationId: string }
             </span>
           )}
         </div>
-        <svg className={`h-4 w-4 text-gray-400 transition ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <svg className={`h-4 w-4 text-gray-400 transition ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
         </svg>
       </button>
 
-      {expanded && (
+      {isExpanded && (
         <div className="mt-4 space-y-2">
           {jobs.map((job) => {
             const style = STATUS_STYLES[job.status] ?? STATUS_STYLES.pending

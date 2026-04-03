@@ -54,8 +54,7 @@ function getWebhookUrl(): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL
     ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
     ?? 'http://localhost:3000'
-  const secret = process.env.WEBHOOK_SECRET ?? ''
-  return `${baseUrl}/api/webhooks/ghl${secret ? `?secret=${secret}` : ''}`
+  return `${baseUrl}/api/webhooks/ghl`
 }
 
 /**

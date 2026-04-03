@@ -1,24 +1,35 @@
 /**
  * Reusable location access guard for API routes.
  * Verifies the authenticated user has access to the requested locationId.
- * Returns the user or null if unauthorized.
+ * Returns a structured result so handlers can distinguish 401 vs 403.
  */
 
 import { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { createAdminClient } from '@/lib/supabase-server'
 
-export async function assertLocationAccess(
+export interface AuthorizedLocationAccess {
+  userId: string
+  email: string
+  isSuperAdmin: boolean
+}
+
+export type LocationAccessResult =
+  | { status: 'unauthenticated' }
+  | { status: 'forbidden' }
+  | ({ status: 'authorized' } & AuthorizedLocationAccess)
+
+export async function getLocationAccess(
   req: NextRequest,
   locationId: string,
-): Promise<{ userId: string; email: string; isSuperAdmin: boolean } | null> {
+): Promise<LocationAccessResult> {
   const authClient = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { getAll() { return req.cookies.getAll() }, setAll() {} } },
   )
   const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return null
+  if (!user) return { status: 'unauthenticated' }
 
   const sb = createAdminClient()
 
@@ -31,10 +42,14 @@ export async function assertLocationAccess(
   const isSuperAdmin = profile?.role === 'super_admin'
 
   // Super admin has access to everything
-  if (isSuperAdmin) return { userId: user.id, email: user.email ?? '', isSuperAdmin: true }
+  if (isSuperAdmin) {
+    return { status: 'authorized', userId: user.id, email: user.email ?? '', isSuperAdmin: true }
+  }
 
   // Check membership
-  if (membership) return { userId: user.id, email: user.email ?? '', isSuperAdmin: false }
+  if (membership) {
+    return { status: 'authorized', userId: user.id, email: user.email ?? '', isSuperAdmin: false }
+  }
 
   // Fallback: check installs table (backward compat)
   const { data: install } = await sb
@@ -44,7 +59,18 @@ export async function assertLocationAccess(
     .eq('location_id', locationId)
     .maybeSingle()
 
-  if (install) return { userId: user.id, email: user.email ?? '', isSuperAdmin: false }
+  if (install) {
+    return { status: 'authorized', userId: user.id, email: user.email ?? '', isSuperAdmin: false }
+  }
 
-  return null
+  return { status: 'forbidden' }
+}
+
+export async function assertLocationAccess(
+  req: NextRequest,
+  locationId: string,
+): Promise<AuthorizedLocationAccess | null> {
+  const result = await getLocationAccess(req, locationId)
+  if (result.status !== 'authorized') return null
+  return result
 }

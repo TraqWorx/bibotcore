@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface Conversation {
   ghl_id: string
@@ -37,7 +37,7 @@ function formatTime(d: string): string {
 
 export default function PortalMessages({
   locationId,
-  contactGhlId,
+  contactGhlId: _contactGhlId,
   conversations,
 }: {
   locationId: string
@@ -53,15 +53,25 @@ export default function PortalMessages({
 
   useEffect(() => {
     if (!selectedId) return
-    setLoading(true)
-    fetch(`/api/portal/messages?locationId=${locationId}&conversationId=${selectedId}`)
-      .then((r) => r.json())
-      .then((data) => {
+    let cancelled = false
+
+    async function loadMessages() {
+      setLoading(true)
+      try {
+        const res = await fetch(`/api/portal/messages?locationId=${locationId}&conversationId=${selectedId}`)
+        const data = await res.json()
+        if (cancelled) return
         setMessages(data.messages ?? [])
-        setLoading(false)
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
-      })
-      .catch(() => setLoading(false))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void loadMessages()
+    return () => {
+      cancelled = true
+    }
   }, [selectedId, locationId])
 
   if (conversations.length === 0) {

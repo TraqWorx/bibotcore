@@ -605,10 +605,6 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
-  useEffect(() => {
-    setPage(1)
-  }, [activeFilterCount, localContacts.length, columns])
-
   const total = filteredContacts.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -617,6 +613,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
   const pageContacts = filteredContacts.slice(startIdx, endIdx)
 
   function updateFilter(colKey: string, f: ColumnFilter | null) {
+    setPage(1)
     setColumnFilters((prev) => {
       const next = { ...prev }
       if (!f) delete next[colKey]
@@ -626,6 +623,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
   }
 
   function clearAllFilters() {
+    setPage(1)
     setColumnFilters({})
     setActiveFilter(null)
   }
@@ -633,7 +631,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
   // Sync with server when props change (deferred to avoid blocking UI)
   useEffect(() => {
     if (Date.now() < skipSyncUntil.current) return
-    setLocalContacts(deferredContacts)
+    Promise.resolve().then(() => setLocalContacts(deferredContacts))
   }, [deferredContacts])
 
   const [deletingId, setDeletingId] = useState<string | null>(null)

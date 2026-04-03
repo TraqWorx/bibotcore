@@ -163,12 +163,28 @@ export default function ConversationInbox({ conversations: initialConversations,
 
   // Load notes when conversation changes (always, so count badge shows)
   useEffect(() => {
-    if (!selected?.contactId) { setNotes([]); return }
-    setNotesLoading(true)
-    getContactNotes(locationId, selected.contactId).then((data) => {
-      setNotes(data)
-      setNotesLoading(false)
-    }).catch(() => setNotesLoading(false))
+    let cancelled = false
+
+    async function loadNotes() {
+      if (!selected?.contactId) {
+        setNotes([])
+        setNotesLoading(false)
+        return
+      }
+
+      setNotesLoading(true)
+      try {
+        const data = await getContactNotes(locationId, selected.contactId)
+        if (!cancelled) setNotes(data)
+      } finally {
+        if (!cancelled) setNotesLoading(false)
+      }
+    }
+
+    void loadNotes()
+    return () => {
+      cancelled = true
+    }
   }, [selected?.contactId, locationId])
 
   function handleSend() {

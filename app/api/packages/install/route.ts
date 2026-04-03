@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GHL_SCOPES } from '@/lib/ghl/scopes'
+import { createOAuthState } from '@/lib/ghl/oauthState'
 
 export async function GET(req: NextRequest) {
   const packageSlug = req.nextUrl.searchParams.get('packageSlug')
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
     redirect_uri: process.env.GHL_REDIRECT_URI!,
     client_id: process.env.GHL_CLIENT_ID!,
     version_id: process.env.GHL_APP_VERSION_ID!,
-    state: packageSlug,
+    state: createOAuthState({ flow: 'package_install', packageSlug }),
   })
 
   const oauthUrl =

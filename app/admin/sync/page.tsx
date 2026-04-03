@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ad } from '@/lib/admin/ui'
 
 interface LocationSync {
@@ -21,8 +21,8 @@ export default function AdminSyncPage() {
   const [syncing, setSyncing] = useState<string | null>(null)
   const [syncResult, setSyncResult] = useState<string | null>(null)
 
-    async function loadData() {
-    setLoading(true)
+  async function loadData(showLoading = true) {
+    if (showLoading) setLoading(true)
     const res = await fetch('/api/admin/sync/status')
     if (res.ok) {
       const data = await res.json()
@@ -31,9 +31,10 @@ export default function AdminSyncPage() {
     setLoading(false)
   }
 
-  useEffect(() => { loadData() }, [])
-
-
+  useEffect(() => {
+    const timer = setTimeout(() => { void loadData(false) }, 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   async function handleSync(locationId: string) {
     setSyncing(locationId)
@@ -46,7 +47,7 @@ export default function AdminSyncPage() {
     const data = await res.json()
     if (res.ok) {
       setSyncResult(`Sync completato per ${locationId}`)
-      loadData()
+      void loadData(false)
     } else {
       setSyncResult(`Errore: ${data.error}`)
     }

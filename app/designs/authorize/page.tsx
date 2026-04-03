@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase-server'
+import { createOAuthState } from '@/lib/ghl/oauthState'
 
 export default async function AuthorizePage({
   searchParams,
@@ -35,7 +36,7 @@ export default async function AuthorizePage({
     redirect_uri: process.env.GHL_REDIRECT_URI!,
     client_id: process.env.GHL_CLIENT_ID!,
     version_id: process.env.GHL_APP_VERSION_ID!,
-    state: `${designSlug}|admin`,
+    state: createOAuthState({ flow: 'admin_design_install', designSlug }),
     locationId,
   })
   const oauthUrl =

@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { assertLocationAccess } from '@/lib/auth/assertLocationAccess'
-import { createServerClient } from '@supabase/ssr'
+import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import { getConversations, getLocationUsers } from '@/app/designs/simfonia/conversations/_actions'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const authClient = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll() { return req.cookies.getAll() }, setAll() {} } },
-  )
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const locationId = req.nextUrl.searchParams.get('locationId')
   if (!locationId) return NextResponse.json({ error: 'locationId required' }, { status: 400 })
+
+  const access = await getLocationAccess(req, locationId)
+  if (access.status === 'unauthenticated') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (access.status === 'forbidden') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const [conversations, users] = await Promise.all([
     getConversations(locationId),
@@ -25,6 +24,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     conversations,
     users,
-    currentUserEmail: user.email ?? '',
+    currentUserEmail: access.email,
   })
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ad } from '@/lib/admin/ui'
 
 interface LocationUser {
@@ -26,8 +26,8 @@ export default function AdminRolesPage() {
   const [inviteRole, setInviteRole] = useState<string>('team_member')
   const [inviting, setInviting] = useState(false)
 
-    async function loadData() {
-    setLoading(true)
+  async function loadData(showLoading = true) {
+    if (showLoading) setLoading(true)
     const res = await fetch('/api/admin/roles')
     if (res.ok) {
       const data = await res.json()
@@ -40,9 +40,10 @@ export default function AdminRolesPage() {
     setLoading(false)
   }
 
-  useEffect(() => { loadData() }, [])
-
-
+  useEffect(() => {
+    const timer = setTimeout(() => { void loadData(false) }, 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   async function handleRoleChange(userId: string, locationId: string, newRole: string) {
     setUpdating(userId)
@@ -54,7 +55,7 @@ export default function AdminRolesPage() {
     })
     if (res.ok) {
       setMessage('Ruolo aggiornato')
-      loadData()
+      void loadData(false)
     } else {
       const data = await res.json()
       setMessage(`Errore: ${data.error}`)
@@ -75,7 +76,7 @@ export default function AdminRolesPage() {
     if (res.ok) {
       setMessage(`Utente ${inviteEmail} aggiunto come ${inviteRole}`)
       setInviteEmail('')
-      loadData()
+      void loadData(false)
     } else {
       setMessage(`Errore: ${data.error}`)
     }
@@ -92,7 +93,7 @@ export default function AdminRolesPage() {
     })
     if (res.ok) {
       setMessage('Utente rimosso')
-      loadData()
+      void loadData(false)
     }
     setUpdating(null)
   }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ad } from '@/lib/admin/ui'
 
 interface EntityStatus {
@@ -16,8 +16,8 @@ export default function SyncStatus({ locationId }: { locationId: string }) {
   const [syncing, setSyncing] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
-    async function loadStatus() {
-    setLoading(true)
+  async function loadStatus(showLoading = true) {
+    if (showLoading) setLoading(true)
     const res = await fetch(`/api/admin/sync?locationId=${locationId}`)
     if (res.ok) {
       const data = await res.json()
@@ -26,9 +26,10 @@ export default function SyncStatus({ locationId }: { locationId: string }) {
     setLoading(false)
   }
 
-  useEffect(() => { loadStatus() }, [locationId])
-
-
+  useEffect(() => {
+    const timer = setTimeout(() => { void loadStatus(false) }, 0)
+    return () => clearTimeout(timer)
+  }, [locationId])
 
   async function handleSync() {
     setSyncing(true)
@@ -45,7 +46,7 @@ export default function SyncStatus({ locationId }: { locationId: string }) {
       } else {
         setMessage('Sync completato — dati e utenti aggiornati')
       }
-      loadStatus()
+      void loadStatus(false)
     } else {
       const data = await res.json()
       setMessage(`Errore: ${data.error}`)
