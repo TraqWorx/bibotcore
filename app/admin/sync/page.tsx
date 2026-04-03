@@ -21,9 +21,7 @@ export default function AdminSyncPage() {
   const [syncing, setSyncing] = useState<string | null>(null)
   const [syncResult, setSyncResult] = useState<string | null>(null)
 
-  useEffect(() => { loadData() }, [])
-
-  async function loadData() {
+    async function loadData() {
     setLoading(true)
     const res = await fetch('/api/admin/sync/status')
     if (res.ok) {
@@ -32,6 +30,10 @@ export default function AdminSyncPage() {
     }
     setLoading(false)
   }
+
+  useEffect(() => { loadData() }, [])
+
+
 
   async function handleSync(locationId: string) {
     setSyncing(locationId)

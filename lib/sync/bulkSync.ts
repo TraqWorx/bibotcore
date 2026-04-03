@@ -72,7 +72,7 @@ async function setSyncStatus(
 }
 
 /** Upsert rows in batches to avoid hitting Supabase payload limits */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 async function upsertBatch(
   table: string,
   rows: any[],

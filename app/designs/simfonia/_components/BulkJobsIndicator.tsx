@@ -14,13 +14,7 @@ export default function BulkJobsIndicator({ locationId }: { locationId: string }
   const [jobs, setJobs] = useState<Job[]>([])
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    loadJobs()
-    const interval = setInterval(loadJobs, 5000)
-    return () => clearInterval(interval)
-  }, [locationId])
-
-  async function loadJobs() {
+    async function loadJobs() {
     try {
       const res = await fetch(`/api/admin/bulk-jobs?locationId=${locationId}`)
       if (!res.ok) return
@@ -31,6 +25,14 @@ export default function BulkJobsIndicator({ locationId }: { locationId: string }
       setJobs(active)
     } catch { /* ignore */ }
   }
+
+  useEffect(() => {
+    loadJobs()
+    const interval = setInterval(loadJobs, 5000)
+    return () => clearInterval(interval)
+  }, [locationId])
+
+
 
   if (jobs.length === 0) return null
 

@@ -16,9 +16,7 @@ export default function SyncStatus({ locationId }: { locationId: string }) {
   const [syncing, setSyncing] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
-  useEffect(() => { loadStatus() }, [locationId])
-
-  async function loadStatus() {
+    async function loadStatus() {
     setLoading(true)
     const res = await fetch(`/api/admin/sync?locationId=${locationId}`)
     if (res.ok) {
@@ -27,6 +25,10 @@ export default function SyncStatus({ locationId }: { locationId: string }) {
     }
     setLoading(false)
   }
+
+  useEffect(() => { loadStatus() }, [locationId])
+
+
 
   async function handleSync() {
     setSyncing(true)

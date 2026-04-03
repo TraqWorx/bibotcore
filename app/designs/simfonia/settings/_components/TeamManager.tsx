@@ -22,9 +22,7 @@ export default function TeamManager({ locationId }: { locationId: string }) {
   const [updating, setUpdating] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
-  useEffect(() => { loadRoles() }, [locationId])
-
-  async function loadRoles() {
+    async function loadRoles() {
     setLoading(true)
     const res = await fetch('/api/admin/roles')
     if (res.ok) {
@@ -33,6 +31,10 @@ export default function TeamManager({ locationId }: { locationId: string }) {
     }
     setLoading(false)
   }
+
+  useEffect(() => { loadRoles() }, [locationId])
+
+
 
   async function handleRoleChange(userId: string, newRole: string) {
     setUpdating(userId)

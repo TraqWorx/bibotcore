@@ -81,7 +81,7 @@ export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
         if (!email) continue
 
         // Find or create Supabase user
-        let { data: profile } = await sb.from('profiles').select('id, role').eq('email', email).maybeSingle()
+        const { data: profile } = await sb.from('profiles').select('id, role').eq('email', email).maybeSingle()
         let profileId = profile?.id
 
         if (!profileId) {

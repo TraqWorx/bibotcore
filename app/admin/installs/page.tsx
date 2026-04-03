@@ -15,7 +15,7 @@ export default async function InstallsPage() {
 
   // Resolve user emails via profiles
   const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))]
-  let emailByUserId: Record<string, string> = {}
+  const emailByUserId: Record<string, string> = {}
   if (userIds.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')

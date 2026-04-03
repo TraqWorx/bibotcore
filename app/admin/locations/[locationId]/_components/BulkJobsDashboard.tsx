@@ -29,6 +29,15 @@ export default function BulkJobsDashboard({ locationId }: { locationId: string }
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(false)
 
+    async function loadJobs() {
+    const res = await fetch(`/api/admin/bulk-jobs?locationId=${locationId}`)
+    if (res.ok) {
+      const data = await res.json()
+      setJobs(data.jobs ?? [])
+    }
+    setLoading(false)
+  }
+
   useEffect(() => { loadJobs() }, [locationId])
 
   useEffect(() => {
@@ -39,14 +48,7 @@ export default function BulkJobsDashboard({ locationId }: { locationId: string }
     return () => clearInterval(interval)
   }, [jobs, locationId])
 
-  async function loadJobs() {
-    const res = await fetch(`/api/admin/bulk-jobs?locationId=${locationId}`)
-    if (res.ok) {
-      const data = await res.json()
-      setJobs(data.jobs ?? [])
-    }
-    setLoading(false)
-  }
+
 
   if (loading) return null
   if (jobs.length === 0) return null

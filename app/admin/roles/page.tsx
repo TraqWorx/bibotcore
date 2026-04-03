@@ -26,9 +26,7 @@ export default function AdminRolesPage() {
   const [inviteRole, setInviteRole] = useState<string>('team_member')
   const [inviting, setInviting] = useState(false)
 
-  useEffect(() => { loadData() }, [])
-
-  async function loadData() {
+    async function loadData() {
     setLoading(true)
     const res = await fetch('/api/admin/roles')
     if (res.ok) {
@@ -41,6 +39,10 @@ export default function AdminRolesPage() {
     }
     setLoading(false)
   }
+
+  useEffect(() => { loadData() }, [])
+
+
 
   async function handleRoleChange(userId: string, locationId: string, newRole: string) {
     setUpdating(userId)

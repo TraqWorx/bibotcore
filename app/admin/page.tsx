@@ -193,7 +193,7 @@ export default async function AdminPage() {
   // User emails for recent installs
   const recentInstalls = recentInstallsRaw ?? []
   const userIds = [...new Set(recentInstalls.map((r) => r.user_id).filter(Boolean))]
-  let emailById: Record<string, string> = {}
+  const emailById: Record<string, string> = {}
   if (userIds.length > 0) {
     const { data: profiles } = await supabase.from('profiles').select('id, email').in('id', userIds)
     for (const p of profiles ?? []) emailById[p.id] = p.email ?? '—'
