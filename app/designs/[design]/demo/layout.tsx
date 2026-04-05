@@ -1,7 +1,7 @@
 import Sidebar from '@/app/designs/simfonia/_components/Sidebar'
 import '@/app/designs/simfonia/shell.css'
 import { DEFAULT_MODULES } from '@/lib/types/design'
-import { resolveDemoShell, type DemoStyleId } from '@/lib/simfonia/demoStyles'
+import { resolveSimfoniaShell } from '@/lib/simfonia/shellTheme'
 import { notFound } from 'next/navigation'
 import { demoTheme } from './_lib/demoData'
 
@@ -18,8 +18,7 @@ export default async function DesignDemoLayout({
     notFound()
   }
 
-  const demoStyle: DemoStyleId = 'serena'
-  const shell = resolveDemoShell(demoTheme, demoStyle)
+  const shell = resolveSimfoniaShell(demoTheme)
   const cssVars = `:root {
     --brand: ${demoTheme.secondaryColor};
     --accent: ${demoTheme.secondaryColor};
@@ -39,12 +38,11 @@ export default async function DesignDemoLayout({
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: cssVars }} />
-      <div className="simfonia-shell flex min-h-screen" data-demo-style={demoStyle}>
+      <div className="simfonia-shell flex min-h-screen">
         <Sidebar
           theme={demoTheme}
           modules={DEFAULT_MODULES}
           locationId=""
-          styleVariant={demoStyle}
           demoMode
           showBulkIndicator={false}
           navBasePath={`/designs/${design}/demo`}

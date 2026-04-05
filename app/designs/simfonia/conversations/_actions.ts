@@ -125,16 +125,20 @@ export async function getConversationMessages(
 
       // Keep conversation date fresh so inbox sorts correctly
       const latest = messages[messages.length - 1]
-      sb.from('cached_conversations')
-        .update({
-          last_message_body: latest.body,
-          last_message_date: latest.dateAdded,
-          last_message_direction: latest.direction,
-        })
-        .eq('location_id', locationId)
-        .eq('ghl_id', conversationId)
-        .then(() => {})
-        .catch(() => {})
+      void (async () => {
+        try {
+          await sb.from('cached_conversations')
+            .update({
+              last_message_body: latest.body,
+              last_message_date: latest.dateAdded,
+              last_message_direction: latest.direction,
+            })
+            .eq('location_id', locationId)
+            .eq('ghl_id', conversationId)
+        } catch {
+          // Ignore cache refresh failures here; the inbox can still proceed with fresh GHL data.
+        }
+      })()
     }
 
     return messages

@@ -2,7 +2,7 @@ import { Suspense, cache } from 'react'
 import { cookies } from 'next/headers'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { DEFAULT_THEME, DEFAULT_MODULES, type DesignTheme, type DesignModules } from '@/lib/types/design'
-import { resolveDemoShell, type DemoStyleId } from '@/lib/simfonia/demoStyles'
+import { resolveSimfoniaShell } from '@/lib/simfonia/shellTheme'
 import Sidebar from './_components/Sidebar'
 import LocationSwitcher from './_components/LocationSwitcher'
 import AiChat from './_components/AiChat'
@@ -96,9 +96,8 @@ const getLayoutData = cache(async () => {
 
 export default async function CrmLayout({ children }: { children: React.ReactNode }) {
   const { locations, currentLocationId, finalTheme, finalModules } = await getLayoutData()
-  const demoStyle: DemoStyleId = 'serena'
   const shellAccent = finalTheme.secondaryColor
-  const shell = resolveDemoShell(finalTheme, demoStyle)
+  const shell = resolveSimfoniaShell(finalTheme)
 
   const cssVars = `:root {
     --brand: ${shellAccent};
@@ -119,8 +118,8 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: cssVars }} />
-      <div className="simfonia-shell flex min-h-screen" data-demo-style={demoStyle}>
-        <Sidebar theme={finalTheme} modules={finalModules} locationId={currentLocationId} styleVariant={demoStyle} />
+      <div className="simfonia-shell flex min-h-screen">
+        <Sidebar theme={finalTheme} modules={finalModules} locationId={currentLocationId} />
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           {locations.length > 1 && (
             <header className="app-top-bar flex items-center justify-between px-6 py-2.5 sm:px-8">

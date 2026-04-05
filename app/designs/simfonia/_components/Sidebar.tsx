@@ -3,7 +3,6 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import type { DesignTheme, DesignModules } from '@/lib/types/design'
-import type { DemoStyleId } from '@/lib/simfonia/demoStyles'
 import BulkJobsIndicator from './BulkJobsIndicator'
 
 function NavGlyph({ name }: { name: string }) {
@@ -114,7 +113,6 @@ interface SidebarProps {
   theme: DesignTheme
   modules: DesignModules
   locationId: string
-  styleVariant: DemoStyleId
   demoMode?: boolean
   showBulkIndicator?: boolean
   navBasePath?: string
@@ -124,7 +122,6 @@ export default function Sidebar({
   theme,
   modules,
   locationId,
-  styleVariant,
   demoMode: _demoMode = false,
   showBulkIndicator = true,
   navBasePath = '/designs/simfonia',
@@ -144,7 +141,6 @@ export default function Sidebar({
 
   return (
     <aside
-      data-demo-style={styleVariant}
       className="sf-sidebar flex w-64 shrink-0 flex-col border-r shadow-[8px_0_40px_-12px_rgba(0,0,0,0.2)]"
       style={{
         background: 'var(--shell-sidebar)',
