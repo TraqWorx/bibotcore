@@ -23,14 +23,14 @@ interface Props {
 }
 
 const CATEGORY_STYLES: Record<string, { bg: string; activeBg: string; text: string; activeText: string; border: string; dot: string }> = {
-  telefonia:           { bg: 'bg-blue-50/60',   activeBg: 'bg-blue-100',   text: 'text-blue-600',   activeText: 'text-blue-800',   border: 'border-blue-200',   dot: 'bg-blue-400' },
+  telefonia:           { bg: 'bg-[var(--shell-soft)]',   activeBg: 'bg-[var(--shell-tint)]',   text: 'text-brand',   activeText: 'text-[var(--foreground)]',   border: 'border-[var(--shell-line)]',   dot: 'bg-brand' },
   energia:             { bg: 'bg-amber-50/60',  activeBg: 'bg-amber-100',  text: 'text-amber-600',  activeText: 'text-amber-800',  border: 'border-amber-200',  dot: 'bg-amber-400' },
   'connettivita-casa': { bg: 'bg-emerald-50/60', activeBg: 'bg-emerald-100', text: 'text-emerald-600', activeText: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-400' },
   connettivita:        { bg: 'bg-emerald-50/60', activeBg: 'bg-emerald-100', text: 'text-emerald-600', activeText: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-400' },
   intrattenimento:     { bg: 'bg-purple-50/60', activeBg: 'bg-purple-100', text: 'text-purple-600', activeText: 'text-purple-800', border: 'border-purple-200', dot: 'bg-purple-400' },
 }
 
-const DEFAULT_CAT_STYLE = { bg: 'bg-gray-50/60', activeBg: 'bg-gray-100', text: 'text-gray-500', activeText: 'text-gray-800', border: 'border-gray-200', dot: 'bg-gray-400' }
+const DEFAULT_CAT_STYLE = { bg: 'bg-[var(--shell-soft)]', activeBg: 'bg-[var(--shell-tint)]', text: 'text-[var(--shell-muted)]', activeText: 'text-[var(--foreground)]', border: 'border-[var(--shell-line)]', dot: 'bg-[var(--shell-muted)]' }
 
 export default function ContactsFilters({
   locationId, categories, allTags, gestoreOptions,
@@ -91,7 +91,7 @@ export default function ContactsFilters({
       {/* Search bar */}
       <div className="relative">
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-          <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <svg className="h-4 w-4 text-[var(--shell-muted)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>
         </div>
@@ -107,7 +107,7 @@ export default function ContactsFilters({
           {search && (
             <button
               onClick={() => { setQuery(''); navigate({ search: null }) }}
-              className="rounded-lg px-2 py-1.5 text-xs text-gray-400 transition-colors hover:text-gray-600"
+              className="rounded-lg px-2 py-1.5 text-xs text-[var(--shell-muted)] transition-colors hover:text-[var(--foreground)]"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -135,7 +135,7 @@ export default function ContactsFilters({
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
                   selectedSlugs.length === 0
                     ? 'border-brand bg-brand text-white shadow-sm'
-                    : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+                    : 'border-[var(--shell-line)] bg-[var(--shell-surface)] text-[var(--shell-muted)] hover:bg-[var(--shell-soft)]'
                 }`}
               >
                 Tutte
@@ -158,7 +158,7 @@ export default function ContactsFilters({
                     className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
                       isActive
                         ? `${s.activeBg} ${s.activeText} ${s.border} shadow-sm`
-                        : `border-gray-200 bg-white ${s.text} hover:${s.bg}`
+                        : `border-[var(--shell-line)] bg-[var(--shell-surface)] ${s.text} hover:${s.bg}`
                     }`}
                   >
                     <span className={`h-2 w-2 rounded-full ${s.dot}`} />
@@ -172,7 +172,7 @@ export default function ContactsFilters({
 
         {/* Separator */}
         {(allTags.length > 0 || gestoreOptions.length > 0) && (
-          <div className="mx-1 h-5 w-px bg-gray-200" />
+          <div className="mx-1 h-5 w-px bg-[var(--shell-line)]" />
         )}
 
         {/* Tag multi-select */}
@@ -193,7 +193,7 @@ export default function ContactsFilters({
               className={`appearance-none rounded-full border py-1.5 pl-3 pr-7 text-xs font-semibold outline-none transition-colors ${
                 activeGestore
                   ? 'border-brand/35 bg-brand/5 text-brand'
-                  : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+                  : 'border-[var(--shell-line)] bg-[var(--shell-surface)] text-[var(--shell-muted)] hover:bg-[var(--shell-soft)]'
               }`}
             >
               <option value="">Gestore</option>
@@ -202,7 +202,7 @@ export default function ContactsFilters({
               ))}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-              <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+              <svg className="h-3 w-3 text-[var(--shell-muted)]" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
               </svg>
             </div>
@@ -215,7 +215,7 @@ export default function ContactsFilters({
           className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
             dateFrom || dateTo || scadenzaFrom || scadenzaTo
               ? 'border-brand/35 bg-brand/5 text-brand'
-              : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+              : 'border-[var(--shell-line)] bg-[var(--shell-surface)] text-[var(--shell-muted)] hover:bg-[var(--shell-soft)]'
           }`}
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -443,7 +443,7 @@ function TagMultiSelect({
         className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
           selectedTags.length > 0
             ? 'border-brand/35 bg-brand/5 text-brand'
-            : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+            : 'border-[var(--shell-line)] bg-[var(--shell-surface)] text-[var(--shell-muted)] hover:bg-[var(--shell-soft)]'
         }`}
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -457,15 +457,15 @@ function TagMultiSelect({
       </button>
 
       {open && (
-        <div className="absolute left-0 z-50 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-xl">
+        <div className="absolute left-0 z-50 mt-2 w-64 rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-surface)] shadow-[0_20px_40px_-24px_rgba(23,21,18,0.25)]">
           {/* Search within tags */}
-          <div className="border-b border-gray-100 px-3 py-2">
+          <div className="border-b border-[var(--shell-line)] px-3 py-2">
             <input
               type="text"
               value={tagSearch}
               onChange={(e) => setTagSearch(e.target.value)}
               placeholder="Cerca tag..."
-              className="w-full rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-1.5 text-xs outline-none placeholder:text-gray-400 focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
+              className="w-full rounded-xl border border-[var(--shell-line)] bg-[var(--shell-canvas)] px-2.5 py-1.5 text-xs outline-none placeholder:text-[var(--shell-muted)] focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
               autoFocus
             />
           </div>
@@ -474,7 +474,7 @@ function TagMultiSelect({
             <button
               type="button"
               onClick={() => onChange([])}
-              className="flex w-full items-center gap-1.5 border-b border-gray-100 px-3 py-2 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50"
+              className="flex w-full items-center gap-1.5 border-b border-[var(--shell-line)] px-3 py-2 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50/80"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -483,9 +483,9 @@ function TagMultiSelect({
             </button>
           )}
 
-          <div className="max-h-56 overflow-y-auto py-1">
+          <div className="max-h-56 overflow-y-auto p-1.5">
             {filteredTags.length === 0 && (
-              <p className="px-3 py-3 text-center text-xs text-gray-400 italic">Nessun tag trovato</p>
+              <p className="px-3 py-3 text-center text-xs italic text-[var(--shell-muted)]">Nessun tag trovato</p>
             )}
             {filteredTags.map((tag) => {
               const isSelected = selectedTags.includes(tag)
@@ -494,16 +494,18 @@ function TagMultiSelect({
                   key={tag}
                   type="button"
                   onClick={() => toggle(tag)}
-                  className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-xs transition-colors hover:bg-gray-50 ${
-                    isSelected ? 'font-semibold' : ''
+                  className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-xs transition-colors ${
+                    isSelected
+                      ? 'border-brand/15 bg-[var(--shell-soft)] font-semibold'
+                      : 'border-transparent hover:bg-[var(--shell-soft)]'
                   }`}
                 >
                   <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[9px] transition-colors ${
-                    isSelected ? 'border-brand bg-brand text-white' : 'border-gray-300'
+                    isSelected ? 'border-brand bg-brand text-white' : 'border-[var(--shell-line)] text-transparent'
                   }`}>
                     {isSelected ? '✓' : ''}
                   </span>
-                  <span className={isSelected ? 'text-brand' : 'text-gray-700'}>{tag}</span>
+                  <span className={isSelected ? 'text-brand' : 'text-[var(--foreground)]'}>{tag}</span>
                 </button>
               )
             })}

@@ -11,8 +11,8 @@ export default async function ConversationsPage({
 
   if (!locationId) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-        <p className="text-sm text-gray-500">Nessuna location connessa.</p>
+      <div className="rounded-[28px] border border-[var(--shell-line)] bg-[var(--shell-surface)] p-10 text-center shadow-[0_14px_32px_-28px_rgba(23,21,18,0.2)]">
+        <p className="text-sm text-[var(--shell-muted)]">Nessuna location connessa.</p>
       </div>
     )
   }

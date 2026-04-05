@@ -2,13 +2,414 @@
 
 .simfonia-shell {
   min-height: 100vh;
-  background-color: #e4e4ed;
+  background: var(--shell-bg);
+  color: var(--foreground);
   background-image:
-    radial-gradient(ellipse 100% 70% at 100% -30%, color-mix(in srgb, var(--brand) 16%, transparent), transparent 52%),
-    radial-gradient(ellipse 90% 60% at -10% 110%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 48%),
-    linear-gradient(165deg, #f2f2f8 0%, #e8e8f0 45%, #e2e2ec 100%);
+    radial-gradient(circle at top left, color-mix(in srgb, var(--brand) 8%, transparent), transparent 24%),
+    radial-gradient(circle at 82% 12%, color-mix(in srgb, var(--shell-tint) 72%, transparent), transparent 18%);
+}
+
+.simfonia-shell .sf-sidebar {
+  transition:
+    background 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    width 220ms ease;
+}
+
+.simfonia-shell .sf-brand-shell,
+.simfonia-shell .sf-brand-card,
+.simfonia-shell .sf-nav-link,
+.simfonia-shell .sf-card,
+.simfonia-shell .sf-card-muted,
+.simfonia-shell .sf-panel,
+.simfonia-shell .sf-form-card,
+.simfonia-shell .sf-stat-tile,
+.simfonia-shell .sf-table-shell,
+.simfonia-shell .sf-calendar-week,
+.simfonia-shell .sf-inbox,
+.simfonia-shell .sf-primary-btn,
+.simfonia-shell .sf-secondary-btn,
+.simfonia-shell .sf-input {
+  transition:
+    background 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    color 220ms ease,
+    border-radius 220ms ease,
+    backdrop-filter 220ms ease,
+    transform 220ms ease;
+}
+
+.simfonia-shell .sf-nav-link[data-active='true'] .sf-nav-icon {
+  color: var(--brand);
+}
+
+.simfonia-shell[data-demo-style='atelier'] {
+  background-image:
+    linear-gradient(180deg, color-mix(in srgb, white 74%, var(--shell-bg) 26%), color-mix(in srgb, var(--shell-soft) 46%, white 54%)),
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--brand) 8%, transparent), transparent 20%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.025) 1px, transparent 1px),
+    linear-gradient(rgba(0, 0, 0, 0.025) 1px, transparent 1px);
+  background-size: auto, auto, 28px 28px, 28px 28px;
+}
+
+.simfonia-shell[data-demo-style='atelier'] header.app-top-bar {
+  backdrop-filter: none;
+  background: color-mix(in srgb, white 90%, var(--shell-bg) 10%);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-sidebar {
+  width: 17.5rem;
+  background: color-mix(in srgb, white 90%, var(--shell-soft) 10%) !important;
+  border-right-color: color-mix(in srgb, var(--foreground) 10%, transparent) !important;
+  box-shadow: 16px 0 48px -34px rgba(56, 48, 39, 0.12);
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-brand-shell {
+  background: color-mix(in srgb, white 94%, var(--shell-soft) 6%);
+  border-color: color-mix(in srgb, var(--foreground) 8%, transparent);
+  box-shadow: none !important;
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-brand-card {
+  background: color-mix(in srgb, white 96%, var(--shell-soft) 4%) !important;
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-sidebar-label,
+.simfonia-shell[data-demo-style='atelier'] .sf-sidebar-footer p {
+  color: color-mix(in srgb, var(--foreground) 42%, transparent);
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-sidebar-divider {
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--foreground) 12%, transparent), transparent);
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-nav-link {
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--foreground) 78%, transparent);
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-nav-link[data-active='true'] {
+  background: color-mix(in srgb, var(--brand) 12%, white);
+  border-color: color-mix(in srgb, var(--brand) 24%, transparent);
+  color: var(--foreground);
+  box-shadow: none;
+  ring: 0;
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-nav-link[data-active='false'] {
+  border-color: transparent;
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-nav-link[data-active='false']:hover {
+  background: color-mix(in srgb, var(--shell-soft) 56%, white 44%);
+  color: var(--foreground);
+}
+
+.simfonia-shell[data-demo-style='obsidian'] {
+  background-image:
+    linear-gradient(180deg, rgba(9, 10, 12, 0.92), rgba(12, 15, 18, 0.86)),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--brand) 20%, transparent), transparent 26%);
+  background-size: auto, 34px 34px, 34px 34px, auto;
+}
+
+.simfonia-shell[data-demo-style='frost'] {
+  background-image:
+    linear-gradient(180deg, color-mix(in srgb, white 56%, var(--shell-bg) 44%), color-mix(in srgb, white 42%, var(--shell-bg) 58%)),
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, white 44%, var(--brand) 8%), transparent 18%),
+    radial-gradient(circle at 85% 12%, color-mix(in srgb, var(--shell-tint) 82%, transparent), transparent 22%);
+}
+
+.simfonia-shell[data-demo-style='frame'] {
+  background-image:
+    linear-gradient(180deg, color-mix(in srgb, white 42%, var(--shell-bg) 58%), color-mix(in srgb, var(--shell-soft) 36%, white 64%)),
+    linear-gradient(90deg, color-mix(in srgb, var(--foreground) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--foreground) 4%, transparent) 1px, transparent 1px);
+  background-size: auto, 20px 20px, 20px 20px;
 }
 
 .simfonia-shell header.app-top-bar {
   background: transparent;
+}
+
+.simfonia-shell header.app-top-bar::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  background: var(--shell-line);
+}
+
+.simfonia-shell header.app-top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--shell-bg) 88%, white 12%);
+}
+
+.simfonia-shell[data-demo-style='obsidian'] header.app-top-bar {
+  background: color-mix(in srgb, var(--shell-bg) 92%, black 8%);
+}
+
+.simfonia-shell[data-demo-style='obsidian'] .sf-sidebar {
+  width: 17rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--shell-sidebar) 92%, black 8%), color-mix(in srgb, var(--shell-sidebar) 82%, #101317 18%)) !important;
+  border-right-color: color-mix(in srgb, var(--brand) 14%, rgba(255,255,255,0.08));
+  box-shadow: 12px 0 42px -16px rgba(0, 0, 0, 0.45);
+}
+
+.simfonia-shell[data-demo-style='obsidian'] .sf-brand-shell {
+  background: color-mix(in srgb, var(--shell-surface) 88%, black 12%);
+  border-color: color-mix(in srgb, var(--brand) 22%, rgba(255,255,255,0.08));
+}
+
+.simfonia-shell[data-demo-style='obsidian'] .sf-brand-card {
+  background: color-mix(in srgb, #0e1012 80%, var(--shell-surface) 20%) !important;
+}
+
+.simfonia-shell[data-demo-style='obsidian'] .sf-nav-link {
+  border-radius: 14px;
+  border-color: rgba(255,255,255,0.04);
+  color: color-mix(in srgb, white 82%, transparent);
+}
+
+.simfonia-shell[data-demo-style='obsidian'] .sf-nav-link[data-active='true'] {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--brand) 18%, transparent), transparent 75%),
+    color-mix(in srgb, var(--shell-surface) 96%, black 4%);
+  border-color: color-mix(in srgb, var(--brand) 28%, rgba(255,255,255,0.1));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 28px -24px color-mix(in srgb, var(--brand) 42%, transparent);
+}
+
+.simfonia-shell[data-demo-style='obsidian'] .sf-nav-link[data-active='false']:hover {
+  background: color-mix(in srgb, var(--shell-surface) 84%, black 16%);
+}
+
+.simfonia-shell[data-demo-style='frost'] header.app-top-bar {
+  background: color-mix(in srgb, var(--shell-bg) 74%, white 26%);
+}
+
+.simfonia-shell[data-demo-style='frost'] header.app-top-bar {
+  backdrop-filter: blur(20px);
+}
+
+.simfonia-shell[data-demo-style='frost'] .sf-sidebar {
+  width: 17rem;
+  backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--shell-sidebar) 72%, white 28%);
+  box-shadow: 12px 0 44px -22px rgba(64, 95, 120, 0.18);
+}
+
+.simfonia-shell[data-demo-style='frost'] .sf-brand-shell,
+.simfonia-shell[data-demo-style='frost'] .sf-brand-card {
+  backdrop-filter: blur(20px);
+}
+
+.simfonia-shell[data-demo-style='frost'] .sf-nav-link {
+  border-radius: 18px;
+  color: color-mix(in srgb, var(--foreground) 82%, transparent);
+}
+
+.simfonia-shell[data-demo-style='frost'] .sf-nav-link[data-active='true'] {
+  background: color-mix(in srgb, white 70%, var(--brand) 30%);
+  border-color: color-mix(in srgb, white 52%, var(--brand) 48%);
+  color: var(--foreground);
+  box-shadow: 0 18px 28px -26px rgba(82, 126, 158, 0.24);
+}
+
+.simfonia-shell[data-demo-style='frost'] .sf-nav-link[data-active='false']:hover {
+  background: color-mix(in srgb, white 82%, var(--shell-soft) 18%);
+}
+
+.simfonia-shell[data-demo-style='frame'] header.app-top-bar::after {
+  background: color-mix(in srgb, var(--shell-line) 82%, var(--foreground) 18%);
+}
+
+.simfonia-shell[data-demo-style='frame'] header.app-top-bar {
+  backdrop-filter: none;
+}
+
+.simfonia-shell[data-demo-style='frame'] .sf-sidebar {
+  width: 16rem;
+  background: color-mix(in srgb, #f8f3ea 72%, var(--shell-sidebar) 28%) !important;
+  box-shadow: none;
+  border-right-width: 1.5px;
+}
+
+.simfonia-shell[data-demo-style='frame'] .sf-brand-shell,
+.simfonia-shell[data-demo-style='frame'] .sf-brand-card {
+  border-radius: 18px;
+  box-shadow: none !important;
+}
+
+.simfonia-shell[data-demo-style='frame'] .sf-sidebar-label,
+.simfonia-shell[data-demo-style='frame'] .sf-sidebar-footer p {
+  color: color-mix(in srgb, var(--foreground) 52%, transparent);
+}
+
+.simfonia-shell[data-demo-style='frame'] .sf-nav-link {
+  border-radius: 12px;
+  border-width: 1.5px;
+  color: color-mix(in srgb, var(--foreground) 82%, transparent);
+}
+
+.simfonia-shell[data-demo-style='frame'] .sf-nav-link[data-active='true'] {
+  background: color-mix(in srgb, var(--brand) 10%, white);
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--shell-line));
+  box-shadow: none;
+  color: var(--foreground);
+}
+
+.simfonia-shell[data-demo-style='frame'] .sf-nav-link[data-active='false']:hover {
+  background: color-mix(in srgb, var(--shell-canvas) 76%, white 24%);
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-page-title {
+  letter-spacing: -0.07em;
+  font-weight: 900;
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-page-header {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-card,
+.simfonia-shell[data-demo-style='atelier'] .sf-panel,
+.simfonia-shell[data-demo-style='atelier'] .sf-form-card,
+.simfonia-shell[data-demo-style='atelier'] .sf-stat-tile {
+  border-radius: 30px;
+  background: color-mix(in srgb, white 94%, var(--shell-soft) 6%);
+  border-color: color-mix(in srgb, var(--foreground) 8%, transparent);
+  box-shadow: 0 18px 36px -30px rgba(88, 75, 56, 0.08);
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-primary-btn {
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.simfonia-shell[data-demo-style='atelier'] .sf-secondary-btn,
+.simfonia-shell[data-demo-style='atelier'] .sf-input,
+.simfonia-shell[data-demo-style='atelier'] .sf-table-shell,
+.simfonia-shell[data-demo-style='atelier'] .sf-calendar-week {
+  border-color: color-mix(in srgb, var(--foreground) 9%, transparent);
+  background: color-mix(in srgb, white 96%, var(--shell-soft) 4%);
+  box-shadow: none;
+}
+
+.simfonia-shell[data-demo-style='obsidian'] .sf-card,
+.simfonia-shell[data-demo-style='obsidian'] .sf-panel,
+.simfonia-shell[data-demo-style='obsidian'] .sf-form-card,
+.simfonia-shell[data-demo-style='obsidian'] .sf-stat-tile,
+.simfonia-shell[data-demo-style='obsidian'] .sf-table-shell,
+.simfonia-shell[data-demo-style='obsidian'] .sf-inbox,
+.simfonia-shell[data-demo-style='obsidian'] .sf-calendar-week {
+  background: color-mix(in srgb, var(--shell-surface) 88%, black 12%);
+  border-color: color-mix(in srgb, var(--brand) 14%, var(--shell-line));
+  box-shadow: 0 20px 42px -26px rgba(0, 0, 0, 0.38);
+}
+
+.simfonia-shell[data-demo-style='obsidian'] .sf-card-muted,
+.simfonia-shell[data-demo-style='obsidian'] .sf-input,
+.simfonia-shell[data-demo-style='obsidian'] .sf-table-head-row {
+  background: color-mix(in srgb, var(--shell-canvas) 82%, black 18%);
+  color: var(--foreground);
+}
+
+.simfonia-shell[data-demo-style='obsidian'] .sf-primary-btn {
+  border-radius: 14px;
+  box-shadow: 0 18px 34px -18px color-mix(in srgb, var(--brand) 46%, transparent);
+}
+
+.simfonia-shell[data-demo-style='obsidian'] .sf-secondary-btn {
+  background: color-mix(in srgb, var(--shell-surface) 84%, black 16%);
+}
+
+.simfonia-shell[data-demo-style='obsidian'] .sf-page-header {
+  padding: 0.5rem 0 1rem;
+}
+
+.simfonia-shell[data-demo-style='obsidian'] .sf-page-title,
+.simfonia-shell[data-demo-style='obsidian'] .sf-page-subtitle,
+.simfonia-shell[data-demo-style='obsidian'] .sf-section-label,
+.simfonia-shell[data-demo-style='obsidian'] .sf-eyebrow {
+  color: color-mix(in srgb, var(--foreground) 92%, white 8%);
+}
+
+.simfonia-shell[data-demo-style='frost'] .sf-card,
+.simfonia-shell[data-demo-style='frost'] .sf-panel,
+.simfonia-shell[data-demo-style='frost'] .sf-form-card,
+.simfonia-shell[data-demo-style='frost'] .sf-stat-tile,
+.simfonia-shell[data-demo-style='frost'] .sf-table-shell,
+.simfonia-shell[data-demo-style='frost'] .sf-inbox,
+.simfonia-shell[data-demo-style='frost'] .sf-calendar-week {
+  background: color-mix(in srgb, white 62%, var(--shell-surface) 38%);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 20px 42px -30px rgba(120, 151, 179, 0.22);
+}
+
+.simfonia-shell[data-demo-style='frost'] .sf-primary-btn,
+.simfonia-shell[data-demo-style='frost'] .sf-secondary-btn {
+  border-radius: 999px;
+}
+
+.simfonia-shell[data-demo-style='frost'] .sf-page-header {
+  gap: 1.75rem;
+}
+
+.simfonia-shell[data-demo-style='frost'] .sf-page-title {
+  letter-spacing: -0.065em;
+}
+
+.simfonia-shell[data-demo-style='frost'] .sf-card-muted,
+.simfonia-shell[data-demo-style='frost'] .sf-input,
+.simfonia-shell[data-demo-style='frost'] .sf-table-head-row {
+  background: color-mix(in srgb, white 72%, var(--shell-canvas) 28%);
+  border-color: color-mix(in srgb, white 46%, var(--shell-line) 54%);
+}
+
+.simfonia-shell[data-demo-style='frame'] .sf-card,
+.simfonia-shell[data-demo-style='frame'] .sf-panel,
+.simfonia-shell[data-demo-style='frame'] .sf-form-card,
+.simfonia-shell[data-demo-style='frame'] .sf-stat-tile,
+.simfonia-shell[data-demo-style='frame'] .sf-table-shell,
+.simfonia-shell[data-demo-style='frame'] .sf-calendar-week {
+  border-radius: 22px;
+  border-width: 1.5px;
+  box-shadow: none;
+}
+
+.simfonia-shell[data-demo-style='frame'] .sf-page-header {
+  padding-bottom: 0.85rem;
+  border-bottom: 1.5px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
+.simfonia-shell[data-demo-style='frame'] .sf-page-title {
+  letter-spacing: -0.055em;
+}
+
+.simfonia-shell[data-demo-style='frame'] .sf-primary-btn,
+.simfonia-shell[data-demo-style='frame'] .sf-secondary-btn {
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.simfonia-shell[data-demo-style='frame'] .sf-section-label,
+.simfonia-shell[data-demo-style='frame'] .sf-eyebrow {
+  letter-spacing: 0.22em;
+}
+
+.simfonia-shell[data-demo-style='frame'] .sf-card-muted,
+.simfonia-shell[data-demo-style='frame'] .sf-input,
+.simfonia-shell[data-demo-style='frame'] .sf-table-head-row {
+  background: color-mix(in srgb, white 72%, var(--shell-canvas) 28%);
+  border-width: 1.5px;
+  box-shadow: none;
 }

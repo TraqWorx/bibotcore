@@ -74,6 +74,14 @@ export default function DesignsTable({ rows }: { rows: DesignRow[] }) {
                     >
                       Settings
                     </Link>
+                    {row.slug === 'simfonia' ? (
+                      <Link
+                        href="/designs/simfonia/demo"
+                        className="text-xs font-bold text-brand underline-offset-4 transition-colors hover:underline"
+                      >
+                        Demo
+                      </Link>
+                    ) : null}
                     <DuplicateButton slug={row.slug} />
                     <form action={deleteDesign.bind(null, row.slug) as unknown as string}>
                       <button

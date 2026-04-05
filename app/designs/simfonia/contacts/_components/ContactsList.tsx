@@ -17,34 +17,24 @@ type Contact = Record<string, unknown> & { id: string }
 /* ─── Tag colors ─── */
 
 const TAG_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
-  energia:      { bg: 'bg-amber-50',  text: 'text-amber-700',  dot: 'bg-amber-400' },
-  telefonia:    { bg: 'bg-blue-50',   text: 'text-blue-700',   dot: 'bg-blue-400' },
-  windtre:      { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-400' },
-  wind:         { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-400' },
-  fastweb:      { bg: 'bg-orange-50', text: 'text-orange-700', dot: 'bg-orange-400' },
-  kena:         { bg: 'bg-violet-50', text: 'text-violet-700', dot: 'bg-violet-400' },
-  connettivita: { bg: 'bg-teal-50',   text: 'text-teal-700',   dot: 'bg-teal-400' },
-  luce:         { bg: 'bg-yellow-50', text: 'text-yellow-700', dot: 'bg-yellow-400' },
-  gas:          { bg: 'bg-amber-50',  text: 'text-amber-800',  dot: 'bg-amber-500' },
+  energia:      { bg: 'bg-[#fbf4e2]', text: 'text-[#9a6f1f]', dot: 'bg-[#d7aa45]' },
+  telefonia:    { bg: 'bg-[var(--shell-soft)]', text: 'text-brand', dot: 'bg-brand' },
+  windtre:      { bg: 'bg-[#f3eef9]', text: 'text-[#8e72aa]', dot: 'bg-[#a98cc3]' },
+  wind:         { bg: 'bg-[#f3eef9]', text: 'text-[#8e72aa]', dot: 'bg-[#a98cc3]' },
+  fastweb:      { bg: 'bg-[#f7e7e3]', text: 'text-[#9e6e63]', dot: 'bg-[#cf8e7f]' },
+  kena:         { bg: 'bg-[#efe9f8]', text: 'text-[#866aa8]', dot: 'bg-[#a689cb]' },
+  connettivita: { bg: 'bg-[#edf7f1]', text: 'text-[#5f8f76]', dot: 'bg-[#7fb492]' },
+  luce:         { bg: 'bg-[#fbf4e2]', text: 'text-[#9a6f1f]', dot: 'bg-[#d7aa45]' },
+  gas:          { bg: 'bg-[#f9ece2]', text: 'text-[#9a7154]', dot: 'bg-[#c89163]' },
 }
 
 const PASTEL_PALETTE: { bg: string; text: string; dot: string }[] = [
-  { bg: 'bg-sky-50',     text: 'text-sky-700',     dot: 'bg-sky-400' },
-  { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-400' },
-  { bg: 'bg-rose-50',    text: 'text-rose-700',    dot: 'bg-rose-400' },
-  { bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-400' },
-  { bg: 'bg-orange-50',  text: 'text-orange-700',  dot: 'bg-orange-400' },
-  { bg: 'bg-teal-50',    text: 'text-teal-700',    dot: 'bg-teal-400' },
-  { bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-400' },
-  { bg: 'bg-pink-50',    text: 'text-pink-700',    dot: 'bg-pink-400' },
-  { bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-400' },
-  { bg: 'bg-lime-50',    text: 'text-lime-700',    dot: 'bg-lime-400' },
-  { bg: 'bg-cyan-50',    text: 'text-cyan-700',    dot: 'bg-cyan-400' },
-  { bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', dot: 'bg-fuchsia-400' },
-  { bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-400' },
-  { bg: 'bg-green-50',   text: 'text-green-700',   dot: 'bg-green-400' },
-  { bg: 'bg-purple-50',  text: 'text-purple-700',  dot: 'bg-purple-400' },
-  { bg: 'bg-red-50',     text: 'text-red-600',     dot: 'bg-red-400' },
+  { bg: 'bg-[var(--shell-soft)]', text: 'text-brand', dot: 'bg-brand' },
+  { bg: 'bg-[#edf7f1]', text: 'text-[#5f8f76]', dot: 'bg-[#7fb492]' },
+  { bg: 'bg-[#f7e7e3]', text: 'text-[#9e6e63]', dot: 'bg-[#cf8e7f]' },
+  { bg: 'bg-[#f3eef9]', text: 'text-[#8e72aa]', dot: 'bg-[#a98cc3]' },
+  { bg: 'bg-[#fbf4e2]', text: 'text-[#9a6f1f]', dot: 'bg-[#d7aa45]' },
+  { bg: 'bg-[#eaf4f6]', text: 'text-[#6a98a1]', dot: 'bg-[#88b8be]' },
 ]
 
 function hashString(str: string): number {
@@ -64,13 +54,13 @@ function getTagColors(tag: string): { bg: string; text: string; dot: string } {
 }
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
-  telefonia:             { bg: 'bg-blue-100/80',    text: 'text-blue-800',    border: 'border-blue-200/80',    dot: 'bg-blue-500' },
-  energia:               { bg: 'bg-amber-100/80',   text: 'text-amber-800',   border: 'border-amber-200/80',   dot: 'bg-amber-500' },
-  'connettività casa':   { bg: 'bg-emerald-100/80', text: 'text-emerald-800', border: 'border-emerald-200/80', dot: 'bg-emerald-500' },
-  connettivita:          { bg: 'bg-emerald-100/80', text: 'text-emerald-800', border: 'border-emerald-200/80', dot: 'bg-emerald-500' },
-  intrattenimento:       { bg: 'bg-purple-100/80',  text: 'text-purple-800',  border: 'border-purple-200/80',  dot: 'bg-purple-500' },
+  telefonia:             { bg: 'bg-[var(--shell-soft)]',    text: 'text-brand',    border: 'border-[var(--shell-line)]',    dot: 'bg-brand' },
+  energia:               { bg: 'bg-[#fbf4e2]',   text: 'text-[#9a6f1f]',   border: 'border-[#eadab5]',   dot: 'bg-[#d7aa45]' },
+  'connettività casa':   { bg: 'bg-[#edf7f1]', text: 'text-[#5f8f76]', border: 'border-[#d7e8de]', dot: 'bg-[#7fb492]' },
+  connettivita:          { bg: 'bg-[#edf7f1]', text: 'text-[#5f8f76]', border: 'border-[#d7e8de]', dot: 'bg-[#7fb492]' },
+  intrattenimento:       { bg: 'bg-[#f3eef9]',  text: 'text-[#8e72aa]',  border: 'border-[#e6ddf1]',  dot: 'bg-[#a98cc3]' },
 }
-const DEFAULT_CAT = { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200', dot: 'bg-gray-400' }
+const DEFAULT_CAT = { bg: 'bg-[var(--shell-soft)]', text: 'text-[var(--foreground)]', border: 'border-[var(--shell-line)]', dot: 'bg-[var(--shell-muted)]' }
 
 /* ─── Types ─── */
 
@@ -232,17 +222,17 @@ function getCellValue(contact: Contact, col: ContactColumn, customFields?: Custo
     const initials = name.slice(0, 2).toUpperCase()
     return (
       <div className="flex items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-indigo-500 text-[10px] font-bold text-white">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--shell-line)] bg-[var(--shell-soft)] text-[10px] font-bold text-brand">
           {initials !== '—' ? initials : '?'}
         </span>
-        <span className="font-semibold text-gray-900">{name}</span>
+        <span className="font-semibold text-[var(--foreground)]">{name}</span>
       </div>
     )
   }
 
   if (col.key === 'tags') {
     const tags = Array.isArray(contact.tags) ? contact.tags : []
-    if (tags.length === 0) return <span className="text-gray-300">—</span>
+    if (tags.length === 0) return <span className="text-[var(--shell-muted)]/50">—</span>
     const maxVisible = 3
     const visible = tags.slice(0, maxVisible)
     const remaining = tags.length - maxVisible
@@ -258,7 +248,7 @@ function getCellValue(contact: Contact, col: ContactColumn, customFields?: Custo
           )
         })}
         {remaining > 0 && (
-          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500 ring-1 ring-inset ring-gray-200/60" title={tags.slice(maxVisible).join(', ')}>
+          <span className="inline-flex items-center rounded-full bg-[var(--shell-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--shell-muted)] ring-1 ring-inset ring-[var(--shell-line)]" title={tags.slice(maxVisible).join(', ')}>
             +{remaining}
           </span>
         )}
@@ -269,17 +259,17 @@ function getCellValue(contact: Contact, col: ContactColumn, customFields?: Custo
   if (col.key === 'dnd') {
     return contact.dnd
       ? <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-600 ring-1 ring-inset ring-red-100">DND</span>
-      : <span className="text-gray-300/60">—</span>
+      : <span className="text-[var(--shell-muted)]/50">—</span>
   }
 
   if (DATE_FIELDS.has(col.key)) return formatDate(contact[col.key])
 
   if (col.key === 'email') {
     const val = contact[col.key]
-    if (!val) return <span className="text-gray-300/60">—</span>
+    if (!val) return <span className="text-[var(--shell-muted)]/50">—</span>
     return (
-      <span className="inline-flex items-center gap-1.5 text-gray-600">
-        <svg className="h-3.5 w-3.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <span className="inline-flex items-center gap-1.5 text-[var(--shell-muted)]">
+        <svg className="h-3.5 w-3.5 shrink-0 text-[var(--shell-muted)]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
         </svg>
         <span className="truncate">{String(val)}</span>
@@ -289,10 +279,10 @@ function getCellValue(contact: Contact, col: ContactColumn, customFields?: Custo
 
   if (col.key === 'phone') {
     const val = contact[col.key]
-    if (!val) return <span className="text-gray-300/60">—</span>
+    if (!val) return <span className="text-[var(--shell-muted)]/50">—</span>
     return (
-      <span className="inline-flex items-center gap-1.5 text-gray-600">
-        <svg className="h-3.5 w-3.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <span className="inline-flex items-center gap-1.5 text-[var(--shell-muted)]">
+        <svg className="h-3.5 w-3.5 shrink-0 text-[var(--shell-muted)]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
         </svg>
         <span className="font-mono text-xs tabular-nums">{String(val)}</span>
@@ -301,7 +291,7 @@ function getCellValue(contact: Contact, col: ContactColumn, customFields?: Custo
   }
 
   const val = contact[col.key]
-  if (val === null || val === undefined || val === '') return <span className="text-gray-300/60">—</span>
+  if (val === null || val === undefined || val === '') return <span className="text-[var(--shell-muted)]/50">—</span>
   return String(val)
 }
 
@@ -328,10 +318,10 @@ function ColumnFilterDropdown({
     const df = filter?.type === 'date' ? filter : { from: '', to: '' }
     return (
       <div className="space-y-3">
-        <p className="text-xs font-semibold text-gray-700">Filtra per data</p>
+        <p className="text-xs font-semibold text-[var(--foreground)]">Filtra per data</p>
         <div className="space-y-2">
           <div>
-            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-400">Da</label>
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-[var(--shell-muted)]">Da</label>
             <input
               type="date"
               value={df.from}
@@ -340,11 +330,11 @@ function ColumnFilterDropdown({
                 if (!next.from && !next.to) onUpdate(null)
                 else onUpdate(next)
               }}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
+              className="w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-surface)] px-3 py-2 text-xs outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
             />
           </div>
           <div>
-            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-gray-400">A</label>
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-[var(--shell-muted)]">A</label>
             <input
               type="date"
               value={df.to}
@@ -353,7 +343,7 @@ function ColumnFilterDropdown({
                 if (!next.from && !next.to) onUpdate(null)
                 else onUpdate(next)
               }}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
+              className="w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-surface)] px-3 py-2 text-xs outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
             />
           </div>
         </div>
@@ -385,7 +375,7 @@ function ColumnFilterDropdown({
         {/* Search within options */}
         {uniqueValues.length > 6 && (
           <div className="relative">
-            <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--shell-muted)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
             </svg>
             <input
@@ -394,7 +384,7 @@ function ColumnFilterDropdown({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               autoFocus
-              className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
+              className="w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-surface)] py-2 pl-8 pr-3 text-xs outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
             />
           </div>
         )}
@@ -410,24 +400,24 @@ function ColumnFilterDropdown({
         )}
 
         {/* Vertical checkbox list */}
-        <div className="max-h-56 overflow-y-auto -mx-1 space-y-0.5">
+        <div className="max-h-56 overflow-y-auto rounded-xl border border-[var(--shell-line)] bg-[var(--shell-canvas)] p-1.5 space-y-0.5">
           {filtered.length === 0 && (
-            <p className="px-3 py-2 text-xs text-gray-400">Nessun risultato</p>
+            <p className="px-3 py-2 text-xs text-[var(--shell-muted)]">Nessun risultato</p>
           )}
           {filtered.map((val) => {
             const isChecked = selected.includes(val)
             return (
               <label
                 key={val}
-                className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-xs transition-colors ${isChecked ? 'bg-brand/5' : 'hover:bg-gray-50'}`}
+                className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-xs transition-colors ${isChecked ? 'border border-brand/15 bg-[var(--shell-soft)]' : 'border border-transparent hover:bg-[var(--shell-soft)]'}`}
               >
                 <input
                   type="checkbox"
                   checked={isChecked}
                   onChange={() => toggle(val)}
-                  className="h-3.5 w-3.5 rounded border-gray-300 text-brand focus:ring-brand focus:ring-offset-0"
+                  className="h-3.5 w-3.5 rounded border-[var(--shell-line)] text-brand focus:ring-brand focus:ring-offset-0"
                 />
-                <span className={`truncate ${isChecked ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>{val}</span>
+                <span className={`truncate ${isChecked ? 'font-semibold text-[var(--foreground)]' : 'text-[var(--shell-muted)]'}`}>{val}</span>
               </label>
             )
           })}
@@ -441,7 +431,7 @@ function ColumnFilterDropdown({
   return (
     <div className="space-y-2">
       <div className="relative">
-        <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--shell-muted)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
         </svg>
         <input
@@ -454,7 +444,7 @@ function ColumnFilterDropdown({
           }}
           onKeyDown={(e) => { if (e.key === 'Enter') onClose() }}
           autoFocus
-          className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
+          className="w-full rounded-lg border border-[var(--shell-line)] bg-[var(--shell-surface)] py-2 pl-8 pr-3 text-xs outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
         />
       </div>
       {tv && (
@@ -682,11 +672,11 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
 
   return (
     <>
-      <div className="overflow-hidden rounded-3xl border border-gray-200/70 bg-white/95 shadow-[0_4px_24px_-8px_rgba(15,23,42,0.08)] backdrop-blur-sm">
+      <div className="relative isolate overflow-visible rounded-3xl border border-[var(--shell-line)] bg-[var(--shell-surface)] shadow-[0_8px_28px_-20px_rgba(23,21,18,0.18)]">
         {/* Active filters bar */}
         {activeFilterCount > 0 && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/50 px-4 py-2.5">
-            <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <div className="flex flex-wrap items-center gap-2 border-b border-[var(--shell-line)] bg-[var(--shell-canvas)] px-4 py-2.5">
+            <svg className="h-3.5 w-3.5 text-[var(--shell-muted)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
             </svg>
             {Object.entries(columnFilters).filter(([, f]) => isFilterActive(f)).map(([colKey, f]) => {
@@ -698,32 +688,32 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
                 </span>
               )
             })}
-            <button type="button" onClick={clearAllFilters} className="ml-auto text-[11px] font-medium text-gray-400 hover:text-gray-600 transition-colors">
+            <button type="button" onClick={clearAllFilters} className="ml-auto text-[11px] font-medium text-[var(--shell-muted)] transition-colors hover:text-[var(--foreground)]">
               Cancella tutti
             </button>
-            <span className="text-[11px] text-gray-400">{filteredContacts.length} / {localContacts.length}</span>
+            <span className="text-[11px] text-[var(--shell-muted)]">{filteredContacts.length} / {localContacts.length}</span>
           </div>
         )}
 
         {filteredContacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
-              <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--shell-soft)]">
+              <svg className="h-6 w-6 text-[var(--shell-muted)]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
               </svg>
             </div>
-            <p className="mt-4 text-sm font-medium text-gray-500">Nessun contatto trovato.</p>
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-4 text-sm font-medium text-[var(--shell-muted)]">Nessun contatto trovato.</p>
+            <p className="mt-1 text-xs text-[var(--shell-muted)]">
               {activeFilterCount > 0 ? 'Prova a modificare i filtri.' : 'Prova a modificare i filtri o crea un nuovo contatto.'}
             </p>
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto max-h-[calc(100vh-330px)] overflow-y-auto">
+            <div className={`relative z-20 overflow-x-auto overflow-y-visible ${activeFilter ? 'min-h-[320px]' : ''}`}>
               <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10">
-                <tr className="border-b border-gray-200/60 bg-gray-50">
-                  <th className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400 w-12 bg-gray-50 border-r border-gray-200/40">
+              <thead className="sticky top-0 z-30">
+                <tr className="border-b border-[var(--shell-line)] bg-[var(--shell-canvas)]">
+                  <th className="w-12 border-r border-[var(--shell-line)] bg-[var(--shell-canvas)] px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--shell-muted)]">
                     #
                   </th>
                   {columns.map((col, colIdx) => {
@@ -734,24 +724,24 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
                     return (
                       <th
                         key={col.key}
-                        className={`relative px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap bg-gray-50 ${isLast ? '' : 'border-r border-gray-200/40'}`}
+                        className={`relative whitespace-nowrap bg-[var(--shell-canvas)] px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.16em] ${isLast ? '' : 'border-r border-[var(--shell-line)]'} ${isOpen ? 'z-40' : ''}`}
                       >
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setActiveFilter(isOpen ? null : col.key) }}
-                          className={`inline-flex items-center gap-1 transition-colors ${hasFilter ? 'text-brand' : 'text-gray-400 hover:text-gray-600'}`}
+                          className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 transition-colors ${hasFilter ? 'border-brand/25 bg-brand/10 text-brand' : 'border-[var(--shell-line)] bg-[var(--shell-surface)] text-[var(--shell-muted)] hover:bg-[var(--shell-soft)] hover:text-[var(--foreground)]'}`}
                         >
                           {col.label}
                           <svg className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                           </svg>
-                          {hasFilter && <span className="h-1.5 w-1.5 rounded-full bg-brand" />}
+                          <span className={`h-1.5 w-1.5 rounded-full ${hasFilter ? 'bg-brand' : 'bg-[var(--shell-muted)]/40'}`} />
                         </button>
                         {/* Filter dropdown */}
                         {isOpen && (
                           <div
                             ref={filterRef}
-                            className="absolute left-0 top-full mt-1 w-64 rounded-xl border border-gray-200 bg-white p-3 shadow-xl z-20"
+                            className="absolute left-0 top-full z-50 mt-2 w-64 rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-surface)] p-3 shadow-[0_20px_40px_-24px_rgba(23,21,18,0.25)]"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <ColumnFilterDropdown
@@ -767,7 +757,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
                       </th>
                     )
                   })}
-                  <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400 w-20 bg-gray-50 border-l border-gray-200/40">
+                  <th className="w-20 border-l border-[var(--shell-line)] bg-[var(--shell-canvas)] px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--shell-muted)]">
                     Azioni
                   </th>
                 </tr>
@@ -789,7 +779,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
                         key={col.key}
                         className={`px-4 py-3.5 ${
                           DATE_FIELDS.has(col.key) || col.key === 'phone' ? 'whitespace-nowrap' : ''
-                        } ${col.key === 'contactName' ? '' : 'text-gray-500'} ${colIdx < columns.length - 1 ? 'border-r border-gray-100/60' : ''}`}
+                        } ${col.key === 'contactName' ? '' : 'text-[var(--shell-muted)]'} ${colIdx < columns.length - 1 ? 'border-r border-[var(--shell-line)]/70' : ''}`}
                       >
                         {getCellValue(c, col, customFields)}
                       </td>
@@ -833,7 +823,7 @@ export default memo(function ContactsList({ contacts: serverContacts, locationId
               </table>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-white/70 px-4 py-3">
+            <div className="relative z-0 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-white/70 px-4 py-3">
               <div className="text-xs text-gray-500">
                 Showing <span className="font-semibold text-gray-900">{startIdx + 1}</span>–<span className="font-semibold text-gray-900">{endIdx}</span> of{' '}
                 <span className="font-semibold text-gray-900">{total}</span>

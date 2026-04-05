@@ -31,8 +31,11 @@ export default function AiChat({ locationId }: { locationId: string }) {
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       setPos((prev) => {
-        if (prev.y !== 700) return prev
-        return { ...prev, y: Math.max(80, window.innerHeight - 80) }
+        if (prev.x !== 270 || prev.y !== 700) return prev
+        return {
+          x: Math.max(16, window.innerWidth - 88),
+          y: Math.max(80, window.innerHeight - 88),
+        }
       })
     })
     return () => window.cancelAnimationFrame(frame)
@@ -76,8 +79,7 @@ export default function AiChat({ locationId }: { locationId: string }) {
       >
         <button
           onClick={() => setOpen(!open)}
-          className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_12px_40px_-8px_color-mix(in_srgb,var(--brand)_55%,transparent)] ring-2 ring-white/30 transition hover:brightness-110"
-          style={{ background: 'linear-gradient(145deg, var(--brand) 0%, color-mix(in srgb, var(--brand) 65%, #6366f1) 100%)' }}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-[0_12px_40px_-8px_color-mix(in_srgb,var(--brand)_55%,transparent)] ring-2 ring-white/30 transition hover:brightness-110"
           title="Chiedi all'AI"
         >
           {open ? (
@@ -104,22 +106,21 @@ export default function AiChat({ locationId }: { locationId: string }) {
           className={`flex h-[500px] w-[380px] flex-col overflow-hidden ${sf.inbox} shadow-2xl`}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200/70 bg-white/80 px-5 py-4 backdrop-blur-md">
+          <div className="flex items-center justify-between border-b border-[var(--shell-line)] bg-[color:color-mix(in_srgb,var(--shell-surface)_88%,white_12%)] px-5 py-4 backdrop-blur-md">
             <div className="flex items-center gap-3">
               <div
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm"
-                style={{ background: 'linear-gradient(145deg, var(--brand) 0%, color-mix(in srgb, var(--brand) 70%, #6366f1) 100%)' }}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-white shadow-sm"
               >
                 <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-bold text-gray-900">AI assistant</p>
-                <p className="text-[10px] text-gray-500">Interroga i dati della location</p>
+                <p className="text-sm font-bold text-[var(--foreground)]">AI assistant</p>
+                <p className="text-[10px] text-[var(--shell-muted)]">Interroga i dati della location</p>
               </div>
             </div>
-            <button type="button" onClick={() => setOpen(false)} className="rounded-xl p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700">
+            <button type="button" onClick={() => setOpen(false)} className="rounded-xl p-2 text-[var(--shell-muted)] transition hover:bg-[var(--shell-soft)] hover:text-[var(--foreground)]">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -127,11 +128,11 @@ export default function AiChat({ locationId }: { locationId: string }) {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-gray-50/40 to-white/30 p-4">
+          <div className="flex-1 space-y-3 overflow-y-auto bg-[var(--shell-canvas)] p-4">
             {messages.length === 0 && !loading && (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center">
-                  <p className="text-sm text-gray-400">Ciao! Come posso aiutarti?</p>
+                  <p className="text-sm text-[var(--shell-muted)]">Ciao! Come posso aiutarti?</p>
                   <div className="mt-3 space-y-1.5">
                     {[
                       'Quanti contatti abbiamo?',
@@ -141,7 +142,7 @@ export default function AiChat({ locationId }: { locationId: string }) {
                       <button
                         key={q}
                         onClick={() => setInput(q)}
-                        className="block w-full rounded-xl border border-gray-200/80 bg-white/80 px-3 py-2.5 text-left text-xs font-medium text-gray-600 shadow-sm transition hover:border-brand/25 hover:bg-white"
+                        className="block w-full rounded-xl border border-[var(--shell-line)] bg-[var(--shell-surface)] px-3 py-2.5 text-left text-xs font-medium text-[var(--shell-muted)] shadow-sm transition hover:border-brand/25 hover:bg-white"
                       >
                         {q}
                       </button>
@@ -155,9 +156,9 @@ export default function AiChat({ locationId }: { locationId: string }) {
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-2.5 shadow-sm ${
-                    m.role === 'user' ? 'text-white' : 'border border-gray-200/80 bg-white text-gray-800'
+                    m.role === 'user' ? 'text-white' : 'border border-[var(--shell-line)] bg-[var(--shell-surface)] text-[var(--foreground)]'
                   }`}
-                  style={m.role === 'user' ? { background: 'linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 75%, #6366f1))' } : undefined}
+                  style={m.role === 'user' ? { background: 'var(--brand)' } : undefined}
                 >
                   <p className="text-sm whitespace-pre-wrap">{m.text}</p>
                 </div>
@@ -166,11 +167,11 @@ export default function AiChat({ locationId }: { locationId: string }) {
 
             {loading && (
               <div className="flex justify-start">
-                <div className="rounded-2xl bg-gray-100 px-4 py-3">
+                <div className="rounded-2xl bg-[var(--shell-soft)] px-4 py-3">
                   <div className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '0ms' }} />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '150ms' }} />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '300ms' }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--shell-muted)]" style={{ animationDelay: '0ms' }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--shell-muted)]" style={{ animationDelay: '150ms' }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--shell-muted)]" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               </div>
@@ -180,7 +181,7 @@ export default function AiChat({ locationId }: { locationId: string }) {
           </div>
 
           {/* Input */}
-          <div className="border-t border-gray-200/70 bg-white/90 p-3 backdrop-blur-md">
+          <div className="border-t border-[var(--shell-line)] bg-[color:color-mix(in_srgb,var(--shell-surface)_92%,white_8%)] p-3 backdrop-blur-md">
             <div className="flex gap-2">
               <input
                 type="text"

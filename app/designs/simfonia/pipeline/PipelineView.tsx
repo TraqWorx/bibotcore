@@ -9,7 +9,6 @@ import {
   Plus,
   LayoutGrid,
   List,
-  Bell,
   GitBranch,
 } from 'lucide-react'
 import SimfoniaPageHeader from '../_components/SimfoniaPageHeader'
@@ -52,10 +51,12 @@ export default function PipelineView({
   pipelines,
   opportunities,
   locationId,
+  demoMode = false,
 }: {
   pipelines: Pipeline[]
   opportunities: Opportunity[]
   locationId: string
+  demoMode?: boolean
 }) {
   const [selectedId, setSelectedId] = useState(pipelines[0]?.id ?? '')
   const [activeDealId, setActiveDealId] = useState<string | null>(null)
@@ -153,11 +154,6 @@ export default function PipelineView({
   const showGroupedList =
     stages.length > 0 && filter !== 'won' && filter !== 'lost' && viewMode === 'list'
 
-  const primaryBtnStyle = {
-    background:
-      'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
-  } as const
-
   return (
     <div className="flex h-[calc(100vh-7rem)] min-h-0 flex-col gap-7">
       <SimfoniaPageHeader
@@ -166,14 +162,14 @@ export default function PipelineView({
         description={
           <>
             <span>Gestisci le opportunità, trascina le card tra gli stage e monitora i risultati.</span>
-            <span className="mt-2 block text-sm leading-relaxed text-gray-600">
-              <span className="font-semibold text-gray-800">{openOpps.length}</span> aperte
-              <span className="text-gray-300"> · </span>
+            <span className="mt-2 block text-sm leading-relaxed text-[var(--shell-muted)]">
+              <span className="font-semibold text-[var(--foreground)]">{openOpps.length}</span> aperte
+              <span className="text-[var(--shell-line)]"> · </span>
               <span className="font-bold tabular-nums text-brand">€{openValue.toLocaleString('it-IT')}</span>
               {wonOpps.length > 0 && (
                 <>
-                  <span className="text-gray-300"> · </span>
-                  <span className="font-bold tabular-nums text-emerald-600">
+                  <span className="text-[var(--shell-line)]"> · </span>
+                  <span className="font-bold tabular-nums text-[color:var(--shell-muted)]">
                     €{wonValue.toLocaleString('it-IT')} vinte
                   </span>
                 </>
@@ -183,31 +179,31 @@ export default function PipelineView({
         }
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200/90 bg-white/90 text-gray-500 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-gray-800"
-              aria-label="Notifiche"
-            >
-              <Bell className="h-4 w-4" />
-            </button>
-            <div className="inline-flex h-11 min-w-[2.75rem] items-center justify-center rounded-2xl border border-gray-200/80 bg-white/80 px-3 text-xs font-bold text-brand shadow-sm backdrop-blur-sm">
-              CRM
-            </div>
-            <Link
-              href={`/designs/simfonia/pipeline/new${q}`}
-              className={sf.primaryBtn}
-              style={primaryBtnStyle}
-            >
-              <Plus className="h-4 w-4" />
-              Nuovo Deal
-            </Link>
+            {demoMode ? (
+              <span
+                className={sf.primaryBtn}
+                style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', opacity: 0.92, cursor: 'default' }}
+              >
+                <Plus className="h-4 w-4" />
+                Nuovo Deal
+              </span>
+            ) : (
+              <Link
+                href={`/designs/simfonia/pipeline/new${q}`}
+                className={sf.primaryBtn}
+                style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)' }}
+              >
+                <Plus className="h-4 w-4" />
+                Nuovo Deal
+              </Link>
+            )}
           </div>
         }
       />
 
       <div className={`flex min-h-0 flex-1 flex-col overflow-hidden ${sf.card}`}>
       {/* Toolbar — z-index above <main> so filter popover paints over the board columns */}
-      <div className="relative z-30 shrink-0 border-b border-gray-200/80 bg-white/70 px-5 py-3 backdrop-blur-sm sm:px-6">
+      <div className="relative z-30 shrink-0 border-b border-[var(--shell-line)] bg-[color:color-mix(in_srgb,var(--shell-surface)_88%,white_12%)] px-5 py-3 backdrop-blur-sm sm:px-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {pipelines.map((p) => (
@@ -221,10 +217,10 @@ export default function PipelineView({
                 className={`relative shrink-0 px-3 py-1.5 text-sm font-medium transition-colors ${
                   selectedId === p.id
                     ? 'text-brand'
-                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
+                    : 'text-[var(--shell-muted)] hover:bg-[var(--shell-soft)] hover:text-[var(--foreground)]'
                 }`}
               >
-                <span className="mr-1.5 inline-flex align-middle text-gray-400">
+                <span className="mr-1.5 inline-flex align-middle text-[var(--shell-muted)]">
                   <GitBranch className="inline h-3.5 w-3.5" />
                 </span>
                 {p.name}
@@ -237,13 +233,13 @@ export default function PipelineView({
 
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--shell-muted)]" />
               <input
                 type="search"
                 placeholder="Cerca deal..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className={`h-9 w-44 pl-8 pr-3 text-sm text-gray-900 sm:w-48 ${sf.input}`}
+                className={`h-9 w-44 bg-[var(--shell-canvas)] pl-8 pr-3 text-sm text-[var(--foreground)] sm:w-48 ${sf.input}`}
               />
             </div>
 
@@ -251,7 +247,7 @@ export default function PipelineView({
               <button
                 type="button"
                 onClick={() => setFilterMenuOpen((o) => !o)}
-                className="relative z-40 flex h-9 items-center gap-1.5 rounded-2xl border border-gray-200/90 bg-white/95 px-3.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-white"
+                className="relative z-40 flex h-9 items-center gap-1.5 rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-surface)] px-3.5 text-sm font-semibold text-[var(--foreground)] shadow-sm transition hover:bg-white"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
                 Filtro
@@ -260,7 +256,7 @@ export default function PipelineView({
                 </span>
               </button>
               {filterMenuOpen && (
-                <div className="absolute right-0 top-full z-50 mt-2 min-w-[180px] rounded-2xl border border-gray-200/80 bg-white py-1 shadow-[0_8px_30px_-12px_rgba(15,23,42,0.15)]">
+                <div className="absolute right-0 top-full z-50 mt-2 min-w-[180px] rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-surface)] py-1 shadow-[0_8px_30px_-12px_rgba(15,23,42,0.15)]">
                   {(['all', 'open', 'won', 'lost'] as Filter[]).map((f) => (
                     <button
                       key={f}
@@ -271,7 +267,7 @@ export default function PipelineView({
                         setFilterMenuOpen(false)
                       }}
                       className={`flex w-full items-center px-3 py-2 text-left text-sm ${
-                        filter === f ? 'bg-brand/10 font-semibold text-brand' : 'text-gray-700 hover:bg-gray-50'
+                        filter === f ? 'bg-brand/10 font-semibold text-brand' : 'text-[var(--foreground)] hover:bg-[var(--shell-soft)]'
                       }`}
                     >
                       {FILTER_LABELS[f]}
@@ -281,7 +277,7 @@ export default function PipelineView({
               )}
             </div>
 
-            <div className="flex items-center overflow-hidden rounded-2xl border border-gray-200/90 bg-white/95 shadow-sm">
+            <div className="flex items-center overflow-hidden rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-surface)] shadow-sm">
               <button
                 type="button"
                 onClick={() => setViewMode('grid')}
@@ -290,7 +286,7 @@ export default function PipelineView({
                 className={`flex h-9 w-9 items-center justify-center transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                   viewMode === 'grid' && filter !== 'won' && filter !== 'lost'
                     ? 'bg-brand/10 text-brand'
-                    : 'text-gray-500 hover:bg-gray-50/80'
+                    : 'text-[var(--shell-muted)] hover:bg-[var(--shell-soft)]'
                 }`}
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
@@ -302,7 +298,7 @@ export default function PipelineView({
                 className={`flex h-9 w-9 items-center justify-center transition-colors ${
                   viewMode === 'list' || filter === 'won' || filter === 'lost'
                     ? 'bg-brand/10 text-brand'
-                    : 'text-gray-500 hover:bg-gray-50/80'
+                    : 'text-[var(--shell-muted)] hover:bg-[var(--shell-soft)]'
                 }`}
               >
                 <List className="h-3.5 w-3.5" />
@@ -317,7 +313,7 @@ export default function PipelineView({
           <button
             type="button"
             onClick={() => scrollBoard('left')}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm hover:text-gray-900 hover:shadow-md"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--shell-line)] bg-[var(--shell-surface)] text-[var(--shell-muted)] shadow-sm hover:text-[var(--foreground)] hover:shadow-md"
             aria-label="Scorri a sinistra"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
@@ -327,7 +323,7 @@ export default function PipelineView({
           <button
             type="button"
             onClick={() => scrollBoard('right')}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm hover:text-gray-900 hover:shadow-md"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--shell-line)] bg-[var(--shell-surface)] text-[var(--shell-muted)] shadow-sm hover:text-[var(--foreground)] hover:shadow-md"
             aria-label="Scorri a destra"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
@@ -364,11 +360,13 @@ export default function PipelineView({
           ) : showBoard ? (
             <div className="h-full min-h-[200px]">
               <PipelineBoard
+                key={selectedId}
                 pipelineId={selectedId}
                 stages={stages}
                 opportunities={pipelineOpps}
                 onDealClick={setActiveDealId}
                 locationId={locationId}
+                demoMode={demoMode}
               />
             </div>
           ) : null}

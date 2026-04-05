@@ -16,7 +16,7 @@ export default function SimfoniaPageHeader({
 }) {
   return (
     <div
-      className={`flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between ${className}`.trim()}
+      className={`sf-page-header flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between ${className}`.trim()}
     >
       <div className="min-w-0">
         {eyebrow ? <p className={sf.eyebrow}>{eyebrow}</p> : null}

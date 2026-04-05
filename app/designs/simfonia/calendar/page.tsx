@@ -37,7 +37,7 @@ export default async function CalendarPage({
   if (!locationId) {
     return (
       <div className={`${sf.emptyPanel}`}>
-        <p className="text-sm font-medium text-gray-500">Nessuna location connessa.</p>
+        <p className="text-sm font-medium text-[var(--shell-muted)]">Nessuna location connessa.</p>
       </div>
     )
   }
@@ -85,9 +85,9 @@ export default async function CalendarPage({
     const msg = err instanceof Error ? err.message : ''
     if (msg.includes('401') || msg.includes('not authorized')) {
       return (
-        <div className="rounded-3xl border border-amber-200/80 bg-amber-50/80 p-10 text-center shadow-sm backdrop-blur-sm">
-          <p className="text-sm font-semibold text-amber-900">Connessione non autorizzata per questa funzione.</p>
-          <p className="mt-1 text-xs text-amber-700">Riconnetti la location con gli scope aggiornati.</p>
+        <div className="rounded-3xl border border-[#eadab5] bg-[#fbf3df] p-10 text-center shadow-sm backdrop-blur-sm">
+          <p className="text-sm font-semibold text-[#9f7d2c]">Connessione non autorizzata per questa funzione.</p>
+          <p className="mt-1 text-xs text-[#9f7d2c]">Riconnetti la location con gli scope aggiornati.</p>
         </div>
       )
     }
@@ -130,9 +130,6 @@ export default async function CalendarPage({
           <Link
             href={`/designs/simfonia/calendar/new?locationId=${locationId}`}
             className={sf.primaryBtn}
-            style={{
-              background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
-            }}
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

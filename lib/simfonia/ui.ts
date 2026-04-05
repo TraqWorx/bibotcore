@@ -3,64 +3,64 @@
  * Import as: import { sf } from '@/lib/simfonia/ui'
  */
 export const sf = {
-  eyebrow: 'text-[11px] font-bold uppercase tracking-[0.22em] text-gray-400',
+  eyebrow: 'sf-eyebrow text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--shell-muted)]',
 
-  pageTitle: 'text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl',
-  pageSubtitle: 'mt-2 max-w-2xl text-sm leading-relaxed text-gray-600 sm:text-base',
+  pageTitle: 'sf-page-title text-3xl font-black tracking-[-0.05em] text-[var(--foreground)] sm:text-4xl',
+  pageSubtitle: 'sf-page-subtitle mt-2 max-w-2xl text-sm leading-relaxed text-[var(--shell-muted)] sm:text-base',
 
   /** Primary surfaces */
-  card: 'rounded-3xl border border-gray-200/70 bg-white/90 shadow-[0_4px_24px_-8px_rgba(15,23,42,0.08)] backdrop-blur-sm',
+  card: 'sf-card rounded-[28px] border border-[var(--shell-line)] bg-[var(--shell-surface)] shadow-[0_18px_40px_-32px_rgba(23,21,18,0.22)]',
   cardPadding: 'p-5 sm:p-6',
-  cardMuted: 'rounded-3xl border border-gray-200/60 bg-gray-50/90 backdrop-blur-sm',
+  cardMuted: 'sf-card-muted rounded-[28px] border border-[var(--shell-line)] bg-[var(--shell-canvas)]',
 
   /** Stat / dashboard tiles */
   statTile:
-    'rounded-3xl border border-gray-200/70 bg-white/95 p-5 shadow-sm backdrop-blur-sm sm:p-6',
+    'sf-stat-tile rounded-[28px] border border-[var(--shell-line)] bg-[var(--shell-surface)] p-5 shadow-[0_14px_32px_-28px_rgba(23,21,18,0.22)] sm:p-6',
 
   /** Controls */
   primaryBtn:
-    'inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-900/10 px-6 py-3 text-sm font-bold text-gray-900 shadow-lg transition hover:brightness-[1.03] active:scale-[0.98]',
+    'sf-primary-btn inline-flex items-center justify-center gap-2 rounded-[18px] border border-[color:var(--brand)] bg-[var(--brand)] px-6 py-3 text-sm font-bold text-white shadow-[0_18px_32px_-22px_color-mix(in_srgb,var(--brand)_38%,transparent)] transition hover:brightness-[1.03] active:scale-[0.98]',
   secondaryBtn:
-    'inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200/90 bg-white/90 px-4 py-2.5 text-sm font-semibold text-gray-800 shadow-sm backdrop-blur-sm transition hover:bg-white',
+    'sf-secondary-btn inline-flex items-center justify-center gap-2 rounded-[18px] border border-[var(--shell-line)] bg-[var(--shell-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] shadow-sm transition hover:bg-white',
 
   input:
-    'rounded-2xl border border-gray-200/90 bg-white shadow-sm outline-none transition placeholder:text-gray-400 focus:border-brand/40 focus:ring-2 focus:ring-brand/15',
+    'sf-input rounded-[18px] border border-[var(--shell-line)] bg-white shadow-sm outline-none transition placeholder:text-[var(--shell-muted)] focus:border-brand/40 focus:ring-2 focus:ring-brand/15',
 
   /** Filter / toolbar panels */
-  panel: 'rounded-3xl border border-gray-200/70 bg-white/85 p-4 shadow-sm backdrop-blur-md sm:p-5',
+  panel: 'sf-panel rounded-[28px] border border-[var(--shell-line)] bg-[var(--shell-surface)] p-4 shadow-[0_14px_32px_-28px_rgba(23,21,18,0.2)] sm:p-5',
 
-  sectionLabel: 'text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400',
+  sectionLabel: 'sf-section-label text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--shell-muted)]',
 
   /** Conversations layout */
-  inbox: 'flex flex-1 overflow-hidden rounded-3xl border border-gray-200/70 bg-white/92 shadow-[0_8px_40px_-16px_rgba(15,23,42,0.12)] backdrop-blur-md',
+  inbox: 'sf-inbox flex flex-1 overflow-hidden rounded-[28px] border border-[var(--shell-line)] bg-[var(--shell-surface)] shadow-[0_18px_36px_-28px_rgba(23,21,18,0.22)]',
 
   /** Calendar week view shell */
   calendarWeek:
-    'min-w-0 flex-1 overflow-hidden rounded-3xl border border-gray-200/70 bg-white/95 shadow-sm backdrop-blur-sm',
+    'sf-calendar-week min-w-0 flex-1 overflow-hidden rounded-[28px] border border-[var(--shell-line)] bg-[var(--shell-surface)] shadow-[0_14px_32px_-28px_rgba(23,21,18,0.2)]',
 
   /** Empty / loading panels */
-  emptyPanel: 'rounded-3xl border border-dashed border-gray-200/80 bg-white/60 px-8 py-16 text-center backdrop-blur-sm',
+  emptyPanel: 'sf-empty-panel rounded-[28px] border border-dashed border-[var(--shell-line)] bg-[var(--shell-surface)] px-8 py-16 text-center',
 
   /** Settings / forms */
-  formCard: 'rounded-3xl border border-gray-200/70 bg-white/90 p-5 shadow-sm backdrop-blur-sm sm:p-6',
+  formCard: 'sf-form-card rounded-[28px] border border-[var(--shell-line)] bg-[var(--shell-surface)] p-5 shadow-[0_14px_32px_-28px_rgba(23,21,18,0.2)] sm:p-6',
   formLabel:
-    'mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-gray-500',
-  formTitle: 'text-lg font-bold tracking-tight text-gray-900',
-  formDesc: 'mt-1 text-sm text-gray-500',
+    'mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--shell-muted)]',
+  formTitle: 'text-lg font-bold tracking-tight text-[var(--foreground)]',
+  formDesc: 'mt-1 text-sm text-[var(--shell-muted)]',
 
   /** Inputs — full width */
-  inputFull: `w-full rounded-2xl border border-gray-200/90 bg-white px-4 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-brand/40 focus:ring-2 focus:ring-brand/15`,
+  inputFull: `sf-input w-full rounded-[18px] border border-[var(--shell-line)] bg-white px-4 py-2.5 text-sm text-[var(--foreground)] shadow-sm outline-none transition placeholder:text-[var(--shell-muted)] focus:border-brand/40 focus:ring-2 focus:ring-brand/15`,
 
   inputSm:
-    'rounded-xl border border-gray-200/90 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/15',
+    'sf-input rounded-xl border border-[var(--shell-line)] bg-white px-3 py-2 text-sm outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/15',
 
   /** Primary actions */
   btnBrand:
-    'rounded-2xl bg-brand px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40',
+    'sf-primary-btn rounded-[18px] border border-[color:var(--brand)] bg-[var(--brand)] px-5 py-2.5 text-sm font-bold text-white shadow-[0_14px_24px_-18px_color-mix(in_srgb,var(--brand)_38%,transparent)] transition hover:brightness-[1.03] disabled:opacity-40',
 
   btnSave:
-    'w-full rounded-2xl border border-gray-900/10 py-3 text-sm font-bold text-gray-900 shadow-md transition hover:brightness-[1.02] disabled:opacity-45',
+    'sf-primary-btn w-full rounded-[18px] border border-[color:var(--brand)] bg-[var(--brand)] py-3 text-sm font-bold text-white shadow-[0_14px_24px_-18px_color-mix(in_srgb,var(--brand)_38%,transparent)] transition hover:brightness-[1.03] disabled:opacity-45',
 
-  tableShell: 'overflow-hidden rounded-2xl border border-gray-200/70 bg-white/95',
-  tableHeadRow: 'border-b border-gray-200/80 bg-gray-50/90 backdrop-blur-sm',
+  tableShell: 'sf-table-shell overflow-hidden rounded-[22px] border border-[var(--shell-line)] bg-[var(--shell-surface)]',
+  tableHeadRow: 'sf-table-head-row border-b border-[var(--shell-line)] bg-[var(--shell-canvas)]',
 } as const

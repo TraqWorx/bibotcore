@@ -30,28 +30,28 @@ import SegmentedControl from '../../_components/SegmentedControl'
 import { sf } from '@/lib/simfonia/ui'
 
 const accentFill = {
-  background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
+  background: 'var(--shell-soft)',
 } as const
 
 const TAG_COLORS: Record<string, string> = {
-  energia:      'bg-amber-50 text-amber-700',
-  telefonia:    'bg-blue-50 text-blue-700',
+  energia:      'bg-[#fbf4e2] text-[#9a6f1f]',
+  telefonia:    'bg-[var(--shell-soft)] text-brand',
   windtre:      'bg-purple-50 text-purple-700',
   wind:         'bg-purple-50 text-purple-700',
   fastweb:      'bg-orange-50 text-orange-700',
   kena:         'bg-violet-50 text-violet-700',
   connettivita: 'bg-teal-50 text-teal-700',
-  luce:         'bg-yellow-50 text-yellow-700',
-  gas:          'bg-amber-50 text-amber-800',
+  luce:         'bg-[#fbf4e2] text-[#9a6f1f]',
+  gas:          'bg-[#fbf4e2] text-[#9a6f1f]',
 }
 
 const CATEGORY_ACCENT: Record<string, { bg: string; border: string; text: string; dot: string }> = {
-  telefonia:       { bg: 'bg-blue-50',    border: 'border-blue-200',    text: 'text-blue-700',    dot: 'bg-blue-400' },
-  energia:         { bg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-700',   dot: 'bg-amber-400' },
-  connettivita:    { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-400' },
+  telefonia:       { bg: 'bg-[var(--shell-soft)]', border: 'border-[var(--shell-line)]', text: 'text-brand', dot: 'bg-brand' },
+  energia:         { bg: 'bg-[#fbf4e2]',   border: 'border-[#eadab5]',   text: 'text-[#9a6f1f]',   dot: 'bg-[#d7aa45]' },
+  connettivita:    { bg: 'bg-[#edf7f1]', border: 'border-[#d7e8de]', text: 'text-[#5f8f76]', dot: 'bg-[#7fb492]' },
   intrattenimento: { bg: 'bg-purple-50',  border: 'border-purple-200',  text: 'text-purple-700',  dot: 'bg-purple-400' },
 }
-const DEFAULT_ACCENT = { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700', dot: 'bg-gray-400' }
+const DEFAULT_ACCENT = { bg: 'bg-[var(--shell-soft)]', border: 'border-[var(--shell-line)]', text: 'text-[var(--foreground)]', dot: 'bg-[var(--shell-muted)]' }
 
 interface Props {
   contactId: string | null
@@ -444,39 +444,40 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-3xl flex-col bg-gray-50/80 shadow-2xl">
+      <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-3xl flex-col bg-[var(--shell-canvas)] shadow-2xl">
         {/* Header */}
-        <div className="relative border-b border-gray-200/60 bg-white px-8 pb-5 pt-6">
+        <div className="relative border-b border-[var(--shell-line)] bg-[var(--shell-surface)] px-8 pb-5 pt-6">
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-xl text-[var(--shell-muted)] transition-colors hover:bg-[var(--shell-soft)] hover:text-[var(--foreground)]"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
           </button>
 
           {loading ? (
             <div className="flex items-center gap-4">
-              <div className="h-14 w-14 animate-pulse rounded-2xl bg-gray-100" />
+              <div className="h-14 w-14 animate-pulse rounded-2xl bg-[var(--shell-soft)]" />
               <div className="space-y-2">
-                <div className="h-5 w-40 animate-pulse rounded-lg bg-gray-100" />
-                <div className="h-3 w-28 animate-pulse rounded-lg bg-gray-100" />
+                <div className="h-5 w-40 animate-pulse rounded-lg bg-[var(--shell-soft)]" />
+                <div className="h-3 w-28 animate-pulse rounded-lg bg-[var(--shell-soft)]" />
               </div>
             </div>
           ) : contact ? (
             <div className="flex items-center gap-5">
               {/* Avatar */}
               <div
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-violet-600 text-lg font-bold text-white shadow-sm"
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-bold text-white shadow-sm"
+                style={{ background: 'var(--brand)' }}
               >
                 {initials}
               </div>
               <div className="min-w-0">
-                <h2 className="text-xl font-bold text-gray-900 truncate">{fullName}</h2>
-                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                <h2 className="truncate text-xl font-bold text-[var(--foreground)]">{fullName}</h2>
+                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--shell-muted)]">
                   {contact.email && (
                     <span className="flex items-center gap-1.5 truncate">
-                      <svg className="h-3.5 w-3.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
+                      <svg className="h-3.5 w-3.5 shrink-0 text-[var(--shell-muted)]" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
                       {contact.email}
                     </span>
                   )}
@@ -516,21 +517,21 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
         {/* Content */}
         {loading ? (
           <div className="flex flex-1 items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-brand" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--shell-line)] border-t-brand" />
           </div>
         ) : contact ? (
           <div className={`flex-1 ${tab === 'messages' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
             {tab === 'info' ? (
               <div className="space-y-5 p-6">
                 {/* AI Summary */}
-                <div className="rounded-2xl border border-brand/15 bg-white p-4 shadow-sm">
+                <div className="rounded-2xl border border-[var(--shell-line)] bg-[var(--shell-surface)] p-4 shadow-sm">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-widest text-brand">AI Riepilogo</p>
                     <button
                       type="button"
                       onClick={handleAiSummary}
                       disabled={aiLoading}
-                      className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-brand to-indigo-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:shadow-md disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-xl bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:shadow-md disabled:opacity-50"
                     >
                       {aiLoading ? (
                         <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -543,7 +544,7 @@ export default function ContactDrawer({ contactId, locationId, customFieldDefs =
                     </button>
                   </div>
                   {aiSummary && (
-                    <div className="mt-3 whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
+                    <div className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-[var(--foreground)]">
                       {aiSummary}
                     </div>
                   )}

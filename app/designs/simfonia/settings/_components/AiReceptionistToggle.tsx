@@ -2,13 +2,22 @@
 
 import { useState } from 'react'
 
-export default function AiReceptionistToggle({ locationId, initialEnabled }: { locationId: string; initialEnabled: boolean }) {
+export default function AiReceptionistToggle({
+  locationId,
+  initialEnabled,
+  demoMode = false,
+}: {
+  locationId: string
+  initialEnabled: boolean
+  demoMode?: boolean
+}) {
   const [enabled, setEnabled] = useState(initialEnabled)
   const [saving, setSaving] = useState(false)
 
   async function toggle() {
     const newValue = !enabled
     setEnabled(newValue)
+    if (demoMode) return
     setSaving(true)
     await fetch('/api/portal/settings', {
       method: 'POST',

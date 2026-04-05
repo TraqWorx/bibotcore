@@ -74,18 +74,23 @@ export default function NewOpportunityForm({ pipelines, contacts, locationId, pr
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!name.trim() || !pipelineId || !stageId) return
+    if (!contactId) {
+      setError('Seleziona un contatto. In GoHighLevel ogni opportunità deve essere collegata a un contatto.')
+      return
+    }
     setSaving(true)
     setError('')
     const result = await createOpportunity({
       name,
       pipelineId,
       pipelineStageId: stageId,
-      ...(contactId ? { contactId } : {}),
+      contactId,
       monetaryValue: value ? Number(value) : 0,
     }, locationId)
     if (result?.error) {
       setError(result.error)
       setSaving(false)
+      return
     }
   }
 
@@ -151,7 +156,7 @@ export default function NewOpportunityForm({ pipelines, contacts, locationId, pr
               )}
             </div>
           )}
-          <p className="mt-1 text-[11px] text-gray-400">Opzionale — associa un contatto a questa opportunità</p>
+          <p className="mt-1 text-[11px] text-gray-400">Obbligatorio — GoHighLevel richiede un contatto per ogni opportunità</p>
         </div>
 
         {/* Name */}

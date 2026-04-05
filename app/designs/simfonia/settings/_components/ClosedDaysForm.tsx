@@ -11,6 +11,7 @@ const accentFill = {
 interface Props {
   locationId: string
   initialDays: string[]
+  demoMode?: boolean
 }
 
 function formatDate(iso: string): string {
@@ -33,7 +34,7 @@ function getDateRange(start: string, end: string): string[] {
   return dates
 }
 
-export default function ClosedDaysForm({ locationId, initialDays }: Props) {
+export default function ClosedDaysForm({ locationId, initialDays, demoMode = false }: Props) {
   const [days, setDays] = useState<string[]>(() => [...initialDays].sort())
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -58,6 +59,10 @@ export default function ClosedDaysForm({ locationId, initialDays }: Props) {
   }
 
   async function handleSave() {
+    if (demoMode) {
+      setResult({ ok: true })
+      return
+    }
     setSaving(true)
     setResult(null)
     const res = await saveClosedDays(locationId, days)
@@ -98,7 +103,7 @@ export default function ClosedDaysForm({ locationId, initialDays }: Props) {
         <button
           type="button"
           onClick={handleAdd}
-          disabled={!startDate}
+          disabled={demoMode || !startDate}
           className="shrink-0 rounded-2xl px-5 py-2.5 text-sm font-bold text-gray-900 shadow-md transition hover:brightness-[1.02] disabled:opacity-45"
           style={accentFill}
         >
@@ -117,6 +122,7 @@ export default function ClosedDaysForm({ locationId, initialDays }: Props) {
               <button
                 type="button"
                 onClick={() => handleRemove(day)}
+                disabled={demoMode}
                 className="text-sm font-bold text-red-400 transition hover:text-red-600"
               >
                 &times;
@@ -132,7 +138,7 @@ export default function ClosedDaysForm({ locationId, initialDays }: Props) {
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
+          disabled={demoMode || saving}
           className="rounded-2xl px-5 py-2.5 text-sm font-bold text-gray-900 shadow-md transition hover:brightness-[1.02] disabled:opacity-45"
           style={accentFill}
         >

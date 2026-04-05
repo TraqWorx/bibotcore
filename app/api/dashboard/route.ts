@@ -33,10 +33,14 @@ export async function GET(req: NextRequest) {
   const sb = createAdminClient()
   const now = new Date()
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const trendStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1)
 
   // ALL queries in one parallel batch
   const [
     { count: totalContacts },
+    { data: recentContacts },
     { data: allCfValues },
     customFields,
     { data: ghlUsers },
@@ -44,8 +48,14 @@ export async function GET(req: NextRequest) {
     { data: gareRows },
     { data: closedDaysData },
     { data: designSettings },
+    { data: calendarEvents },
   ] = await Promise.all([
     sb.from('cached_contacts').select('ghl_id', { count: 'exact', head: true }).eq('location_id', locationId),
+    sb.from('cached_contacts')
+      .select('date_added')
+      .eq('location_id', locationId)
+      .gte('date_added', trendStart.toISOString())
+      .order('date_added', { ascending: true }),
     sb.from('cached_contact_custom_fields').select('contact_ghl_id, field_id, value').eq('location_id', locationId),
     getCustomFieldDefs(locationId),
     sb.from('cached_ghl_users').select('ghl_id, name, first_name, last_name, email, role').eq('location_id', locationId),
@@ -53,6 +63,12 @@ export async function GET(req: NextRequest) {
     sb.from('gare_mensili').select('categoria, obiettivo, tag').eq('location_id', locationId).eq('month', currentMonth).order('categoria'),
     sb.from('location_settings').select('closed_days').eq('location_id', locationId).single(),
     sb.from('location_design_settings').select('module_overrides').eq('location_id', locationId).maybeSingle(),
+    sb.from('cached_calendar_events')
+      .select('ghl_id, title, start_time, appointment_status, contact_ghl_id')
+      .eq('location_id', locationId)
+      .gte('start_time', monthStart.toISOString())
+      .lt('start_time', monthEnd.toISOString())
+      .order('start_time', { ascending: true }),
   ])
 
   const isSuperAdmin = access.isSuperAdmin
@@ -139,6 +155,36 @@ export async function GET(req: NextRequest) {
   const moduleOverrides = (designSettings?.module_overrides ?? {}) as Record<string, { enabled?: boolean }>
   const aiEnabled = moduleOverrides.ai?.enabled !== false // default on
 
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const contactsTrend = Array.from({ length: daysInMonth }, (_, index) => {
+    const d = index + 1
+    const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    return { date: iso, count: 0 }
+  })
+  const trendIndex = new Map(contactsTrend.map((item, index) => [item.date, index]))
+  for (const row of recentContacts ?? []) {
+    if (!row.date_added) continue
+    const key = new Date(row.date_added).toISOString().slice(0, 10)
+    const index = trendIndex.get(key)
+    if (index !== undefined) contactsTrend[index].count += 1
+  }
+
+  const eventContactIds = [...new Set((calendarEvents ?? []).map((e) => e.contact_ghl_id).filter(Boolean))]
+  const { data: calendarContacts } = eventContactIds.length > 0
+    ? await sb.from('cached_contacts').select('ghl_id, first_name, last_name').eq('location_id', locationId).in('ghl_id', eventContactIds)
+    : { data: [] }
+  const contactNameById = new Map(
+    (calendarContacts ?? []).map((c) => [c.ghl_id, [c.first_name, c.last_name].filter(Boolean).join(' ').trim()])
+  )
+
+  const appointmentPreview = (calendarEvents ?? []).map((event) => ({
+    id: event.ghl_id,
+    title: event.title ?? 'Appuntamento',
+    startTime: event.start_time,
+    status: event.appointment_status ?? 'new',
+    contactName: event.contact_ghl_id ? (contactNameById.get(event.contact_ghl_id) || null) : null,
+  }))
+
   return NextResponse.json({
     totalContacts: totalContacts ?? 0,
     operators: (ghlUsers ?? []).length,
@@ -150,5 +196,7 @@ export async function GET(req: NextRequest) {
     closedDays: closedDaysData?.closed_days ?? [],
     isAdmin,
     aiEnabled,
+    contactsTrend,
+    appointmentPreview,
   })
 }

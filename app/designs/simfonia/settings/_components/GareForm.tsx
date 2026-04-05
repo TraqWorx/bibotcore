@@ -13,9 +13,10 @@ interface Props {
   month: string // 'YYYY-MM-01'
   initialRows: GaraRow[]
   gestoriOptions: string[]
+  demoMode?: boolean
 }
 
-export default function GareForm({ locationId, month, initialRows, gestoriOptions }: Props) {
+export default function GareForm({ locationId, month, initialRows, gestoriOptions, demoMode = false }: Props) {
   const [rows, setRows] = useState<GaraRow[]>(initialRows)
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
@@ -37,6 +38,10 @@ export default function GareForm({ locationId, month, initialRows, gestoriOption
   }
 
   function handleSave() {
+    if (demoMode) {
+      setMessage({ text: 'Demo aggiornata', error: false })
+      return
+    }
     startTransition(async () => {
       const result = await saveGareMensili(locationId, month, rows)
       if (result.error) {
@@ -90,6 +95,7 @@ export default function GareForm({ locationId, month, initialRows, gestoriOption
                       min="0"
                       value={row.obiettivo}
                       onChange={(e) => updateObiettivo(i, parseInt(e.target.value) || 0)}
+                      disabled={demoMode}
                       className={`w-24 ${sf.inputSm} font-semibold`}
                     />
                   </td>
@@ -97,6 +103,7 @@ export default function GareForm({ locationId, month, initialRows, gestoriOption
                     <button
                       type="button"
                       onClick={() => removeRow(i)}
+                      disabled={demoMode}
                       className="text-gray-300 hover:text-red-500 transition-colors"
                       title="Rimuovi"
                     >
@@ -111,7 +118,7 @@ export default function GareForm({ locationId, month, initialRows, gestoriOption
       )}
 
       {/* Add gestore selector */}
-      <GestoreSelector availableGestori={availableGestori} onSelect={addGestore} />
+      <GestoreSelector availableGestori={availableGestori} onSelect={addGestore} disabled={demoMode} />
 
       {message && (
         <p className={`text-sm font-medium ${message.error ? 'text-red-600' : 'text-green-600'}`}>
@@ -122,7 +129,7 @@ export default function GareForm({ locationId, month, initialRows, gestoriOption
       <button
         type="button"
         onClick={handleSave}
-        disabled={isPending}
+        disabled={demoMode || isPending}
         className={`${sf.btnSave} font-bold`}
         style={accentFill}
       >
@@ -132,7 +139,7 @@ export default function GareForm({ locationId, month, initialRows, gestoriOption
   )
 }
 
-function GestoreSelector({ availableGestori, onSelect }: { availableGestori: string[]; onSelect: (g: string) => void }) {
+function GestoreSelector({ availableGestori, onSelect, disabled = false }: { availableGestori: string[]; onSelect: (g: string) => void; disabled?: boolean }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
 
@@ -153,7 +160,8 @@ function GestoreSelector({ availableGestori, onSelect }: { availableGestori: str
           type="text"
           value={query}
           onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => !disabled && setOpen(true)}
+          disabled={disabled}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && filtered.length === 1) {
               e.preventDefault()

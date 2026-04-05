@@ -19,7 +19,7 @@ type SegmentedControlProps<T extends string> = {
   tabIdPrefix?: string
   equalWidth?: boolean
   scrollable?: boolean
-  size?: 'md' | 'sm'
+  size?: 'lg' | 'md' | 'sm'
   stackedIcons?: boolean
 }
 
@@ -44,6 +44,10 @@ export default function SegmentedControl<T extends string>({
   const listBase =
     'flex gap-0.5 rounded-2xl border border-gray-200/60 bg-white/55 p-1 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.85)] backdrop-blur-md'
 
+  const layoutLg = stackedIcons
+    ? 'relative flex min-h-[3.5rem] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[18px] px-3 py-3 text-center transition-[color,background,box-shadow,transform] duration-200 sm:flex-row sm:gap-2 sm:px-5'
+    : 'relative flex min-h-[3.5rem] min-w-0 items-center justify-center gap-2 rounded-[18px] px-5 py-3 text-center font-semibold transition-[color,background,box-shadow] duration-200'
+
   const layoutWide = stackedIcons
     ? 'relative flex min-h-[2.5rem] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 py-2 text-center transition-[color,background,box-shadow,transform] duration-200 sm:flex-row sm:gap-1.5 sm:px-2.5 sm:py-2'
     : 'relative flex min-h-[2.25rem] min-w-0 items-center justify-center gap-1.5 rounded-xl px-2.5 py-2 text-center font-semibold transition-[color,background,box-shadow] duration-200'
@@ -52,14 +56,18 @@ export default function SegmentedControl<T extends string>({
     ? layoutWide
     : 'relative flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 font-semibold transition-[color,background,box-shadow] duration-200'
 
-  const btnLayout = size === 'sm' ? layoutSm : layoutWide
-  const textSize = size === 'sm'
+  const btnLayout = size === 'lg' ? layoutLg : size === 'sm' ? layoutSm : layoutWide
+  const textSize = size === 'lg'
     ? stackedIcons
-      ? 'text-[10px] sm:text-xs'
-      : 'text-xs'
-    : stackedIcons
-      ? 'text-[10px] font-semibold leading-tight tracking-tight sm:text-[11px]'
-      : 'text-xs font-semibold tracking-tight'
+      ? 'text-xs font-semibold leading-tight tracking-tight sm:text-sm'
+      : 'text-base font-semibold tracking-tight'
+    : size === 'sm'
+      ? stackedIcons
+        ? 'text-[10px] sm:text-xs'
+        : 'text-xs'
+      : stackedIcons
+        ? 'text-[10px] font-semibold leading-tight tracking-tight sm:text-[11px]'
+        : 'text-xs font-semibold tracking-tight'
 
   const innerStretch = equalWidth ? 'min-w-full' : 'w-max max-w-full'
 
@@ -82,13 +90,13 @@ export default function SegmentedControl<T extends string>({
               onClick={() => onChange(item.value)}
               className={`${btnLayout} ${equalWidth ? 'flex-1' : 'shrink-0'} ${textSize} ${
                 selected
-                  ? 'bg-white text-brand shadow-[0_2px_8px_-2px_color-mix(in_srgb,var(--brand)_20%,transparent)] ring-1 ring-brand/20'
+                  ? 'bg-brand text-white shadow-[0_2px_12px_-2px_color-mix(in_srgb,var(--brand)_32%,transparent)] ring-1 ring-brand/25'
                   : 'text-gray-500 hover:bg-white/45 hover:text-gray-800'
               } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35`}
             >
               {item.icon ? (
                 <span
-                  className={`shrink-0 [&_svg]:transition-colors ${selected ? 'text-brand' : 'text-gray-400'}`}
+                  className={`shrink-0 [&_svg]:transition-colors ${selected ? 'text-white' : 'text-gray-400'}`}
                   aria-hidden
                 >
                   {item.icon}

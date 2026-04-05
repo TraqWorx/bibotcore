@@ -132,6 +132,18 @@ export async function sendMessageToContact(
     const rawType = conversation?.type || type
     const msgType = TYPE_MAP[rawType] ?? type
     await ghl.conversations.send(conversationId, message, { type: msgType, contactId })
+
+    // Update cache so conversation sorts to top in inbox
+    const sb = createAdminClient()
+    await sb.from('cached_conversations')
+      .update({
+        last_message_body: message,
+        last_message_date: new Date().toISOString(),
+        last_message_direction: 'outbound',
+      })
+      .eq('location_id', locationId)
+      .eq('ghl_id', conversationId)
+
     return {}
   } catch (err) {
     console.error('[sendMessage] FAILED:', err instanceof Error ? err.message : err)

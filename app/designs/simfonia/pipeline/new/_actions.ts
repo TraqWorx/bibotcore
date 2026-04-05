@@ -1,5 +1,5 @@
 'use server'
-
+import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getGhlClient } from '@/lib/ghl/ghlClient'
 import { assertUserOwnsLocation } from '@/lib/location/getActiveLocation'
@@ -13,7 +13,7 @@ export async function createOpportunity(data: {
   pipelineStageId: string
   contactId?: string
   monetaryValue?: number
-}, locationId: string): Promise<{ error: string } | undefined> {
+}, locationId: string): Promise<{ error?: string } | undefined> {
   try {
     await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
@@ -26,13 +26,23 @@ export async function createOpportunity(data: {
     })
     const opp = result?.opportunity ?? result
     if (opp?.id) {
-      await writeThroughOpportunity(ghl.locationId, opp as Record<string, unknown>)
+      await writeThroughOpportunity(ghl.locationId, {
+        ...data,
+        ...opp as Record<string, unknown>,
+        id: (opp as Record<string, unknown>).id ?? (opp as Record<string, unknown>).opportunityId,
+        pipelineId: (opp as Record<string, unknown>).pipelineId ?? data.pipelineId,
+        pipelineStageId: (opp as Record<string, unknown>).pipelineStageId ?? data.pipelineStageId,
+        contactId: (opp as Record<string, unknown>).contactId ?? data.contactId,
+        monetaryValue: (opp as Record<string, unknown>).monetaryValue ?? data.monetaryValue ?? 0,
+        status: (opp as Record<string, unknown>).status ?? 'open',
+      })
     }
     await trackEvent(locationId, 'opportunity_created')
+    revalidatePath('/designs/simfonia/pipeline')
   } catch (err) {
     console.error('Create opportunity failed:', err)
     return { error: translateGhlError(err, 'Errore nella creazione dell\'opportunità') }
   }
 
-  redirect('/designs/simfonia/pipeline')
+  redirect(`/designs/simfonia/pipeline?locationId=${locationId}&created=${Date.now()}`)
 }

@@ -12,7 +12,7 @@ export default async function PipelinePage({
   if (!locationId) {
     return (
       <div className={`${sf.emptyPanel}`}>
-        <p className="text-sm font-medium text-gray-500">Nessuna location connessa.</p>
+        <p className="text-sm font-medium text-[var(--shell-muted)]">Nessuna location connessa.</p>
       </div>
     )
   }

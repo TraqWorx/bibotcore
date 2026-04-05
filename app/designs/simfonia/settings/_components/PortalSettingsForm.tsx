@@ -10,17 +10,31 @@ interface Props {
   initialIconUrl: string
   initialWelcomeMessage: string
   initialAutoInvite: boolean
+  demoMode?: boolean
 }
 
-export default function PortalSettingsForm({ locationId, portalUrl, initialIconUrl, initialWelcomeMessage, initialAutoInvite }: Props) {
+export default function PortalSettingsForm({
+  locationId,
+  portalUrl,
+  initialIconUrl,
+  initialWelcomeMessage,
+  initialAutoInvite,
+  demoMode = false,
+}: Props) {
   const [iconUrl, setIconUrl] = useState(initialIconUrl)
   const [welcomeMessage, setWelcomeMessage] = useState(initialWelcomeMessage)
   const [autoInvite, setAutoInvite] = useState(initialAutoInvite)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [testLoading, setTestLoading] = useState(false)
+  const [testError, setTestError] = useState<string | null>(null)
 
   async function handleSave() {
+    if (demoMode) {
+      setMessage('Salvato')
+      return
+    }
     setSaving(true)
     setMessage(null)
     const res = await fetch('/api/portal/settings', {
@@ -87,6 +101,7 @@ export default function PortalSettingsForm({ locationId, portalUrl, initialIconU
             type="url"
             value={iconUrl}
             onChange={(e) => setIconUrl(e.target.value)}
+            disabled={demoMode}
             placeholder="https://example.com/icon-512.png"
             className={`${sf.inputFull} flex-1`}
           />
@@ -100,6 +115,7 @@ export default function PortalSettingsForm({ locationId, portalUrl, initialIconU
         <textarea
           value={welcomeMessage}
           onChange={(e) => setWelcomeMessage(e.target.value)}
+          disabled={demoMode}
           rows={3}
           className={`${sf.inputFull} mt-3 min-h-[5.5rem]`}
         />
@@ -114,6 +130,7 @@ export default function PortalSettingsForm({ locationId, portalUrl, initialIconU
         <button
           type="button"
           onClick={() => setAutoInvite(!autoInvite)}
+          disabled={demoMode}
           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent ${
             autoInvite ? 'bg-emerald-500' : 'bg-gray-200'
           }`}
@@ -124,12 +141,50 @@ export default function PortalSettingsForm({ locationId, portalUrl, initialIconU
         </button>
       </div>
 
+      {/* Test Portal */}
+      <div className="rounded-2xl border border-brand/15 bg-brand/5 px-4 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-gray-800">Anteprima Portale</h3>
+            <p className="text-xs text-gray-400">Apri il portale come amministratore per verificare che tutto funzioni e che sia ottimizzato per mobile.</p>
+          </div>
+          <button
+            type="button"
+            disabled={testLoading}
+            onClick={async () => {
+              if (demoMode) {
+                window.open(portalUrl, '_blank')
+                return
+              }
+              setTestLoading(true)
+              setTestError(null)
+              const res = await fetch('/api/portal/test-access', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ locationId }),
+              })
+              if (res.ok) {
+                window.open(portalUrl, '_blank')
+              } else {
+                const data = await res.json().catch(() => ({}))
+                setTestError(data.error ?? 'Errore nella creazione dell\'accesso di test')
+              }
+              setTestLoading(false)
+            }}
+            className={sf.secondaryBtn}
+          >
+            {testLoading ? 'Preparazione…' : 'Apri Portale'}
+          </button>
+        </div>
+        {testError && <p className="mt-2 text-xs font-medium text-red-500">{testError}</p>}
+      </div>
+
       {/* Save */}
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
+          disabled={demoMode || saving}
           className={sf.btnBrand}
         >
           {saving ? 'Salvataggio…' : 'Salva'}

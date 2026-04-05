@@ -132,7 +132,7 @@ export default function ColumnPicker({ locationId, savedColumns, customFields, a
   }
 
   return (
-    <div className="relative" ref={ref}>
+    <div className={`relative ${open ? 'z-[140]' : 'z-20'}`} ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -146,7 +146,7 @@ export default function ColumnPicker({ locationId, savedColumns, customFields, a
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-96 rounded-2xl border border-gray-200 bg-white shadow-xl">
+        <div className="absolute right-0 top-full z-[160] mt-2 w-96 rounded-2xl border border-gray-200 bg-white shadow-[0_24px_60px_-24px_rgba(15,23,42,0.28)]">
           <div className="border-b border-gray-100 px-4 py-3">
             <p className="text-sm font-bold text-gray-800">Colonne visibili</p>
             <p className="text-xs text-gray-400">Trascina per riordinare, clicca per aggiungere/rimuovere</p>

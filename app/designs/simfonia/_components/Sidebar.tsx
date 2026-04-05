@@ -2,8 +2,8 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { darkenHex, lightenHex } from '@/lib/utils/colorUtils'
 import type { DesignTheme, DesignModules } from '@/lib/types/design'
+import type { DemoStyleId } from '@/lib/simfonia/demoStyles'
 import BulkJobsIndicator from './BulkJobsIndicator'
 
 function NavGlyph({ name }: { name: string }) {
@@ -78,7 +78,6 @@ function NavLink({
   href,
   label,
   navKey,
-  secondaryColor,
   isActive,
   isPending,
   onClick,
@@ -86,36 +85,24 @@ function NavLink({
   href: string
   label: string
   navKey: string
-  secondaryColor: string
   isActive: boolean
   isPending: boolean
   onClick: (e: React.MouseEvent) => void
 }) {
   const active = isActive || isPending
-  const rgb2 = hexToRgb(secondaryColor)
 
   return (
     <a
       href={href}
       onClick={onClick}
-      className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+      data-active={active ? 'true' : 'false'}
+      className={`sf-nav-link group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
         active
-          ? 'text-white shadow-lg shadow-black/20 ring-1 ring-white/10'
-          : 'text-white/60 hover:bg-white/[0.07] hover:text-white/95'
+          ? 'border border-[color:color-mix(in_srgb,var(--brand)_22%,transparent)] bg-[color:color-mix(in_srgb,var(--brand)_13%,transparent)] text-white/95 shadow-lg shadow-black/10 ring-1 ring-white/10'
+          : 'border border-transparent text-white/60 hover:bg-white/[0.07] hover:text-white/95'
       }`}
-      style={
-        active
-          ? {
-              background: `linear-gradient(135deg, rgba(${rgb2},0.22) 0%, rgba(${rgb2},0.08) 100%)`,
-              border: `1px solid rgba(${rgb2},0.35)`,
-            }
-          : { border: '1px solid transparent' }
-      }
     >
-      <span
-        className={active ? '' : 'opacity-80 group-hover:opacity-100'}
-        style={{ color: active ? secondaryColor : undefined }}
-      >
+      <span className={`sf-nav-icon ${active ? 'text-brand' : 'opacity-80 group-hover:opacity-100'}`}>
         <NavGlyph name={navKey} />
       </span>
       {label}
@@ -123,20 +110,32 @@ function NavLink({
   )
 }
 
-interface GymSidebarProps {
+interface SidebarProps {
   theme: DesignTheme
   modules: DesignModules
   locationId: string
+  styleVariant: DemoStyleId
+  demoMode?: boolean
+  showBulkIndicator?: boolean
+  navBasePath?: string
 }
 
-export default function GymSidebar({ theme, modules, locationId }: GymSidebarProps) {
-  const darkBg = darkenHex(theme.primaryColor, 0.22)
-  const midTint = lightenHex(theme.primaryColor, 0.06)
+export default function Sidebar({
+  theme,
+  modules,
+  locationId,
+  styleVariant,
+  demoMode: _demoMode = false,
+  showBulkIndicator = true,
+  navBasePath = '/designs/simfonia',
+}: SidebarProps) {
   const qs = locationId ? `?locationId=${locationId}` : ''
   const pathname = usePathname()
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [pendingPath, setPendingPath] = useState<string | null>(null)
+  const accentColor = theme.secondaryColor
+  const accentRgb = hexToRgb(accentColor)
 
   const navItems = MODULE_NAV.filter((item) => {
     const mod = modules[item.key as keyof DesignModules]
@@ -145,52 +144,56 @@ export default function GymSidebar({ theme, modules, locationId }: GymSidebarPro
 
   return (
     <aside
-      className="flex w-64 shrink-0 flex-col border-r border-white/[0.07] shadow-[8px_0_40px_-12px_rgba(0,0,0,0.35)]"
+      data-demo-style={styleVariant}
+      className="sf-sidebar flex w-64 shrink-0 flex-col border-r shadow-[8px_0_40px_-12px_rgba(0,0,0,0.2)]"
       style={{
-        background: `linear-gradient(165deg, ${theme.primaryColor} 0%, ${midTint} 42%, ${darkBg} 100%)`,
+        background: 'var(--shell-sidebar)',
+        borderColor: 'rgba(255,255,255,0.06)',
       }}
     >
-      <div className="flex items-center gap-3 px-4 py-5">
+      <div className="px-4 py-5">
         <div
-          className="rounded-2xl border border-white/10 bg-white/[0.09] p-0.5 shadow-inner backdrop-blur-sm"
-          style={{ boxShadow: `inset 0 1px 0 0 rgba(${hexToRgb(theme.secondaryColor)}, 0.15)` }}
+          className="sf-brand-shell rounded-[24px] border border-white/10 bg-white/[0.04] p-3 shadow-inner"
+          style={{ boxShadow: `inset 0 1px 0 0 rgba(${accentRgb}, 0.18)` }}
         >
           {theme.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={theme.logoUrl} alt="" className="h-10 w-10 rounded-[0.875rem] object-cover" />
+            <img
+              src={theme.logoUrl}
+              alt={theme.companyName}
+              className="sf-brand-card h-auto max-h-24 w-full rounded-[18px] object-contain bg-white px-3 py-3"
+            />
           ) : (
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-[0.875rem] text-sm font-black"
+              className="sf-brand-card flex h-20 w-full items-center justify-center rounded-[18px] text-2xl font-black"
               style={{
-                background: `rgba(${hexToRgb(theme.secondaryColor)}, 0.2)`,
-                color: theme.secondaryColor,
-                border: `1px solid rgba(${hexToRgb(theme.secondaryColor)}, 0.35)`,
+                background: `rgba(${accentRgb}, 0.16)`,
+                color: accentColor,
+                border: `1px solid rgba(${accentRgb}, 0.28)`,
               }}
             >
               {theme.logoText}
             </div>
           )}
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold leading-tight tracking-tight text-white">{theme.companyName}</p>
-          <p
-            className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]"
-            style={{ color: `rgba(${hexToRgb(theme.secondaryColor)}, 0.85)` }}
-          >
-            CRM
-          </p>
+          <div aria-hidden className="mt-3 min-w-0 px-1" />
         </div>
       </div>
 
-      <div className="mx-3 mb-2 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+      <div className="sf-sidebar-divider mx-3 mb-2 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
       <div className="flex flex-1 flex-col overflow-y-auto px-2.5 pb-3">
-        <p className="mb-2 px-2.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Menu</p>
+        <p className="sf-sidebar-label mb-2 px-2.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Menu</p>
         <nav className="space-y-0.5">
           {navItems.map((item) => {
-            const href = `${item.path}${qs}`
-            const basePath = item.path
-            const isActive = pathname.startsWith(basePath)
+            const basePath =
+              navBasePath.endsWith('/demo') && item.key === 'dashboard'
+                ? navBasePath
+                : item.path.replace('/designs/simfonia', navBasePath)
+            const href = `${basePath}${qs}`
+            const isActive =
+              item.key === 'dashboard'
+                ? pathname === basePath
+                : pathname.startsWith(basePath)
             const isThisPending = isPending && pendingPath === basePath
 
             return (
@@ -199,7 +202,6 @@ export default function GymSidebar({ theme, modules, locationId }: GymSidebarPro
                 href={href}
                 label={item.label}
                 navKey={item.key}
-                secondaryColor={theme.secondaryColor}
                 isActive={isActive}
                 isPending={isThisPending}
                 onClick={(e) => {
@@ -218,9 +220,9 @@ export default function GymSidebar({ theme, modules, locationId }: GymSidebarPro
         </nav>
       </div>
 
-      <BulkJobsIndicator locationId={locationId} />
+      {showBulkIndicator ? <BulkJobsIndicator locationId={locationId} /> : null}
 
-      <div className="border-t border-white/[0.07] px-4 py-3.5">
+      <div className="sf-sidebar-footer border-t border-white/[0.07] px-4 py-3.5">
         <p className="text-center text-[10px] font-medium tracking-wide text-white/30">Bibot Core · 2026</p>
       </div>
     </aside>

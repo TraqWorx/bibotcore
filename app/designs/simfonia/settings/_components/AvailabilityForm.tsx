@@ -19,9 +19,10 @@ interface Props {
   locationId: string
   users: GhlUser[]
   initialSlots: AvailabilitySlot[]
+  demoMode?: boolean
 }
 
-export default function AvailabilityForm({ locationId, users, initialSlots }: Props) {
+export default function AvailabilityForm({ locationId, users, initialSlots, demoMode = false }: Props) {
   const [selectedUserId, setSelectedUserId] = useState(users[0]?.id ?? '')
   const [allSlots, setAllSlots] = useState<AvailabilitySlot[]>(() => {
     // Ensure every user has 7 day slots
@@ -61,6 +62,10 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
   }
 
   async function handleSave() {
+    if (demoMode) {
+      setResult({ ok: true })
+      return
+    }
     setSaving(true)
     setResult(null)
     const res = await saveUserAvailability(locationId, allSlots)
@@ -83,6 +88,7 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
               key={u.id}
               type="button"
               onClick={() => { setSelectedUserId(u.id); setResult(null) }}
+              disabled={demoMode}
               className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
                 selectedUserId === u.id
                   ? 'border-brand bg-brand text-white shadow-sm'
@@ -116,6 +122,7 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
                     type="checkbox"
                     checked={slot.enabled}
                     onChange={(e) => updateSlot(slot.day_of_week, 'enabled', e.target.checked)}
+                    disabled={demoMode}
                     className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand/20"
                   />
                 </label>
@@ -130,7 +137,7 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
                   type="time"
                   value={slot.start_time}
                   onChange={(e) => updateSlot(slot.day_of_week, 'start_time', e.target.value)}
-                  disabled={!slot.enabled}
+                  disabled={demoMode || !slot.enabled}
                   className={`${sf.inputSm} w-auto disabled:opacity-40`}
                 />
                 <span className="text-xs text-gray-400">—</span>
@@ -138,7 +145,7 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
                   type="time"
                   value={slot.end_time}
                   onChange={(e) => updateSlot(slot.day_of_week, 'end_time', e.target.value)}
-                  disabled={!slot.enabled}
+                  disabled={demoMode || !slot.enabled}
                   className={`${sf.inputSm} w-auto disabled:opacity-40`}
                 />
               </div>
@@ -151,7 +158,7 @@ export default function AvailabilityForm({ locationId, users, initialSlots }: Pr
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving}
+            disabled={demoMode || saving}
             className={`${sf.btnSave} mt-4 font-bold`}
             style={accentFill}
           >

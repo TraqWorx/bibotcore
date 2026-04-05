@@ -11,9 +11,10 @@ const accentFill = {
 interface Props {
   locationId: string
   initialRows: ProvvigioneRow[]
+  demoMode?: boolean
 }
 
-export default function ProvvigioniForm({ locationId, initialRows }: Props) {
+export default function ProvvigioniForm({ locationId, initialRows, demoMode = false }: Props) {
   const [rows, setRows] = useState<ProvvigioneRow[]>(initialRows)
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
@@ -33,6 +34,10 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
   }
 
   function handleSave() {
+    if (demoMode) {
+      setMessage({ text: 'Demo aggiornata', error: false })
+      return
+    }
     startTransition(async () => {
       setMessage(null)
       const result = await saveProvvigioni(locationId, rows)
@@ -63,6 +68,7 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
               placeholder="Es. Gettone Energia Standard"
               value={row.nome}
               onChange={(e) => updateRow(i, 'nome', e.target.value)}
+              disabled={demoMode}
             />
           </div>
           <div className="w-36">
@@ -71,6 +77,7 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
               className={inputClass}
               value={row.tipo}
               onChange={(e) => updateRow(i, 'tipo', e.target.value as 'fisso' | 'percentuale')}
+              disabled={demoMode}
             >
               <option value="fisso">Fisso (&euro;)</option>
               <option value="percentuale">Percentuale (%)</option>
@@ -85,11 +92,13 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
               className={inputClass}
               value={row.valore}
               onChange={(e) => updateRow(i, 'valore', parseFloat(e.target.value) || 0)}
+              disabled={demoMode}
             />
           </div>
           <button
             type="button"
             onClick={() => removeRow(i)}
+            disabled={demoMode}
             className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
           >
             &times;
@@ -100,6 +109,7 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
       <button
         type="button"
         onClick={addRow}
+        disabled={demoMode}
         className="rounded-2xl border border-dashed border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-500 transition-colors hover:border-brand/40 hover:text-brand"
       >
         + Aggiungi Provvigione
@@ -114,7 +124,7 @@ export default function ProvvigioniForm({ locationId, initialRows }: Props) {
       <button
         type="button"
         onClick={handleSave}
-        disabled={isPending}
+        disabled={demoMode || isPending}
         className={`${sf.btnSave} font-bold`}
         style={accentFill}
       >

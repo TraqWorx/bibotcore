@@ -108,7 +108,7 @@ export async function getConversationMessages(
       .filter((m) => m.body)
       .sort((a, b) => new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime())
 
-    // Cache messages in background (fire-and-forget)
+    // Cache messages + update conversation's last_message_date (fire-and-forget)
     if (messages.length > 0) {
       const rows = messages.map((m) => ({
         ghl_id: m.id,
@@ -122,6 +122,19 @@ export async function getConversationMessages(
         synced_at: new Date().toISOString(),
       }))
       Promise.resolve(sb.from('cached_messages').upsert(rows, { onConflict: 'location_id,ghl_id' })).catch(() => {})
+
+      // Keep conversation date fresh so inbox sorts correctly
+      const latest = messages[messages.length - 1]
+      sb.from('cached_conversations')
+        .update({
+          last_message_body: latest.body,
+          last_message_date: latest.dateAdded,
+          last_message_direction: latest.direction,
+        })
+        .eq('location_id', locationId)
+        .eq('ghl_id', conversationId)
+        .then(() => {})
+        .catch(() => {})
     }
 
     return messages
@@ -172,6 +185,18 @@ export async function sendMessage(
     const msgType = TYPE_MAP[type] ?? 'SMS'
 
     await ghl.conversations.send(conversationId, message, { type: msgType, contactId })
+
+    // Update cache so conversation sorts to top
+    const sb = createAdminClient()
+    await sb.from('cached_conversations')
+      .update({
+        last_message_body: message,
+        last_message_date: new Date().toISOString(),
+        last_message_direction: 'outbound',
+      })
+      .eq('location_id', locationId)
+      .eq('ghl_id', conversationId)
+
     return {}
   } catch (err) {
     const { translateGhlError } = await import('@/lib/utils/ghlErrors')

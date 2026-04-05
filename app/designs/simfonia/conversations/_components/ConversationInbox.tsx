@@ -20,8 +20,8 @@ import { sf } from '@/lib/simfonia/ui'
 
 /** Deterministic color for a user ID */
 const USER_COLORS = [
-  'var(--brand)', '#e11d48', '#059669', '#d97706', '#7c3aed',
-  '#0891b2', '#c026d3', '#dc2626', '#4f46e5', '#0d9488',
+  'var(--brand)', '#9e6e63', '#5f8f76', '#9f7d2c', '#8e72aa',
+  '#7aa6a8', '#b7819f', '#88939f', '#7689b4', '#7c9a8a',
 ]
 function getUserColor(userId: string): string {
   let hash = 0
@@ -81,9 +81,20 @@ interface Props {
   locationId: string
   users: LocationUser[]
   currentUserEmail?: string
+  demoMode?: boolean
+  demoMessagesByConversation?: Record<string, ConversationMessage[]>
+  demoNotesByContact?: Record<string, NoteItem[]>
 }
 
-export default function ConversationInbox({ conversations: initialConversations, locationId, users, currentUserEmail }: Props) {
+export default function ConversationInbox({
+  conversations: initialConversations,
+  locationId,
+  users,
+  currentUserEmail,
+  demoMode = false,
+  demoMessagesByConversation,
+  demoNotesByContact,
+}: Props) {
   // Resolve current user's GHL user ID from email
   const currentGhlUserId = currentUserEmail
     ? users.find((u) => u.email.toLowerCase() === currentUserEmail.toLowerCase())?.id ?? ''
@@ -119,6 +130,12 @@ export default function ConversationInbox({ conversations: initialConversations,
   // Load messages when conversation selected + poll
   useEffect(() => {
     if (!selectedId) return
+    if (demoMode) {
+      const timeout = setTimeout(() => {
+        setMessages(demoMessagesByConversation?.[selectedId] ?? [])
+      }, 0)
+      return () => clearTimeout(timeout)
+    }
     let cancelled = false
     let prevCount = 0
 
@@ -143,10 +160,11 @@ export default function ConversationInbox({ conversations: initialConversations,
     loadMessages(true)
     const interval = setInterval(() => loadMessages(false), 5000)
     return () => { cancelled = true; clearInterval(interval) }
-  }, [selectedId, locationId])
+  }, [selectedId, locationId, demoMode, demoMessagesByConversation])
 
   // Poll conversation list every 10s — preserve local assignedTo overrides
   useEffect(() => {
+    if (demoMode) return
     const interval = setInterval(() => {
       if (document.hidden) return
       getConversations(locationId).then((data) => {
@@ -162,7 +180,7 @@ export default function ConversationInbox({ conversations: initialConversations,
       })
     }, 10000)
     return () => clearInterval(interval)
-  }, [locationId])
+  }, [locationId, demoMode])
 
   // Load notes when conversation changes (always, so count badge shows)
   useEffect(() => {
@@ -172,6 +190,12 @@ export default function ConversationInbox({ conversations: initialConversations,
       if (!selected?.contactId) {
         setNotes([])
         setNotesLoading(false)
+        return
+      }
+
+      if (demoMode) {
+        setNotesLoading(false)
+        setNotes(demoNotesByContact?.[selected.contactId] ?? [])
         return
       }
 
@@ -188,9 +212,10 @@ export default function ConversationInbox({ conversations: initialConversations,
     return () => {
       cancelled = true
     }
-  }, [selected?.contactId, locationId])
+  }, [selected?.contactId, locationId, demoMode, demoNotesByContact])
 
   function handleSend() {
+    if (demoMode) return
     if (!messageText.trim() || !selectedId || !selected) return
     startSend(async () => {
       const result = await sendMessage(
@@ -213,6 +238,7 @@ export default function ConversationInbox({ conversations: initialConversations,
   }
 
   function handleSaveNote() {
+    if (demoMode) return
     if (!newNote.trim() || !selected?.contactId) return
     startSaveNote(async () => {
       const result = await createContactNote(locationId, selected!.contactId, newNote.trim(), currentGhlUserId || undefined)
@@ -225,6 +251,7 @@ export default function ConversationInbox({ conversations: initialConversations,
   }
 
   async function handleDeleteNote(noteId: string) {
+    if (demoMode) return
     if (!selected?.contactId) return
     setDeletingNoteId(noteId)
     const result = await deleteContactNote(locationId, selected.contactId, noteId)
@@ -235,6 +262,7 @@ export default function ConversationInbox({ conversations: initialConversations,
   }
 
   async function handleSaveEditNote() {
+    if (demoMode) return
     if (!editingNoteId || !editingNoteBody.trim() || !selected?.contactId) return
     setSavingEdit(true)
     const result = await updateContactNote(locationId, selected.contactId, editingNoteId, editingNoteBody.trim())
@@ -247,6 +275,13 @@ export default function ConversationInbox({ conversations: initialConversations,
   }
 
   function handleAssign(userId: string) {
+    if (demoMode) {
+      if (!selectedId) return
+      setConversations((prev) =>
+        prev.map((c) => c.id === selectedId ? { ...c, assignedTo: userId } : c)
+      )
+      return
+    }
     if (!selectedId) return
     startAssign(async () => {
       await assignConversation(locationId, selectedId!, userId)
@@ -271,35 +306,35 @@ export default function ConversationInbox({ conversations: initialConversations,
   return (
     <div className={`flex flex-1 min-h-0 overflow-hidden ${sf.inbox}`}>
       {/* Left — conversation list */}
-      <div className="flex w-80 shrink-0 flex-col border-r border-gray-100">
+      <div className="flex w-80 shrink-0 flex-col border-r border-[var(--shell-line)]">
         {/* Search */}
-        <div className="border-b border-gray-100 p-3">
+        <div className="border-b border-[var(--shell-line)] p-3">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cerca conversazione..."
-            className={`${sf.input} w-full bg-gray-50/90 px-3 py-2 text-sm`}
+            className={`${sf.input} w-full bg-[var(--shell-canvas)] px-3 py-2 text-sm`}
           />
         </div>
 
         {/* List */}
         <div className="flex-1 overflow-y-auto">
           {filtered.length === 0 ? (
-            <p className="p-6 text-center text-sm text-gray-400">Nessuna conversazione.</p>
+            <p className="p-6 text-center text-sm text-[var(--shell-muted)]">Nessuna conversazione.</p>
           ) : (
             filtered.map((conv) => (
               <button
                 key={conv.id}
                 onClick={() => { setSelectedId(conv.id); setMessages([]); setSendResult(null); setShowNotes(false) }}
-                className={`flex w-full items-start gap-3 border-b border-gray-50 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${
+                className={`flex w-full items-start gap-3 border-b border-[var(--shell-tint)] px-4 py-3 text-left transition-colors hover:bg-[var(--shell-soft)] ${
                   selectedId === conv.id ? 'bg-brand/5' : ''
                 }`}
               >
                 {/* Avatar */}
                 <div
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
-                    conv.unreadCount > 0 ? 'bg-brand' : 'bg-gray-400'
+                    conv.unreadCount > 0 ? 'bg-brand' : 'bg-[var(--shell-muted)]'
                   }`}
                 >
                   {conv.contactName.slice(0, 2).toUpperCase()}
@@ -307,22 +342,22 @@ export default function ConversationInbox({ conversations: initialConversations,
 
                 <div className="flex-1 overflow-hidden">
                   <div className="flex items-center justify-between">
-                    <p className={`truncate text-sm ${conv.unreadCount > 0 ? 'font-bold text-gray-900' : 'font-medium text-gray-700'}`}>
+                    <p className={`truncate text-sm ${conv.unreadCount > 0 ? 'font-bold text-[var(--foreground)]' : 'font-medium text-[var(--foreground)]'}`}>
                       {conv.contactName}
                     </p>
-                    <span className="shrink-0 text-[10px] text-gray-400">
+                    <span className="shrink-0 text-[10px] text-[var(--shell-muted)]">
                       {formatTime(conv.lastMessageDate)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <p className={`truncate text-xs ${conv.unreadCount > 0 ? 'font-medium text-gray-700' : 'text-gray-400'}`}>
+                    <p className={`truncate text-xs ${conv.unreadCount > 0 ? 'font-medium text-[var(--foreground)]' : 'text-[var(--shell-muted)]'}`}>
                       {conv.lastMessageDirection === 'outbound' && (
-                        <span className="text-gray-300 mr-1">Tu: </span>
+                        <span className="mr-1 text-[var(--shell-muted)]">Tu: </span>
                       )}
                       {conv.lastMessageBody || '—'}
                     </p>
                     <div className="flex shrink-0 items-center gap-1.5">
-                      <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] font-medium text-gray-500">
+                      <span className="rounded-full bg-[var(--shell-soft)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--shell-muted)]">
                         {TYPE_LABELS[conv.type] ?? conv.type}
                       </span>
                       {conv.unreadCount > 0 && (
@@ -356,19 +391,19 @@ export default function ConversationInbox({ conversations: initialConversations,
         {!selectedId ? (
           <div className="flex flex-1 items-center justify-center">
             <div className="text-center">
-              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100">
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--shell-soft)]">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
               </div>
-              <p className="text-sm font-medium text-gray-400">Seleziona una conversazione</p>
-              <p className="mt-1 text-xs text-gray-300">Scegli dalla lista a sinistra</p>
+              <p className="text-sm font-medium text-[var(--shell-muted)]">Seleziona una conversazione</p>
+              <p className="mt-1 text-xs text-[var(--shell-muted)]">Scegli dalla lista a sinistra</p>
             </div>
           </div>
         ) : (
           <>
             {/* Chat header with assignment + notes toggle */}
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
+            <div className="flex items-center justify-between border-b border-[var(--shell-line)] px-5 py-3">
               <div className="flex items-center gap-3">
                 <div
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-xs font-bold text-white"
@@ -376,8 +411,8 @@ export default function ConversationInbox({ conversations: initialConversations,
                   {selected?.contactName.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-gray-900">{selected?.contactName}</p>
-                  <p className="text-[10px] text-gray-400">
+                  <p className="text-sm font-bold text-[var(--foreground)]">{selected?.contactName}</p>
+                  <p className="text-[10px] text-[var(--shell-muted)]">
                     {TYPE_LABELS[selected?.type ?? ''] ?? selected?.type}
                   </p>
                 </div>
@@ -389,8 +424,8 @@ export default function ConversationInbox({ conversations: initialConversations,
                   <select
                     value={selected?.assignedTo ?? ''}
                     onChange={(e) => handleAssign(e.target.value)}
-                    disabled={assigning}
-                    className={`${sf.input} h-8 rounded-xl bg-gray-50/90 px-2 pr-7 text-xs text-gray-600 disabled:opacity-50`}
+                    disabled={assigning || demoMode}
+                    className={`${sf.input} h-8 rounded-xl bg-[var(--shell-canvas)] px-2 pr-7 text-xs text-[var(--foreground)] disabled:opacity-50`}
                   >
                     <option value="">Non assegnato</option>
                     {users.map((u) => (
@@ -405,7 +440,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                   className={`flex h-8 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-colors ${
                     showNotes
                       ? 'border-brand/35 bg-brand/5 text-brand'
-                      : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100'
+                      : 'border-[var(--shell-line)] bg-[var(--shell-canvas)] text-[var(--shell-muted)] hover:bg-[var(--shell-soft)]'
                   }`}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -431,10 +466,10 @@ export default function ConversationInbox({ conversations: initialConversations,
                 <div className="flex-1 overflow-y-auto p-5">
                   {messagesLoading ? (
                     <div className="flex items-center justify-center py-10">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-brand" />
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--shell-line)] border-t-brand" />
                     </div>
                   ) : messages.length === 0 ? (
-                    <p className="py-10 text-center text-sm text-gray-400">Nessun messaggio.</p>
+                    <p className="py-10 text-center text-sm text-[var(--shell-muted)]">Nessun messaggio.</p>
                   ) : (
                     <div className="space-y-2">
                       {messages.map((msg) => {
@@ -448,12 +483,12 @@ export default function ConversationInbox({ conversations: initialConversations,
                               className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm ${
                                 isOutbound
                                   ? 'rounded-tr-sm bg-brand text-white'
-                                  : 'rounded-tl-sm bg-gray-100 text-gray-900'
+                                  : 'rounded-tl-sm bg-[var(--shell-soft)] text-[var(--foreground)]'
                               }`}
                             >
                               <p className="leading-snug whitespace-pre-wrap">{msg.body}</p>
                               {msg.dateAdded && (
-                                <p className={`mt-1 text-[10px] ${isOutbound ? 'text-white/50' : 'text-gray-400'}`}>
+                                <p className={`mt-1 text-[10px] ${isOutbound ? 'text-white/50' : 'text-[var(--shell-muted)]'}`}>
                                   {formatMessageTime(msg.dateAdded)}
                                 </p>
                               )}
@@ -467,7 +502,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                 </div>
 
                 {/* Send */}
-                <div className="border-t border-gray-100 p-4 space-y-2">
+                <div className="border-t border-[var(--shell-line)] p-4 space-y-2">
                   {sendResult && (
                     <p className="text-xs font-medium text-red-600">{sendResult}</p>
                   )}
@@ -483,9 +518,9 @@ export default function ConversationInbox({ conversations: initialConversations,
                     <div />
                     <div className="flex items-center gap-2">
                       {messageText.trim() && (
-                        <button onClick={() => setMessageText('')} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50">Cancella</button>
+                        <button onClick={() => setMessageText('')} className="rounded-lg border border-[var(--shell-line)] px-3 py-1.5 text-xs font-medium text-[var(--shell-muted)] hover:bg-[var(--shell-soft)]">Cancella</button>
                       )}
-                      {messages.length > 0 && (
+                      {messages.length > 0 && !demoMode && (
                         <button
                           onClick={async () => {
                             if (!selected || aiSuggesting) return
@@ -506,8 +541,8 @@ export default function ConversationInbox({ conversations: initialConversations,
                           )}
                         </button>
                       )}
-                      <button onClick={handleSend} disabled={sending || !messageText.trim()} className="rounded-xl bg-brand px-5 py-1.5 text-sm font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-40">
-                        {sending ? '...' : 'Invia'}
+                      <button onClick={handleSend} disabled={demoMode || sending || !messageText.trim()} className="rounded-xl bg-brand px-5 py-1.5 text-sm font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-40">
+                        {demoMode ? 'Demo' : sending ? '...' : 'Invia'}
                       </button>
                     </div>
                   </div>
@@ -516,19 +551,19 @@ export default function ConversationInbox({ conversations: initialConversations,
 
               {/* Notes side panel — absolute overlay on the right */}
               {showNotes && (
-                <div className="absolute right-0 top-0 bottom-0 z-10 flex w-72 flex-col border-l border-gray-200 bg-white shadow-lg">
-                  <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                <div className="absolute bottom-0 right-0 top-0 z-10 flex w-72 flex-col border-l border-[var(--shell-line)] bg-[var(--shell-surface)] shadow-lg">
+                  <div className="flex items-center justify-between border-b border-[var(--shell-line)] px-4 py-3">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">Note</h3>
-                      <p className="text-[10px] text-gray-400">{selected?.contactName}</p>
+                      <h3 className="text-sm font-bold text-[var(--foreground)]">Note</h3>
+                      <p className="text-[10px] text-[var(--shell-muted)]">{selected?.contactName}</p>
                     </div>
-                    <button onClick={() => setShowNotes(false)} className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                    <button onClick={() => setShowNotes(false)} className="rounded p-1 text-[var(--shell-muted)] hover:bg-[var(--shell-soft)] hover:text-[var(--foreground)]">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                   </div>
 
                   {/* New note input */}
-                  <div className="border-b border-gray-100 p-3">
+                  <div className="border-b border-[var(--shell-line)] p-3">
                     <textarea
                       value={newNote}
                       onChange={(e) => setNewNote(e.target.value)}
@@ -538,10 +573,10 @@ export default function ConversationInbox({ conversations: initialConversations,
                     />
                     <button
                       onClick={handleSaveNote}
-                      disabled={savingNote || !newNote.trim()}
+                      disabled={demoMode || savingNote || !newNote.trim()}
                       className="mt-1.5 w-full rounded-xl bg-brand py-1.5 text-xs font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-40"
                     >
-                      {savingNote ? 'Salvataggio...' : 'Salva Nota'}
+                      {demoMode ? 'Demo' : savingNote ? 'Salvataggio...' : 'Salva Nota'}
                     </button>
                   </div>
 
@@ -549,14 +584,14 @@ export default function ConversationInbox({ conversations: initialConversations,
                   <div className="flex-1 overflow-y-auto p-3">
                     {notesLoading ? (
                       <div className="flex items-center justify-center py-6">
-                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-brand" />
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--shell-line)] border-t-brand" />
                       </div>
                     ) : notes.length === 0 ? (
-                      <p className="py-6 text-center text-xs text-gray-400">Nessuna nota per questo contatto.</p>
+                      <p className="py-6 text-center text-xs text-[var(--shell-muted)]">Nessuna nota per questo contatto.</p>
                     ) : (
                       <div className="space-y-2">
                         {notes.map((note) => (
-                          <div key={note.id} className="group relative rounded-lg border border-gray-100 bg-white p-3">
+                          <div key={note.id} className="group relative rounded-lg border border-[var(--shell-line)] bg-[var(--shell-surface)] p-3">
                             {editingNoteId === note.id ? (
                               <>
                                 <textarea
@@ -576,7 +611,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                                   </button>
                                   <button
                                     onClick={() => { setEditingNoteId(null); setEditingNoteBody('') }}
-                                    className="flex-1 rounded border border-gray-200 py-1 text-[10px] font-medium text-gray-500"
+                                    className="flex-1 rounded border border-[var(--shell-line)] py-1 text-[10px] font-medium text-[var(--shell-muted)]"
                                   >
                                     Annulla
                                   </button>
@@ -584,7 +619,7 @@ export default function ConversationInbox({ conversations: initialConversations,
                               </>
                             ) : (
                               <>
-                                <p className="text-xs leading-relaxed text-gray-700 whitespace-pre-wrap pr-10">{note.body}</p>
+                                <p className="whitespace-pre-wrap pr-10 text-xs leading-relaxed text-[var(--foreground)]">{note.body}</p>
                                 <div className="mt-1.5 flex items-center gap-1.5">
                                   {note.createdBy && (() => {
                                     const author = users.find((u) => u.id === note.createdBy)
@@ -595,14 +630,14 @@ export default function ConversationInbox({ conversations: initialConversations,
                                       </span>
                                     )
                                   })()}
-                                  <span className="text-[10px] text-gray-300">{note.createdBy ? '·' : ''}</span>
-                                  <span className="text-[10px] text-gray-400">{formatNoteDate(note.dateAdded)}</span>
+                                  <span className="text-[10px] text-[var(--shell-muted)]">{note.createdBy ? '·' : ''}</span>
+                                  <span className="text-[10px] text-[var(--shell-muted)]">{formatNoteDate(note.dateAdded)}</span>
                                 </div>
                                 {/* Edit + Delete buttons */}
                                 <div className="absolute right-2 top-2 hidden gap-0.5 group-hover:flex">
                                   <button
                                     onClick={() => { setEditingNoteId(note.id); setEditingNoteBody(note.body) }}
-                                    className="rounded p-0.5 text-gray-300 transition-colors hover:bg-blue-50 hover:text-blue-500"
+                                    className="rounded p-0.5 text-[var(--shell-muted)] transition-colors hover:bg-[var(--shell-soft)] hover:text-brand"
                                     title="Modifica nota"
                                   >
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -613,11 +648,11 @@ export default function ConversationInbox({ conversations: initialConversations,
                                   <button
                                     onClick={() => handleDeleteNote(note.id)}
                                     disabled={deletingNoteId === note.id}
-                                    className="rounded p-0.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                                    className="rounded p-0.5 text-[var(--shell-muted)] transition-colors hover:bg-[#f7e7e3] hover:text-[#9e6e63] disabled:opacity-50"
                                     title="Elimina nota"
                                   >
                                     {deletingNoteId === note.id ? (
-                                      <div className="h-3.5 w-3.5 animate-spin rounded-full border border-gray-300 border-t-red-500" />
+                                      <div className="h-3.5 w-3.5 animate-spin rounded-full border border-[var(--shell-line)] border-t-[#9e6e63]" />
                                     ) : (
                                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <polyline points="3 6 5 6 21 6" />

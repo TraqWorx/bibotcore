@@ -4,18 +4,15 @@ import { useState } from 'react'
 import { saveThemeOverrides } from '../_actions'
 import { sf } from '@/lib/simfonia/ui'
 
-const accentFill = {
-  background: 'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 88%, white) 100%)',
-} as const
-
 interface Props {
   locationId: string
   primaryColor: string
   secondaryColor: string
   logoUrl: string
+  demoMode?: boolean
 }
 
-export default function ThemeForm({ locationId, primaryColor: initPrimary, secondaryColor: initSecondary, logoUrl: initLogo }: Props) {
+export default function ThemeForm({ locationId, primaryColor: initPrimary, secondaryColor: initSecondary, logoUrl: initLogo, demoMode = false }: Props) {
   const [primaryColor, setPrimaryColor] = useState(initPrimary)
   const [secondaryColor, setSecondaryColor] = useState(initSecondary)
   const [logoUrl, setLogoUrl] = useState(initLogo)
@@ -24,6 +21,10 @@ export default function ThemeForm({ locationId, primaryColor: initPrimary, secon
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (demoMode) {
+      setResult({ ok: true })
+      return
+    }
     setSaving(true)
     setResult(null)
     const res = await saveThemeOverrides(locationId, {
@@ -39,7 +40,7 @@ export default function ThemeForm({ locationId, primaryColor: initPrimary, secon
     <div className={sf.formCard}>
       <h2 className={sf.formTitle}>Personalizzazione visiva</h2>
       <p className={`${sf.formDesc} mb-5`}>
-        Colori e logo per questa location. Lascia vuoto per usare i valori predefiniti del design.
+        Colori e logo per questa location. Il logo viene usato nella sidebar Simfonia e i colori guidano tutto il tema.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -49,8 +50,9 @@ export default function ThemeForm({ locationId, primaryColor: initPrimary, secon
             <input
               type="color"
               value={primaryColor}
-              onChange={(e) => setPrimaryColor(e.target.value)}
-              className="h-12 w-full cursor-pointer rounded-2xl border border-gray-200/90 bg-white p-1 shadow-sm"
+          onChange={(e) => setPrimaryColor(e.target.value)}
+          disabled={demoMode}
+          className="h-12 w-full cursor-pointer rounded-2xl border border-gray-200/90 bg-white p-1 shadow-sm"
             />
           </div>
           <div>
@@ -58,8 +60,9 @@ export default function ThemeForm({ locationId, primaryColor: initPrimary, secon
             <input
               type="color"
               value={secondaryColor}
-              onChange={(e) => setSecondaryColor(e.target.value)}
-              className="h-12 w-full cursor-pointer rounded-2xl border border-gray-200/90 bg-white p-1 shadow-sm"
+          onChange={(e) => setSecondaryColor(e.target.value)}
+          disabled={demoMode}
+          className="h-12 w-full cursor-pointer rounded-2xl border border-gray-200/90 bg-white p-1 shadow-sm"
             />
           </div>
         </div>
@@ -71,6 +74,7 @@ export default function ThemeForm({ locationId, primaryColor: initPrimary, secon
             placeholder="https://..."
             value={logoUrl}
             onChange={(e) => setLogoUrl(e.target.value)}
+            disabled={demoMode}
             className={sf.inputFull}
           />
         </div>
@@ -82,7 +86,6 @@ export default function ThemeForm({ locationId, primaryColor: initPrimary, secon
           type="submit"
           disabled={saving}
           className={`${sf.btnSave} font-bold`}
-          style={accentFill}
         >
           {saving ? 'Salvataggio…' : 'Salva personalizzazione'}
         </button>

@@ -13,9 +13,10 @@ export default function SettingsTabs({ tabs }: { tabs: Tab[] }) {
   const [activeTab, setActiveTab] = useState(tabs[0]?.id ?? '')
 
   return (
-    <div>
+    <div className="space-y-8">
       <SegmentedControl
-        className="max-w-full"
+        className="w-full max-w-full"
+        listClassName="w-full rounded-[26px] border-[var(--shell-line)] bg-[var(--shell-surface)] p-2 shadow-[0_14px_32px_-26px_rgba(23,21,18,0.16)]"
         tablist
         tabIdPrefix="settings-tab"
         ariaLabel="Sezioni impostazioni"
@@ -23,11 +24,11 @@ export default function SettingsTabs({ tabs }: { tabs: Tab[] }) {
         value={activeTab}
         onChange={setActiveTab}
         scrollable
-        equalWidth={false}
-        size="sm"
+        equalWidth
+        size="lg"
       />
 
-      <div className="mt-8">
+      <div>
         {tabs.map((tab) => (
           <div
             key={tab.id}

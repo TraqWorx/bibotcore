@@ -22,6 +22,7 @@ export default async function AdminDesignsPage() {
         <h1 className={ad.pageTitle}>Designs</h1>
         <CreateDesignButton />
       </div>
+
       {rows.length === 0 ? (
         <div className={ad.panel}>
           <p className="text-sm font-medium text-gray-500">No designs yet.</p>

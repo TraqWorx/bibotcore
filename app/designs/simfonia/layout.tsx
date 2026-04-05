@@ -2,7 +2,8 @@ import { Suspense, cache } from 'react'
 import { cookies } from 'next/headers'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { DEFAULT_THEME, DEFAULT_MODULES, type DesignTheme, type DesignModules } from '@/lib/types/design'
-import GymSidebar from './_components/GymSidebar'
+import { resolveDemoShell, type DemoStyleId } from '@/lib/simfonia/demoStyles'
+import Sidebar from './_components/Sidebar'
 import LocationSwitcher from './_components/LocationSwitcher'
 import AiChat from './_components/AiChat'
 import './shell.css'
@@ -95,24 +96,43 @@ const getLayoutData = cache(async () => {
 
 export default async function CrmLayout({ children }: { children: React.ReactNode }) {
   const { locations, currentLocationId, finalTheme, finalModules } = await getLayoutData()
+  const demoStyle: DemoStyleId = 'serena'
+  const shellAccent = finalTheme.secondaryColor
+  const shell = resolveDemoShell(finalTheme, demoStyle)
 
-  const cssVars = `:root { --brand: ${finalTheme.primaryColor}; --accent: ${finalTheme.secondaryColor}; --foreground: #0f0f1a; }`
+  const cssVars = `:root {
+    --brand: ${shellAccent};
+    --accent: ${shellAccent};
+    --foreground: ${shell.foreground};
+    --shell-bg: ${shell.shellBg};
+    --shell-surface: ${shell.shellSurface};
+    --shell-canvas: ${shell.shellCanvas};
+    --shell-muted: ${shell.shellMuted};
+    --shell-line: ${shell.shellLine};
+    --shell-soft: ${shell.shellSoft};
+    --shell-soft-alt: ${shell.shellSoftAlt};
+    --shell-tint: ${shell.shellTint};
+    --shell-tint-strong: ${shell.shellTintStrong};
+    --shell-sidebar: ${shell.shellSidebar};
+  }`
 
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: cssVars }} />
-      <div className="simfonia-shell flex min-h-screen">
-        <GymSidebar theme={finalTheme} modules={finalModules} locationId={currentLocationId} />
+      <div className="simfonia-shell flex min-h-screen" data-demo-style={demoStyle}>
+        <Sidebar theme={finalTheme} modules={finalModules} locationId={currentLocationId} styleVariant={demoStyle} />
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-          <header className="app-top-bar flex items-center justify-between px-6 py-3.5 sm:px-8">
-            <Suspense fallback={null}>
-              <LocationSwitcher
-                locations={locations}
-                currentLocationId={currentLocationId}
-              />
-            </Suspense>
-            <div className="flex items-center gap-4" />
-          </header>
+          {locations.length > 1 && (
+            <header className="app-top-bar flex items-center justify-between px-6 py-2.5 sm:px-8">
+              <Suspense fallback={null}>
+                <LocationSwitcher
+                  locations={locations}
+                  currentLocationId={currentLocationId}
+                />
+              </Suspense>
+              <div className="flex items-center gap-4" />
+            </header>
+          )}
           <main className="flex-1 px-5 py-7 sm:px-8 sm:py-10">
             <div className="mx-auto w-full max-w-7xl">{children}</div>
           </main>

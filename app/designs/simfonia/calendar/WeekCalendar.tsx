@@ -51,10 +51,10 @@ function formatDateRange(start: Date, end: Date): string {
 }
 
 const STATUS_STYLE: Record<string, { bg: string; text: string; border: string }> = {
-  confirmed: { bg: '#ECFDF5', text: '#047857', border: '#A7F3D0' },
-  showed: { bg: '#ECFDF5', text: '#047857', border: '#A7F3D0' },
-  cancelled: { bg: '#FEF2F2', text: '#DC2626', border: '#FECACA' },
-  noshow: { bg: '#F3F4F6', text: '#6B7280', border: '#E5E7EB' },
+  confirmed: { bg: '#edf7f1', text: '#5f8f76', border: '#d7e8de' },
+  showed: { bg: '#edf7f1', text: '#5f8f76', border: '#d7e8de' },
+  cancelled: { bg: '#f7e7e3', text: '#9e6e63', border: '#edd9d4' },
+  noshow: { bg: 'var(--shell-soft)', text: 'var(--shell-muted)', border: 'var(--shell-line)' },
   new: {
     bg: 'color-mix(in srgb, var(--brand) 10%, white)',
     text: 'var(--brand)',
@@ -144,11 +144,11 @@ export default function WeekCalendar({
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
       {/* Main calendar — booking-style soft shell */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-gradient-to-b from-gray-50/90 via-white to-white ring-1 ring-gray-200/60 shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_12px_40px_-24px_rgba(15,23,42,0.12)]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] bg-[var(--shell-surface)] ring-1 ring-[var(--shell-line)] shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_12px_40px_-24px_rgba(15,23,42,0.12)]">
         {/* Navigation */}
-        <div className="flex flex-col gap-4 border-b border-gray-200/60 bg-white/40 px-4 py-4 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
+        <div className="flex flex-col gap-4 border-b border-[var(--shell-line)] bg-[color:color-mix(in_srgb,var(--shell-surface)_88%,white_12%)] px-4 py-4 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
           <div className="min-w-0 space-y-2">
-            <p className="truncate text-lg font-bold tracking-tight text-gray-900 sm:text-xl">
+            <p className="truncate text-lg font-bold tracking-tight text-[var(--foreground)] sm:text-xl">
               {viewMode === 'week'
                 ? formatDateRange(monday, sunday)
                 : new Date(today.getFullYear(), today.getMonth() + monthOffset).toLocaleDateString('it-IT', {
@@ -156,18 +156,18 @@ export default function WeekCalendar({
                     year: 'numeric',
                   })}
             </p>
-            <p className="text-xs font-medium text-gray-400">
+            <p className="text-xs font-medium text-[var(--shell-muted)]">
               {viewMode === 'week' ? 'Vista settimanale' : 'Vista mensile'}
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              <div className="inline-flex items-center rounded-full border border-gray-200/90 bg-white/90 p-0.5 shadow-sm">
+              <div className="inline-flex items-center rounded-full border border-[var(--shell-line)] bg-[var(--shell-surface)] p-0.5 shadow-sm">
                 <button
                   type="button"
                   onClick={() => setViewMode('week')}
                   className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
                     viewMode === 'week'
-                      ? 'bg-gray-900 text-white shadow-sm'
-                      : 'text-gray-500 hover:text-gray-800'
+                      ? 'bg-[var(--foreground)] text-white shadow-sm'
+                      : 'text-[var(--shell-muted)] hover:text-[var(--foreground)]'
                   }`}
                 >
                   Settimana
@@ -177,8 +177,8 @@ export default function WeekCalendar({
                   onClick={() => setViewMode('month')}
                   className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
                     viewMode === 'month'
-                      ? 'bg-gray-900 text-white shadow-sm'
-                      : 'text-gray-500 hover:text-gray-800'
+                      ? 'bg-[var(--foreground)] text-white shadow-sm'
+                      : 'text-[var(--shell-muted)] hover:text-[var(--foreground)]'
                   }`}
                 >
                   Mese
@@ -196,16 +196,16 @@ export default function WeekCalendar({
               className={`rounded-full px-4 py-2 text-xs font-bold transition-all ${
                 weekOffset === 0 && monthOffset === 0
                   ? 'bg-brand text-white shadow-md shadow-brand/25'
-                  : 'border border-gray-200/90 bg-white text-gray-600 shadow-sm hover:bg-gray-50'
+                  : 'border border-[var(--shell-line)] bg-[var(--shell-surface)] text-[var(--shell-muted)] shadow-sm hover:bg-[var(--shell-soft)]'
               }`}
             >
               Oggi
             </button>
-            <div className="flex items-center gap-1 rounded-full border border-gray-200/90 bg-white p-1 shadow-sm">
+            <div className="flex items-center gap-1 rounded-full border border-[var(--shell-line)] bg-[var(--shell-surface)] p-1 shadow-sm">
               <button
                 type="button"
                 onClick={() => (viewMode === 'week' ? setWeekOffset((w) => w - 1) : setMonthOffset((m) => m - 1))}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--shell-muted)] transition-colors hover:bg-[var(--shell-soft)] hover:text-[var(--foreground)]"
                 aria-label="Precedente"
               >
                 <ChevronLeft className="h-4 w-4" strokeWidth={2} />
@@ -213,7 +213,7 @@ export default function WeekCalendar({
               <button
                 type="button"
                 onClick={() => (viewMode === 'week' ? setWeekOffset((w) => w + 1) : setMonthOffset((m) => m + 1))}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--shell-muted)] transition-colors hover:bg-[var(--shell-soft)] hover:text-[var(--foreground)]"
                 aria-label="Successiva"
               >
                 <ChevronRight className="h-4 w-4" strokeWidth={2} />
@@ -232,26 +232,26 @@ export default function WeekCalendar({
                 return (
                   <div
                     key={i}
-                    className={`rounded-2xl px-2 py-3 text-center shadow-sm transition-shadow sm:px-3 sm:py-3.5 ${
+                    className={`rounded-[22px] px-2 py-3 text-center shadow-sm transition-all sm:px-3 sm:py-3.5 ${
                       isToday
-                        ? 'bg-brand text-white ring-2 ring-brand/30 ring-offset-2 ring-offset-gray-50/80 shadow-md shadow-brand/20'
-                        : 'border border-gray-100/90 bg-white/90 text-gray-900 hover:border-gray-200'
+                        ? 'bg-brand text-white ring-2 ring-brand/25 ring-offset-2 ring-offset-[var(--shell-surface)] shadow-md shadow-brand/20'
+                        : 'border border-[var(--shell-line)] bg-[var(--shell-canvas)] text-[var(--foreground)] hover:border-brand/20 hover:bg-[var(--shell-soft)]'
                     }`}
                   >
                     <p
                       className={`text-[10px] font-bold uppercase tracking-[0.14em] sm:text-[11px] ${
-                        isToday ? 'text-white/80' : 'text-gray-400'
+                        isToday ? 'text-white/80' : 'text-[var(--shell-muted)]'
                       }`}
                     >
                       {DAY_NAMES[i]}
                     </p>
-                    <p className={`mt-1 text-xl font-bold tabular-nums sm:text-2xl ${isToday ? 'text-white' : 'text-gray-900'}`}>
+                    <p className={`mt-1 text-xl font-bold tabular-nums sm:text-2xl ${isToday ? 'text-white' : 'text-[var(--foreground)]'}`}>
                       {day.getDate()}
                     </p>
                     {count > 0 && (
                       <span
                         className={`mt-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          isToday ? 'bg-white/25 text-white' : 'bg-brand/12 text-brand'
+                          isToday ? 'bg-white/20 text-white' : 'bg-brand/10 text-brand'
                         }`}
                       >
                         {count}
@@ -266,11 +266,11 @@ export default function WeekCalendar({
               {eventsByDay.map(({ events: dayEvents }, i) => (
                 <div
                   key={i}
-                  className="flex flex-col gap-2 rounded-2xl border border-gray-100/90 bg-white/70 p-2 shadow-[0_8px_30px_-18px_rgba(15,23,42,0.08)] sm:p-2.5"
+                  className="flex flex-col gap-2 rounded-[24px] border border-[var(--shell-line)] bg-[var(--shell-canvas)] p-2 shadow-[0_10px_30px_-22px_rgba(15,23,42,0.1)] sm:p-2.5"
                 >
                   {dayEvents.length === 0 ? (
                     <div className="flex flex-1 flex-col items-center justify-center py-10">
-                      <span className="text-[11px] font-medium text-gray-200">Libero</span>
+                      <span className="text-[11px] font-medium text-[var(--shell-muted)]/45">Libero</span>
                     </div>
                   ) : (
                     dayEvents.map((event) => {
@@ -282,7 +282,7 @@ export default function WeekCalendar({
                           key={event.id}
                           type="button"
                           onClick={() => setSelectedEvent(event)}
-                          className={`w-full cursor-pointer rounded-xl border-y border-r border-gray-100/80 border-l-[3px] bg-white/95 p-2.5 text-left text-xs shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-200/80 hover:shadow-md sm:p-3 ${accent}`}
+                          className={`w-full cursor-pointer rounded-[18px] border border-[var(--shell-line)] border-l-[3px] p-2.5 text-left text-xs shadow-[0_10px_24px_-20px_rgba(23,21,18,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-3 ${accent}`}
                           style={style ? { background: style.bg, color: style.text } : { color: '#374151' }}
                         >
                           <p className="truncate font-bold leading-tight">{event.title ?? 'Appuntamento'}</p>
@@ -315,7 +315,7 @@ export default function WeekCalendar({
             <div className="grid grid-cols-7 gap-1.5 pb-3">
               {DAY_NAMES.map((d) => (
                 <div key={d} className="py-2 text-center">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400">{d}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--shell-muted)]">{d}</p>
                 </div>
               ))}
             </div>
@@ -325,7 +325,7 @@ export default function WeekCalendar({
                   return (
                     <div
                       key={i}
-                      className="min-h-[88px] rounded-xl bg-gray-50/40 ring-1 ring-gray-100/80"
+                      className="min-h-[88px] rounded-[20px] bg-[var(--shell-canvas)]/60 ring-1 ring-[var(--shell-line)]"
                     />
                   )
                 const isToday = isSameDay(day, today)
@@ -333,15 +333,15 @@ export default function WeekCalendar({
                 return (
                   <div
                     key={i}
-                    className={`flex min-h-[88px] flex-col rounded-xl p-1.5 ring-1 transition-shadow sm:p-2 ${
+                    className={`flex min-h-[96px] flex-col rounded-[20px] p-1.5 ring-1 transition-shadow sm:p-2 ${
                       isToday
                         ? 'bg-brand/5 ring-brand/25 shadow-sm'
-                        : 'bg-white/80 ring-gray-100/90 hover:ring-gray-200'
+                        : 'bg-[var(--shell-surface)] ring-[var(--shell-line)] hover:ring-brand/18'
                     }`}
                   >
                     <p
                       className={`mb-1 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
-                        isToday ? 'bg-brand text-white shadow-sm' : 'text-gray-600'
+                        isToday ? 'bg-brand text-white shadow-sm' : 'text-[var(--shell-muted)]'
                       }`}
                     >
                       {day.getDate()}
@@ -355,8 +355,8 @@ export default function WeekCalendar({
                             key={e.id}
                             type="button"
                             onClick={() => setSelectedEvent(e)}
-                            className={`w-full cursor-pointer truncate rounded-lg border-y border-r border-gray-100/80 border-l-2 py-1 pl-1.5 pr-1 text-left text-[9px] font-semibold leading-tight shadow-sm ${ac}`}
-                            style={s ? { background: s.bg, color: s.text } : { background: '#f9fafb', color: '#6b7280' }}
+                            className={`w-full cursor-pointer truncate rounded-xl border border-[var(--shell-line)] border-l-2 py-1 pl-1.5 pr-1 text-left text-[9px] font-semibold leading-tight shadow-sm ${ac}`}
+                            style={s ? { background: s.bg, color: s.text } : { background: 'var(--shell-canvas)', color: 'var(--shell-muted)' }}
                           >
                             {e.startTime &&
                               new Date(e.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}{' '}
@@ -365,7 +365,7 @@ export default function WeekCalendar({
                         )
                       })}
                       {dayEvts.length > 2 && (
-                        <p className="text-[9px] font-semibold text-gray-400">+{dayEvts.length - 2}</p>
+                        <p className="text-[9px] font-semibold text-[var(--shell-muted)]">+{dayEvts.length - 2}</p>
                       )}
                     </div>
                   </div>
@@ -380,42 +380,42 @@ export default function WeekCalendar({
       <aside className="w-full shrink-0 space-y-4 lg:sticky lg:top-6 lg:w-[280px]">
         {/* Event detail */}
         {selectedEvent && (
-          <div className={`${sf.card} ${sf.cardPadding} ring-1 ring-gray-100/80 shadow-[0_12px_40px_-20px_rgba(15,23,42,0.12)]`}>
+          <div className={`${sf.card} ${sf.cardPadding} ring-1 ring-[var(--shell-line)] shadow-[0_12px_40px_-20px_rgba(15,23,42,0.12)]`}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className={sf.sectionLabel}>Dettaglio</h3>
-              <button onClick={() => setSelectedEvent(null)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setSelectedEvent(null)} className="text-[var(--shell-muted)] hover:text-[var(--foreground)]">
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
             <div className="space-y-2.5">
-              <p className="text-sm font-bold text-gray-900">{selectedEvent.title ?? 'Appuntamento'}</p>
+              <p className="text-sm font-bold text-[var(--foreground)]">{selectedEvent.title ?? 'Appuntamento'}</p>
               {selectedEvent.contactName && (
                 <div>
-                  <p className="text-[10px] text-gray-400">Contatto</p>
-                  <p className="text-xs font-medium text-gray-700">{selectedEvent.contactName}</p>
+                  <p className="text-[10px] text-[var(--shell-muted)]">Contatto</p>
+                  <p className="text-xs font-medium text-[var(--foreground)]">{selectedEvent.contactName}</p>
                 </div>
               )}
               {selectedEvent.contactEmail && (
                 <div>
-                  <p className="text-[10px] text-gray-400">Email</p>
-                  <p className="text-xs text-gray-600">{selectedEvent.contactEmail}</p>
+                  <p className="text-[10px] text-[var(--shell-muted)]">Email</p>
+                  <p className="text-xs text-[var(--shell-muted)]">{selectedEvent.contactEmail}</p>
                 </div>
               )}
               {selectedEvent.contactPhone && (
                 <div>
-                  <p className="text-[10px] text-gray-400">Telefono</p>
-                  <p className="text-xs text-gray-600">{selectedEvent.contactPhone}</p>
+                  <p className="text-[10px] text-[var(--shell-muted)]">Telefono</p>
+                  <p className="text-xs text-[var(--shell-muted)]">{selectedEvent.contactPhone}</p>
                 </div>
               )}
               {selectedEvent.startTime && (
                 <div>
-                  <p className="text-[10px] text-gray-400">Data e ora</p>
-                  <p className="text-xs font-medium text-gray-700">
+                  <p className="text-[10px] text-[var(--shell-muted)]">Data e ora</p>
+                  <p className="text-xs font-medium text-[var(--foreground)]">
                     {new Date(selectedEvent.startTime).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </p>
-                  <p className="text-xs text-gray-600">
+                  <p className="text-xs text-[var(--shell-muted)]">
                     {new Date(selectedEvent.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
                     {selectedEvent.endTime && ` – ${new Date(selectedEvent.endTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`}
                   </p>
@@ -423,11 +423,11 @@ export default function WeekCalendar({
               )}
               {selectedEvent.appointmentStatus && (
                 <div>
-                  <p className="text-[10px] text-gray-400">Stato</p>
+                  <p className="text-[10px] text-[var(--shell-muted)]">Stato</p>
                   <span className={`inline-block mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                     selectedEvent.appointmentStatus === 'confirmed' || selectedEvent.appointmentStatus === 'showed' ? 'bg-emerald-50 text-emerald-700' :
                     selectedEvent.appointmentStatus === 'cancelled' ? 'bg-red-50 text-red-600' :
-                    'bg-gray-100 text-gray-600'
+                    'bg-[var(--shell-canvas)] text-[var(--shell-muted)]'
                   }`}>
                     {STATUS_LABELS[selectedEvent.appointmentStatus] ?? selectedEvent.appointmentStatus}
                   </span>
@@ -438,7 +438,7 @@ export default function WeekCalendar({
         )}
 
           {users.length > 0 && (
-          <div className={`${sf.card} ${sf.cardPadding} ring-1 ring-gray-100/80`}>
+          <div className={`${sf.card} ${sf.cardPadding} ring-1 ring-[var(--shell-line)]`}>
             <h3 className={`mb-4 ${sf.sectionLabel}`}>
               {isAdmin ? 'Operatori' : 'Il mio calendario'}
             </h3>
@@ -450,12 +450,12 @@ export default function WeekCalendar({
                   className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left text-sm font-semibold transition-all ${
                     !selectedUserId
                       ? 'border-brand/20 bg-brand/10 text-brand shadow-sm ring-2 ring-brand/15'
-                      : 'border-transparent text-gray-600 hover:border-gray-100 hover:bg-gray-50/80'
+                      : 'border-transparent text-[var(--shell-muted)] hover:border-[var(--shell-line)] hover:bg-[var(--shell-soft)]'
                   }`}
                 >
                   <span
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm ${
-                      !selectedUserId ? 'bg-brand' : 'bg-gray-400'
+                      !selectedUserId ? 'bg-brand' : 'bg-[var(--shell-muted)]'
                     }`}
                   >
                     T
@@ -481,12 +481,12 @@ export default function WeekCalendar({
                     } ${
                       isActive
                         ? 'border-brand/20 bg-brand/10 text-brand shadow-sm ring-2 ring-brand/15'
-                        : 'border-transparent text-gray-600 hover:border-gray-100 hover:bg-gray-50/80'
+                        : 'border-transparent text-[var(--shell-muted)] hover:border-[var(--shell-line)] hover:bg-[var(--shell-soft)]'
                     }`}
                   >
                     <span
                       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm ${
-                        isActive ? 'bg-brand' : 'bg-gray-400'
+                        isActive ? 'bg-brand' : 'bg-[var(--shell-muted)]'
                       }`}
                     >
                       {initials}

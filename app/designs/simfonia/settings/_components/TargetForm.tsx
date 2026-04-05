@@ -11,9 +11,10 @@ const accentFill = {
 interface Props {
   locationId: string
   currentTarget: number
+  demoMode?: boolean
 }
 
-export default function TargetForm({ locationId, currentTarget }: Props) {
+export default function TargetForm({ locationId, currentTarget, demoMode = false }: Props) {
   const [target, setTarget] = useState(String(currentTarget))
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<{ ok?: boolean; error?: string } | null>(null)
@@ -23,6 +24,10 @@ export default function TargetForm({ locationId, currentTarget }: Props) {
     const val = parseInt(target, 10)
     if (!val || val < 1) {
       setResult({ error: 'Target non valido' })
+      return
+    }
+    if (demoMode) {
+      setResult({ ok: true })
       return
     }
     setSaving(true)
@@ -47,12 +52,13 @@ export default function TargetForm({ locationId, currentTarget }: Props) {
             min="1"
             value={target}
             onChange={(e) => setTarget(e.target.value)}
+            disabled={demoMode}
             className={sf.inputFull}
           />
         </div>
         <button
           type="submit"
-          disabled={saving}
+          disabled={demoMode || saving}
           className="rounded-2xl px-6 py-2.5 text-sm font-bold text-gray-900 shadow-md transition hover:brightness-[1.02] disabled:opacity-45"
           style={accentFill}
         >

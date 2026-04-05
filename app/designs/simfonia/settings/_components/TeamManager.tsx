@@ -16,9 +16,17 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: 'Solo lettura',
 }
 
-export default function TeamManager({ locationId }: { locationId: string }) {
-  const [users, setUsers] = useState<UserRole[]>([])
-  const [loading, setLoading] = useState(true)
+export default function TeamManager({
+  locationId,
+  demoUsers,
+  demoMode = false,
+}: {
+  locationId: string
+  demoUsers?: UserRole[]
+  demoMode?: boolean
+}) {
+  const [users, setUsers] = useState<UserRole[]>(demoUsers ?? [])
+  const [loading, setLoading] = useState(!demoUsers)
   const [updating, setUpdating] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -33,10 +41,17 @@ export default function TeamManager({ locationId }: { locationId: string }) {
   })
 
   useEffect(() => {
+    if (demoUsers) return
     void loadRoles(false)
-  }, [locationId])
+  }, [locationId, demoUsers])
 
   async function handleRoleChange(userId: string, newRole: string) {
+    if (demoMode) {
+      setUsers((prev) => prev.map((u) => u.userId === userId ? { ...u, role: newRole } : u))
+      setMessage('Ruolo aggiornato')
+      setTimeout(() => setMessage(null), 2000)
+      return
+    }
     setUpdating(userId)
     setMessage(null)
     const res = await fetch('/api/admin/roles', {
@@ -78,7 +93,7 @@ export default function TeamManager({ locationId }: { locationId: string }) {
               <select
                 value={u.role}
                 onChange={(e) => handleRoleChange(u.userId, e.target.value)}
-                disabled={updating === u.userId}
+                disabled={demoMode ? false : updating === u.userId}
                 className={`rounded-xl border px-3 py-1.5 text-xs font-semibold outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/15 ${
                   u.role === 'location_admin'
                     ? 'border-brand/30 bg-brand/8 text-brand'

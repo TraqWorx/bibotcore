@@ -71,8 +71,8 @@ export default async function ContactsPage({
   if (!locationId) {
     return (
       <div className={sf.emptyPanel}>
-        <p className="text-sm font-medium text-gray-500">Nessuna location connessa.</p>
-        <p className="mt-1 text-xs text-gray-400">Seleziona una location valida e riprova.</p>
+        <p className="text-sm font-medium text-[var(--shell-muted)]">Nessuna location connessa.</p>
+        <p className="mt-1 text-xs text-[var(--shell-muted)]">Seleziona una location valida e riprova.</p>
       </div>
     )
   }
