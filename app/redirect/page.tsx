@@ -10,13 +10,35 @@ export default async function RedirectPage() {
   const supabase = createAdminClient()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, agency_id')
     .eq('id', user.id)
     .single()
 
-  // Super admin → admin panel
-  if (profile?.role === 'super_admin') redirect('/admin')
+  console.log('[redirect]', user.email, 'role:', profile?.role, 'agency_id:', profile?.agency_id)
+
+  // Super admin → platform
+  if (profile?.role === 'super_admin') {
+    console.log('[redirect] → /platform')
+    redirect('/platform')
+  }
+
+  // Agency owner → admin panel
+  if (profile?.agency_id) {
+    const { data: agency } = await supabase
+      .from('agencies')
+      .select('owner_user_id')
+      .eq('id', profile.agency_id)
+      .single()
+
+    console.log('[redirect] agency owner:', agency?.owner_user_id, 'user:', user.id, 'match:', agency?.owner_user_id === user.id)
+
+    if (agency?.owner_user_id === user.id) {
+      console.log('[redirect] → /admin')
+      redirect('/admin')
+    }
+  }
 
   // Everyone else → location picker
+  console.log('[redirect] → /agency')
   redirect('/agency')
 }

@@ -9,11 +9,17 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/login') ||
     pathname.startsWith('/redirect') ||
     pathname.startsWith('/portal/login') ||
+    pathname.startsWith('/onboarding') ||
     /^\/designs\/[^/]+\/demo(?:\/.*)?$/.test(pathname) ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname === '/'
   ) {
+    return NextResponse.next()
+  }
+
+  // Embed routes with token don't need session auth
+  if (pathname.startsWith('/embed/') && req.nextUrl.searchParams.has('token')) {
     return NextResponse.next()
   }
 
@@ -79,5 +85,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*', '/designs/:path*', '/agency', '/agency/:path*', '/portal/:path*'],
+  matcher: ['/dashboard/:path*', '/admin/:path*', '/platform/:path*', '/designs/:path*', '/agency', '/agency/:path*', '/portal/:path*', '/embed/:path*'],
 }

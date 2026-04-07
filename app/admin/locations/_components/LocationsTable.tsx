@@ -22,6 +22,7 @@ interface LocationRow {
   connected: boolean
   users: number
   design: string | null
+  dashboard: { token: string; widgetCount: number } | null
   needsOAuth: boolean
   dateAdded: string | null
   planId: string | null
@@ -237,6 +238,7 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                   <HeaderCell col="connected" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Status</HeaderCell>
                   <HeaderCell col="users" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Users</HeaderCell>
                   <HeaderCell col="design" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Design</HeaderCell>
+                  <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-gray-400 whitespace-nowrap">Dashboard</th>
                   <HeaderCell col="plan" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Plan</HeaderCell>
                   <HeaderCell col="price" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort} align="right">Price</HeaderCell>
                   <HeaderCell col="totalPaid" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort} align="right">Total Paid</HeaderCell>
@@ -296,6 +298,18 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                         {row.design}
                       </ChangeDesignButton>
                       ) : <span className="text-xs text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-3">
+                      <Link
+                        href={`/admin/locations/${row.id}/widgets`}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-600 shadow-sm transition hover:border-brand/25 hover:text-brand"
+                      >
+                        {row.dashboard && row.dashboard.widgetCount > 0 ? (
+                          <><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{row.dashboard.widgetCount} widgets</>
+                        ) : (
+                          'Configure'
+                        )}
+                      </Link>
                     </td>
                     <td className="px-3 py-3 text-xs text-gray-600">
                       {row.churned

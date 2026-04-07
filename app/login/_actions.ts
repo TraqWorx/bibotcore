@@ -19,15 +19,15 @@ export async function requestMagicLink(
   const headers = { Authorization: `Bearer ${token}`, Version: '2021-07-28' }
   const emailLower = email.toLowerCase()
 
-  // Step 0: Allow super_admin profiles through immediately
+  // Step 0: Allow known users through immediately (super_admin or agency members)
   const supabaseAdmin = createAdminClient()
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('role')
+    .select('role, agency_id')
     .eq('email', emailLower)
     .single()
 
-  if (profile?.role === 'super_admin') {
+  if (profile?.role === 'super_admin' || profile?.agency_id) {
     return sendMagicLink(email)
   }
 

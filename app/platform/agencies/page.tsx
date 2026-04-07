@@ -1,0 +1,68 @@
+import { createAdminClient } from '@/lib/supabase-server'
+import Link from 'next/link'
+
+export default async function PlatformAgenciesPage() {
+  const sb = createAdminClient()
+
+  const [{ data: agencies }, { data: subscriptions }] = await Promise.all([
+    sb.from('agencies').select('id, name, email, created_at').order('created_at', { ascending: false }),
+    sb.from('agency_subscriptions').select('agency_id, plan, status, price_cents'),
+  ])
+
+  const subsByAgency = new Map<string, { total: number; basic: number; pro: number; mrr: number }>()
+  for (const sub of subscriptions ?? []) {
+    const existing = subsByAgency.get(sub.agency_id) ?? { total: 0, basic: 0, pro: 0, mrr: 0 }
+    existing.total++
+    if (sub.plan === 'basic') existing.basic++
+    else existing.pro++
+    if (sub.status === 'active') existing.mrr += sub.price_cents
+    subsByAgency.set(sub.agency_id, existing)
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold text-gray-900">Agencies</h1>
+        <p className="mt-1 text-sm text-gray-500">{(agencies ?? []).length} agencies registered</p>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <th className="px-5 py-3">Agency</th>
+              <th className="px-5 py-3">Email</th>
+              <th className="px-5 py-3 text-center">Locations</th>
+              <th className="px-5 py-3 text-center">Basic</th>
+              <th className="px-5 py-3 text-center">Pro</th>
+              <th className="px-5 py-3 text-right">MRR</th>
+              <th className="px-5 py-3">Joined</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {(agencies ?? []).map((agency) => {
+              const stats = subsByAgency.get(agency.id) ?? { total: 0, basic: 0, pro: 0, mrr: 0 }
+              return (
+                <tr key={agency.id} className="transition-colors hover:bg-gray-50/50">
+                  <td className="px-5 py-3.5">
+                    <Link href={`/platform/agencies/${agency.id}`} className="font-semibold text-gray-900 hover:text-brand">
+                      {agency.name}
+                    </Link>
+                  </td>
+                  <td className="px-5 py-3.5 text-gray-500">{agency.email}</td>
+                  <td className="px-5 py-3.5 text-center font-semibold">{stats.total}</td>
+                  <td className="px-5 py-3.5 text-center">{stats.basic}</td>
+                  <td className="px-5 py-3.5 text-center">{stats.pro}</td>
+                  <td className="px-5 py-3.5 text-right font-bold tabular-nums text-brand">${(stats.mrr / 100).toFixed(0)}</td>
+                  <td className="px-5 py-3.5 text-gray-400">
+                    {new Date(agency.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

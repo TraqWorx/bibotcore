@@ -72,7 +72,7 @@ export default async function LocationsPage() {
   const agencyToken: string | null = envToken ?? dbToken
   const companyId: string | undefined = envCompanyId ?? dbCompanyId ?? undefined
 
-  const [ghlLocations, { data: installs }, { data: designs }, { data: connections }, { data: userProfiles }, { data: ghlPlans }] =
+  const [ghlLocations, { data: installs }, { data: designs }, { data: connections }, { data: userProfiles }, { data: ghlPlans }, { data: dashboardConfigs }] =
     await Promise.all([
       agencyToken ? fetchAllGhlLocations(agencyToken, companyId) : Promise.resolve([]),
       supabase.from('installs').select('location_id, design_slug'),
@@ -80,6 +80,7 @@ export default async function LocationsPage() {
       supabase.from('ghl_connections').select('location_id, refresh_token'),
       supabase.from('profile_locations').select('location_id'),
       supabase.from('ghl_plans').select('ghl_plan_id, name, price_monthly').order('name'),
+      supabase.from('dashboard_configs').select('location_id, embed_token, config'),
     ])
 
   // Retry with DB token if env token returned nothing
@@ -117,6 +118,14 @@ export default async function LocationsPage() {
   const designByLocation: Record<string, string | null> = {}
   for (const i of installs ?? []) designByLocation[i.location_id] = i.design_slug
 
+  const dashboardByLocation: Record<string, { token: string; widgetCount: number }> = {}
+  for (const c of dashboardConfigs ?? []) {
+    dashboardByLocation[c.location_id] = {
+      token: c.embed_token,
+      widgetCount: Array.isArray(c.config) ? c.config.length : 0,
+    }
+  }
+
   const userCountByLocation: Record<string, number> = {}
   for (const pl of userProfiles ?? []) {
     userCountByLocation[pl.location_id] = (userCountByLocation[pl.location_id] ?? 0) + 1
@@ -152,6 +161,7 @@ export default async function LocationsPage() {
       connected: connectedIds.has(l.id),
       users: userCountByLocation[l.id] ?? 0,
       design: designByLocation[l.id] ?? null,
+      dashboard: dashboardByLocation[l.id] ?? null,
       needsOAuth: connectedIds.has(l.id) && !hasOAuthToken.has(l.id),
       dateAdded: l.dateAdded,
       planId: churned ? null : planId,
