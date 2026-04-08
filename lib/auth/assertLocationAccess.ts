@@ -46,6 +46,17 @@ export async function getLocationAccess(
     return { status: 'authorized', userId: user.id, email: user.email ?? '', isSuperAdmin: true }
   }
 
+  // Admin has access to all locations in their agency
+  if (profile?.role === 'admin') {
+    const { data: prof } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
+    if (prof?.agency_id) {
+      const { data: loc } = await sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+      if (loc?.agency_id === prof.agency_id) {
+        return { status: 'authorized', userId: user.id, email: user.email ?? '', isSuperAdmin: false }
+      }
+    }
+  }
+
   // Check membership
   if (membership) {
     return { status: 'authorized', userId: user.id, email: user.email ?? '', isSuperAdmin: false }

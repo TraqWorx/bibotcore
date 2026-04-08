@@ -6,15 +6,15 @@ export function resolveSimfoniaShell(theme: DesignTheme) {
   const accent = theme.secondaryColor
 
   return {
-    foreground: '#171512',
+    foreground: '#1a1a2e',
     shellSidebar: darkenHex(primary, 0.12),
-    shellBg: mixHex(accent, '#faf6ee', 0.92),
-    shellSurface: mixHex(accent, '#fffdfa', 0.965),
-    shellCanvas: mixHex(accent, '#fdf8ef', 0.88),
-    shellMuted: mixHex(primary, '#8f8578', 0.72),
-    shellLine: mixHex(primary, '#efe4d2', 0.78),
-    shellSoft: mixHex(accent, '#fffdf8', 0.82),
-    shellSoftAlt: mixHex(accent, '#fff7ec', 0.9),
+    shellBg: mixHex(primary, '#f8f8fc', 0.92),
+    shellSurface: mixHex(primary, '#ffffff', 0.965),
+    shellCanvas: mixHex(primary, '#f5f5fa', 0.88),
+    shellMuted: mixHex(primary, '#8888a0', 0.72),
+    shellLine: mixHex(primary, '#e8e8f0', 0.78),
+    shellSoft: mixHex(accent, '#f8f8ff', 0.82),
+    shellSoftAlt: mixHex(accent, '#f4f4fc', 0.9),
     shellTint: mixHex(accent, '#ffffff', 0.72),
     shellTintStrong: mixHex(accent, '#ffffff', 0.56),
   }

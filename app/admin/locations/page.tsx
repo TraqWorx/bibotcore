@@ -1,7 +1,10 @@
-import { createAdminClient } from '@/lib/supabase-server'
+import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { redirect } from 'next/navigation'
+import { isBibotAgency } from '@/lib/isBibotAgency'
 import BulkConnectButton from './_components/BulkConnectButton'
 import LocationsTable from './_components/LocationsTable'
 import SyncSubscriptionsButton from './_components/SyncSubscriptionsButton'
+import ConnectLocationButton from './_components/ConnectLocationButton'
 import { ad } from '@/lib/admin/ui'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
@@ -27,7 +30,6 @@ interface GhlLocation {
   planId: string | null
 }
 
-// Raw GHL location object — capture every possible plan/subscription field
 type RawGhlLocation = Record<string, unknown>
 
 async function fetchAllGhlLocations(token: string, companyId?: string): Promise<GhlLocation[]> {
@@ -37,10 +39,7 @@ async function fetchAllGhlLocations(token: string, companyId?: string): Promise<
     headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
     cache: 'no-store',
   })
-  if (!res.ok) {
-    console.error('[fetchAllGhlLocations] GHL error:', res.status, await res.text().catch(() => ''))
-    return []
-  }
+  if (!res.ok) return []
   const data = await res.json()
   return (data?.locations ?? []).map((l: RawGhlLocation) => {
     const saasSettings = (l.settings as { saasSettings?: { saasPlanId?: string } } | null)?.saasSettings
@@ -56,54 +55,68 @@ async function fetchAllGhlLocations(token: string, companyId?: string): Promise<
 }
 
 export default async function LocationsPage() {
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) redirect('/login')
+
   const supabase = createAdminClient()
+  const { data: profile } = await supabase.from('profiles').select('agency_id').eq('id', user.id).single()
+  if (!profile?.agency_id) redirect('/login')
 
-  const envToken = process.env.GHL_AGENCY_TOKEN
-  const envCompanyId = process.env.GHL_COMPANY_ID
+  const agencyId = profile.agency_id
+  const isBibot = isBibotAgency(agencyId)
 
-  const { data: integration } = await supabase
-    .from('ghl_private_integrations')
-    .select('api_key, company_id')
-    .limit(1)
-    .single()
-  const dbToken = integration?.api_key ?? null
-  const dbCompanyId = (integration as { company_id?: string } | null)?.company_id ?? null
+  // ── Fetch locations ──
+  let ghlLocations: GhlLocation[] = []
 
-  const agencyToken: string | null = envToken ?? dbToken
-  const companyId: string | undefined = envCompanyId ?? dbCompanyId ?? undefined
+  if (isBibot) {
+    // Bibot: fetch all from GHL agency token
+    const envToken = process.env.GHL_AGENCY_TOKEN
+    const envCompanyId = process.env.GHL_COMPANY_ID
+    if (envToken) {
+      ghlLocations = await fetchAllGhlLocations(envToken, envCompanyId)
+    }
+    // Backfill location names
+    if (ghlLocations.length > 0) {
+      const upsertRows = ghlLocations.map((l) => ({
+        location_id: l.id,
+        name: l.name,
+        agency_id: agencyId,
+        ...(l.dateAdded ? { ghl_date_added: l.dateAdded } : {}),
+      }))
+      await supabase.from('locations').upsert(upsertRows, { onConflict: 'location_id' })
+    }
+  } else {
+    // Regular agency: only show locations connected via OAuth
+    const { data: agencyLocations } = await supabase
+      .from('locations')
+      .select('location_id, name, ghl_date_added')
+      .eq('agency_id', agencyId)
+    ghlLocations = (agencyLocations ?? []).map((l) => ({
+      id: l.location_id,
+      name: l.name ?? l.location_id,
+      dateAdded: l.ghl_date_added ?? null,
+      planId: null,
+    }))
+  }
 
-  const [ghlLocations, { data: installs }, { data: designs }, { data: connections }, { data: userProfiles }, { data: ghlPlans }, { data: dashboardConfigs }] =
+  // ── Common data loading ──
+  const locationIds = ghlLocations.map((l) => l.id)
+
+  const [{ data: installs }, { data: designs }, { data: connections }, { data: userProfiles }, { data: ghlPlans }, { data: dashboardConfigs }] =
     await Promise.all([
-      agencyToken ? fetchAllGhlLocations(agencyToken, companyId) : Promise.resolve([]),
-      supabase.from('installs').select('location_id, design_slug'),
+      locationIds.length ? supabase.from('installs').select('location_id, design_slug').in('location_id', locationIds) : Promise.resolve({ data: [] }),
       supabase.from('designs').select('slug, name').order('name'),
-      supabase.from('ghl_connections').select('location_id, refresh_token'),
-      supabase.from('profile_locations').select('location_id'),
+      locationIds.length ? supabase.from('ghl_connections').select('location_id, refresh_token').in('location_id', locationIds) : Promise.resolve({ data: [] }),
+      locationIds.length ? supabase.from('profile_locations').select('location_id').in('location_id', locationIds) : Promise.resolve({ data: [] }),
       supabase.from('ghl_plans').select('ghl_plan_id, name, price_monthly').order('name'),
-      supabase.from('dashboard_configs').select('location_id, embed_token, config'),
+      locationIds.length ? supabase.from('dashboard_configs').select('location_id, embed_token, config').in('location_id', locationIds) : Promise.resolve({ data: [] }),
     ])
 
-  // Retry with DB token if env token returned nothing
-  if (ghlLocations.length === 0 && envToken && dbToken && dbToken !== envToken) {
-    const retried = await fetchAllGhlLocations(dbToken, dbCompanyId ?? envCompanyId ?? undefined)
-    if (retried.length > 0) ghlLocations.push(...retried)
-  }
-
-  // Backfill location names + dates from GHL (never touch ghl_plan_id here — Sync Subscriptions handles that)
-  if (ghlLocations.length > 0) {
-    const upsertRows = ghlLocations.map((l) => ({
-      location_id: l.id,
-      name: l.name,
-      ...(l.dateAdded ? { ghl_date_added: l.dateAdded } : {}),
-    }))
-    await supabase.from('locations').upsert(upsertRows, { onConflict: 'location_id' })
-  }
-
-  // Read plan assignments back from locations table (covers all locations)
-  const { data: locationPlanRows } = await supabase
-    .from('locations')
-    .select('location_id, ghl_plan_id, ghl_date_added, churned_at')
-    .in('location_id', ghlLocations.map((l) => l.id))
+  // Plan assignments from locations table
+  const { data: locationPlanRows } = locationIds.length
+    ? await supabase.from('locations').select('location_id, ghl_plan_id, ghl_date_added, churned_at').in('location_id', locationIds)
+    : { data: [] }
 
   const planByLocation: Record<string, string | null> = {}
   const churnedLocations = new Set<string>()
@@ -144,7 +157,7 @@ export default async function LocationsPage() {
   const unconnectedLocations = ghlLocations.filter((l) => !connectedIds.has(l.id))
 
   const rows = ghlLocations.map((l) => {
-    const planId = planByLocation[l.id] ?? null
+    const planId = planByLocation[l.id] ?? l.planId ?? null
     const churned = churnedLocations.has(l.id)
     const plan = planId ? planById[planId] ?? null : null
     const meta = locationMeta[l.id]
@@ -181,20 +194,26 @@ export default async function LocationsPage() {
           <p className={ad.pageSubtitle}>{ghlLocations.length} total</p>
         </div>
         <div className="flex items-center gap-3">
-          <SyncSubscriptionsButton />
-          <BulkConnectButton designs={designsList} unconnectedLocations={unconnectedLocations} />
+          {isBibot && <SyncSubscriptionsButton />}
+          {isBibot ? (
+            <BulkConnectButton designs={designsList} unconnectedLocations={unconnectedLocations} />
+          ) : (
+            <ConnectLocationButton />
+          )}
         </div>
       </div>
 
-      {!agencyToken ? (
-        <div className={ad.panel}>
-          <p className="text-sm font-medium text-red-600">
-            No GHL agency token configured. Set <code>GHL_AGENCY_TOKEN</code> in your environment variables.
-          </p>
-        </div>
-      ) : ghlLocations.length === 0 ? (
-        <div className={ad.panel}>
-          <p className="text-sm font-medium text-gray-500">No locations found in GHL agency.</p>
+      {ghlLocations.length === 0 ? (
+        <div className={`${ad.panel} py-16 text-center`}>
+          <div className="mx-auto max-w-sm">
+            <p className="text-sm font-medium text-gray-900">No locations connected yet</p>
+            <p className="mt-1 text-sm text-gray-500">
+              Connect your first GHL location to get started. Each location gets its own dashboard.
+            </p>
+            <div className="mt-6">
+              <ConnectLocationButton />
+            </div>
+          </div>
         </div>
       ) : (
         <LocationsTable rows={rows} designs={designsList} unconnectedLocations={unconnectedLocations} />

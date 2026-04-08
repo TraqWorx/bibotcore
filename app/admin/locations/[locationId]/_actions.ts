@@ -15,7 +15,7 @@ async function assertSuperAdmin() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'super_admin') throw new Error('Not authorized')
+  if (profile?.role !== 'super_admin' && profile?.role !== 'admin') throw new Error('Not authorized')
 }
 
 export async function generateLoginLink(

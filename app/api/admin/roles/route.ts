@@ -12,7 +12,7 @@ async function getAuthUser(req: NextRequest) {
   if (!user) return null
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
-  return { ...user, platformRole: profile?.role ?? 'client' }
+  return { ...user, platformRole: profile?.role ?? 'user' }
 }
 
 async function assertSuperAdmin(req: NextRequest) {
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
     if (createErr) return NextResponse.json({ error: createErr.message }, { status: 400 })
     userId = created?.user?.id
     if (userId) {
-      await sb.from('profiles').upsert({ id: userId, email: email.toLowerCase(), role: 'client' }, { onConflict: 'id' })
+      await sb.from('profiles').upsert({ id: userId, email: email.toLowerCase(), role: 'agency' }, { onConflict: 'id' })
     }
   }
 

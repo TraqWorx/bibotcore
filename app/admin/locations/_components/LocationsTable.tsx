@@ -91,6 +91,7 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
     () => [...new Set(rows.map((r) => r.design).filter(Boolean))] as string[],
     [rows]
   )
+  const hasDesigns = uniqueDesigns.length > 0
 
   const uniquePlans = useMemo(
     () => [...new Map(rows.filter((r) => r.planId && r.planName).map((r) => [r.planId, r.planName])).entries()]
@@ -190,13 +191,15 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
           <option value="without">No Users</option>
         </select>
 
-        <select value={designFilter} onChange={(e) => { setDesignFilter(e.target.value); setPage(1) }} className={selectClass}>
-          <option value="all">All Designs</option>
-          <option value="__none__">No Design</option>
-          {uniqueDesigns.map((slug) => (
-            <option key={slug} value={slug}>{slug}</option>
-          ))}
-        </select>
+        {hasDesigns && (
+          <select value={designFilter} onChange={(e) => { setDesignFilter(e.target.value); setPage(1) }} className={selectClass}>
+            <option value="all">All Designs</option>
+            <option value="__none__">No Design</option>
+            {uniqueDesigns.map((slug) => (
+              <option key={slug} value={slug}>{slug}</option>
+            ))}
+          </select>
+        )}
 
         <select value={planFilter} onChange={(e) => { setPlanFilter(e.target.value); setPage(1) }} className={selectClass}>
           <option value="all">All Plans</option>
@@ -237,7 +240,7 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                   <HeaderCell col="dateAdded" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Added</HeaderCell>
                   <HeaderCell col="connected" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Status</HeaderCell>
                   <HeaderCell col="users" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Users</HeaderCell>
-                  <HeaderCell col="design" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Design</HeaderCell>
+                  {hasDesigns && <HeaderCell col="design" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Design</HeaderCell>}
                   <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-gray-400 whitespace-nowrap">Dashboard</th>
                   <HeaderCell col="plan" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort}>Plan</HeaderCell>
                   <HeaderCell col="price" sortCol={sortCol} sortDir={sortDir} onToggle={toggleSort} align="right">Price</HeaderCell>
@@ -292,24 +295,30 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                     <td className="px-3 py-3 text-center text-xs font-semibold tabular-nums text-gray-700">
                       {row.users > 0 ? row.users : <span className="text-gray-300">0</span>}
                     </td>
+                    {hasDesigns && (
+                      <td className="px-3 py-3">
+                        {row.design ? (
+                        <ChangeDesignButton locationId={row.id} currentSlug={row.design} designs={designs}>
+                          {row.design}
+                        </ChangeDesignButton>
+                        ) : <span className="text-xs text-gray-300">—</span>}
+                      </td>
+                    )}
                     <td className="px-3 py-3">
-                      {row.design ? (
-                      <ChangeDesignButton locationId={row.id} currentSlug={row.design} designs={designs}>
-                        {row.design}
-                      </ChangeDesignButton>
-                      ) : <span className="text-xs text-gray-300">—</span>}
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link
-                        href={`/admin/locations/${row.id}/widgets`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-600 shadow-sm transition hover:border-brand/25 hover:text-brand"
-                      >
-                        {row.dashboard && row.dashboard.widgetCount > 0 ? (
-                          <><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{row.dashboard.widgetCount} widgets</>
-                        ) : (
-                          'Configure'
-                        )}
-                      </Link>
+                      {row.connected ? (
+                        <Link
+                          href={`/admin/locations/${row.id}/widgets`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-600 shadow-sm transition hover:border-brand/25 hover:text-brand"
+                        >
+                          {row.dashboard && row.dashboard.widgetCount > 0 ? (
+                            <><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{row.dashboard.widgetCount} widgets</>
+                          ) : (
+                            'Configure'
+                          )}
+                        </Link>
+                      ) : (
+                        <span className="text-[11px] text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-xs text-gray-600">
                       {row.churned

@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
     const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString()
 
     const isAdminFlow = state.flow === 'admin_design_install'
+    const isConnectFlow = state.flow === 'connect_location'
     let packageSlug: string = state.flow === 'package_install' ? state.packageSlug : 'unknown'
     let designSlug: string | null = state.flow === 'admin_design_install' ? state.designSlug : null
     let autoInstall: boolean | null = state.flow === 'admin_design_install' ? true : null
@@ -126,6 +127,42 @@ export async function GET(req: NextRequest) {
         { location_id: data.locationId, name: locationName, updated_at: new Date().toISOString() },
         { onConflict: 'location_id' }
       )
+
+    // ── connect_location flow: simple connect, no design/install ──
+    if (isConnectFlow) {
+      // Save GHL connection
+      await supabase.from('ghl_connections').upsert(
+        {
+          location_id: data.locationId,
+          company_id: data.companyId,
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          expires_at: expiresAt,
+          status: 'active',
+        },
+        { onConflict: 'location_id' },
+      )
+
+      // Link location to the current user's agency
+      const cookieStore = await cookies()
+      const authClient = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { cookies: { getAll() { return cookieStore.getAll() }, setAll() {} } },
+      )
+      const { data: { user } } = await authClient.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('agency_id').eq('id', user.id).single()
+        if (profile?.agency_id) {
+          await supabase.from('locations').upsert(
+            { location_id: data.locationId, name: locationName, agency_id: profile.agency_id, updated_at: new Date().toISOString() },
+            { onConflict: 'location_id' },
+          )
+        }
+      }
+
+      return NextResponse.redirect(new URL('/admin/locations', req.url))
+    }
 
     const connectionStatus = autoInstall ? 'active' : 'pending'
 
@@ -223,7 +260,7 @@ export async function GET(req: NextRequest) {
                 .from('profiles')
                 .select('id, email')
                 .eq('location_id', data.locationId)
-                .eq('role', 'client')
+                .eq('role', 'agency')
                 .maybeSingle()
 
               if (existingByLocation) {
@@ -268,7 +305,7 @@ export async function GET(req: NextRequest) {
                   } else if (!prof) {
                     const { error: insertErr } = await supabase
                       .from('profiles')
-                      .insert({ id: profileId, email, role: 'client' })
+                      .insert({ id: profileId, email, role: 'agency' })
                     if (insertErr) {
                       console.error('[oauth/callback] profile insert failed:', insertErr.message, insertErr.code)
                       profileId = null

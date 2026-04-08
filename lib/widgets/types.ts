@@ -7,6 +7,44 @@ export type WidgetType =
   | 'gare_mensili'
   | 'pipeline_funnel'
   | 'leaderboard'
+  | 'custom'
+
+export type CustomDisplayType = 'metric' | 'table' | 'bar_chart' | 'line_chart' | 'pie_chart' | 'list' | 'progress' | 'static'
+
+export type CustomDataSource =
+  | 'contacts'
+  | 'opportunities'
+  | 'pipelines'
+  | 'users'
+  | 'calendars'
+  | 'tasks'
+  | 'conversations'
+  | 'invoices'
+  | 'tags'
+  | 'none' // for static/computed widgets like "working days"
+
+export interface CustomWidgetConfig {
+  displayType: CustomDisplayType
+  dataSource: CustomDataSource
+  /** GHL API sub-path or query params */
+  endpoint?: string
+  /** Which fields to show */
+  fields?: { key: string; label: string; format?: 'number' | 'currency' | 'date' | 'percent' | 'text' }[]
+  /** For metric widgets */
+  metric?: { field: string; label: string; format?: string; aggregation?: 'count' | 'sum' | 'avg' }
+  /** For chart widgets */
+  chart?: { xField: string; yField: string; label?: string }
+  /** For progress widgets */
+  progress?: { current: number; target: number; label: string }
+  /** For static widgets — raw content */
+  staticContent?: { html?: string; value?: string | number; subtitle?: string }
+  /** Computed logic (e.g., working days) */
+  compute?: string
+  /** Filters */
+  filters?: Record<string, string>
+  /** Colors override */
+  color?: string
+}
 
 export interface WidgetConfig {
   id: string
@@ -17,9 +55,15 @@ export interface WidgetConfig {
   options?: Record<string, unknown>
 }
 
+export interface DashboardColors {
+  primaryColor?: string
+  secondaryColor?: string
+}
+
 export interface DashboardLayout {
   columns: number
   widgets: WidgetConfig[]
+  colors?: DashboardColors
 }
 
 export interface CategoryData {

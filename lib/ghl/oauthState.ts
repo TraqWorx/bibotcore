@@ -5,6 +5,7 @@ const STATE_TTL_MS = 10 * 60 * 1000
 export type OAuthStatePayload =
   | { flow: 'package_install'; packageSlug: string; nonce: string; iat: number; exp: number }
   | { flow: 'admin_design_install'; designSlug: string; nonce: string; iat: number; exp: number }
+  | { flow: 'connect_location'; nonce: string; iat: number; exp: number }
 
 function getOAuthStateSecret() {
   const secret = process.env.GHL_OAUTH_STATE_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -33,24 +34,18 @@ function constantTimeEqual(a: string, b: string) {
 }
 
 export function createOAuthState(
-  input: { flow: 'package_install'; packageSlug: string } | { flow: 'admin_design_install'; designSlug: string },
+  input:
+    | { flow: 'package_install'; packageSlug: string }
+    | { flow: 'admin_design_install'; designSlug: string }
+    | { flow: 'connect_location' },
 ) {
   const now = Date.now()
+  const base = { nonce: randomUUID(), iat: now, exp: now + STATE_TTL_MS }
   const payload: OAuthStatePayload = input.flow === 'package_install'
-    ? {
-        flow: input.flow,
-        packageSlug: input.packageSlug,
-        nonce: randomUUID(),
-        iat: now,
-        exp: now + STATE_TTL_MS,
-      }
-    : {
-        flow: input.flow,
-        designSlug: input.designSlug,
-        nonce: randomUUID(),
-        iat: now,
-        exp: now + STATE_TTL_MS,
-      }
+    ? { flow: input.flow, packageSlug: input.packageSlug, ...base }
+    : input.flow === 'admin_design_install'
+    ? { flow: input.flow, designSlug: input.designSlug, ...base }
+    : { flow: input.flow, ...base }
 
   const encodedPayload = toBase64Url(JSON.stringify(payload))
   const signature = sign(encodedPayload)
@@ -73,6 +68,9 @@ export function verifyOAuthState(state: string): OAuthStatePayload | null {
       return payload as OAuthStatePayload
     }
     if (payload.flow === 'admin_design_install' && typeof payload.designSlug === 'string') {
+      return payload as OAuthStatePayload
+    }
+    if (payload.flow === 'connect_location') {
       return payload as OAuthStatePayload
     }
     return null

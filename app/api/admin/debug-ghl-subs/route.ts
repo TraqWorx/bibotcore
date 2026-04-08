@@ -22,7 +22,7 @@ export async function GET() {
 
   const supabase = createAdminClient()
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (profile?.role !== 'super_admin' && profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const token = process.env.GHL_AGENCY_TOKEN!
   const companyId = process.env.GHL_COMPANY_ID!

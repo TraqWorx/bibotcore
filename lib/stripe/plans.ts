@@ -1,16 +1,17 @@
-export const PLANS = {
-  basic: {
-    name: 'Basic Dashboard',
-    priceId: process.env.STRIPE_BASIC_PRICE_ID ?? '',
-    priceCents: 1000,
-    features: ['Pre-built dashboard templates', 'Basic widget set', 'GHL data sync', 'Embed via iframe'],
-  },
-  pro: {
-    name: 'Pro Dashboard',
-    priceId: process.env.STRIPE_PRO_PRICE_ID ?? '',
-    priceCents: 1900,
-    features: ['Everything in Basic', 'AI dashboard designer', 'Full widget library', 'Custom KPIs', 'Custom branding', 'Multiple dashboards'],
-  },
-} as const
+export const PLAN = {
+  name: 'GHL Dashboard',
+  id: 'pro' as const,
+  priceId: process.env.STRIPE_PRO_PRICE_ID ?? '',
+  priceCents: 1900,
+  priceLabel: '$19/mo',
+  features: [
+    'Visual drag-and-drop dashboard builder',
+    'AI dashboard designer — create any widget',
+    'GHL data sync (contacts, pipeline, calendar, team)',
+    'Custom widgets, colors, and branding',
+    'Embeddable share link for clients',
+    'Unlimited widget types',
+  ],
+}
 
-export type PlanId = keyof typeof PLANS
+export type PlanId = 'pro'

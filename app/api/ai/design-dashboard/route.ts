@@ -20,17 +20,19 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
   if (!profile?.agency_id) return NextResponse.json({ error: 'No agency' }, { status: 403 })
 
-  // Verify Pro plan
-  const { data: subscription } = await sb
-    .from('agency_subscriptions')
-    .select('plan')
-    .eq('agency_id', profile.agency_id)
-    .eq('location_id', locationId)
-    .eq('status', 'active')
-    .single()
-
-  if (!subscription || subscription.plan !== 'pro') {
-    return NextResponse.json({ error: 'Pro plan required for AI designer' }, { status: 403 })
+  // Verify subscription
+  const { isBibotAgency } = await import('@/lib/isBibotAgency')
+  if (!isBibotAgency(profile.agency_id)) {
+    const { data: subscription } = await sb
+      .from('agency_subscriptions')
+      .select('status')
+      .eq('agency_id', profile.agency_id)
+      .eq('location_id', locationId)
+      .eq('status', 'active')
+      .maybeSingle()
+    if (!subscription) {
+      return NextResponse.json({ error: 'Active subscription required' }, { status: 403 })
+    }
   }
 
   try {

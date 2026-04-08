@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createAdminClient } from '@/lib/supabase-server'
+import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { isBibotAgency } from '@/lib/isBibotAgency'
+import SubscribeBanner from './widgets/_components/SubscribeBanner'
 import ModuleToggles from './_components/ModuleToggles'
 import SyncStatus from './_components/SyncStatus'
 import UsersAndRoles from './_components/UsersAndRoles'
@@ -33,7 +35,26 @@ export default async function LocationDetailPage({
   params: Promise<{ locationId: string }>
 }) {
   const { locationId } = await params
+
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
   const supabase = createAdminClient()
+
+  // Check subscription for non-Bibot agencies
+  let needsSubscription = false
+  if (user) {
+    const { data: prof } = await supabase.from('profiles').select('agency_id').eq('id', user.id).single()
+    if (prof?.agency_id && !isBibotAgency(prof.agency_id)) {
+      const { data: sub } = await supabase
+        .from('agency_subscriptions')
+        .select('status')
+        .eq('agency_id', prof.agency_id)
+        .eq('location_id', locationId)
+        .eq('status', 'active')
+        .maybeSingle()
+      needsSubscription = !sub
+    }
+  }
 
   const [
     { data: location },
@@ -109,6 +130,27 @@ export default async function LocationDetailPage({
   const subscriptionStart = (location as { ghl_date_added?: string | null }).ghl_date_added ?? null
   const months = subscriptionStart ? paymentsMade(subscriptionStart) : 0
   const totalPaid = priceMonthly != null ? priceMonthly * months : null
+
+  if (needsSubscription) {
+    return (
+      <div className="space-y-6">
+        <Link
+          href="/admin/locations"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+        >
+          <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+            <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
+          </svg>
+          Back to Locations
+        </Link>
+        <div>
+          <h1 className={ad.pageTitle}>{location?.name || locationId}</h1>
+          <p className="mt-1 font-mono text-xs text-gray-400">{locationId}</p>
+        </div>
+        <SubscribeBanner locationId={locationId} />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

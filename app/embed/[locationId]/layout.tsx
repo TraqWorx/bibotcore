@@ -1,16 +1,40 @@
 import { resolveSimfoniaShell } from '@/lib/simfonia/shellTheme'
-import { DEFAULT_THEME } from '@/lib/types/design'
+import { DEFAULT_THEME, type DesignTheme } from '@/lib/types/design'
+import { createAdminClient } from '@/lib/supabase-server'
 import '@/app/designs/simfonia/shell.css'
 
 export const metadata = {
   title: 'Dashboard',
 }
 
-export default function EmbedLayout({ children }: { children: React.ReactNode }) {
-  const shell = resolveSimfoniaShell(DEFAULT_THEME)
+export default async function EmbedLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode
+  params: Promise<{ locationId: string }>
+}) {
+  const { locationId } = await params
+
+  // Load custom colors from dashboard_configs
+  const sb = createAdminClient()
+  const { data: config } = await sb
+    .from('dashboard_configs')
+    .select('theme')
+    .eq('location_id', locationId)
+    .maybeSingle()
+
+  const customTheme = config?.theme as { primaryColor?: string; secondaryColor?: string } | null
+  const theme: DesignTheme = {
+    ...DEFAULT_THEME,
+    ...(customTheme?.primaryColor && { primaryColor: customTheme.primaryColor }),
+    ...(customTheme?.secondaryColor && { secondaryColor: customTheme.secondaryColor }),
+  }
+
+  const shell = resolveSimfoniaShell(theme)
   const cssVars = `:root {
-    --brand: ${DEFAULT_THEME.secondaryColor};
-    --accent: ${DEFAULT_THEME.secondaryColor};
+    --brand: ${theme.secondaryColor};
+    --accent: ${theme.secondaryColor};
     --foreground: ${shell.foreground};
     --shell-bg: ${shell.shellBg};
     --shell-surface: ${shell.shellSurface};

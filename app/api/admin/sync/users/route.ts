@@ -18,7 +18,7 @@ async function getAuthenticatedAdmin() {
   if (!user) return null
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'super_admin') return null
+  if (profile?.role !== 'super_admin' && profile?.role !== 'admin') return null
   return user
 }
 

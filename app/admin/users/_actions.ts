@@ -15,7 +15,7 @@ async function assertSuperAdmin() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'super_admin') throw new Error('Not authorized')
+  if (profile?.role !== 'super_admin' && profile?.role !== 'admin') throw new Error('Not authorized')
 }
 
 export async function inviteUser(
@@ -154,7 +154,7 @@ export async function syncGhlUsers(): Promise<{ synced: number; removed: number;
             if (profileId) {
               const { data: prof } = await supabase.from('profiles').select('id').eq('id', profileId).maybeSingle()
               if (!prof) {
-                await supabase.from('profiles').insert({ id: profileId, email, role: 'client' })
+                await supabase.from('profiles').insert({ id: profileId, email, role: 'agency' })
               }
             }
           }

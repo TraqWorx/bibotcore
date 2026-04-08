@@ -25,19 +25,25 @@ const getLayoutData = cache(async () => {
     const supabase = createAdminClient()
 
     const [{ data: profile }, { data: connections }, { data: profileLocs }, cookieStore] = await Promise.all([
-      supabase.from('profiles').select('role, location_id').eq('id', user.id).single(),
+      supabase.from('profiles').select('role, location_id, agency_id').eq('id', user.id).single(),
       supabase.from('ghl_connections').select('location_id').order('location_id'),
       supabase.from('profile_locations').select('location_id').eq('user_id', user.id),
       cookies(),
     ])
 
-    const isSuperAdmin = profile?.role === 'super_admin'
+    const isAdmin = profile?.role === 'admin'
     const connectedIds = new Set((connections ?? []).map((c) => c.location_id).filter(Boolean))
 
     let locationIds: string[]
-    if (isSuperAdmin) {
-      locationIds = [...connectedIds]
+    if (isAdmin && profile?.agency_id) {
+      // Admins see all locations in their agency
+      const { data: agencyLocs } = await supabase
+        .from('locations')
+        .select('location_id')
+        .eq('agency_id', profile.agency_id)
+      locationIds = (agencyLocs ?? []).map((l) => l.location_id).filter((id) => connectedIds.has(id))
     } else {
+      // Everyone (including super_admin) — only locations they're associated with
       const fromDb = (profileLocs ?? []).map((r) => r.location_id)
       locationIds = fromDb.filter((id) => connectedIds.has(id))
       if (locationIds.length === 0 && profile?.location_id && connectedIds.has(profile.location_id)) {

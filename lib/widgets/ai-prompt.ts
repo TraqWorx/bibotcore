@@ -1,22 +1,17 @@
-import { WIDGET_META } from './registry'
-import type { WidgetType } from './types'
+import { WIDGET_META, BUILDER_WIDGET_TYPES } from './registry'
 
 export function buildDesignerPrompt(): string {
-  const widgetDocs = (Object.entries(WIDGET_META) as [WidgetType, typeof WIDGET_META[WidgetType]][])
-    .map(([type, meta]) => `- **${type}** (span: ${meta.defaultSpan}): ${meta.description}`)
+  const widgetDocs = BUILDER_WIDGET_TYPES
+    .map((type) => {
+      const meta = WIDGET_META[type]
+      return `- **${type}** (default span: ${meta.defaultSpan}): ${meta.description}`
+    })
     .join('\n')
 
   return `You are a dashboard designer for a CRM platform. You create dashboard layouts by generating JSON configurations.
 
-## Available Widget Types
+## Available Widget Types (ONLY use these)
 ${widgetDocs}
-
-## KPI Widget Options
-The "kpi" widget accepts an \`options.metric\` field:
-- "total_contacts" — Total contact count
-- "switch_out" — Switch Out count (highlighted red if > 0)
-- "target" — Annual target (admin) or daily average (user)
-- "progress" — % achieved (admin) or appointment count (user)
 
 ## Output Format
 Return ONLY valid JSON matching this structure:
@@ -29,23 +24,22 @@ Return ONLY valid JSON matching this structure:
 
 ## Rules
 - "columns" is always 12
-- Each widget needs a unique "id" (use descriptive kebab-case like "kpi-contacts")
-- "span" is the grid column span (1-12). Common: 3 for KPIs, 4 for sidebar widgets, 6 for half-width, 8 for main content, 12 for full-width
-- "type" must be one of the available widget types listed above
-- Only include "options" when needed (e.g., for kpi widgets)
+- Each widget needs a unique "id" (use descriptive kebab-case like "trend-main")
+- "type" MUST be one of: ${BUILDER_WIDGET_TYPES.join(', ')}
+- Do NOT use "kpi", "category_breakdown", "performance_overview", or "gare_mensili" — these are not available
+- "span" is the grid column span (1-12). Common: 4 for sidebar widgets, 6 for half-width, 8 for main content, 12 for full-width
 - Keep layouts clean and balanced — don't exceed 12 columns per row
 - Return ONLY the JSON, no markdown, no explanation
 
 ## Example
-For "show me contacts and a trend chart":
+For "show me contacts and upcoming appointments":
 {
   "columns": 12,
   "widgets": [
-    { "id": "kpi-contacts", "type": "kpi", "span": 4, "options": { "metric": "total_contacts" } },
-    { "id": "kpi-target", "type": "kpi", "span": 4, "options": { "metric": "target" } },
-    { "id": "kpi-progress", "type": "kpi", "span": 4, "options": { "metric": "progress" } },
     { "id": "trend", "type": "contacts_trend", "span": 8 },
-    { "id": "agenda", "type": "agenda_preview", "span": 4 }
+    { "id": "agenda", "type": "agenda_preview", "span": 4 },
+    { "id": "funnel", "type": "pipeline_funnel", "span": 6 },
+    { "id": "ranking", "type": "leaderboard", "span": 6 }
   ]
 }`
 }

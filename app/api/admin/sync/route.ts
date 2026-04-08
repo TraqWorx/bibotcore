@@ -27,18 +27,22 @@ async function getAuthenticatedAdmin() {
   const sb = createAdminClient()
   const { data: profile } = await sb
     .from('profiles')
-    .select('role')
+    .select('role, agency_id')
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'super_admin') return null
-  return user
+  // Super admin or admin can sync
+  if (profile?.role === 'super_admin' || profile?.role === 'admin') {
+    return { user, agencyId: profile.agency_id }
+  }
+
+  return null
 }
 
 /** POST — trigger bulk sync for a location */
 export async function POST(request: Request) {
-  const admin = await getAuthenticatedAdmin()
-  if (!admin) {
+  const auth = await getAuthenticatedAdmin()
+  if (!auth) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -48,9 +52,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'locationId required' }, { status: 400 })
   }
 
+  // Agency owners can only sync locations belonging to their agency
+  const sb = createAdminClient()
+  if (auth.agencyId) {
+    const { data: loc } = await sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+    if (loc?.agency_id && loc.agency_id !== auth.agencyId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  }
+
   try {
-    // Check if location has an OAuth connection
-    const sb = createAdminClient()
     const { data: conn } = await sb
       .from('ghl_connections')
       .select('refresh_token')
@@ -80,8 +91,8 @@ export async function POST(request: Request) {
 
 /** GET — check sync status for a location */
 export async function GET(request: Request) {
-  const admin = await getAuthenticatedAdmin()
-  if (!admin) {
+  const auth = await getAuthenticatedAdmin()
+  if (!auth) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

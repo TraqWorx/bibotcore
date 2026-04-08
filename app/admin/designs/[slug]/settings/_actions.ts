@@ -10,7 +10,7 @@ async function assertSuperAdmin() {
   if (!user) throw new Error('Not authenticated')
   const supabase = createAdminClient()
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'super_admin') throw new Error('Not authorized')
+  if (profile?.role !== 'super_admin' && profile?.role !== 'admin') throw new Error('Not authorized')
 }
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/

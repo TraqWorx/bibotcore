@@ -145,7 +145,7 @@ export async function syncLocationUsers(
     const { data: prof } = await supabase.from('profiles').select('id, role').eq('id', profileId).maybeSingle()
     if (prof?.role === 'super_admin') continue
     if (!prof) {
-      await supabase.from('profiles').insert({ id: profileId, email, role: 'client' })
+      await supabase.from('profiles').insert({ id: profileId, email, role: 'agency' })
     }
     await supabase.from('profiles').update({ location_id: locationId }).eq('id', profileId)
     await supabase.from('installs').update({ user_id: profileId }).eq('location_id', locationId)

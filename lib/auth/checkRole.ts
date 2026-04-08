@@ -10,14 +10,17 @@
 
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 
-export type PlatformRole = 'super_admin' | 'user'
+export type PlatformRole = 'super_admin' | 'admin' | 'agency' | 'user'
 export type LocationRole = 'location_admin' | 'team_member' | 'viewer'
 
 const ROLE_LEVEL: Record<string, number> = {
   super_admin: 100,
+  admin: 90,
   location_admin: 80,
+  agency: 60,
   team_member: 50,
   viewer: 10,
+  user: 5,
 }
 
 export interface UserRoles {
@@ -44,7 +47,10 @@ export async function getUserRoles(locationId: string): Promise<UserRoles | null
     sb.from('profile_locations').select('role').eq('user_id', user.id).eq('location_id', locationId).single(),
   ])
 
-  const platformRole: PlatformRole = profile?.role === 'super_admin' ? 'super_admin' : 'user'
+  const knownRoles: readonly string[] = ['super_admin', 'admin', 'agency']
+  const platformRole: PlatformRole = profile?.role && knownRoles.includes(profile.role)
+    ? (profile.role as PlatformRole)
+    : 'user'
   const locationRole = (membership?.role as LocationRole) ?? null
 
   const platformLevel = ROLE_LEVEL[platformRole] ?? 0

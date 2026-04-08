@@ -14,31 +14,37 @@ export default async function RedirectPage() {
     .eq('id', user.id)
     .single()
 
-  console.log('[redirect]', user.email, 'role:', profile?.role, 'agency_id:', profile?.agency_id)
-
-  // Super admin → platform
-  if (profile?.role === 'super_admin') {
-    console.log('[redirect] → /platform')
-    redirect('/platform')
+  // Existing user — route by role
+  if (profile) {
+    if (profile.role === 'super_admin') redirect('/platform')
+    if (profile.role === 'admin') redirect('/admin')
+    if (profile.role === 'agency') redirect('/agency')
+    redirect('/agency')
   }
 
-  // Agency owner → admin panel
-  if (profile?.agency_id) {
-    const { data: agency } = await supabase
-      .from('agencies')
-      .select('owner_user_id')
-      .eq('id', profile.agency_id)
-      .single()
+  // New user — auto-create agency + profile with admin role
+  const email = user.email ?? ''
+  const agencyName = email.split('@')[1]?.split('.')[0] ?? 'My Agency'
+  const displayName = agencyName.charAt(0).toUpperCase() + agencyName.slice(1)
 
-    console.log('[redirect] agency owner:', agency?.owner_user_id, 'user:', user.id, 'match:', agency?.owner_user_id === user.id)
+  const { data: newAgency } = await supabase
+    .from('agencies')
+    .insert({
+      name: displayName,
+      email,
+      owner_user_id: user.id,
+    })
+    .select('id')
+    .single()
 
-    if (agency?.owner_user_id === user.id) {
-      console.log('[redirect] → /admin')
-      redirect('/admin')
-    }
+  if (newAgency) {
+    await supabase.from('profiles').upsert({
+      id: user.id,
+      email,
+      role: 'admin',
+      agency_id: newAgency.id,
+    }, { onConflict: 'id' })
   }
 
-  // Everyone else → location picker
-  console.log('[redirect] → /agency')
-  redirect('/agency')
+  redirect('/admin')
 }

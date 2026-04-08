@@ -4,6 +4,8 @@ import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import OpenCrmButton from './locations/_components/OpenCrmButton'
 import { ad } from '@/lib/admin/ui'
 
+export const dynamic = 'force-dynamic'
+
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
 async function ghlAgencyGet(path: string) {
@@ -31,11 +33,11 @@ export default async function AgencyPage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, location_id')
+    .select('role, location_id, agency_id')
     .eq('id', user.id)
     .single()
 
-  const isSuperAdmin = profile?.role === 'super_admin'
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
   const companyId = process.env.GHL_COMPANY_ID
 
   // All connected location IDs from Supabase
@@ -77,23 +79,26 @@ export default async function AgencyPage({
     return prof?.location_id ? [prof.location_id] : []
   }
 
-  // Super admin previewing as a specific user
-  if (isSuperAdmin && previewAs) {
+  // Admin or super_admin previewing as a specific user
+  if ((isAdmin) && previewAs) {
     const { data: targetProfile } = await supabase
       .from('profiles')
-      .select('email')
+      .select('email, agency_id')
       .eq('id', previewAs)
       .single()
 
-    if (targetProfile?.email) {
+    // Agency owners can only preview users in their own agency
+    // Admins can preview users in their own agency; super_admin can preview anyone
+    const canPreview = profile?.role === 'super_admin' || (isAdmin && targetProfile?.agency_id === profile?.agency_id)
+    if (targetProfile?.email && canPreview) {
       previewUserEmail = targetProfile.email
       locationIds = await resolveLocationsForUser(previewAs, targetProfile.email)
     }
-  } else if (isSuperAdmin) {
-    locationIds = [...connectedIds]
   } else {
     locationIds = await resolveLocationsForUser(user.id, user.email ?? '')
   }
+
+  console.log('[agency] resolved locationIds:', locationIds.length, locationIds)
 
   // Fetch names + install info + packages in parallel
   const [{ data: locationRows }, { data: installs }, ghlLocationsData, { data: ghlPlans }] = await Promise.all([
@@ -160,6 +165,7 @@ export default async function AgencyPage({
   })
 
   // Compute stats
+  const hasDesigns = rows.some((r) => r.designSlug)
   const designCounts: Record<string, number> = {}
   for (const row of rows) {
     const key = row.designSlug ?? '—'
@@ -205,19 +211,17 @@ export default async function AgencyPage({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className={`grid gap-4 ${hasDesigns ? 'grid-cols-4' : 'grid-cols-3'}`}>
         {/* Total locations */}
         <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Location Totali</p>
           <p className="mt-2 text-3xl font-bold text-gray-900">{rows.length}</p>
         </div>
 
-        {/* Per design */}
-        <div className={ad.panel}>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">Per Design</p>
-          {Object.keys(designCounts).length === 0 ? (
-            <p className="text-sm text-gray-300">—</p>
-          ) : (
+        {/* Per design — only shown if agency has designs */}
+        {hasDesigns && (
+          <div className={ad.panel}>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">Per Design</p>
             <div className="space-y-2">
               {Object.entries(designCounts)
                 .sort((a, b) => b[1] - a[1])
@@ -234,8 +238,8 @@ export default async function AgencyPage({
                   </div>
                 ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Monthly revenue */}
         <div className={ad.panel}>
@@ -290,7 +294,7 @@ export default async function AgencyPage({
             <thead>
               <tr className={ad.tableHeadRow}>
                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Location</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Design</th>
+                {hasDesigns && <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Design</th>}
                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Piano</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Prezzo</th>
                 <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Mesi</th>
@@ -302,11 +306,13 @@ export default async function AgencyPage({
               {rows.map((row) => (
                 <tr key={row.locationId} className="hover:bg-gray-50/60 transition-colors">
                   <td className="px-5 py-4 font-medium text-gray-900">{row.name}</td>
-                  <td className="px-5 py-4 text-gray-600">
-                    {row.designSlug
-                      ? <span className="rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand">{row.designSlug}</span>
-                      : <span className="text-gray-300">—</span>}
-                  </td>
+                  {hasDesigns && (
+                    <td className="px-5 py-4 text-gray-600">
+                      {row.designSlug
+                        ? <span className="rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand">{row.designSlug}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                  )}
                   <td className="px-5 py-4 text-xs font-medium text-gray-700">
                     {row.planName ?? <span className="text-gray-300">—</span>}
                   </td>

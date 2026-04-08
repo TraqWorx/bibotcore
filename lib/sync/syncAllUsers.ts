@@ -107,7 +107,7 @@ export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
           if (profileId) {
             const { data: existingProf } = await sb.from('profiles').select('id').eq('id', profileId).maybeSingle()
             if (!existingProf) {
-              await sb.from('profiles').insert({ id: profileId, email, role: 'client' })
+              await sb.from('profiles').insert({ id: profileId, email, role: 'agency' })
             }
           }
         }

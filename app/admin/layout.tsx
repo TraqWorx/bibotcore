@@ -13,15 +13,12 @@ const getAdminData = cache(async () => {
   const admin = createAdminClient()
   const { data: profile } = await admin.from('profiles').select('role, agency_id').eq('id', user.id).single()
 
-  // Must have an agency to access /admin
-  if (!profile?.agency_id) return null
+  // Only admin role can access /admin
+  if (profile?.role !== 'admin' || !profile.agency_id) return null
 
   const agencyId = profile.agency_id
-  const { data: agency } = await admin.from('agencies').select('name, owner_user_id').eq('id', agencyId).single()
+  const { data: agency } = await admin.from('agencies').select('name').eq('id', agencyId).single()
   if (!agency) return null
-
-  // Only agency owner can access /admin
-  if (agency.owner_user_id !== user.id) return null
 
   const agencyName = agency.name
 
@@ -35,7 +32,6 @@ const getAdminData = cache(async () => {
     { href: '/admin', label: 'Dashboard' },
     { href: '/admin/users', label: 'Users', count: userCount ?? 0 },
     { href: '/admin/locations', label: 'Locations', count: locationCount ?? 0 },
-    { href: '/admin/billing', label: 'Billing' },
   ]
 
   // Agencies with installed designs get Designs + Plan Mapping
@@ -51,7 +47,7 @@ const getAdminData = cache(async () => {
     }
   }
 
-  return { navLinks, agencyName, agencyId, initials: agencyName.slice(0, 2).toUpperCase() }
+  return { navLinks, agencyName, agencyId, initials: agencyName.slice(0, 2).toUpperCase(), accountLink: { href: '/admin/account', label: 'Account & Billing' } }
 })
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -78,6 +74,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <div className="border-t border-gray-200/60 px-3 py-4">
                 <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">Gestione</p>
                 <AdminNavClient navLinks={data.navLinks} />
+              </div>
+              <div className="border-t border-gray-200/60 px-3 py-2">
+                <AdminNavClient navLinks={[data.accountLink]} />
               </div>
               <div className="flex items-center justify-between border-t border-gray-200/60 px-5 py-4">
                 <p className="text-[10px] text-gray-400">GHL Dash © 2026</p>

@@ -22,7 +22,7 @@ export async function getActiveLocation(
   if (locationId) {
     // Run profile + access check in parallel
     const [{ data: profile }, { data: membership }, { data: install }] = await Promise.all([
-      supabase.from('profiles').select('role').eq('id', user.id).single(),
+      supabase.from('profiles').select('role, agency_id').eq('id', user.id).single(),
       supabase.from('profile_locations').select('role').eq('user_id', user.id).eq('location_id', locationId).maybeSingle(),
       supabase.from('installs').select('location_id').eq('user_id', user.id).eq('location_id', locationId).maybeSingle(),
     ])
@@ -30,16 +30,27 @@ export async function getActiveLocation(
     if (profile?.role === 'super_admin' || membership || install) {
       return locationId
     }
+    // Admin can access any location in their agency
+    if (profile?.role === 'admin' && profile.agency_id) {
+      const { data: loc } = await supabase.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+      if (loc?.agency_id === profile.agency_id) return locationId
+    }
     throw new Error('Location not found or access denied')
   }
 
   // No locationId — auto-select
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
 
   if (profile?.role === 'super_admin') {
     const { data: conn } = await supabase.from('ghl_connections').select('location_id').limit(1).single()
     if (!conn?.location_id) throw new Error('No connected location found')
     return conn.location_id
+  }
+
+  // Admin — pick first location in their agency
+  if (profile?.role === 'admin' && profile.agency_id) {
+    const { data: loc } = await supabase.from('locations').select('location_id').eq('agency_id', profile.agency_id).limit(1).single()
+    if (loc?.location_id) return loc.location_id
   }
 
   const { data: install } = await supabase
@@ -61,12 +72,16 @@ export async function assertUserOwnsLocation(locationId: string): Promise<void> 
 
   // Run all checks in parallel
   const [{ data: profile }, { data: membership }, { data: install }] = await Promise.all([
-    supabase.from('profiles').select('role').eq('id', user.id).single(),
+    supabase.from('profiles').select('role, agency_id').eq('id', user.id).single(),
     supabase.from('profile_locations').select('role').eq('user_id', user.id).eq('location_id', locationId).maybeSingle(),
     supabase.from('installs').select('location_id').eq('user_id', user.id).eq('location_id', locationId).maybeSingle(),
   ])
 
   if (profile?.role === 'super_admin' || membership || install) return
+  if (profile?.role === 'admin' && profile.agency_id) {
+    const { data: loc } = await supabase.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+    if (loc?.agency_id === profile.agency_id) return
+  }
   throw new Error('Location not found or access denied')
 }
 
