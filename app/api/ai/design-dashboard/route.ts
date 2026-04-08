@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
 import { buildDesignerPrompt } from '@/lib/widgets/ai-prompt'
 import { validateConfig } from '@/lib/widgets/validateConfig'
 
-const anthropic = new Anthropic()
+async function getAnthropic() {
+  const { default: Client } = await import('@anthropic-ai/sdk')
+  return new Client()
+}
 
 export async function POST(req: NextRequest) {
   const { prompt, locationId } = await req.json()
@@ -38,6 +41,7 @@ export async function POST(req: NextRequest) {
   try {
     const systemPrompt = buildDesignerPrompt()
 
+    const anthropic = await getAnthropic()
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,

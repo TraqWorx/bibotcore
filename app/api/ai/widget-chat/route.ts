@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
 import { PRESET_WIDGETS } from '@/lib/widgets/registry'
 
-const anthropic = new Anthropic()
+async function getAnthropic() {
+  const { default: Client } = await import('@anthropic-ai/sdk')
+  return new Client()
+}
 
 function buildSystemPrompt(): string {
   const presets = PRESET_WIDGETS.flatMap((cat) =>
@@ -188,6 +191,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const anthropic = await getAnthropic()
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2048,
