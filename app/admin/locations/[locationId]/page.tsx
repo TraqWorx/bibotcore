@@ -3,30 +3,16 @@ import Link from 'next/link'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import SubscribeBanner from './widgets/_components/SubscribeBanner'
-import ModuleToggles from './_components/ModuleToggles'
 import SyncStatus from './_components/SyncStatus'
 import UsersAndRoles from './_components/UsersAndRoles'
 import BulkJobsDashboard from './_components/BulkJobsDashboard'
+import ModuleToggles from './_components/ModuleToggles'
 import { DEFAULT_MODULES } from '@/lib/types/design'
 import type { DesignModules } from '@/lib/types/design'
 import { ad } from '@/lib/admin/ui'
 
-function paymentsMade(iso: string): number {
-  const start = new Date(iso)
-  const end = new Date()
-  const billingDay = start.getDate()
-  let payments = 0
-  const cursor = new Date(start)
-  while (cursor <= end) {
-    payments++
-    cursor.setMonth(cursor.getMonth() + 1)
-    cursor.setDate(billingDay)
-  }
-  return Math.max(1, payments)
-}
-
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
+  return new Date(iso).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 export default async function LocationDetailPage({
@@ -40,111 +26,62 @@ export default async function LocationDetailPage({
   const { data: { user } } = await authClient.auth.getUser()
   const supabase = createAdminClient()
 
-  // Check subscription for non-Bibot agencies
-  let needsSubscription = false
+  // Get agency info
+  let agencyId: string | null = null
+  let isBibot = false
   if (user) {
     const { data: prof } = await supabase.from('profiles').select('agency_id').eq('id', user.id).single()
-    if (prof?.agency_id && !isBibotAgency(prof.agency_id)) {
-      const { data: sub } = await supabase
-        .from('agency_subscriptions')
-        .select('status')
-        .eq('agency_id', prof.agency_id)
-        .eq('location_id', locationId)
-        .eq('status', 'active')
-        .maybeSingle()
-      needsSubscription = !sub
-    }
+    agencyId = prof?.agency_id ?? null
+    isBibot = isBibotAgency(agencyId)
   }
 
-  const [
-    { data: location },
-    { data: profileLocationRows },
-    { data: legacyProfiles },
-    { data: install },
-  ] = await Promise.all([
-    supabase
-      .from('locations')
-      .select('location_id, name, ghl_plan_id, ghl_date_added')
+  // Check subscription
+  let isSubscribed = isBibot
+  if (!isBibot && agencyId) {
+    const { data: sub } = await supabase
+      .from('agency_subscriptions')
+      .select('status, price_cents, created_at')
+      .eq('agency_id', agencyId)
       .eq('location_id', locationId)
-      .single(),
-    supabase
-      .from('profile_locations')
-      .select('user_id')
-      .eq('location_id', locationId),
-    // Fallback: old profiles.location_id
-    supabase
-      .from('profiles')
-      .select('id, email, role, created_at')
-      .eq('location_id', locationId),
-    supabase
-      .from('installs')
-      .select('design_slug, installed_at, configured')
-      .eq('location_id', locationId)
-      .maybeSingle(),
-  ])
-
-  // Combine user IDs from junction table + legacy profiles.location_id
-  const userIds = [...new Set([
-    ...(profileLocationRows ?? []).map((r) => r.user_id),
-    ...(legacyProfiles ?? []).map((p) => p.id),
-  ])]
-
-  let profiles: { id: string; email: string | null; role: string | null; created_at: string | null }[] = []
-  if (userIds.length > 0) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, email, role, created_at')
-      .in('id', userIds)
-      .order('created_at')
-    profiles = data ?? []
+      .eq('status', 'active')
+      .maybeSingle()
+    isSubscribed = !!sub
   }
+
+  // Check GHL connection
+  const { data: connection } = await supabase
+    .from('ghl_connections')
+    .select('location_id, refresh_token')
+    .eq('location_id', locationId)
+    .maybeSingle()
+  const isConnected = !!connection?.refresh_token
+
+  const { data: location } = await supabase
+    .from('locations')
+    .select('location_id, name, ghl_plan_id, ghl_date_added')
+    .eq('location_id', locationId)
+    .single()
 
   if (!location) notFound()
 
-  // Design modules + location overrides
-  let designModules: Record<string, { enabled: boolean }> = {}
-  let locationModuleOverrides: Record<string, { enabled: boolean }> = {}
+  // Dashboard config
+  const { data: dashboardConfig } = await supabase
+    .from('dashboard_configs')
+    .select('config')
+    .eq('location_id', locationId)
+    .maybeSingle()
+  const widgetCount = Array.isArray(dashboardConfig?.config) ? dashboardConfig.config.length : 0
 
-  if (install?.design_slug) {
-    const [{ data: design }, { data: locSettings }] = await Promise.all([
-      supabase.from('designs').select('modules').eq('slug', install.design_slug).single(),
-      supabase.from('location_design_settings').select('module_overrides').eq('location_id', locationId).single(),
-    ])
-    designModules = (design?.modules as Partial<DesignModules> ?? DEFAULT_MODULES) as Record<string, { enabled: boolean }>
-    locationModuleOverrides = (locSettings?.module_overrides as Record<string, { enabled: boolean }>) ?? {}
-  }
-
-  // Plan data
-  let planName: string | null = null
-  let priceMonthly: number | null = null
-  if (location.ghl_plan_id) {
-    const { data: plan } = await supabase
-      .from('ghl_plans')
-      .select('name, price_monthly')
-      .eq('ghl_plan_id', location.ghl_plan_id)
-      .single()
-    planName = plan?.name ?? `Unknown (…${location.ghl_plan_id!.slice(-6)})`
-    priceMonthly = plan?.price_monthly != null ? Number(plan.price_monthly) : null
-  }
-
-  const subscriptionStart = (location as { ghl_date_added?: string | null }).ghl_date_added ?? null
-  const months = subscriptionStart ? paymentsMade(subscriptionStart) : 0
-  const totalPaid = priceMonthly != null ? priceMonthly * months : null
-
-  if (needsSubscription) {
+  // Paywall for non-Bibot
+  if (!isSubscribed) {
     return (
       <div className="space-y-6">
-        <Link
-          href="/admin/locations"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors"
-        >
-          <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-            <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
-          </svg>
+        <Link href="/admin/locations" className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors">
+          <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" /></svg>
           Back to Locations
         </Link>
         <div>
-          <h1 className={ad.pageTitle}>{location?.name || locationId}</h1>
+          <h1 className={ad.pageTitle}>{location.name || locationId}</h1>
           <p className="mt-1 font-mono text-xs text-gray-400">{locationId}</p>
         </div>
         <SubscribeBanner locationId={locationId} />
@@ -152,135 +89,140 @@ export default async function LocationDetailPage({
     )
   }
 
+  // ── Bibot-only data ──
+  let profiles: { id: string; email: string | null; role: string | null; created_at: string | null }[] = []
+  let install: { design_slug: string | null; installed_at: string | null; configured: boolean } | null = null
+  let designModules: Record<string, { enabled: boolean }> = {}
+  let locationModuleOverrides: Record<string, { enabled: boolean }> = {}
+
+  if (isBibot) {
+    const [{ data: profileLocationRows }, { data: legacyProfiles }, { data: installRow }] = await Promise.all([
+      supabase.from('profile_locations').select('user_id').eq('location_id', locationId),
+      supabase.from('profiles').select('id, email, role, created_at').eq('location_id', locationId),
+      supabase.from('installs').select('design_slug, installed_at, configured').eq('location_id', locationId).maybeSingle(),
+    ])
+    install = installRow
+
+    const userIds = [...new Set([...(profileLocationRows ?? []).map((r) => r.user_id), ...(legacyProfiles ?? []).map((p) => p.id)])]
+    if (userIds.length > 0) {
+      const { data } = await supabase.from('profiles').select('id, email, role, created_at').in('id', userIds).order('created_at')
+      profiles = data ?? []
+    }
+
+    if (install?.design_slug) {
+      const [{ data: design }, { data: locSettings }] = await Promise.all([
+        supabase.from('designs').select('modules').eq('slug', install.design_slug).single(),
+        supabase.from('location_design_settings').select('module_overrides').eq('location_id', locationId).single(),
+      ])
+      designModules = (design?.modules as Partial<DesignModules> ?? DEFAULT_MODULES) as Record<string, { enabled: boolean }>
+      locationModuleOverrides = (locSettings?.module_overrides as Record<string, { enabled: boolean }>) ?? {}
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Back */}
-      <Link
-        href="/admin/locations"
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors"
-      >
-        <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-          <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
-        </svg>
+      <Link href="/admin/locations" className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors">
+        <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" /></svg>
         Back to Locations
       </Link>
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className={ad.pageTitle}>{location.name || location.location_id}</h1>
-          <p className="mt-1 font-mono text-xs text-gray-400">{location.location_id}</p>
+          <h1 className={ad.pageTitle}>{location.name || locationId}</h1>
+          <p className="mt-1 font-mono text-xs text-gray-400">{locationId}</p>
         </div>
-        {install?.design_slug && (
-          <span className="rounded-full border border-brand/20 bg-brand/10 px-3 py-1 text-xs font-bold text-brand">
-            {install.design_slug}
-          </span>
+        <div className="flex items-center gap-2">
+          {isConnected && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Connected
+            </span>
+          )}
+          {!isConnected && isSubscribed && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Not Connected
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Status cards */}
+      <div className={`grid gap-4 ${isBibot ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <div className={ad.panel}>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Dashboard</p>
+          <p className="mt-2 text-xl font-bold text-gray-900">
+            {widgetCount > 0 ? `${widgetCount} widgets` : <span className="text-gray-300">Not configured</span>}
+          </p>
+          {isConnected && (
+            <Link href={`/admin/locations/${locationId}/widgets`} className="mt-3 inline-flex text-xs font-semibold text-brand hover:underline">
+              {widgetCount > 0 ? 'Edit Dashboard' : 'Configure Dashboard'}
+            </Link>
+          )}
+        </div>
+
+        <div className={ad.panel}>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">GHL Connection</p>
+          <p className="mt-2 text-xl font-bold text-gray-900">
+            {isConnected ? 'Active' : <span className="text-gray-300">Pending</span>}
+          </p>
+          {isConnected && (
+            <p className="mt-0.5 text-xs text-gray-400">OAuth connected</p>
+          )}
+        </div>
+
+        {isBibot && (
+          <div className={ad.panel}>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Users</p>
+            <p className="mt-2 text-xl font-bold text-gray-900">{profiles.length}</p>
+            <p className="mt-0.5 text-xs text-gray-400">linked to this location</p>
+          </div>
         )}
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-4 gap-4">
-        {/* Plan */}
-        <div className={ad.panel}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Plan</p>
-          <p className="mt-2 text-xl font-bold text-gray-900">
-            {planName ?? <span className="text-gray-300">—</span>}
-          </p>
-          {location.ghl_plan_id && (
-            <p className="mt-0.5 font-mono text-[10px] text-gray-300 truncate">{location.ghl_plan_id}</p>
+      {/* Bibot-only sections */}
+      {isBibot && (
+        <>
+          <UsersAndRoles locationId={locationId} profiles={profiles} />
+
+          {install?.design_slug && (
+            <>
+              <div className={ad.panel}>
+                <h2 className="mb-3 text-sm font-bold text-gray-900">Install</h2>
+                <dl className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">Design</dt>
+                    <dd className="mt-1 font-medium text-gray-800">{install.design_slug}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">Installed</dt>
+                    <dd className="mt-1 text-gray-600">{install.installed_at ? formatDate(install.installed_at) : '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">Status</dt>
+                    <dd className="mt-1">
+                      <span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${install.configured ? 'border-emerald-200 bg-emerald-50/80 text-emerald-800' : 'border-amber-200 bg-amber-50/80 text-amber-800'}`}>
+                        {install.configured ? 'Configured' : 'Pending'}
+                      </span>
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div className={ad.panel}>
+                <div className="mb-1">
+                  <h2 className="text-sm font-bold text-gray-900">Modules</h2>
+                  <p className="text-xs text-gray-500">Enable or disable features for this location.</p>
+                </div>
+                <ModuleToggles locationId={locationId} designModules={designModules} locationOverrides={locationModuleOverrides} />
+              </div>
+            </>
           )}
-        </div>
 
-        {/* Monthly price */}
-        <div className={ad.panel}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Monthly</p>
-          <p className="mt-2 text-xl font-bold text-gray-900">
-            {priceMonthly != null
-              ? `€${priceMonthly.toLocaleString('it-IT')}`
-              : <span className="text-gray-300">—</span>}
-          </p>
-          {priceMonthly != null && (
-            <p className="mt-0.5 text-xs text-gray-400">per month</p>
-          )}
-        </div>
-
-        {/* Subscription duration */}
-        <div className={ad.panel}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Subscribed</p>
-          <p className="mt-2 text-xl font-bold text-gray-900">
-            {subscriptionStart ? `${months} mo` : <span className="text-gray-300">—</span>}
-          </p>
-          {subscriptionStart && (
-            <p className="mt-0.5 text-xs text-gray-400">since {formatDate(subscriptionStart)}</p>
-          )}
-        </div>
-
-        {/* Total paid */}
-        <div className={ad.panel}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Paid</p>
-          <p className="mt-2 text-xl font-bold text-emerald-700">
-            {totalPaid != null
-              ? `€${totalPaid.toLocaleString('it-IT')}`
-              : <span className="text-gray-300">—</span>}
-          </p>
-          {totalPaid != null && (
-            <p className="mt-0.5 text-xs text-gray-400">{months} × €{priceMonthly?.toLocaleString('it-IT')}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Users & Roles (unified) */}
-      <UsersAndRoles locationId={locationId} profiles={profiles} />
-
-      {/* Install info */}
-      {install && (
-        <div className={ad.panel}>
-          <h2 className="mb-3 text-sm font-bold text-gray-900">Install</h2>
-          <dl className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">Design</dt>
-              <dd className="mt-1 font-medium text-gray-800">{install.design_slug ?? '—'}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">Installed</dt>
-              <dd className="mt-1 text-gray-600">
-                {install.installed_at ? formatDate(install.installed_at) : '—'}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">Status</dt>
-              <dd className="mt-1">
-                <span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${
-                  install.configured ? 'border-emerald-200 bg-emerald-50/80 text-emerald-800' : 'border-amber-200 bg-amber-50/80 text-amber-800'
-                }`}>
-                  {install.configured ? 'Configured' : 'Pending'}
-                </span>
-              </dd>
-            </div>
-          </dl>
-        </div>
+          <SyncStatus locationId={locationId} />
+          <BulkJobsDashboard locationId={locationId} />
+        </>
       )}
-
-      {/* Module overrides */}
-      {install?.design_slug && (
-        <div className={ad.panel}>
-          <div className="mb-1">
-            <h2 className="text-sm font-bold text-gray-900">Modules</h2>
-            <p className="text-xs text-gray-500">Enable or disable features for this location. Overrides the design defaults.</p>
-          </div>
-          <ModuleToggles
-            locationId={locationId}
-            designModules={designModules}
-            locationOverrides={locationModuleOverrides}
-          />
-        </div>
-      )}
-
-      {/* Sync Status */}
-      <SyncStatus locationId={locationId} />
-
-      {/* Bulk AI Jobs */}
-      <BulkJobsDashboard locationId={locationId} />
     </div>
   )
 }
