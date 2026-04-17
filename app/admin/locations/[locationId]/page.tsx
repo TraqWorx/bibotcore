@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import SubscribeBanner from './widgets/_components/SubscribeBanner'
+import ConnectLocationButton from '../_components/ConnectLocationButton'
 import SyncStatus from './_components/SyncStatus'
 import UsersAndRoles from './_components/UsersAndRoles'
 import BulkJobsDashboard from './_components/BulkJobsDashboard'
@@ -166,8 +167,12 @@ export default async function LocationDetailPage({
           <p className="mt-2 text-xl font-bold text-gray-900">
             {isConnected ? 'Active' : <span className="text-gray-300">Pending</span>}
           </p>
-          {isConnected && (
+          {isConnected ? (
             <p className="mt-0.5 text-xs text-gray-400">OAuth connected</p>
+          ) : (
+            <div className="mt-3">
+              <ConnectLocationButton locationId={locationId} size="small" />
+            </div>
           )}
         </div>
 
