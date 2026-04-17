@@ -1,4 +1,6 @@
-import { createAdminClient } from '@/lib/supabase-server'
+import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { redirect } from 'next/navigation'
+import { isBibotAgency } from '@/lib/isBibotAgency'
 import LogoutButton from './_components/LogoutButton'
 import LocationChart from './_components/LocationChart'
 import { ad } from '@/lib/admin/ui'
@@ -51,8 +53,54 @@ async function fetchGhlLocations(): Promise<GhlLocation[]> {
 }
 
 export default async function AdminPage() {
-  const supabase = createAdminClient()
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) redirect('/login')
 
+  const supabase = createAdminClient()
+  const { data: profile } = await supabase.from('profiles').select('agency_id').eq('id', user.id).single()
+  const agencyId = profile?.agency_id
+  const isBibot = isBibotAgency(agencyId)
+
+  // Non-Bibot: simple agency dashboard
+  if (!isBibot && agencyId) {
+    const [{ count: locationCount }, { count: activeSubCount }, { data: subs }] = await Promise.all([
+      supabase.from('locations').select('location_id', { count: 'exact', head: true }).eq('agency_id', agencyId),
+      supabase.from('agency_subscriptions').select('id', { count: 'exact', head: true }).eq('agency_id', agencyId).eq('status', 'active'),
+      supabase.from('agency_subscriptions').select('location_id, plan, status, price_cents').eq('agency_id', agencyId).eq('status', 'active'),
+    ])
+    const monthlyTotal = (subs ?? []).reduce((s, sub) => s + (sub.price_cents ?? 0), 0)
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className={ad.pageTitle}>Dashboard</h1>
+          <p className="mt-0.5 text-sm text-gray-400">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div className={ad.panel}>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Locations</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">{locationCount ?? 0}</p>
+            <p className="mt-0.5 text-xs text-gray-400">connected</p>
+          </div>
+          <div className={ad.panel}>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Active Subscriptions</p>
+            <p className="mt-2 text-3xl font-bold text-brand">{activeSubCount ?? 0}</p>
+            <p className="mt-0.5 text-xs text-gray-400">locations unlocked</p>
+          </div>
+          <div className={ad.panel}>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Monthly Cost</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">${(monthlyTotal / 100).toFixed(0)}/mo</p>
+            <p className="mt-0.5 text-xs text-gray-400">{(subs ?? []).length} active plan{(subs ?? []).length !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Bibot: full platform analytics
   const now = new Date()
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
   const todayStr = now.toISOString().split('T')[0]

@@ -104,8 +104,48 @@ export async function getGhlOAuthUrl(
   return { url }
 }
 
-export async function getConnectLocationUrl(): Promise<{ url: string } | { error: string }> {
-  await assertSuperAdmin()
+export async function addLocation(locationId: string): Promise<{ error: string } | undefined> {
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const sb = createAdminClient()
+  const { data: profile } = await sb.from('profiles').select('role, agency_id').eq('id', user.id).single()
+  if (profile?.role !== 'admin' && profile?.role !== 'super_admin') return { error: 'Not authorized' }
+  if (!profile.agency_id) return { error: 'No agency' }
+
+  const trimmed = locationId.trim()
+  if (!trimmed) return { error: 'Location ID is required' }
+
+  // Check if already exists for this agency
+  const { data: existing } = await sb.from('locations').select('location_id').eq('location_id', trimmed).eq('agency_id', profile.agency_id).maybeSingle()
+  if (existing) return { error: 'This location is already in your list' }
+
+  const { error } = await sb.from('locations').upsert(
+    { location_id: trimmed, name: trimmed, agency_id: profile.agency_id },
+    { onConflict: 'location_id' },
+  )
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/locations')
+}
+
+export async function getConnectLocationUrl(locationId: string): Promise<{ url: string } | { error: string }> {
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const sb = createAdminClient()
+  const { data: profile } = await sb.from('profiles').select('role, agency_id').eq('id', user.id).single()
+  if (profile?.role !== 'admin' && profile?.role !== 'super_admin') return { error: 'Not authorized' }
+
+  // Check subscription (Bibot bypasses)
+  const { isBibotAgency } = await import('@/lib/isBibotAgency')
+  if (!isBibotAgency(profile?.agency_id)) {
+    const { data: sub } = await sb.from('agency_subscriptions').select('status').eq('agency_id', profile!.agency_id!).eq('location_id', locationId).eq('status', 'active').maybeSingle()
+    if (!sub) return { error: 'Subscribe to this location before connecting GHL' }
+  }
+
   const clientId = process.env.GHL_CLIENT_ID
   const redirectUri = process.env.GHL_REDIRECT_URI
   if (!clientId || !redirectUri) {
@@ -115,7 +155,7 @@ export async function getConnectLocationUrl(): Promise<{ url: string } | { error
   const { createOAuthState } = await import('@/lib/ghl/oauthState')
   const scope = process.env.GHL_SCOPES ?? GHL_SCOPES
   const versionId = process.env.GHL_APP_VERSION_ID ?? ''
-  const state = createOAuthState({ flow: 'connect_location' })
+  const state = createOAuthState({ flow: 'connect_location', locationId })
   const params = new URLSearchParams({ response_type: 'code', redirect_uri: redirectUri, client_id: clientId, state })
   let url = `https://marketplace.gohighlevel.com/oauth/chooselocation?${params.toString()}&scope=${encodeURIComponent(scope).replace(/%2F/g, '/')}`
   if (versionId) url += `&version_id=${versionId}`

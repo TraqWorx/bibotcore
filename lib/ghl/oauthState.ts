@@ -5,7 +5,7 @@ const STATE_TTL_MS = 10 * 60 * 1000
 export type OAuthStatePayload =
   | { flow: 'package_install'; packageSlug: string; nonce: string; iat: number; exp: number }
   | { flow: 'admin_design_install'; designSlug: string; nonce: string; iat: number; exp: number }
-  | { flow: 'connect_location'; nonce: string; iat: number; exp: number }
+  | { flow: 'connect_location'; locationId?: string; nonce: string; iat: number; exp: number }
 
 function getOAuthStateSecret() {
   const secret = process.env.GHL_OAUTH_STATE_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -37,7 +37,7 @@ export function createOAuthState(
   input:
     | { flow: 'package_install'; packageSlug: string }
     | { flow: 'admin_design_install'; designSlug: string }
-    | { flow: 'connect_location' },
+    | { flow: 'connect_location'; locationId?: string },
 ) {
   const now = Date.now()
   const base = { nonce: randomUUID(), iat: now, exp: now + STATE_TTL_MS }
@@ -45,7 +45,7 @@ export function createOAuthState(
     ? { flow: input.flow, packageSlug: input.packageSlug, ...base }
     : input.flow === 'admin_design_install'
     ? { flow: input.flow, designSlug: input.designSlug, ...base }
-    : { flow: input.flow, ...base }
+    : { flow: input.flow, locationId: input.locationId, ...base }
 
   const encodedPayload = toBase64Url(JSON.stringify(payload))
   const signature = sign(encodedPayload)

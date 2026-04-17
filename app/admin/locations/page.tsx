@@ -4,7 +4,7 @@ import { isBibotAgency } from '@/lib/isBibotAgency'
 import BulkConnectButton from './_components/BulkConnectButton'
 import LocationsTable from './_components/LocationsTable'
 import SyncSubscriptionsButton from './_components/SyncSubscriptionsButton'
-import ConnectLocationButton from './_components/ConnectLocationButton'
+import AddLocationForm from './_components/AddLocationForm'
 import { ad } from '@/lib/admin/ui'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
@@ -103,7 +103,7 @@ export default async function LocationsPage() {
   // ── Common data loading ──
   const locationIds = ghlLocations.map((l) => l.id)
 
-  const [{ data: installs }, { data: designs }, { data: connections }, { data: userProfiles }, { data: ghlPlans }, { data: dashboardConfigs }] =
+  const [{ data: installs }, { data: designs }, { data: connections }, { data: userProfiles }, { data: ghlPlans }, { data: dashboardConfigs }, { data: subscriptions }] =
     await Promise.all([
       locationIds.length ? supabase.from('installs').select('location_id, design_slug').in('location_id', locationIds) : Promise.resolve({ data: [] }),
       supabase.from('designs').select('slug, name').order('name'),
@@ -111,7 +111,10 @@ export default async function LocationsPage() {
       locationIds.length ? supabase.from('profile_locations').select('location_id').in('location_id', locationIds) : Promise.resolve({ data: [] }),
       supabase.from('ghl_plans').select('ghl_plan_id, name, price_monthly').order('name'),
       locationIds.length ? supabase.from('dashboard_configs').select('location_id, embed_token, config').in('location_id', locationIds) : Promise.resolve({ data: [] }),
+      locationIds.length ? supabase.from('agency_subscriptions').select('location_id, status').eq('agency_id', agencyId).eq('status', 'active').in('location_id', locationIds) : Promise.resolve({ data: [] }),
     ])
+
+  const subscribedIds = new Set((subscriptions ?? []).map((s) => s.location_id))
 
   // Plan assignments from locations table
   const { data: locationPlanRows } = locationIds.length
@@ -172,6 +175,7 @@ export default async function LocationsPage() {
       id: l.id,
       name: l.name,
       connected: connectedIds.has(l.id),
+      subscribed: isBibot || subscribedIds.has(l.id),
       users: userCountByLocation[l.id] ?? 0,
       design: designByLocation[l.id] ?? null,
       dashboard: dashboardByLocation[l.id] ?? null,
@@ -198,7 +202,7 @@ export default async function LocationsPage() {
           {isBibot ? (
             <BulkConnectButton designs={designsList} unconnectedLocations={unconnectedLocations} />
           ) : (
-            <ConnectLocationButton />
+            <AddLocationForm />
           )}
         </div>
       </div>
@@ -206,12 +210,12 @@ export default async function LocationsPage() {
       {ghlLocations.length === 0 ? (
         <div className={`${ad.panel} py-16 text-center`}>
           <div className="mx-auto max-w-sm">
-            <p className="text-sm font-medium text-gray-900">No locations connected yet</p>
+            <p className="text-sm font-medium text-gray-900">No locations yet</p>
             <p className="mt-1 text-sm text-gray-500">
-              Connect your first GHL location to get started. Each location gets its own dashboard.
+              Add your first GHL location ID to get started.
             </p>
             <div className="mt-6">
-              <ConnectLocationButton />
+              <AddLocationForm />
             </div>
           </div>
         </div>

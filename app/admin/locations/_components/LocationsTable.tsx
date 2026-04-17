@@ -15,11 +15,14 @@ import ConnectButton from './ConnectButton'
 import DisconnectButton from './DisconnectButton'
 import ChangeDesignButton from './ChangeDesignButton'
 import ReauthorizeButton from './ReauthorizeButton'
+import SubscribeButton from './SubscribeButton'
+import ConnectLocationButton from './ConnectLocationButton'
 
 interface LocationRow {
   id: string
   name: string
   connected: boolean
+  subscribed: boolean
   users: number
   design: string | null
   dashboard: { token: string; widgetCount: number } | null
@@ -305,7 +308,7 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                       </td>
                     )}
                     <td className="px-3 py-3">
-                      {row.connected ? (
+                      {row.connected && row.subscribed ? (
                         <Link
                           href={`/admin/locations/${row.id}/widgets`}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-600 shadow-sm transition hover:border-brand/25 hover:text-brand"
@@ -316,6 +319,10 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                             'Configure'
                           )}
                         </Link>
+                      ) : row.subscribed && !row.connected ? (
+                        <ConnectLocationButton locationId={row.id} size="small" />
+                      ) : !row.subscribed ? (
+                        <SubscribeButton locationId={row.id} />
                       ) : (
                         <span className="text-[11px] text-gray-300">—</span>
                       )}
