@@ -6,16 +6,17 @@ export default async function PlatformAgenciesPage() {
 
   const [{ data: agencies }, { data: subscriptions }] = await Promise.all([
     sb.from('agencies').select('id, name, email, created_at').order('created_at', { ascending: false }),
-    sb.from('agency_subscriptions').select('agency_id, plan, status, price_cents'),
+    sb.from('agency_subscriptions').select('agency_id, status, price_cents'),
   ])
 
-  const subsByAgency = new Map<string, { total: number; basic: number; pro: number; mrr: number }>()
+  const subsByAgency = new Map<string, { total: number; active: number; mrr: number }>()
   for (const sub of subscriptions ?? []) {
-    const existing = subsByAgency.get(sub.agency_id) ?? { total: 0, basic: 0, pro: 0, mrr: 0 }
+    const existing = subsByAgency.get(sub.agency_id) ?? { total: 0, active: 0, mrr: 0 }
     existing.total++
-    if (sub.plan === 'basic') existing.basic++
-    else existing.pro++
-    if (sub.status === 'active') existing.mrr += sub.price_cents
+    if (sub.status === 'active') {
+      existing.active++
+      existing.mrr += sub.price_cents
+    }
     subsByAgency.set(sub.agency_id, existing)
   }
 
@@ -33,15 +34,14 @@ export default async function PlatformAgenciesPage() {
               <th className="px-5 py-3">Agency</th>
               <th className="px-5 py-3">Email</th>
               <th className="px-5 py-3 text-center">Locations</th>
-              <th className="px-5 py-3 text-center">Basic</th>
-              <th className="px-5 py-3 text-center">Pro</th>
+              <th className="px-5 py-3 text-center">Active</th>
               <th className="px-5 py-3 text-right">MRR</th>
               <th className="px-5 py-3">Joined</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {(agencies ?? []).map((agency) => {
-              const stats = subsByAgency.get(agency.id) ?? { total: 0, basic: 0, pro: 0, mrr: 0 }
+              const stats = subsByAgency.get(agency.id) ?? { total: 0, active: 0, mrr: 0 }
               return (
                 <tr key={agency.id} className="transition-colors hover:bg-gray-50/50">
                   <td className="px-5 py-3.5">
@@ -51,8 +51,7 @@ export default async function PlatformAgenciesPage() {
                   </td>
                   <td className="px-5 py-3.5 text-gray-500">{agency.email}</td>
                   <td className="px-5 py-3.5 text-center font-semibold">{stats.total}</td>
-                  <td className="px-5 py-3.5 text-center">{stats.basic}</td>
-                  <td className="px-5 py-3.5 text-center">{stats.pro}</td>
+                  <td className="px-5 py-3.5 text-center font-semibold text-emerald-600">{stats.active}</td>
                   <td className="px-5 py-3.5 text-right font-bold tabular-nums text-brand">${(stats.mrr / 100).toFixed(0)}</td>
                   <td className="px-5 py-3.5 text-gray-400">
                     {new Date(agency.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
