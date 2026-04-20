@@ -92,18 +92,8 @@ export default async function WidgetEditorPage({
 
       <DashboardBuilder
         locationId={locationId}
-        initialLayout={currentLayout}
+        initialWidgets={currentLayout?.widgets ?? []}
         initialColors={currentColors}
-        initialTemplates={savedTemplates}
-        isPro={true}
-        onSave={async (layout, colors, templates) => {
-          'use server'
-          return saveConfig(locationId, agencyId, layout, colors, templates)
-        }}
-        onClear={async () => {
-          'use server'
-          return clearConfig(locationId)
-        }}
       />
 
       {!isSubscribed && currentLayout && (

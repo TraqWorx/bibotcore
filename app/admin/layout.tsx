@@ -65,9 +65,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!data) redirect('/agency')
 
   return (
-    <div className="min-h-screen bg-[#f5f5f8]">
+    <div id="admin-layout" className="min-h-screen bg-[#f5f5f8]">
       <div className="mx-auto flex min-h-screen w-full max-w-[96rem] gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <aside className="hidden w-72 shrink-0 lg:block">
+        <aside id="admin-sidebar" className="hidden w-72 shrink-0 lg:block">
           <div className="sticky top-6 space-y-4">
             <div
               className="overflow-hidden rounded-3xl border border-gray-200/70 bg-gradient-to-br from-white via-[color-mix(in_srgb,var(--brand)_4%,white)] to-[color-mix(in_srgb,var(--accent)_6%,white)] shadow-sm"

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { CustomWidgetConfig } from './types'
+import type { CustomWidgetConfig, CustomDataSource } from './types'
 import { useDashboardFilters } from './DashboardFilterContext'
 import WidgetShell from './WidgetShell'
 
@@ -272,6 +272,114 @@ function ProgressDisplay({ config }: { config: CustomWidgetConfig }) {
   )
 }
 
+// ── Dropdown Widget ──
+function DropdownDisplay({ items, config }: { items: unknown[]; config: CustomWidgetConfig }) {
+  const [selected, setSelected] = useState<number>(0)
+  const dd = config.dropdown
+  if (!dd) return null
+
+  const options = items.map((item, i) => ({
+    label: String(getNestedValue(item, dd.labelField) ?? `Item ${i + 1}`),
+    item,
+  }))
+  const current = options[selected]?.item
+
+  return (
+    <div className="p-4">
+      <select
+        value={selected}
+        onChange={(e) => setSelected(Number(e.target.value))}
+        className="w-full rounded-lg border px-3 py-2 text-sm font-medium outline-none"
+        style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-soft)', color: 'var(--foreground)' }}
+      >
+        {options.map((o, i) => <option key={i} value={i}>{o.label}</option>)}
+      </select>
+      {current != null && dd.detailFields && (
+        <div className="mt-3 space-y-2">
+          {dd.detailFields.map((f) => (
+            <div key={f.key} className="flex items-center justify-between py-1" style={{ borderBottom: '1px solid var(--shell-line)' }}>
+              <span className="text-xs font-medium" style={{ color: 'var(--shell-muted)' }}>{f.label}</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>{String(formatValue(getNestedValue(current, f.key), f.format))}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Tabs Widget ──
+function TabsDisplay({ config, locationId, globalFilters }: { config: CustomWidgetConfig; locationId: string; globalFilters?: { userId?: string } }) {
+  const [activeTab, setActiveTab] = useState(0)
+  const tabs = config.tabs
+  if (!tabs?.length) return null
+
+  const activeConfig = tabs[activeTab]
+
+  return (
+    <div>
+      <div className="flex border-b" style={{ borderColor: 'var(--shell-line)' }}>
+        {tabs.map((tab, i) => (
+          <button
+            key={i}
+            onClick={() => setActiveTab(i)}
+            className="px-4 py-2 text-xs font-semibold transition-colors"
+            style={{
+              color: i === activeTab ? 'var(--brand)' : 'var(--shell-muted)',
+              borderBottom: i === activeTab ? '2px solid var(--brand)' : '2px solid transparent',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <TabContent key={activeTab} tab={activeConfig} locationId={locationId} globalFilters={globalFilters} />
+    </div>
+  )
+}
+
+function TabContent({ tab, locationId, globalFilters }: { tab: { dataSource: CustomDataSource; fields?: { key: string; label: string; format?: string }[]; metric?: { field: string; label: string; aggregation?: 'count' | 'sum' | 'avg'; format?: string } }; locationId: string; globalFilters?: { userId?: string } }) {
+  const tabConfig = { displayType: tab.metric ? 'metric' : 'table', dataSource: tab.dataSource, fields: tab.fields, metric: tab.metric } as CustomWidgetConfig
+  const { data: rawData, loading } = useWidgetData(locationId, tabConfig, globalFilters)
+  const items = extractItems(rawData, tab.dataSource)
+
+  if (loading) return <div className="flex items-center justify-center p-6"><div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-200" style={{ borderTopColor: 'var(--brand)' }} /></div>
+  if (tab.metric) return <MetricDisplay items={items} config={tabConfig} />
+  return <TableDisplay items={items} config={tabConfig} />
+}
+
+// ── Cards Grid Widget ──
+function CardsGridDisplay({ items, config }: { items: unknown[]; config: CustomWidgetConfig }) {
+  const cg = config.cardsGrid
+  if (!cg) return null
+  const cols = cg.columns ?? 3
+
+  return (
+    <div className="p-4 grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+      {items.slice(0, 20).map((item, i) => (
+        <div key={i} className="rounded-xl border p-3 transition hover:shadow-md" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-soft)' }}>
+          {cg.imageField && getNestedValue(item, cg.imageField) != null && (
+            <div className="h-8 w-8 rounded-full mb-2 bg-cover bg-center" style={{ backgroundImage: `url(${String(getNestedValue(item, cg.imageField))})` }} />
+          )}
+          <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+            {String(getNestedValue(item, cg.labelField) ?? `Item ${i + 1}`)}
+          </p>
+          {cg.valueField && (
+            <p className="mt-0.5 text-lg font-black" style={{ color: 'var(--brand)' }}>
+              {String(getNestedValue(item, cg.valueField) ?? '—')}
+            </p>
+          )}
+          {cg.subtitleField && (
+            <p className="text-[11px]" style={{ color: 'var(--shell-muted)' }}>
+              {String(getNestedValue(item, cg.subtitleField) ?? '')}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Main Custom Widget ──
 export default function CustomWidget({ title, options }: Props) {
   const config = options as CustomWidgetConfig
@@ -302,6 +410,11 @@ export default function CustomWidget({ title, options }: Props) {
     )
   }
 
+  // Tabs need special handling — they fetch their own data per tab
+  if (config.displayType === 'tabs') {
+    return <WidgetShell title={title}><TabsDisplay config={config} locationId={locationId} globalFilters={globalFilters} /></WidgetShell>
+  }
+
   return (
     <WidgetShell title={title}>
       {config.displayType === 'metric' && <MetricDisplay items={items} config={config} />}
@@ -311,6 +424,8 @@ export default function CustomWidget({ title, options }: Props) {
       {config.displayType === 'progress' && <ProgressDisplay config={config} />}
       {config.displayType === 'pie_chart' && <BarChartDisplay items={items} config={config} />}
       {config.displayType === 'line_chart' && <BarChartDisplay items={items} config={config} />}
+      {config.displayType === 'dropdown' && <DropdownDisplay items={items} config={config} />}
+      {config.displayType === 'cards_grid' && <CardsGridDisplay items={items} config={config} />}
     </WidgetShell>
   )
 }

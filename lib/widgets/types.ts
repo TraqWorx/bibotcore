@@ -9,7 +9,7 @@ export type WidgetType =
   | 'leaderboard'
   | 'custom'
 
-export type CustomDisplayType = 'metric' | 'table' | 'bar_chart' | 'line_chart' | 'pie_chart' | 'list' | 'progress' | 'static'
+export type CustomDisplayType = 'metric' | 'table' | 'bar_chart' | 'line_chart' | 'pie_chart' | 'list' | 'progress' | 'static' | 'dropdown' | 'tabs' | 'cards_grid'
 
 export type CustomDataSource =
   | 'contacts'
@@ -44,6 +44,22 @@ export interface CustomWidgetConfig {
   filters?: Record<string, string>
   /** Colors override */
   color?: string
+  /** For dropdown widgets — shows a selector that displays detail for selected item */
+  dropdown?: {
+    labelField: string
+    detailFields?: { key: string; label: string; format?: 'number' | 'currency' | 'date' | 'percent' | 'text' }[]
+    groupBy?: string
+  }
+  /** For tabs — multiple views in one widget */
+  tabs?: { label: string; dataSource: CustomDataSource; fields?: { key: string; label: string; format?: string }[]; metric?: { field: string; label: string; aggregation?: 'count' | 'sum' | 'avg'; format?: string } }[]
+  /** For cards_grid — clickable card grid */
+  cardsGrid?: {
+    labelField: string
+    valueField?: string
+    subtitleField?: string
+    imageField?: string
+    columns?: number
+  }
 }
 
 export interface WidgetConfig {
