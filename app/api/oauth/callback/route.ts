@@ -130,10 +130,20 @@ export async function GET(req: NextRequest) {
 
     // ── connect_location flow: simple connect, no design/install ──
     if (isConnectFlow) {
+      const expectedLocationId = state.locationId
+      const ghlLocationId = data.locationId
+
+      // If we expected a specific location, verify it matches
+      if (expectedLocationId && expectedLocationId !== ghlLocationId) {
+        const errorUrl = new URL('/admin/locations', req.url)
+        errorUrl.searchParams.set('error', `You selected a different GHL location. Expected: ${expectedLocationId}, got: ${ghlLocationId}. Please try again and select the correct location.`)
+        return NextResponse.redirect(errorUrl)
+      }
+
       // Save GHL connection
       await supabase.from('ghl_connections').upsert(
         {
-          location_id: data.locationId,
+          location_id: ghlLocationId,
           company_id: data.companyId,
           access_token: data.access_token,
           refresh_token: data.refresh_token,
@@ -154,14 +164,14 @@ export async function GET(req: NextRequest) {
       if (user) {
         const { data: profile } = await supabase.from('profiles').select('agency_id').eq('id', user.id).single()
         if (profile?.agency_id) {
-          await supabase.from('locations').upsert(
-            { location_id: data.locationId, name: locationName, agency_id: profile.agency_id, updated_at: new Date().toISOString() },
-            { onConflict: 'location_id' },
-          )
+          // Update the existing location record with GHL data
+          await supabase.from('locations').update(
+            { name: locationName, updated_at: new Date().toISOString() },
+          ).eq('location_id', ghlLocationId).eq('agency_id', profile.agency_id)
         }
       }
 
-      return NextResponse.redirect(new URL('/admin/locations', req.url))
+      return NextResponse.redirect(new URL('/admin/locations?connected=true', req.url))
     }
 
     const connectionStatus = autoInstall ? 'active' : 'pending'
@@ -398,6 +408,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/install/design', req.url))
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[oauth/callback] error:', message)
+    const errorUrl = new URL('/admin/locations', req.url)
+    errorUrl.searchParams.set('error', `Connection failed: ${message}`)
+    return NextResponse.redirect(errorUrl)
   }
 }

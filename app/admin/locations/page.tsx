@@ -55,7 +55,12 @@ async function fetchAllGhlLocations(token: string, companyId?: string): Promise<
   })
 }
 
-export default async function LocationsPage() {
+export default async function LocationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; connected?: string }>
+}) {
+  const sp = await searchParams
   const authClient = await createAuthClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) redirect('/login')
@@ -193,6 +198,12 @@ export default async function LocationsPage() {
 
   return (
     <div className="space-y-6">
+      {sp.error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{sp.error}</div>
+      )}
+      {sp.connected && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">Location connected successfully!</div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className={ad.pageTitle}>Locations</h1>

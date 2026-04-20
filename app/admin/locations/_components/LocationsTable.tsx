@@ -17,6 +17,7 @@ import ChangeDesignButton from './ChangeDesignButton'
 import ReauthorizeButton from './ReauthorizeButton'
 import SubscribeButton from './SubscribeButton'
 import ConnectLocationButton from './ConnectLocationButton'
+import CancelSubscriptionButton from './CancelSubscriptionButton'
 
 interface LocationRow {
   id: string
@@ -349,14 +350,16 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        {row.connected ? (
+                        {row.connected && hasDesigns ? (
                           <>
                             {row.needsOAuth && row.design && (
                               <ReauthorizeButton designSlug={row.design} />
                             )}
                             <DisconnectButton locationId={row.id} />
                           </>
-                        ) : hasDesigns ? (
+                        ) : !hasDesigns && row.subscribed ? (
+                          <CancelSubscriptionButton locationId={row.id} />
+                        ) : hasDesigns && !row.connected ? (
                           <ConnectButton designs={designs} unconnectedLocations={unconnectedLocations} preselectedId={row.id} />
                         ) : null}
                       </div>
