@@ -15,7 +15,7 @@ export default function ConnectLocationButton({ locationId, size = 'default' }: 
       setError(result.error)
       setLoading(false)
     } else {
-      window.open(result.url, '_blank')
+      window.location.href = result.url
     }
   }
 
