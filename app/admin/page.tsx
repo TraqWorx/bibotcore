@@ -2,6 +2,7 @@ import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { isBibotAgency } from '@/lib/isBibotAgency'
+import AddLocationForm from './locations/_components/AddLocationForm'
 import LogoutButton from './_components/LogoutButton'
 import LocationChart from './_components/LocationChart'
 import { ad } from '@/lib/admin/ui'
@@ -74,17 +75,20 @@ export default async function AdminPage() {
 
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className={ad.pageTitle}>Dashboard</h1>
-          <p className="mt-0.5 text-sm text-gray-400">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className={ad.pageTitle}>Dashboard</h1>
+            <p className="mt-0.5 text-sm text-gray-400">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </p>
+          </div>
+          <AddLocationForm />
         </div>
         <div className="grid grid-cols-3 gap-4">
           <div className={ad.panel}>
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Locations</p>
             <p className="mt-2 text-3xl font-bold text-gray-900">{locationCount ?? 0}</p>
-            <p className="mt-0.5 text-xs text-gray-400">connected</p>
+            <p className="mt-0.5 text-xs text-gray-400">added</p>
           </div>
           <div className={ad.panel}>
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Active Subscriptions</p>

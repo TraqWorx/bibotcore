@@ -30,7 +30,6 @@ const getAdminData = cache(async () => {
 
   const navLinks = [
     { href: '/admin', label: 'Dashboard' },
-    { href: '/admin/users', label: 'Users', count: userCount ?? 0 },
     { href: '/admin/locations', label: 'Locations', count: locationCount ?? 0 },
   ]
 
@@ -47,7 +46,12 @@ const getAdminData = cache(async () => {
     }
   }
 
-  return { navLinks, agencyName, agencyId, initials: agencyName.slice(0, 2).toUpperCase(), accountLink: { href: '/admin/account', label: 'Account & Billing' }, email: user.email ?? '' }
+  const bottomLinks = [
+    { href: '/admin/users', label: 'Users', count: userCount ?? 0 },
+    { href: '/admin/account', label: 'Account & Billing' },
+  ]
+
+  return { navLinks, bottomLinks, agencyName, agencyId, initials: agencyName.slice(0, 2).toUpperCase(), email: user.email ?? '' }
 })
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -76,7 +80,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 <AdminNavClient navLinks={data.navLinks} />
               </div>
               <div className="border-t border-gray-200/60 px-3 py-2">
-                <AdminNavClient navLinks={[data.accountLink]} />
+                <AdminNavClient navLinks={data.bottomLinks} />
               </div>
               <div className="border-t border-gray-200/60 px-5 py-4">
                 <p className="truncate text-[11px] font-medium text-gray-500 mb-2">{data.email}</p>
