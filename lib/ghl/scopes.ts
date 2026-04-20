@@ -150,4 +150,5 @@ export const GHL_SCOPES = [
   'charges.write',
   'marketplace-installer-details.readonly',
   'marketplace-external-auth-migration.write',
+  'affiliate-manager.readonly',
 ].join(' ')
