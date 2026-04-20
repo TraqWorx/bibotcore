@@ -98,7 +98,7 @@ export async function getGhlOAuthUrl(
   const versionId = process.env.GHL_APP_VERSION_ID ?? ''
   const state = createOAuthState({ flow: 'admin_design_install', designSlug })
   const params = new URLSearchParams({ response_type: 'code', redirect_uri: redirectUri, client_id: clientId, state })
-  let url = `https://marketplace.gohighlevel.com/oauth/chooselocation?${params.toString()}&scope=${encodeURIComponent(scope).replace(/%2F/g, '/')}`
+  let url = `https://marketplace.gohighlevel.com/v2/oauth/chooselocation?${params.toString()}&scope=${encodeURIComponent(scope).replace(/%2F/g, '/')}`
   if (versionId) url += `&version_id=${versionId}`
   return { url }
 }
@@ -156,7 +156,7 @@ export async function getConnectLocationUrl(locationId: string): Promise<{ url: 
   const versionId = process.env.GHL_APP_VERSION_ID ?? ''
   const state = createOAuthState({ flow: 'connect_location', locationId })
   const params = new URLSearchParams({ response_type: 'code', redirect_uri: redirectUri, client_id: clientId, state })
-  let url = `https://marketplace.gohighlevel.com/oauth/chooselocation?${params.toString()}&scope=${encodeURIComponent(scope).replace(/%2F/g, '/')}`
+  let url = `https://marketplace.gohighlevel.com/v2/oauth/chooselocation?${params.toString()}&scope=${encodeURIComponent(scope).replace(/%2F/g, '/')}`
   if (versionId) url += `&version_id=${versionId}`
   return { url }
 }
