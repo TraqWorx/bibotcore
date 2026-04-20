@@ -48,7 +48,18 @@ export async function GET(req: NextRequest) {
     const data = await res.json()
     if (!res.ok) return NextResponse.json(data, { status: res.status })
 
+    console.log('[oauth/callback] Token response keys:', Object.keys(data))
+    console.log('[oauth/callback] locationId:', data.locationId, 'location_id:', data.location_id)
     console.log('[oauth/callback] Token scopes granted:', data.scope)
+
+    // Normalize locationId — v2 may use different field name
+    if (!data.locationId && data.location_id) data.locationId = data.location_id
+    if (!data.locationId) {
+      console.error('[oauth/callback] No locationId in token response:', JSON.stringify(data).slice(0, 500))
+      const errorUrl = new URL('/admin/locations', req.url)
+      errorUrl.searchParams.set('error', 'GHL did not return a location ID. Please try again.')
+      return NextResponse.redirect(errorUrl)
+    }
 
     const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString()
 
