@@ -70,10 +70,12 @@ export default async function AdminUsersPage() {
           <h1 className={ad.pageTitle}>Users</h1>
           <p className={ad.pageSubtitle}>{allProfiles.length} total</p>
         </div>
-        <div className="flex items-center gap-2">
-          {isBibot && <SyncUsersButton />}
-          <InviteUserForm />
-        </div>
+        {isBibot && (
+          <div className="flex items-center gap-2">
+            <SyncUsersButton />
+            <InviteUserForm />
+          </div>
+        )}
       </div>
       {rows.length === 0 ? (
         <div className={ad.panel}>
