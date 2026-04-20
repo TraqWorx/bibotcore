@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe/stripe'
+import { getStripe } from '@/lib/stripe/stripe'
 import { createAdminClient } from '@/lib/supabase-server'
 import { PLAN } from '@/lib/stripe/plans'
 import type Stripe from 'stripe'
@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
 
   if (!sig) return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
 
+  const stripe = getStripe()
   let event: Stripe.Event
   try {
     event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
@@ -91,6 +92,30 @@ export async function POST(req: NextRequest) {
         await sb.from('agency_subscriptions')
           .update({ status: 'past_due', updated_at: new Date().toISOString() })
           .eq('stripe_subscription_id', subscriptionId)
+      }
+      break
+    }
+
+    case 'charge.refunded': {
+      // When a refund happens, deactivate the location
+      const charge = event.data.object as unknown as Record<string, unknown>
+      const invoiceId = typeof charge.invoice === 'string' ? charge.invoice : null
+      if (invoiceId) {
+        try {
+          const invoice = await stripe.invoices.retrieve(invoiceId) as unknown as Record<string, unknown>
+          const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null
+          if (subscriptionId) {
+            // Cancel the subscription in Stripe
+            await stripe.subscriptions.cancel(subscriptionId)
+            // Update DB
+            await sb.from('agency_subscriptions')
+              .update({ status: 'canceled', updated_at: new Date().toISOString() })
+              .eq('stripe_subscription_id', subscriptionId)
+            console.log(`[Stripe webhook] Refund → canceled subscription ${subscriptionId}`)
+          }
+        } catch (err) {
+          console.error('[Stripe webhook] refund handling error:', err)
+        }
       }
       break
     }

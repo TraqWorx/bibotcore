@@ -1,17 +1,18 @@
 import { createAdminClient } from '@/lib/supabase-server'
 
+export const dynamic = 'force-dynamic'
+
 export default async function PlatformOverviewPage() {
   const sb = createAdminClient()
 
-  const [{ data: agencies }, { data: subscriptions }] = await Promise.all([
-    sb.from('agencies').select('id, name, email, created_at').order('created_at', { ascending: false }),
-    sb.from('agency_subscriptions').select('agency_id, plan, status, price_cents'),
+  const [{ data: agencies }, { data: subscriptions }, { count: locationCount }] = await Promise.all([
+    sb.from('agencies').select('id').order('created_at', { ascending: false }),
+    sb.from('agency_subscriptions').select('agency_id, status, price_cents'),
+    sb.from('locations').select('location_id', { count: 'exact', head: true }),
   ])
 
   const active = (subscriptions ?? []).filter((s) => s.status === 'active')
   const mrr = active.reduce((sum, s) => sum + s.price_cents, 0)
-  const basicCount = active.filter((s) => s.plan === 'basic').length
-  const proCount = active.filter((s) => s.plan === 'pro').length
   const canceled = (subscriptions ?? []).filter((s) => s.status === 'canceled').length
   const totalSubs = (subscriptions ?? []).length
   const churnRate = totalSubs > 0 ? ((canceled / totalSubs) * 100).toFixed(1) : '0'
@@ -29,20 +30,16 @@ export default async function PlatformOverviewPage() {
           <p className="mt-2 text-3xl font-black text-gray-900">{(agencies ?? []).length}</p>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Locations</p>
+          <p className="mt-2 text-3xl font-black text-gray-900">{locationCount ?? 0}</p>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Active Subs</p>
-          <p className="mt-2 text-3xl font-black text-gray-900">{active.length}</p>
+          <p className="mt-2 text-3xl font-black text-emerald-600">{active.length}</p>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">MRR</p>
-          <p className="mt-2 text-3xl font-black text-emerald-600">${(mrr / 100).toFixed(0)}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Plans</p>
-          <p className="mt-2 text-lg font-bold">
-            <span className="text-gray-500">{basicCount} Basic</span>
-            <span className="mx-1.5 text-gray-300">/</span>
-            <span className="text-brand">{proCount} Pro</span>
-          </p>
+          <p className="mt-2 text-3xl font-black text-brand">${(mrr / 100).toFixed(0)}</p>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Churn</p>

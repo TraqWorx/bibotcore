@@ -1,18 +1,25 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 export default async function PlatformAgenciesPage() {
   const sb = createAdminClient()
 
-  const [{ data: agencies }, { data: subscriptions }] = await Promise.all([
+  const [{ data: agencies }, { data: subscriptions }, { data: locations }] = await Promise.all([
     sb.from('agencies').select('id, name, email, created_at').order('created_at', { ascending: false }),
     sb.from('agency_subscriptions').select('agency_id, status, price_cents'),
+    sb.from('locations').select('location_id, agency_id'),
   ])
 
-  const subsByAgency = new Map<string, { total: number; active: number; mrr: number }>()
+  const locCountByAgency = new Map<string, number>()
+  for (const loc of locations ?? []) {
+    if (loc.agency_id) locCountByAgency.set(loc.agency_id, (locCountByAgency.get(loc.agency_id) ?? 0) + 1)
+  }
+
+  const subsByAgency = new Map<string, { active: number; mrr: number }>()
   for (const sub of subscriptions ?? []) {
-    const existing = subsByAgency.get(sub.agency_id) ?? { total: 0, active: 0, mrr: 0 }
-    existing.total++
+    const existing = subsByAgency.get(sub.agency_id) ?? { active: 0, mrr: 0 }
     if (sub.status === 'active') {
       existing.active++
       existing.mrr += sub.price_cents
@@ -34,14 +41,15 @@ export default async function PlatformAgenciesPage() {
               <th className="px-5 py-3">Agency</th>
               <th className="px-5 py-3">Email</th>
               <th className="px-5 py-3 text-center">Locations</th>
-              <th className="px-5 py-3 text-center">Active</th>
+              <th className="px-5 py-3 text-center">Active Subs</th>
               <th className="px-5 py-3 text-right">MRR</th>
               <th className="px-5 py-3">Joined</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {(agencies ?? []).map((agency) => {
-              const stats = subsByAgency.get(agency.id) ?? { total: 0, active: 0, mrr: 0 }
+              const stats = subsByAgency.get(agency.id) ?? { active: 0, mrr: 0 }
+              const locCount = locCountByAgency.get(agency.id) ?? 0
               return (
                 <tr key={agency.id} className="transition-colors hover:bg-gray-50/50">
                   <td className="px-5 py-3.5">
@@ -50,7 +58,7 @@ export default async function PlatformAgenciesPage() {
                     </Link>
                   </td>
                   <td className="px-5 py-3.5 text-gray-500">{agency.email}</td>
-                  <td className="px-5 py-3.5 text-center font-semibold">{stats.total}</td>
+                  <td className="px-5 py-3.5 text-center font-semibold">{locCount}</td>
                   <td className="px-5 py-3.5 text-center font-semibold text-emerald-600">{stats.active}</td>
                   <td className="px-5 py-3.5 text-right font-bold tabular-nums text-brand">${(stats.mrr / 100).toFixed(0)}</td>
                   <td className="px-5 py-3.5 text-gray-400">
