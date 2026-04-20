@@ -465,6 +465,27 @@ export default async function AdminPage() {
         </div>
       </div>
 
+      {/* Affiliate Stats */}
+      {(affRevenue > 0 || affOwed > 0 || affPaid > 0) && (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Affiliate Revenue</p>
+            <p className="mt-2 text-4xl font-bold tracking-tight text-gray-900">{'\u20AC'}{affRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+            <p className="mt-0.5 text-xs text-gray-400">generated</p>
+          </div>
+          <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Affiliate Owed</p>
+            <p className="mt-2 text-4xl font-bold tracking-tight text-red-600">{'\u20AC'}{affOwed.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+            <p className="mt-0.5 text-xs text-gray-400">to pay</p>
+          </div>
+          <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Affiliate Paid</p>
+            <p className="mt-2 text-4xl font-bold tracking-tight text-emerald-600">{'\u20AC'}{affPaid.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+            <p className="mt-0.5 text-xs text-gray-400">paid out</p>
+          </div>
+        </div>
+      )}
+
       {/* Chart */}
       <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
         <div className="mb-5 flex items-center justify-between">
@@ -476,24 +497,6 @@ export default async function AdminPage() {
             {totalLocationsCount} total
           </span>
         </div>
-        {/* Affiliate Stats */}
-        {(affRevenue > 0 || affOwed > 0 || affPaid > 0) && (
-          <div className="grid grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Affiliate Revenue</p>
-              <p className="mt-2 text-2xl font-black text-gray-900">{'\u20AC'}{affRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-            </div>
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Affiliate Owed</p>
-              <p className="mt-2 text-2xl font-black text-red-600">{'\u20AC'}{affOwed.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-            </div>
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Affiliate Paid</p>
-              <p className="mt-2 text-2xl font-black text-emerald-600">{'\u20AC'}{affPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-            </div>
-          </div>
-        )}
-
         <LocationChart allDates={allDates} />
       </div>
 
