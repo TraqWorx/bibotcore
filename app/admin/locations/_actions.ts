@@ -92,14 +92,11 @@ export async function getGhlOAuthUrl(
   if (!clientId || !redirectUri) {
     return { error: 'GHL OAuth not configured (missing GHL_CLIENT_ID or GHL_REDIRECT_URI)' }
   }
-  const { GHL_SCOPES } = await import('@/lib/ghl/scopes')
   const { createOAuthState } = await import('@/lib/ghl/oauthState')
-  const scope = process.env.GHL_SCOPES ?? GHL_SCOPES
   const versionId = process.env.GHL_APP_VERSION_ID ?? ''
   const state = createOAuthState({ flow: 'admin_design_install', designSlug })
-  // Build URL manually to avoid URLSearchParams encoding slashes in scope names
   const params = new URLSearchParams({ response_type: 'code', redirect_uri: redirectUri, client_id: clientId, state })
-  let url = `https://marketplace.gohighlevel.com/v2/oauth/chooselocation?${params.toString()}&scope=${encodeURIComponent(scope).replace(/%2F/g, '/')}`
+  let url = `https://marketplace.gohighlevel.com/oauth/chooselocation?${params.toString()}`
   if (versionId) url += `&version_id=${versionId}`
   return { url }
 }
@@ -151,13 +148,11 @@ export async function getConnectLocationUrl(locationId: string): Promise<{ url: 
   if (!clientId || !redirectUri) {
     return { error: 'GHL OAuth not configured (missing GHL_CLIENT_ID or GHL_REDIRECT_URI)' }
   }
-  const { GHL_SCOPES } = await import('@/lib/ghl/scopes')
   const { createOAuthState } = await import('@/lib/ghl/oauthState')
-  const scope = process.env.GHL_SCOPES ?? GHL_SCOPES
   const versionId = process.env.GHL_APP_VERSION_ID ?? ''
   const state = createOAuthState({ flow: 'connect_location', locationId })
   const params = new URLSearchParams({ response_type: 'code', redirect_uri: redirectUri, client_id: clientId, state })
-  let url = `https://marketplace.gohighlevel.com/v2/oauth/chooselocation?${params.toString()}&scope=${encodeURIComponent(scope).replace(/%2F/g, '/')}`
+  let url = `https://marketplace.gohighlevel.com/oauth/chooselocation?${params.toString()}`
   if (versionId) url += `&version_id=${versionId}`
   return { url }
 }
