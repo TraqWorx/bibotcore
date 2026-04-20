@@ -1,6 +1,7 @@
 /**
- * Full GHL OAuth scope list — matches the published marketplace app.
+ * Full GHL OAuth scope list — matches the published marketplace app v2.
  * Single source of truth used by all OAuth entry points.
+ * Extracted from live GHL OAuth URL.
  */
 export const GHL_SCOPES = [
   'contacts.readonly',
@@ -55,8 +56,8 @@ export const GHL_SCOPES = [
   'socialplanner/statistics.readonly',
   'agent-studio.readonly',
   'agent-studio.write',
-  'associations.readonly',
   'associations.write',
+  'associations.readonly',
   'associations/relation.readonly',
   'associations/relation.write',
   'blogs/post.write',
@@ -68,6 +69,8 @@ export const GHL_SCOPES = [
   'blogs/list.readonly',
   'brand-boards/design-kit.readonly',
   'brand-boards/design-kit.write',
+  'brand-boards/voices.readonly',
+  'brand-boards/voices.write',
   'businesses.readonly',
   'businesses.write',
   'calendars/resources.readonly',
@@ -80,9 +83,6 @@ export const GHL_SCOPES = [
   'conversations/livechat.write',
   'custom-menu-link.readonly',
   'custom-menu-link.write',
-  'emails/builder.readonly',
-  'emails/builder.write',
-  'emails/schedule.readonly',
   'funnels/redirect.readonly',
   'funnels/redirect.write',
   'funnels/page.readonly',
@@ -96,15 +96,15 @@ export const GHL_SCOPES = [
   'invoices/template.write',
   'invoices/estimate.readonly',
   'invoices/estimate.write',
-  'knowledge-bases.readonly',
   'knowledge-bases.write',
+  'knowledge-bases.readonly',
   'lc-email.readonly',
   'links.readonly',
   'links.write',
   'recurring-tasks.readonly',
   'recurring-tasks.write',
-  'oauth.readonly',
   'oauth.write',
+  'oauth.readonly',
   'objects/schema.readonly',
   'objects/schema.write',
   'objects/record.readonly',
@@ -150,4 +150,9 @@ export const GHL_SCOPES = [
   'charges.write',
   'marketplace-installer-details.readonly',
   'marketplace-external-auth-migration.write',
+  'affiliate-manager.readonly',
+  'emails/builder.write',
+  'emails/builder.readonly',
+  'emails/schedule.readonly',
+  'emails/schedule.write',
 ].join(' ')
