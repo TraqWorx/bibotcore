@@ -97,21 +97,25 @@ export async function POST(req: NextRequest) {
     }
 
     case 'charge.refunded': {
-      // When a refund happens, deactivate the location
       const charge = event.data.object as unknown as Record<string, unknown>
+      const amountRefunded = typeof charge.amount_refunded === 'number' ? charge.amount_refunded : 0
       const invoiceId = typeof charge.invoice === 'string' ? charge.invoice : null
       if (invoiceId) {
         try {
           const invoice = await stripe.invoices.retrieve(invoiceId) as unknown as Record<string, unknown>
           const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null
           if (subscriptionId) {
-            // Cancel the subscription in Stripe
-            await stripe.subscriptions.cancel(subscriptionId)
-            // Update DB
-            await sb.from('agency_subscriptions')
-              .update({ status: 'canceled', updated_at: new Date().toISOString() })
+            // Record refund amount and cancel
+            const { data: sub } = await sb.from('agency_subscriptions')
+              .select('refunded_cents')
               .eq('stripe_subscription_id', subscriptionId)
-            console.log(`[Stripe webhook] Refund → canceled subscription ${subscriptionId}`)
+              .single()
+            const totalRefunded = (sub?.refunded_cents ?? 0) + amountRefunded
+            await stripe.subscriptions.cancel(subscriptionId)
+            await sb.from('agency_subscriptions')
+              .update({ status: 'canceled', refunded_cents: totalRefunded, updated_at: new Date().toISOString() })
+              .eq('stripe_subscription_id', subscriptionId)
+            console.log(`[Stripe webhook] Refund $${(amountRefunded / 100).toFixed(2)} → canceled subscription ${subscriptionId}`)
           }
         } catch (err) {
           console.error('[Stripe webhook] refund handling error:', err)

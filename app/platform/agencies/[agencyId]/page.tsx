@@ -166,6 +166,7 @@ export default async function PlatformAgencyDetailPage({
               <th className="px-5 py-3 text-right">Price</th>
               <th className="px-5 py-3">Since</th>
               <th className="px-5 py-3 text-right">Total Paid</th>
+              <th className="px-5 py-3 text-right">Refunded</th>
               <th className="px-5 py-3">Actions</th>
             </tr>
           </thead>
@@ -210,6 +211,9 @@ export default async function PlatformAgencyDetailPage({
                   <td className="px-5 py-3.5 text-right font-bold tabular-nums text-gray-900">
                     {locTotalPaid > 0 ? `$${locTotalPaid.toFixed(0)}` : '—'}
                   </td>
+                  <td className="px-5 py-3.5 text-right font-bold tabular-nums text-red-600">
+                    {sub?.refunded_cents ? `$${(sub.refunded_cents / 100).toFixed(0)}` : '—'}
+                  </td>
                   <td className="px-5 py-3.5">
                     {isActive ? (
                       <form action={deactivateLocation}>
@@ -232,7 +236,7 @@ export default async function PlatformAgencyDetailPage({
             })}
             {allLocationIds.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-5 py-8 text-center text-gray-400">No locations</td>
+                <td colSpan={9} className="px-5 py-8 text-center text-gray-400">No locations</td>
               </tr>
             )}
           </tbody>
