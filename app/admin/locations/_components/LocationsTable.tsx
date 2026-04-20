@@ -356,9 +356,9 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                             )}
                             <DisconnectButton locationId={row.id} />
                           </>
-                        ) : (
+                        ) : hasDesigns ? (
                           <ConnectButton designs={designs} unconnectedLocations={unconnectedLocations} preselectedId={row.id} />
-                        )}
+                        ) : null}
                       </div>
                     </td>
                   </tr>

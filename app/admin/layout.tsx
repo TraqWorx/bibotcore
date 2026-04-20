@@ -47,7 +47,7 @@ const getAdminData = cache(async () => {
     }
   }
 
-  return { navLinks, agencyName, agencyId, initials: agencyName.slice(0, 2).toUpperCase(), accountLink: { href: '/admin/account', label: 'Account & Billing' } }
+  return { navLinks, agencyName, agencyId, initials: agencyName.slice(0, 2).toUpperCase(), accountLink: { href: '/admin/account', label: 'Account & Billing' }, email: user.email ?? '' }
 })
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -78,9 +78,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <div className="border-t border-gray-200/60 px-3 py-2">
                 <AdminNavClient navLinks={[data.accountLink]} />
               </div>
-              <div className="flex items-center justify-between border-t border-gray-200/60 px-5 py-4">
-                <p className="text-[10px] text-gray-400">GHL Dash © 2026</p>
-                <LogoutButton />
+              <div className="border-t border-gray-200/60 px-5 py-4">
+                <p className="truncate text-[11px] font-medium text-gray-500 mb-2">{data.email}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-gray-400">GHL Dash</p>
+                  <LogoutButton />
+                </div>
               </div>
             </div>
           </div>
