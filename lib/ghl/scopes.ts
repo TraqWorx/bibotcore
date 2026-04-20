@@ -150,9 +150,8 @@ export const GHL_SCOPES = [
   'charges.write',
   'marketplace-installer-details.readonly',
   'marketplace-external-auth-migration.write',
-  'affiliate-manager.readonly',
-  'emails/builder.write',
-  'emails/builder.readonly',
-  'emails/schedule.readonly',
-  'emails/schedule.write',
 ].join(' ')
+
+// Note: affiliate-manager.readonly, brand-boards/voices, emails/builder,
+// emails/schedule are configured in the GHL app version but NOT passed
+// in the OAuth URL scope param — they are granted via version_id.
