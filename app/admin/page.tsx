@@ -214,6 +214,37 @@ export default async function AdminPage() {
     totalRevenue += price * months
   }
 
+  // Affiliate stats (fetch from GHL)
+  let affRevenue = 0, affOwed = 0, affPaid = 0
+  try {
+    const { refreshIfNeeded } = await import('@/lib/ghl/refreshIfNeeded')
+    const { data: affConns } = await supabase.from('ghl_connections').select('location_id, access_token, refresh_token, expires_at, company_id').not('refresh_token', 'is', null).limit(5)
+    const ghlCompanyId = process.env.GHL_COMPANY_ID ?? ''
+    for (const conn of affConns ?? []) {
+      const token = await refreshIfNeeded(conn.location_id, conn)
+      const cid = conn.company_id ?? ghlCompanyId
+      // Get location token
+      const ltRes = await fetch('https://services.leadconnectorhq.com/oauth/locationToken', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Bearer ${token}`, Version: '2021-07-28' },
+        body: new URLSearchParams({ companyId: cid, locationId: conn.location_id }),
+      })
+      if (!ltRes.ok) continue
+      const { access_token: locToken } = await ltRes.json()
+      if (!locToken) continue
+      const affRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/affiliates`, {
+        headers: { Authorization: `Bearer ${locToken}`, Version: '2021-07-28' },
+      })
+      if (!affRes.ok) continue
+      const affData = await affRes.json()
+      for (const a of affData.affiliates ?? []) {
+        affRevenue += a.revenue ?? 0
+        affOwed += a.owned ?? 0
+        affPaid += a.paid ?? 0
+      }
+    }
+  } catch (err) { console.error('[admin] affiliate stats error:', err) }
+
   // Revenue per design
   const designRevenue: Record<string, { count: number; mrr: number }> = {}
   for (const r of designStatsRaw ?? []) {
@@ -445,6 +476,24 @@ export default async function AdminPage() {
             {totalLocationsCount} total
           </span>
         </div>
+        {/* Affiliate Stats */}
+        {(affRevenue > 0 || affOwed > 0 || affPaid > 0) && (
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Affiliate Revenue</p>
+              <p className="mt-2 text-2xl font-black text-gray-900">{'\u20AC'}{affRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Affiliate Owed</p>
+              <p className="mt-2 text-2xl font-black text-red-600">{'\u20AC'}{affOwed.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Affiliate Paid</p>
+              <p className="mt-2 text-2xl font-black text-emerald-600">{'\u20AC'}{affPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+        )}
+
         <LocationChart allDates={allDates} />
       </div>
 
