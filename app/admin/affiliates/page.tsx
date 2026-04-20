@@ -9,16 +9,20 @@ export const dynamic = 'force-dynamic'
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
 interface Affiliate {
-  id: string
-  name?: string
+  _id: string
+  id?: string
   firstName?: string
   lastName?: string
   email?: string
-  phone?: string
-  status?: string
-  totalRevenue?: number
-  totalPaid?: number
-  totalDue?: number
+  active?: boolean
+  revenue?: number
+  paid?: number
+  owned?: number // "owed" — GHL typo in their API
+  customer?: number
+  lead?: number
+  droppedCustomer?: number
+  clickCount?: string
+  currency?: string
   createdAt?: string
   [key: string]: unknown
 }
@@ -73,9 +77,10 @@ async function fetchAffiliates(locationId: string, token: string, companyId: str
   }
 }
 
-function formatCurrency(cents: number | undefined | null): string {
-  if (cents == null) return '—'
-  return `$${(cents / 100).toFixed(2)}`
+function formatMoney(amount: number | undefined | null, currency?: string): string {
+  if (amount == null) return '—'
+  const sym = currency === 'EUR' ? '€' : '$'
+  return `${sym}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export default async function AffiliatesPage() {
@@ -111,9 +116,12 @@ export default async function AffiliatesPage() {
     }
   }
 
-  const totalOwed = allAffiliates.reduce((s, a) => s + (a.totalRevenue ?? 0), 0)
-  const totalPaid = allAffiliates.reduce((s, a) => s + (a.totalPaid ?? 0), 0)
-  const totalDue = allAffiliates.reduce((s, a) => s + (a.totalDue ?? 0), 0)
+  const totalRevenue = allAffiliates.reduce((s, a) => s + (a.revenue ?? 0), 0)
+  const totalPaid = allAffiliates.reduce((s, a) => s + (a.paid ?? 0), 0)
+  const totalOwed = allAffiliates.reduce((s, a) => s + (a.owned ?? 0), 0)
+  const totalCustomers = allAffiliates.reduce((s, a) => s + (a.customer ?? 0), 0)
+  const totalLeads = allAffiliates.reduce((s, a) => s + (a.lead ?? 0), 0)
+  const defaultCurrency = allAffiliates[0]?.currency
 
   return (
     <div className="space-y-6">
@@ -131,18 +139,26 @@ export default async function AffiliatesPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-5 gap-4">
             <div className={ad.panel}>
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Owed</p>
-              <p className="mt-2 text-3xl font-black text-gray-900">{formatCurrency(totalOwed)}</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Revenue</p>
+              <p className="mt-2 text-3xl font-black text-gray-900">{formatMoney(totalRevenue, defaultCurrency)}</p>
             </div>
             <div className={ad.panel}>
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Paid</p>
-              <p className="mt-2 text-3xl font-black text-emerald-600">{formatCurrency(totalPaid)}</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Owed</p>
+              <p className="mt-2 text-3xl font-black text-red-600">{formatMoney(totalOwed, defaultCurrency)}</p>
             </div>
             <div className={ad.panel}>
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Due</p>
-              <p className="mt-2 text-3xl font-black text-red-600">{formatCurrency(totalDue)}</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Paid</p>
+              <p className="mt-2 text-3xl font-black text-emerald-600">{formatMoney(totalPaid, defaultCurrency)}</p>
+            </div>
+            <div className={ad.panel}>
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Customers</p>
+              <p className="mt-2 text-3xl font-black text-gray-900">{totalCustomers}</p>
+            </div>
+            <div className={ad.panel}>
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Leads</p>
+              <p className="mt-2 text-3xl font-black text-gray-900">{totalLeads}</p>
             </div>
           </div>
 
@@ -152,31 +168,33 @@ export default async function AffiliatesPage() {
                 <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
                   <th className="px-5 py-3">Affiliate</th>
                   <th className="px-5 py-3">Email</th>
-                  <th className="px-5 py-3">Location</th>
                   <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3 text-center">Customers</th>
+                  <th className="px-5 py-3 text-center">Leads</th>
+                  <th className="px-5 py-3 text-right">Revenue</th>
                   <th className="px-5 py-3 text-right">Owed</th>
                   <th className="px-5 py-3 text-right">Paid</th>
-                  <th className="px-5 py-3 text-right">Due</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {allAffiliates.map((a) => (
-                  <tr key={`${a.locationId}-${a.id}`} className="transition-colors hover:bg-gray-50/50">
+                  <tr key={`${a.locationId}-${a._id}`} className="transition-colors hover:bg-gray-50/50">
                     <td className="px-5 py-3.5 font-medium text-gray-900">
-                      {a.name ?? (`${a.firstName ?? ''} ${a.lastName ?? ''}`.trim() || '—')}
+                      {(`${a.firstName ?? ''} ${a.lastName ?? ''}`.trim() || '—')}
                     </td>
                     <td className="px-5 py-3.5 text-gray-500">{a.email ?? '—'}</td>
-                    <td className="px-5 py-3.5 text-xs text-gray-400">{a.locationName}</td>
                     <td className="px-5 py-3.5">
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        a.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                        a.active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
                       }`}>
-                        {a.status ?? '—'}
+                        {a.active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-right font-semibold tabular-nums">{formatCurrency(a.totalRevenue)}</td>
-                    <td className="px-5 py-3.5 text-right font-semibold tabular-nums text-emerald-600">{formatCurrency(a.totalPaid)}</td>
-                    <td className="px-5 py-3.5 text-right font-bold tabular-nums text-red-600">{formatCurrency(a.totalDue)}</td>
+                    <td className="px-5 py-3.5 text-center font-semibold tabular-nums">{a.customer ?? 0}</td>
+                    <td className="px-5 py-3.5 text-center font-semibold tabular-nums">{a.lead ?? 0}</td>
+                    <td className="px-5 py-3.5 text-right font-semibold tabular-nums">{formatMoney(a.revenue, a.currency)}</td>
+                    <td className="px-5 py-3.5 text-right font-bold tabular-nums text-red-600">{formatMoney(a.owned, a.currency)}</td>
+                    <td className="px-5 py-3.5 text-right font-semibold tabular-nums text-emerald-600">{formatMoney(a.paid, a.currency)}</td>
                   </tr>
                 ))}
               </tbody>
