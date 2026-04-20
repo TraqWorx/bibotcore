@@ -80,6 +80,47 @@ export async function POST(req: Request) {
     }
   }
 
+  // ── Handle user added to location ──────────────────────────────────────
+  const USER_CREATED_EVENTS = ['UserCreate', 'user.created', 'UserAdded', 'user.added']
+  if (USER_CREATED_EVENTS.includes(eventType)) {
+    const email = (
+      (body.email as string | undefined) ??
+      ((body.data as Record<string, unknown> | undefined)?.email as string | undefined) ??
+      ((body.user as Record<string, unknown> | undefined)?.email as string | undefined)
+    )?.toLowerCase()
+
+    if (email) {
+      // Find or create Supabase user
+      let profileId: string | null = null
+      const { data: existing } = await supabase.from('profiles').select('id, role').eq('email', email).maybeSingle()
+
+      if (existing) {
+        profileId = existing.id
+      } else {
+        // Create auth user + profile
+        const { data: created, error: createErr } = await supabase.auth.admin.createUser({ email, email_confirm: true })
+        if (!createErr && created?.user) {
+          profileId = created.user.id
+          await supabase.from('profiles').upsert({ id: profileId, email, role: 'agency' }, { onConflict: 'id' })
+        }
+      }
+
+      if (profileId && existing?.role !== 'super_admin') {
+        // Link to location + update agency
+        await supabase.from('profile_locations').upsert(
+          { user_id: profileId, location_id: locationId, role: 'team_member' },
+          { onConflict: 'user_id,location_id' },
+        )
+        // Set agency_id from location
+        const { data: loc } = await supabase.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+        if (loc?.agency_id) {
+          await supabase.from('profiles').update({ agency_id: loc.agency_id }).eq('id', profileId)
+        }
+        console.log(`[ghl-webhook] UserCreate → added ${email} to ${locationId}`)
+      }
+    }
+  }
+
   // ── Handle user removed from location ────────────────────────────────────
   // GHL fires UserDeleted (or user.deleted) when a staff member is removed
   const USER_DELETED_EVENTS = ['UserDeleted', 'user.deleted', 'UserRemoved', 'user.removed']
@@ -98,12 +139,17 @@ export async function POST(req: Request) {
         .eq('email', email)
         .maybeSingle()
 
-      if (profile && profile.role !== 'super_admin') {
-        const { error: delErr } = await supabase.auth.admin.deleteUser(profile.id)
-        if (delErr) {
-          console.error(`[ghl-webhook] deleteUser failed for ${email}:`, delErr.message)
+      if (profile && profile.role !== 'super_admin' && profile.role !== 'admin') {
+        // Remove from this location
+        await supabase.from('profile_locations').delete().eq('user_id', profile.id).eq('location_id', locationId)
+        // Check if user has any other locations
+        const { count } = await supabase.from('profile_locations').select('user_id', { count: 'exact', head: true }).eq('user_id', profile.id)
+        if ((count ?? 0) === 0) {
+          // No locations left — remove user entirely
+          await supabase.auth.admin.deleteUser(profile.id)
+          console.log(`[ghl-webhook] UserDeleted → removed ${email} from platform (no locations left)`)
         } else {
-          console.log(`[ghl-webhook] UserDeleted → removed ${email} from platform`)
+          console.log(`[ghl-webhook] UserDeleted → unlinked ${email} from ${locationId}`)
         }
       }
     }
