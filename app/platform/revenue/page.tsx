@@ -65,7 +65,6 @@ export default async function PlatformRevenuePage() {
               const agencyActive = agencySubs.filter((s) => s.status === 'active')
               const agencyMrr = agencyActive.reduce((sum, s) => sum + s.price_cents, 0)
               const agencyRefunded = agencySubs.reduce((sum, s) => sum + (s.refunded_cents ?? 0), 0)
-              if (agencySubs.length === 0) return null
               return (
                 <tr key={agency.id} className="transition-colors hover:bg-gray-50/50">
                   <td className="px-5 py-3.5">
