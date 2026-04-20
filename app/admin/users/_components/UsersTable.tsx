@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { deleteUser } from '../_actions'
 import { ad } from '@/lib/admin/ui'
 
 interface UserLocation {
@@ -205,26 +204,8 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
                             target="_blank"
                             className="inline-flex items-center gap-1.5 rounded-xl border border-brand/25 bg-brand/5 px-3 py-1.5 text-xs font-bold text-brand shadow-sm transition hover:bg-brand/10"
                           >
-                            Login
+                            Login as
                           </Link>
-                        )}
-                        {row.role !== 'super_admin' && (
-                          <Link
-                            href={`/admin/users/${row.id}`}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200/90 bg-white/90 px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-white"
-                          >
-                            View
-                          </Link>
-                        )}
-                        {row.role !== 'super_admin' && (
-                          <form action={deleteUser.bind(null, row.id) as unknown as string}>
-                            <button
-                              type="submit"
-                              className="inline-flex items-center rounded-xl border border-red-200 bg-red-50/40 px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-50"
-                            >
-                              Delete
-                            </button>
-                          </form>
                         )}
                       </div>
                     </td>

@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
-import InviteUserForm from './_components/InviteUserForm'
 import SyncUsersButton from './_components/SyncUsersButton'
 import UsersTable from './_components/UsersTable'
 import { ad } from '@/lib/admin/ui'
@@ -70,12 +69,7 @@ export default async function AdminUsersPage() {
           <h1 className={ad.pageTitle}>Users</h1>
           <p className={ad.pageSubtitle}>{allProfiles.length} total</p>
         </div>
-        {isBibot && (
-          <div className="flex items-center gap-2">
-            <SyncUsersButton />
-            <InviteUserForm />
-          </div>
-        )}
+        {isBibot && <SyncUsersButton />}
       </div>
       {rows.length === 0 ? (
         <div className={ad.panel}>
