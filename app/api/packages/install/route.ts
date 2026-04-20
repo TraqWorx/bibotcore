@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   })
 
   const oauthUrl =
-    'https://marketplace.gohighlevel.com/oauth/chooselocation?' +
+    'https://marketplace.gohighlevel.com/v2/oauth/chooselocation?' +
     params.toString() +
     '&scope=' + encodeURIComponent(scopes).replace(/%2F/g, '/')
 
