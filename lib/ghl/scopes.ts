@@ -68,8 +68,6 @@ export const GHL_SCOPES = [
   'blogs/list.readonly',
   'brand-boards/design-kit.readonly',
   'brand-boards/design-kit.write',
-  'brand-boards/voices.readonly',
-  'brand-boards/voices.write',
   'businesses.readonly',
   'businesses.write',
   'calendars/resources.readonly',
@@ -85,7 +83,6 @@ export const GHL_SCOPES = [
   'emails/builder.readonly',
   'emails/builder.write',
   'emails/schedule.readonly',
-  'emails/schedule.write',
   'funnels/redirect.readonly',
   'funnels/redirect.write',
   'funnels/page.readonly',
@@ -153,5 +150,4 @@ export const GHL_SCOPES = [
   'charges.write',
   'marketplace-installer-details.readonly',
   'marketplace-external-auth-migration.write',
-  'affiliate-manager.readonly',
 ].join(' ')
