@@ -200,6 +200,14 @@ export default function UsersTable({ rows }: { rows: UserRow[] }) {
                       <div className="flex items-center justify-end gap-2 flex-nowrap">
                         {row.role !== 'super_admin' && (
                           <Link
+                            href={`/admin/users/${row.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200/90 bg-white/90 px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-white"
+                          >
+                            View
+                          </Link>
+                        )}
+                        {row.role !== 'super_admin' && (
+                          <Link
                             href={`/agency?as=${row.id}`}
                             target="_blank"
                             className="inline-flex items-center gap-1.5 rounded-xl border border-brand/25 bg-brand/5 px-3 py-1.5 text-xs font-bold text-brand shadow-sm transition hover:bg-brand/10"
