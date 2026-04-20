@@ -55,9 +55,9 @@ export async function GET(req: NextRequest) {
     // Normalize locationId — v2 may use different field name
     if (!data.locationId && data.location_id) data.locationId = data.location_id
     if (!data.locationId) {
-      console.error('[oauth/callback] No locationId in token response:', JSON.stringify(data).slice(0, 500))
+      console.error('[oauth/callback] No locationId in token response:', JSON.stringify(data).slice(0, 1000))
       const errorUrl = new URL('/admin/locations', req.url)
-      errorUrl.searchParams.set('error', 'GHL did not return a location ID. Please try again.')
+      errorUrl.searchParams.set('error', `GHL did not return a location ID. Keys: ${Object.keys(data).join(', ')}`)
       return NextResponse.redirect(errorUrl)
     }
 
