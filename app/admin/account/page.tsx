@@ -1,4 +1,5 @@
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import AccountForm from './_components/AccountForm'
 import { ad } from '@/lib/admin/ui'

@@ -1,4 +1,5 @@
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import BulkConnectButton from './_components/BulkConnectButton'
