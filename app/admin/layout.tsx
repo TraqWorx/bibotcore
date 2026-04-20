@@ -1,6 +1,7 @@
 import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { isBibotAgency } from '@/lib/isBibotAgency'
 import AdminNavClient from './_components/AdminNavClient'
 import LogoutButton from './_components/LogoutButton'
 import { ad } from '@/lib/admin/ui'
@@ -32,6 +33,11 @@ const getAdminData = cache(async () => {
     { href: '/admin', label: 'Dashboard' },
     { href: '/admin/locations', label: 'Locations', count: locationCount ?? 0 },
   ]
+
+  // Bibot-only nav items
+  if (isBibotAgency(agencyId)) {
+    navLinks.push({ href: '/admin/affiliates', label: 'Affiliates' })
+  }
 
   // Agencies with installed designs get Designs + Plan Mapping
   if (agencyId) {
