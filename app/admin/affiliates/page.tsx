@@ -23,12 +23,44 @@ interface Affiliate {
   [key: string]: unknown
 }
 
-async function fetchAffiliates(locationId: string, token: string): Promise<Affiliate[]> {
+async function getLocationToken(companyToken: string, locationId: string, companyId: string): Promise<string | null> {
   try {
-    const res = await fetch(`${GHL_BASE}/affiliate-manager/${locationId}/affiliates`, {
+    const res = await fetch(`${GHL_BASE}/oauth/locationToken`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${companyToken}`,
+        Version: '2021-07-28',
+      },
+      body: new URLSearchParams({ companyId, locationId }),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.access_token ?? null
+  } catch {
+    return null
+  }
+}
+
+async function fetchAffiliates(locationId: string, token: string, companyId: string): Promise<Affiliate[]> {
+  try {
+    // First try with the token directly
+    let res = await fetch(`${GHL_BASE}/affiliate-manager/${locationId}/affiliates`, {
       headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
       cache: 'no-store',
     })
+
+    // If 401, try exchanging for a location token
+    if (res.status === 401) {
+      const locToken = await getLocationToken(token, locationId, companyId)
+      if (locToken) {
+        res = await fetch(`${GHL_BASE}/affiliate-manager/${locationId}/affiliates`, {
+          headers: { Authorization: `Bearer ${locToken}`, Version: '2021-07-28' },
+          cache: 'no-store',
+        })
+      }
+    }
+
     if (!res.ok) {
       console.error(`[affiliates] GHL ${locationId} error:`, res.status)
       return []
@@ -56,9 +88,10 @@ export default async function AffiliatesPage() {
   if (!profile?.agency_id || !isBibotAgency(profile.agency_id)) redirect('/admin')
 
   // Fetch affiliates from all connected locations
+  const companyId = process.env.GHL_COMPANY_ID ?? ''
   const { data: connections } = await sb
     .from('ghl_connections')
-    .select('location_id, access_token, refresh_token, expires_at')
+    .select('location_id, access_token, refresh_token, expires_at, company_id')
     .not('refresh_token', 'is', null)
 
   const allAffiliates: (Affiliate & { locationId: string; locationName: string })[] = []
@@ -67,7 +100,8 @@ export default async function AffiliatesPage() {
 
   for (const conn of connections ?? []) {
     const token = await refreshIfNeeded(conn.location_id, conn)
-    const affiliates = await fetchAffiliates(conn.location_id, token)
+    const cid = conn.company_id ?? companyId
+    const affiliates = await fetchAffiliates(conn.location_id, token, cid)
     for (const a of affiliates) {
       allAffiliates.push({
         ...a,
