@@ -65,10 +65,7 @@ async function fetchAffiliates(locationId: string, token: string, companyId: str
       }
     }
 
-    if (!res.ok) {
-      console.error(`[affiliates] GHL ${locationId} error:`, res.status)
-      return []
-    }
+    if (!res.ok) return []
     const data = await res.json()
     return (data?.affiliates ?? data?.data ?? []) as Affiliate[]
   } catch (err) {
