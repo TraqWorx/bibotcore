@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { installDesign } from '../_actions'
+import { installDesign, removeDesign } from '../_actions'
 
 interface Props {
   locationId: string
@@ -14,15 +14,20 @@ interface Props {
 export default function ChangeDesignButton({ locationId, currentSlug, designs, children }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [selected, setSelected] = useState(currentSlug ?? designs[0]?.slug ?? '')
+  const [selected, setSelected] = useState(currentSlug || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit() {
-    if (!selected || selected === currentSlug) { setOpen(false); return }
+    if ((!selected && !currentSlug) || selected === currentSlug) { setOpen(false); return }
     setLoading(true)
     setError(null)
-    const result = await installDesign(locationId, selected)
+    let result
+    if (selected === '__remove__') {
+      result = await removeDesign(locationId)
+    } else {
+      result = await installDesign(locationId, selected)
+    }
     setLoading(false)
     if (result?.error) {
       setError(result.error)
@@ -60,9 +65,11 @@ export default function ChangeDesignButton({ locationId, currentSlug, designs, c
         onChange={(e) => setSelected(e.target.value)}
         className="rounded-xl border border-gray-200/90 bg-white px-2 py-1 text-xs outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
       >
+        {!currentSlug && <option value="">— Select design —</option>}
         {designs.map((d) => (
           <option key={d.slug} value={d.slug}>{d.name}</option>
         ))}
+        {currentSlug && <option value="__remove__">— Remove design —</option>}
       </select>
       <button
         onClick={handleSubmit}

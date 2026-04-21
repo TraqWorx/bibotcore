@@ -40,7 +40,7 @@ export default async function AuthorizePage({
     locationId,
   })
   const oauthUrl =
-    'https://marketplace.gohighlevel.com/v2/oauth/chooselocation?' +
+    'https://marketplace.gohighlevel.com/oauth/chooselocation?' +
     oauthParams.toString() +
     '&scope=' + encodeURIComponent(scope).replace(/%2F/g, '/')
 

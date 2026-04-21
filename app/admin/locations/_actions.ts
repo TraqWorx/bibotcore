@@ -96,9 +96,11 @@ export async function getGhlOAuthUrl(
   const { createOAuthState } = await import('@/lib/ghl/oauthState')
   const scope = process.env.GHL_SCOPES ?? GHL_SCOPES
   const versionId = process.env.GHL_APP_VERSION_ID ?? ''
-  const state = createOAuthState({ flow: 'admin_design_install', designSlug })
+  const state = designSlug
+    ? createOAuthState({ flow: 'admin_design_install', designSlug })
+    : createOAuthState({ flow: 'connect_location' })
   const params = new URLSearchParams({ response_type: 'code', redirect_uri: redirectUri, client_id: clientId, state })
-  let url = `https://marketplace.gohighlevel.com/v2/oauth/chooselocation?${params.toString()}&scope=${encodeURIComponent(scope).replace(/%2F/g, '/')}`
+  let url = `https://marketplace.gohighlevel.com/oauth/chooselocation?${params.toString()}&scope=${encodeURIComponent(scope).replace(/%2F/g, '/')}`
   if (versionId) url += `&version_id=${versionId}`
   return { url }
 }
@@ -156,7 +158,7 @@ export async function getConnectLocationUrl(locationId: string): Promise<{ url: 
   const versionId = process.env.GHL_APP_VERSION_ID ?? ''
   const state = createOAuthState({ flow: 'connect_location', locationId })
   const params = new URLSearchParams({ response_type: 'code', redirect_uri: redirectUri, client_id: clientId, state })
-  let url = `https://marketplace.gohighlevel.com/v2/oauth/chooselocation?${params.toString()}&scope=${encodeURIComponent(scope).replace(/%2F/g, '/')}`
+  let url = `https://marketplace.gohighlevel.com/oauth/chooselocation?${params.toString()}&scope=${encodeURIComponent(scope).replace(/%2F/g, '/')}`
   if (versionId) url += `&version_id=${versionId}`
   return { url }
 }
@@ -212,10 +214,13 @@ export async function installDesign(
     const supabase = createAdminClient()
 
     // Set design_slug and reset configured so installer runs fresh
-    const { error } = await supabase
-      .from('installs')
-      .update({ design_slug: designSlug, configured: false })
-      .eq('location_id', locationId)
+    const { data: existing } = await supabase.from('installs').select('id').eq('location_id', locationId).maybeSingle()
+    let error
+    if (existing) {
+      ({ error } = await supabase.from('installs').update({ design_slug: designSlug, configured: false }).eq('location_id', locationId))
+    } else {
+      ({ error } = await supabase.from('installs').insert({ location_id: locationId, design_slug: designSlug, configured: false, installed_at: new Date().toISOString() }))
+    }
 
     if (error) return { error: error.message }
 
@@ -225,5 +230,17 @@ export async function installDesign(
   } catch (err) {
     if ((err as { digest?: string }).digest?.startsWith('NEXT_REDIRECT')) throw err
     return { error: err instanceof Error ? err.message : 'Failed to install design' }
+  }
+}
+
+export async function removeDesign(locationId: string): Promise<{ error: string } | undefined> {
+  try {
+    await assertSuperAdmin()
+    const supabase = createAdminClient()
+    await supabase.from('installs').update({ design_slug: null, configured: false }).eq('location_id', locationId)
+    redirect('/admin/locations')
+  } catch (err) {
+    if ((err as { digest?: string }).digest?.startsWith('NEXT_REDIRECT')) throw err
+    return { error: err instanceof Error ? err.message : 'Failed to remove design' }
   }
 }

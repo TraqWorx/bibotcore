@@ -13,12 +13,12 @@ interface Props {
 
 export default function ConnectButton({ designs }: Props) {
   const [open, setOpen] = useState(false)
-  const [designSlug, setDesignSlug] = useState(designs[0]?.slug ?? '')
+  const [designSlug, setDesignSlug] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleConnect() {
-    if (!designSlug) { setError('Select a design'); return }
+    // designSlug can be empty — connecting without a design is allowed
     setLoading(true)
     setError(null)
     const result = await getGhlOAuthUrl(designSlug)
@@ -56,6 +56,7 @@ export default function ConnectButton({ designs }: Props) {
             onChange={(e) => setDesignSlug(e.target.value)}
             className={ad.input}
           >
+            <option value="">— No design —</option>
             {designs.map((d) => (
               <option key={d.slug} value={d.slug}>{d.name}</option>
             ))}

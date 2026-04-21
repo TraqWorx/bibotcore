@@ -9,7 +9,7 @@ export async function getGhlTokenForLocation(locationId: string): Promise<string
   const supabase = createAdminClient()
   const { data: connection } = await supabase
     .from('ghl_connections')
-    .select('access_token, refresh_token, expires_at')
+    .select('access_token, refresh_token, expires_at, company_id')
     .eq('location_id', locationId)
     .single()
 

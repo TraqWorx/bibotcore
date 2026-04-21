@@ -54,13 +54,12 @@ export async function GET(req: NextRequest) {
 
     // Normalize locationId — v2 may not return it (company-level install)
     if (!data.locationId && data.location_id) data.locationId = data.location_id
-    // Fall back to locationId from OAuth state (connect_location flow)
+    // Fall back to locationId from OAuth state
     if (!data.locationId && state.flow === 'connect_location' && state.locationId) {
       data.locationId = state.locationId
       console.log('[oauth/callback] Using locationId from state:', state.locationId)
     }
     if (!data.locationId) {
-      console.error('[oauth/callback] No locationId in token response:', JSON.stringify(data).slice(0, 1000))
       const errorUrl = new URL('/admin/locations', req.url)
       errorUrl.searchParams.set('error', 'GHL did not return a location ID. Please try again.')
       return NextResponse.redirect(errorUrl)

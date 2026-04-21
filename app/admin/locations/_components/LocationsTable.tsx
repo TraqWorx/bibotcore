@@ -302,9 +302,13 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                     {hasDesigns && (
                       <td className="px-3 py-3">
                         {row.design ? (
-                        <ChangeDesignButton locationId={row.id} currentSlug={row.design} designs={designs}>
-                          {row.design}
-                        </ChangeDesignButton>
+                          <ChangeDesignButton locationId={row.id} currentSlug={row.design} designs={designs}>
+                            {row.design}
+                          </ChangeDesignButton>
+                        ) : row.connected ? (
+                          <ChangeDesignButton locationId={row.id} currentSlug="" designs={designs}>
+                            <span className="text-xs text-gray-400">Assign</span>
+                          </ChangeDesignButton>
                         ) : <span className="text-xs text-gray-300">—</span>}
                       </td>
                     )}
@@ -320,9 +324,9 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                             'Configure'
                           )}
                         </Link>
-                      ) : row.subscribed && !row.connected ? (
+                      ) : !hasDesigns && row.subscribed && !row.connected ? (
                         <ConnectLocationButton locationId={row.id} size="small" />
-                      ) : !row.subscribed ? (
+                      ) : !hasDesigns && !row.subscribed ? (
                         <SubscribeButton locationId={row.id} />
                       ) : (
                         <span className="text-[11px] text-gray-300">—</span>
