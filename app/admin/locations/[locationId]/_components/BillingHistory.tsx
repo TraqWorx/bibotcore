@@ -10,7 +10,7 @@ interface Payment {
   net: number
   status: string
   customerEmail: string
-  invoiceUrl: string | null
+  receiptUrl: string | null
 }
 
 function formatEur(cents: number) {
@@ -101,9 +101,9 @@ export default function BillingHistory({ locationId }: { locationId: string }) {
               <td className="px-5 py-3.5 text-right tabular-nums text-red-600">{'\u20AC'}{formatEur(p.stripeFee)}</td>
               <td className="px-5 py-3.5 text-right font-semibold tabular-nums text-emerald-600">{'\u20AC'}{formatEur(p.net)}</td>
               <td className="px-5 py-3.5 text-right">
-                {p.invoiceUrl && (
-                  <a href={p.invoiceUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-medium text-brand hover:underline">
-                    Invoice
+                {p.receiptUrl && (
+                  <a href={p.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-medium text-brand hover:underline">
+                    Receipt
                   </a>
                 )}
               </td>

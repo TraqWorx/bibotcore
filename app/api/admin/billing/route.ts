@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ payments: [] })
     }
 
-    // Get all invoices for these customers
+    // Get all charges for these customers (charges have fee data)
     const payments: {
       id: string
       date: string
@@ -69,38 +69,40 @@ export async function GET(req: NextRequest) {
       net: number
       status: string
       customerEmail: string
-      invoiceUrl: string | null
+      receiptUrl: string | null
     }[] = []
 
+    const customerEmailMap = new Map<string, string>()
+    for (const c of allCustomers) {
+      if (locationCustomerIds.includes(c.id) && c.email) customerEmailMap.set(c.id, c.email)
+    }
+
     for (const custId of locationCustomerIds) {
-      const invoices = await stripe.invoices.list({
+      const charges = await stripe.charges.list({
         customer: custId,
         limit: 100,
-        expand: ['data.charge.balance_transaction'],
+        expand: ['data.balance_transaction'],
       })
 
-      for (const inv of invoices.data) {
-        if (inv.status !== 'paid') continue
+      for (const charge of charges.data) {
+        if (charge.status !== 'succeeded') continue
         let stripeFee = 0
-        let net = inv.amount_paid
-        const charge = (inv as unknown as Record<string, unknown>).charge
-        if (charge && typeof charge === 'object') {
-          const bt = (charge as Record<string, unknown>).balance_transaction
-          if (bt && typeof bt === 'object') {
-            const btObj = bt as { fee: number; net: number }
-            stripeFee = btObj.fee
-            net = btObj.net
-          }
+        let net = charge.amount
+        const bt = charge.balance_transaction
+        if (bt && typeof bt === 'object') {
+          const btObj = bt as unknown as { fee: number; net: number }
+          stripeFee = btObj.fee
+          net = btObj.net
         }
         payments.push({
-          id: inv.id,
-          date: new Date((inv.status_transitions?.paid_at ?? inv.created) * 1000).toISOString(),
-          amount: inv.amount_paid,
+          id: charge.id,
+          date: new Date(charge.created * 1000).toISOString(),
+          amount: charge.amount,
           stripeFee,
           net,
-          status: inv.status,
-          customerEmail: inv.customer_email ?? '',
-          invoiceUrl: inv.hosted_invoice_url ?? null,
+          status: charge.status,
+          customerEmail: customerEmailMap.get(custId) ?? charge.billing_details?.email ?? '',
+          receiptUrl: charge.receipt_url ?? null,
         })
       }
     }
