@@ -75,7 +75,7 @@ export default function BillingHistory({ locationId }: { locationId: string }) {
           <p className="mt-1 text-lg font-black text-red-600">{'\u20AC'}{formatEur(totalFees)}</p>
         </div>
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Net Received</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Total Payouts</p>
           <p className="mt-1 text-lg font-black text-emerald-600">{'\u20AC'}{formatEur(totalNet)}</p>
         </div>
       </div>
@@ -88,7 +88,7 @@ export default function BillingHistory({ locationId }: { locationId: string }) {
             <th className="px-5 py-3">Email</th>
             <th className="px-5 py-3 text-right">Amount</th>
             <th className="px-5 py-3 text-right">Stripe Fee</th>
-            <th className="px-5 py-3 text-right">Net</th>
+            <th className="px-5 py-3 text-right">Payout</th>
             <th className="px-5 py-3" />
           </tr>
         </thead>
