@@ -153,8 +153,8 @@ export default async function AffiliatesPage() {
     const token = await refreshIfNeeded(conn.location_id, conn)
     const cid = conn.company_id ?? companyId
     const affiliates = await fetchAffiliates(conn.location_id, token, cid)
-    // Get location token for detail fetches
-    const locToken = await getLocationToken(token, conn.location_id, cid)
+    // Get location token for detail fetches (use raw company token, not refreshed)
+    const locToken = await getLocationToken(conn.access_token, conn.location_id, cid)
     for (const a of affiliates) {
       let details = { commissionPercent: null as number | null, customers: [] as AffiliateCustomer[] }
       if (locToken) {
