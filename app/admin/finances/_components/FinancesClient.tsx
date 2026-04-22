@@ -13,7 +13,7 @@ interface Cost {
 }
 
 function formatEur(n: number) {
-  return n.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+  return n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function monthlyCost(cost: Cost): number {
