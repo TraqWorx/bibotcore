@@ -37,19 +37,21 @@ export async function GET(req: NextRequest) {
       if (locId === locationId) locationCustomerIds.push(c.id)
     }
 
-    // Also match by email: profiles with this location → their emails → Stripe customers
-    const { data: profiles } = await sb.from('profiles').select('email').eq('location_id', locationId)
-    const { data: profileLocs } = await sb.from('profile_locations').select('user_id').eq('location_id', locationId)
-    const userIds = (profileLocs ?? []).map(p => p.user_id)
-    let extraProfiles: { email: string | null }[] = []
-    if (userIds.length > 0) {
-      const { data } = await sb.from('profiles').select('email').in('id', userIds)
-      extraProfiles = data ?? []
+    // Match by emails unique to this location (exclude shared team members)
+    const { data: profiles } = await sb.from('profiles').select('email, location_id').eq('location_id', locationId)
+    const candidateEmails = (profiles ?? []).map(p => p.email?.toLowerCase()).filter(Boolean) as string[]
+
+    // Exclude emails that appear in other locations too
+    const locationEmails = new Set<string>()
+    for (const email of candidateEmails) {
+      const { count } = await sb.from('profiles').select('id', { count: 'exact', head: true }).eq('email', email)
+      const { count: locCount } = await sb.from('profile_locations').select('user_id', { count: 'exact', head: true })
+        .in('user_id', (await sb.from('profiles').select('id').eq('email', email)).data?.map(p => p.id) ?? [])
+      // Only include if this email isn't shared across multiple locations
+      if ((count ?? 0) <= 1 && (locCount ?? 0) <= 1) {
+        locationEmails.add(email)
+      }
     }
-    const locationEmails = new Set([
-      ...(profiles ?? []).map(p => p.email?.toLowerCase()).filter(Boolean),
-      ...extraProfiles.map(p => p.email?.toLowerCase()).filter(Boolean),
-    ] as string[])
     for (const c of allCustomers) {
       if (c.email && locationEmails.has(c.email.toLowerCase()) && !locationCustomerIds.includes(c.id)) {
         locationCustomerIds.push(c.id)
