@@ -185,12 +185,16 @@ export async function setLocationPlan(
       updated_at: now,
     }
     if (ghlPlanId) {
-      // Subscribing: set plan, subscribed_at, clear churned_at
+      // Subscribing: set plan, subscribed_at, date_added if missing, clear churned_at
       upsertData.ghl_plan_id = ghlPlanId
       upsertData.subscribed_at = now
       upsertData.churned_at = null
+      // Set ghl_date_added if not already set (for total paid calculation)
+      const { data: loc } = await supabase.from('locations').select('ghl_date_added').eq('location_id', locationId).single()
+      if (!loc?.ghl_date_added) upsertData.ghl_date_added = now
     } else {
-      // Removing plan: set churned_at but keep ghl_plan_id for revenue tracking
+      // Removing plan: clear plan and set churned
+      upsertData.ghl_plan_id = null
       upsertData.churned_at = now
     }
     const { error } = await supabase
