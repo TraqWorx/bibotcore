@@ -36,15 +36,15 @@ export default async function FinancesPage() {
     }
   }
 
-  // Fetch affiliate owed amounts
-  let affiliateOwed = 0
+  // Fetch affiliate monthly cost (owed ÷ months active)
+  let affiliateMonthlyCost = 0
+  let affiliateTotalOwed = 0
   try {
     const { refreshIfNeeded } = await import('@/lib/ghl/refreshIfNeeded')
     const { data: conns } = await sb.from('ghl_connections').select('location_id, access_token, refresh_token, expires_at, company_id').not('refresh_token', 'is', null).limit(5)
     for (const conn of conns ?? []) {
       const token = await refreshIfNeeded(conn.location_id, conn)
       const cid = conn.company_id ?? process.env.GHL_COMPANY_ID ?? ''
-      // Get location token
       const ltRes = await fetch('https://services.leadconnectorhq.com/oauth/locationToken', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Bearer ${token}`, Version: '2021-07-28' },
@@ -58,8 +58,13 @@ export default async function FinancesPage() {
       })
       if (!affRes.ok) continue
       const affData = await affRes.json()
-      for (const a of affData.affiliates ?? []) {
-        affiliateOwed += a.owned ?? 0
+      for (const a of (affData.affiliates ?? []) as { owned?: number; createdAt?: string }[]) {
+        const owed = a.owned ?? 0
+        affiliateTotalOwed += owed
+        if (owed > 0 && a.createdAt) {
+          const months = Math.max(1, Math.round((Date.now() - new Date(a.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 30)))
+          affiliateMonthlyCost += owed / months
+        }
       }
     }
   } catch { /* ignore */ }
@@ -77,7 +82,7 @@ export default async function FinancesPage() {
         <h1 className={ad.pageTitle}>Finances</h1>
         <p className={ad.pageSubtitle}>Track your costs and profitability</p>
       </div>
-      <FinancesClient costs={typedCosts} mrr={mrr} affiliateOwed={affiliateOwed} />
+      <FinancesClient costs={typedCosts} mrr={mrr} affiliateMonthlyCost={affiliateMonthlyCost} affiliateTotalOwed={affiliateTotalOwed} />
     </div>
   )
 }

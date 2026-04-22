@@ -20,7 +20,7 @@ function monthlyCost(cost: Cost): number {
   return cost.frequency === 'annual' ? cost.amount / 12 : cost.amount
 }
 
-export default function FinancesClient({ costs, mrr, affiliateOwed = 0 }: { costs: Cost[]; mrr: number; affiliateOwed?: number }) {
+export default function FinancesClient({ costs, mrr, affiliateMonthlyCost = 0, affiliateTotalOwed = 0 }: { costs: Cost[]; mrr: number; affiliateMonthlyCost?: number; affiliateTotalOwed?: number }) {
   const router = useRouter()
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -30,7 +30,7 @@ export default function FinancesClient({ costs, mrr, affiliateOwed = 0 }: { cost
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const totalMonthlyCosts = costs.reduce((s, c) => s + monthlyCost(c), 0) + affiliateOwed
+  const totalMonthlyCosts = costs.reduce((s, c) => s + monthlyCost(c), 0) + affiliateMonthlyCost
   const monthlyProfit = mrr - totalMonthlyCosts
 
   function startEdit(cost: Cost) {
@@ -133,14 +133,17 @@ export default function FinancesClient({ costs, mrr, affiliateOwed = 0 }: { cost
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {affiliateOwed > 0 && (
+            {affiliateMonthlyCost > 0 && (
               <tr className="bg-amber-50/30">
-                <td className="px-5 py-3.5 font-medium text-gray-900">Affiliate Commissions</td>
-                <td className="px-5 py-3.5 text-right font-semibold tabular-nums">{'\u20AC'}{formatEur(affiliateOwed)}</td>
+                <td className="px-5 py-3.5 font-medium text-gray-900">
+                  Affiliate Commissions
+                  <p className="text-[10px] text-gray-400 mt-0.5">Total owed: {'\u20AC'}{formatEur(affiliateTotalOwed)}</p>
+                </td>
+                <td className="px-5 py-3.5 text-right font-semibold tabular-nums">{'\u20AC'}{formatEur(affiliateTotalOwed)}</td>
                 <td className="px-5 py-3.5">
                   <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-amber-50 text-amber-700">from GHL</span>
                 </td>
-                <td className="px-5 py-3.5 text-right font-bold tabular-nums text-gray-900">{'\u20AC'}{formatEur(affiliateOwed)}</td>
+                <td className="px-5 py-3.5 text-right font-bold tabular-nums text-gray-900">{'\u20AC'}{formatEur(affiliateMonthlyCost)}</td>
                 <td className="px-5 py-3.5" />
               </tr>
             )}
