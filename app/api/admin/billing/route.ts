@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { getStripe } from '@/lib/stripe/stripe'
+import Stripe from 'stripe'
 
 export async function GET(req: NextRequest) {
   const locationId = req.nextUrl.searchParams.get('locationId')
@@ -15,7 +15,10 @@ export async function GET(req: NextRequest) {
   if (profile?.role !== 'admin' && profile?.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
-    const stripe = getStripe()
+    // Use GHL Stripe for customer payment history (separate from SaaS Stripe)
+    const ghlStripeKey = process.env.STRIPE_GHL_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY
+    if (!ghlStripeKey) return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 })
+    const stripe = new Stripe(ghlStripeKey)
 
     // Find Stripe customers linked to this location
     const allCustomers: { id: string; email: string | null; metadata: Record<string, string> }[] = []
