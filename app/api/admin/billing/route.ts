@@ -61,11 +61,13 @@ export async function GET(req: NextRequest) {
         if (inv.status !== 'paid') continue
         let stripeFee = 0
         let net = inv.amount_paid
-        if (inv.charge && typeof inv.charge === 'object') {
-          const bt = inv.charge.balance_transaction
+        const charge = (inv as unknown as Record<string, unknown>).charge
+        if (charge && typeof charge === 'object') {
+          const bt = (charge as Record<string, unknown>).balance_transaction
           if (bt && typeof bt === 'object') {
-            stripeFee = bt.fee
-            net = bt.net
+            const btObj = bt as { fee: number; net: number }
+            stripeFee = btObj.fee
+            net = btObj.net
           }
         }
         payments.push({
