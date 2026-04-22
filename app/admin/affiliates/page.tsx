@@ -66,7 +66,7 @@ async function getLocationToken(companyToken: string, locationId: string, compan
   }
 }
 
-async function fetchAffiliateDetails(locationId: string, locToken: string, affiliate: Affiliate, planLookup: (email: string) => { planName: string; planPrice: number } | null): Promise<{ commissionPercent: number | null; customers: AffiliateCustomer[] }> {
+async function fetchAffiliateDetails(locationId: string, locToken: string, affiliate: Affiliate, planLookup: (email: string) => { planName: string; planPrice: number; locationName: string } | null): Promise<{ commissionPercent: number | null; customers: AffiliateCustomer[] }> {
   let commissionPercent: number | null = null
   let customers: AffiliateCustomer[] = []
   try {
