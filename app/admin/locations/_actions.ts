@@ -197,9 +197,11 @@ export async function setLocationPlan(
       upsertData.ghl_plan_id = null
       upsertData.churned_at = now
     }
+    const { location_id: _, ...updateData } = upsertData as Record<string, unknown> & { location_id: string }
     const { error } = await supabase
       .from('locations')
-      .upsert(upsertData, { onConflict: 'location_id' })
+      .update(updateData)
+      .eq('location_id', locationId)
     if (error) return { error: error.message }
     revalidatePath('/admin/locations')
     revalidatePath('/admin')
