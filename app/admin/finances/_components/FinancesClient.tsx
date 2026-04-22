@@ -135,11 +135,8 @@ export default function FinancesClient({ costs, mrr, affiliateMonthlyCost = 0, a
           <tbody className="divide-y divide-gray-50">
             {affiliateMonthlyCost > 0 && (
               <tr className="bg-amber-50/30">
-                <td className="px-5 py-3.5 font-medium text-gray-900">
-                  Affiliate Commissions
-                  <p className="text-[10px] text-gray-400 mt-0.5">Total owed: {'\u20AC'}{formatEur(affiliateTotalOwed)}</p>
-                </td>
-                <td className="px-5 py-3.5 text-right font-semibold tabular-nums">{'\u20AC'}{formatEur(affiliateTotalOwed)}</td>
+                <td className="px-5 py-3.5 font-medium text-gray-900">Affiliate Commissions</td>
+                <td className="px-5 py-3.5 text-right font-semibold tabular-nums">—</td>
                 <td className="px-5 py-3.5">
                   <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-amber-50 text-amber-700">from GHL</span>
                 </td>
