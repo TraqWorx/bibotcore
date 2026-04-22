@@ -18,17 +18,36 @@ export async function GET(req: NextRequest) {
     const stripe = getStripe()
 
     // Find Stripe customers linked to this location
-    const customers = await stripe.customers.list({ limit: 100 })
+    const allCustomers: { id: string; email: string | null; metadata: Record<string, string> }[] = []
+    let hasMore = true
+    let startingAfter: string | undefined
+    while (hasMore) {
+      const page = await stripe.customers.list({ limit: 100, ...(startingAfter ? { starting_after: startingAfter } : {}) })
+      for (const c of page.data) allCustomers.push({ id: c.id, email: c.email, metadata: (c.metadata ?? {}) as Record<string, string> })
+      hasMore = page.has_more
+      if (page.data.length > 0) startingAfter = page.data[page.data.length - 1].id
+    }
+
     const locationCustomerIds: string[] = []
-    for (const c of customers.data) {
+    for (const c of allCustomers) {
       const locId = c.metadata?.locationId ?? c.metadata?.location
       if (locId === locationId) locationCustomerIds.push(c.id)
     }
 
     // Also match by email: profiles with this location → their emails → Stripe customers
     const { data: profiles } = await sb.from('profiles').select('email').eq('location_id', locationId)
-    const locationEmails = new Set((profiles ?? []).map(p => p.email?.toLowerCase()).filter(Boolean))
-    for (const c of customers.data) {
+    const { data: profileLocs } = await sb.from('profile_locations').select('user_id').eq('location_id', locationId)
+    const userIds = (profileLocs ?? []).map(p => p.user_id)
+    let extraProfiles: { email: string | null }[] = []
+    if (userIds.length > 0) {
+      const { data } = await sb.from('profiles').select('email').in('id', userIds)
+      extraProfiles = data ?? []
+    }
+    const locationEmails = new Set([
+      ...(profiles ?? []).map(p => p.email?.toLowerCase()).filter(Boolean),
+      ...extraProfiles.map(p => p.email?.toLowerCase()).filter(Boolean),
+    ] as string[])
+    for (const c of allCustomers) {
       if (c.email && locationEmails.has(c.email.toLowerCase()) && !locationCustomerIds.includes(c.id)) {
         locationCustomerIds.push(c.id)
       }
