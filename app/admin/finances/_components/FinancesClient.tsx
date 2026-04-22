@@ -20,7 +20,7 @@ function monthlyCost(cost: Cost): number {
   return cost.frequency === 'annual' ? cost.amount / 12 : cost.amount
 }
 
-export default function FinancesClient({ costs, mrr }: { costs: Cost[]; mrr: number }) {
+export default function FinancesClient({ costs, mrr, affiliateOwed = 0 }: { costs: Cost[]; mrr: number; affiliateOwed?: number }) {
   const router = useRouter()
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -30,7 +30,7 @@ export default function FinancesClient({ costs, mrr }: { costs: Cost[]; mrr: num
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const totalMonthlyCosts = costs.reduce((s, c) => s + monthlyCost(c), 0)
+  const totalMonthlyCosts = costs.reduce((s, c) => s + monthlyCost(c), 0) + affiliateOwed
   const monthlyProfit = mrr - totalMonthlyCosts
 
   function startEdit(cost: Cost) {
@@ -133,6 +133,17 @@ export default function FinancesClient({ costs, mrr }: { costs: Cost[]; mrr: num
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
+            {affiliateOwed > 0 && (
+              <tr className="bg-amber-50/30">
+                <td className="px-5 py-3.5 font-medium text-gray-900">Affiliate Commissions</td>
+                <td className="px-5 py-3.5 text-right font-semibold tabular-nums">{'\u20AC'}{formatEur(affiliateOwed)}</td>
+                <td className="px-5 py-3.5">
+                  <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-amber-50 text-amber-700">from GHL</span>
+                </td>
+                <td className="px-5 py-3.5 text-right font-bold tabular-nums text-gray-900">{'\u20AC'}{formatEur(affiliateOwed)}</td>
+                <td className="px-5 py-3.5" />
+              </tr>
+            )}
             {costs.map((cost) => (
               editingId === cost.id ? (
                 <tr key={cost.id} className="bg-brand/5">

@@ -36,6 +36,34 @@ export default async function FinancesPage() {
     }
   }
 
+  // Fetch affiliate owed amounts
+  let affiliateOwed = 0
+  try {
+    const { refreshIfNeeded } = await import('@/lib/ghl/refreshIfNeeded')
+    const { data: conns } = await sb.from('ghl_connections').select('location_id, access_token, refresh_token, expires_at, company_id').not('refresh_token', 'is', null).limit(5)
+    for (const conn of conns ?? []) {
+      const token = await refreshIfNeeded(conn.location_id, conn)
+      const cid = conn.company_id ?? process.env.GHL_COMPANY_ID ?? ''
+      // Get location token
+      const ltRes = await fetch('https://services.leadconnectorhq.com/oauth/locationToken', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Bearer ${token}`, Version: '2021-07-28' },
+        body: new URLSearchParams({ companyId: cid, locationId: conn.location_id }),
+      })
+      if (!ltRes.ok) continue
+      const { access_token: locToken } = await ltRes.json()
+      if (!locToken) continue
+      const affRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/affiliates`, {
+        headers: { Authorization: `Bearer ${locToken}`, Version: '2021-07-28' },
+      })
+      if (!affRes.ok) continue
+      const affData = await affRes.json()
+      for (const a of affData.affiliates ?? []) {
+        affiliateOwed += a.owned ?? 0
+      }
+    }
+  } catch { /* ignore */ }
+
   const typedCosts = (costs ?? []).map((c) => ({
     id: c.id as string,
     name: c.name as string,
@@ -49,7 +77,7 @@ export default async function FinancesPage() {
         <h1 className={ad.pageTitle}>Finances</h1>
         <p className={ad.pageSubtitle}>Track your costs and profitability</p>
       </div>
-      <FinancesClient costs={typedCosts} mrr={mrr} />
+      <FinancesClient costs={typedCosts} mrr={mrr} affiliateOwed={affiliateOwed} />
     </div>
   )
 }
