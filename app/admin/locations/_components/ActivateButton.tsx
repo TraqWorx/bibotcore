@@ -34,7 +34,7 @@ export default function ActivateButton({ locationId, currentPlanId, plans }: {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50">
+      <button onClick={() => setOpen(true)} className="rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50 whitespace-nowrap">
         {currentPlanId ? 'Change Plan' : 'Set Plan'}
       </button>
     )
