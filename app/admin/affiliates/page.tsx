@@ -37,6 +37,7 @@ interface AffiliateCustomer {
   type?: string
   planName?: string
   planPrice?: number
+  locationName?: string
 }
 
 interface AffiliateDisplay extends Affiliate {
@@ -96,6 +97,7 @@ async function fetchAffiliateDetails(locationId: string, locToken: string, affil
           type: c.type as string | undefined,
           planName: plan?.planName,
           planPrice: plan?.planPrice,
+          locationName: plan?.locationName,
         }
       })
     }
@@ -165,12 +167,15 @@ export default async function AffiliatesPage() {
   }
 
   const { data: profiles } = await sb.from('profiles').select('email, location_id').eq('agency_id', profile.agency_id)
-  const emailToPlan = new Map<string, { planName: string; planPrice: number }>()
+  const emailToPlan = new Map<string, { planName: string; planPrice: number; locationName: string }>()
   for (const p of profiles ?? []) {
     if (p.email && p.location_id) {
       const loc = (locations ?? []).find((l) => l.location_id === p.location_id)
+      const locName = nameMap.get(p.location_id) ?? p.location_id
       if (loc?.ghl_plan_id && planById[loc.ghl_plan_id]) {
-        emailToPlan.set(p.email.toLowerCase(), { planName: planById[loc.ghl_plan_id].name, planPrice: planById[loc.ghl_plan_id].price })
+        emailToPlan.set(p.email.toLowerCase(), { planName: planById[loc.ghl_plan_id].name, planPrice: planById[loc.ghl_plan_id].price, locationName: locName })
+      } else {
+        emailToPlan.set(p.email.toLowerCase(), { planName: '', planPrice: 0, locationName: locName })
       }
     }
   }

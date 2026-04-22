@@ -10,6 +10,7 @@ interface AffiliateCustomer {
   type?: string
   planName?: string
   planPrice?: number
+  locationName?: string
 }
 
 interface AffiliateRow {
@@ -105,8 +106,8 @@ export default function AffiliatesTable({ affiliates }: { affiliates: AffiliateR
                           <table className="w-full text-xs">
                             <thead>
                               <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                                <th className="pb-2">Customer</th>
-                                <th className="pb-2">Email</th>
+                                <th className="pb-2">Sub-account</th>
+                                <th className="pb-2">Contact</th>
                                 <th className="pb-2">Plan</th>
                                 <th className="pb-2">Connected</th>
                                 <th className="pb-2 text-center">Months</th>
@@ -123,9 +124,9 @@ export default function AffiliatesTable({ affiliates }: { affiliates: AffiliateR
                                 return (
                                   <tr key={i}>
                                     <td className="py-2 font-medium text-gray-900">
-                                      {(`${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || '—')}
+                                      {c.locationName ?? (`${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || '—')}
                                     </td>
-                                    <td className="py-2 text-gray-500">{c.email ?? '—'}</td>
+                                    <td className="py-2 text-gray-500">{(`${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || c.email || '—')}</td>
                                     <td className="py-2 text-gray-400 text-[11px]">{c.planName ? `${c.planName} (€${c.planPrice})` : '—'}</td>
                                     <td className="py-2 text-gray-500">{c.createdAt ? formatDate(c.createdAt) : '—'}</td>
                                     <td className="py-2 text-center font-semibold">{months}</td>
