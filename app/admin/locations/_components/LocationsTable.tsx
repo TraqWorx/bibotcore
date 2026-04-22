@@ -36,7 +36,6 @@ interface LocationRow {
   totalPaid: number | null
   totalPaidVat: number | null
   churned: boolean
-  manualPlan: boolean
 }
 
 interface Props {
@@ -359,7 +358,7 @@ export default function LocationsTable({ rows, designs, unconnectedLocations, pl
                       <div className="flex items-center justify-end gap-1">
                         {hasDesigns ? (
                           <div className="flex items-center gap-1">
-                            {(!row.planId || row.manualPlan) && <ActivateButton locationId={row.id} currentPlanId={row.planId} plans={plans ?? []} />}
+                            <ActivateButton locationId={row.id} currentPlanId={row.planId} plans={plans ?? []} />
                             {row.connected && row.needsOAuth && row.design && <ReauthorizeButton designSlug={row.design} />}
                             {row.connected && <DisconnectButton locationId={row.id} />}
                             {!row.connected && <ConnectButton designs={designs} unconnectedLocations={unconnectedLocations} preselectedId={row.id} />}

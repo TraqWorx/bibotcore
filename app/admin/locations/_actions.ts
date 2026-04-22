@@ -182,7 +182,6 @@ export async function setLocationPlan(
     const now = new Date().toISOString()
     const upsertData: Record<string, unknown> = {
       location_id: locationId,
-      updated_at: now,
     }
     if (ghlPlanId) {
       // Subscribing: set plan, subscribed_at, date_added if missing, clear churned_at

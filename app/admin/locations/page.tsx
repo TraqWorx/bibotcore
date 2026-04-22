@@ -195,7 +195,6 @@ export default async function LocationsPage({
       totalPaid,
       totalPaidVat: totalPaid != null ? Math.round(totalPaid * 1.22 * 100) / 100 : null,
       churned,
-      manualPlan: !l.planId && !!planByLocation[l.id],
     }
   })
 
