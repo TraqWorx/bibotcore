@@ -124,17 +124,19 @@ export default async function LocationsPage({
 
   // Plan assignments from locations table
   const { data: locationPlanRows } = locationIds.length
-    ? await supabase.from('locations').select('location_id, ghl_plan_id, ghl_date_added, churned_at').in('location_id', locationIds)
+    ? await supabase.from('locations').select('location_id, ghl_plan_id, ghl_date_added, churned_at, subscribed_at').in('location_id', locationIds)
     : { data: [] }
 
   const planByLocation: Record<string, string | null> = {}
   const churnedLocations = new Set<string>()
+  const manualPlanLocations = new Set<string>()
   const locationMeta: Record<string, { ghl_date_added?: string | null; churned_at?: string | null }> = {}
   for (const row of locationPlanRows ?? []) {
-    const r = row as { location_id: string; ghl_plan_id?: string | null; ghl_date_added?: string | null; churned_at?: string | null }
+    const r = row as { location_id: string; ghl_plan_id?: string | null; ghl_date_added?: string | null; churned_at?: string | null; subscribed_at?: string | null }
     planByLocation[r.location_id] = r.ghl_plan_id ?? null
     locationMeta[r.location_id] = { ghl_date_added: r.ghl_date_added, churned_at: r.churned_at }
     if (r.churned_at) churnedLocations.add(r.location_id)
+    if (r.subscribed_at) manualPlanLocations.add(r.location_id)
   }
 
   const designByLocation: Record<string, string | null> = {}
@@ -193,6 +195,7 @@ export default async function LocationsPage({
       totalPaid,
       totalPaidVat: totalPaid != null ? Math.round(totalPaid * 1.22 * 100) / 100 : null,
       churned,
+      manualPlan: manualPlanLocations.has(l.id),
     }
   })
 
