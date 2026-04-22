@@ -2,6 +2,7 @@ import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
+import AffiliatesTable from './_components/AffiliatesTable'
 import { ad } from '@/lib/admin/ui'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +25,23 @@ interface Affiliate {
   clickCount?: string
   currency?: string
   createdAt?: string
+  campaignIds?: string[]
   [key: string]: unknown
+}
+
+interface AffiliateCustomer {
+  firstName?: string
+  lastName?: string
+  email?: string
+  createdAt?: string
+  type?: string
+}
+
+interface AffiliateDisplay extends Affiliate {
+  locationId: string
+  locationName: string
+  commissionPercent: number | null
+  customers: AffiliateCustomer[]
 }
 
 async function getLocationToken(companyToken: string, locationId: string, companyId: string): Promise<string | null> {
@@ -44,6 +61,38 @@ async function getLocationToken(companyToken: string, locationId: string, compan
   } catch {
     return null
   }
+}
+
+async function fetchAffiliateDetails(locationId: string, locToken: string, affiliate: Affiliate): Promise<{ commissionPercent: number | null; customers: AffiliateCustomer[] }> {
+  let commissionPercent: number | null = null
+  let customers: AffiliateCustomer[] = []
+  try {
+    // Get campaign commission %
+    if (affiliate.campaignIds?.[0]) {
+      const campRes = await fetch(`${GHL_BASE}/affiliate-manager/${locationId}/campaigns/${affiliate.campaignIds[0]}`, {
+        headers: { Authorization: `Bearer ${locToken}`, Version: '2021-07-28' },
+      })
+      if (campRes.ok) {
+        const camp = await campRes.json()
+        commissionPercent = camp.commissionV2?.[0]?.defaultCommission?.commission ?? null
+      }
+    }
+    // Get customers
+    const custRes = await fetch(`${GHL_BASE}/affiliate-manager/${locationId}/affiliates/${affiliate._id}/customers`, {
+      headers: { Authorization: `Bearer ${locToken}`, Version: '2021-07-28' },
+    })
+    if (custRes.ok) {
+      const custData = await custRes.json()
+      customers = (custData.customers ?? []).map((c: Record<string, unknown>) => ({
+        firstName: c.firstName as string | undefined,
+        lastName: c.lastName as string | undefined,
+        email: c.email as string | undefined,
+        createdAt: c.createdAt as string | undefined,
+        type: c.type as string | undefined,
+      }))
+    }
+  } catch { /* ignore */ }
+  return { commissionPercent, customers }
 }
 
 async function fetchAffiliates(locationId: string, token: string, companyId: string): Promise<Affiliate[]> {
@@ -96,7 +145,7 @@ export default async function AffiliatesPage() {
     .select('location_id, access_token, refresh_token, expires_at, company_id')
     .not('refresh_token', 'is', null)
 
-  const allAffiliates: (Affiliate & { locationId: string; locationName: string })[] = []
+  const allAffiliates: AffiliateDisplay[] = []
   const { data: locations } = await sb.from('locations').select('location_id, name').eq('agency_id', profile.agency_id)
   const nameMap = new Map((locations ?? []).map((l) => [l.location_id, l.name]))
 
@@ -104,11 +153,19 @@ export default async function AffiliatesPage() {
     const token = await refreshIfNeeded(conn.location_id, conn)
     const cid = conn.company_id ?? companyId
     const affiliates = await fetchAffiliates(conn.location_id, token, cid)
+    // Get location token for detail fetches
+    const locToken = await getLocationToken(token, conn.location_id, cid)
     for (const a of affiliates) {
+      let details = { commissionPercent: null as number | null, customers: [] as AffiliateCustomer[] }
+      if (locToken) {
+        details = await fetchAffiliateDetails(conn.location_id, locToken, a)
+      }
       allAffiliates.push({
         ...a,
         locationId: conn.location_id,
         locationName: nameMap.get(conn.location_id) ?? conn.location_id,
+        commissionPercent: details.commissionPercent,
+        customers: details.customers,
       })
     }
   }
@@ -159,44 +216,7 @@ export default async function AffiliatesPage() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
-                  <th className="px-5 py-3">Affiliate</th>
-                  <th className="px-5 py-3">Email</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3 text-center">Customers</th>
-                  <th className="px-5 py-3 text-center">Leads</th>
-                  <th className="px-5 py-3 text-right">Revenue</th>
-                  <th className="px-5 py-3 text-right">Owed</th>
-                  <th className="px-5 py-3 text-right">Paid</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {allAffiliates.map((a) => (
-                  <tr key={`${a.locationId}-${a._id}`} className="transition-colors hover:bg-gray-50/50">
-                    <td className="px-5 py-3.5 font-medium text-gray-900">
-                      {(`${a.firstName ?? ''} ${a.lastName ?? ''}`.trim() || '—')}
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-500">{a.email ?? '—'}</td>
-                    <td className="px-5 py-3.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        a.active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        {a.active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-center font-semibold tabular-nums">{a.customer ?? 0}</td>
-                    <td className="px-5 py-3.5 text-center font-semibold tabular-nums">{a.lead ?? 0}</td>
-                    <td className="px-5 py-3.5 text-right font-semibold tabular-nums">{formatMoney(a.revenue, a.currency)}</td>
-                    <td className="px-5 py-3.5 text-right font-bold tabular-nums text-red-600">{formatMoney(a.owned, a.currency)}</td>
-                    <td className="px-5 py-3.5 text-right font-semibold tabular-nums text-emerald-600">{formatMoney(a.paid, a.currency)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AffiliatesTable affiliates={allAffiliates} />
         </>
       )}
     </div>

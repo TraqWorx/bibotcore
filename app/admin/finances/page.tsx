@@ -44,18 +44,27 @@ export default async function FinancesPage() {
     const { data: conns } = await sb.from('ghl_connections').select('location_id, access_token, refresh_token, expires_at, company_id').not('refresh_token', 'is', null).limit(5)
     for (const conn of conns ?? []) {
       const token = await refreshIfNeeded(conn.location_id, conn)
-      const cid = conn.company_id ?? process.env.GHL_COMPANY_ID ?? ''
-      const ltRes = await fetch('https://services.leadconnectorhq.com/oauth/locationToken', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Bearer ${token}`, Version: '2021-07-28' },
-        body: new URLSearchParams({ companyId: cid, locationId: conn.location_id }),
+      // Try direct first (refreshIfNeeded may have already exchanged)
+      let affRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/affiliates`, {
+        headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
       })
-      if (!ltRes.ok) continue
-      const { access_token: locToken } = await ltRes.json()
-      if (!locToken) continue
-      const affRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/affiliates`, {
-        headers: { Authorization: `Bearer ${locToken}`, Version: '2021-07-28' },
-      })
+      // If 401, try location token exchange
+      if (affRes.status === 401) {
+        const cid = conn.company_id ?? process.env.GHL_COMPANY_ID ?? ''
+        const ltRes = await fetch('https://services.leadconnectorhq.com/oauth/locationToken', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Bearer ${conn.access_token}`, Version: '2021-07-28' },
+          body: new URLSearchParams({ companyId: cid, locationId: conn.location_id }),
+        })
+        if (ltRes.ok) {
+          const { access_token: locToken } = await ltRes.json()
+          if (locToken) {
+            affRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/affiliates`, {
+              headers: { Authorization: `Bearer ${locToken}`, Version: '2021-07-28' },
+            })
+          }
+        }
+      }
       if (!affRes.ok) continue
       const affData = await affRes.json()
       for (const a of (affData.affiliates ?? []) as { owned?: number; createdAt?: string }[]) {
