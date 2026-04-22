@@ -19,7 +19,7 @@ export default async function FinancesPage() {
 
   // Get MRR from locations with plans
   const [{ data: locations }, { data: ghlPlans }, { data: costs }] = await Promise.all([
-    sb.from('locations').select('ghl_plan_id').eq('agency_id', agencyId).not('ghl_plan_id', 'is', null),
+    sb.from('locations').select('ghl_plan_id').eq('agency_id', agencyId).not('ghl_plan_id', 'is', null).is('churned_at', null),
     sb.from('ghl_plans').select('ghl_plan_id, price_monthly'),
     sb.from('agency_costs').select('id, name, amount, frequency').eq('agency_id', agencyId).order('created_at'),
   ])
