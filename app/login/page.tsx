@@ -24,11 +24,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [urlError, setUrlError] = useState<string | null>(() => getInitialUrlError())
 
-  // Parse error from Supabase redirect hash (e.g. expired magic link)
+  // Parse error from Supabase redirect hash or query param
   useEffect(() => {
     const hash = window.location.hash
+    const params = new URLSearchParams(window.location.search)
+    const msg = params.get('message')
+    if (msg) {
+      setUrlError(msg)
+      history.replaceState(null, '', window.location.pathname)
+    }
     if (!hash) return
-    // Clean the hash from URL without reload
     history.replaceState(null, '', window.location.pathname + window.location.search)
   }, [])
 

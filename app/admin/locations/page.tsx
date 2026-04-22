@@ -232,7 +232,7 @@ export default async function LocationsPage({
           </div>
         </div>
       ) : (
-        <LocationsTable rows={rows} designs={designsList} unconnectedLocations={unconnectedLocations} />
+        <LocationsTable rows={rows} designs={designsList} unconnectedLocations={unconnectedLocations} plans={ghlPlans ?? []} />
       )}
     </div>
   )

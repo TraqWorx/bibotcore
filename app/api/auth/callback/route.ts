@@ -38,6 +38,12 @@ export async function GET(req: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
       console.error('[auth/callback] exchangeCodeForSession error:', error.message)
+      // PKCE verifier missing — ask user to request a new link
+      if (error.message.includes('code verifier') || error.message.includes('PKCE')) {
+        const loginUrl = new URL('/login', req.url)
+        loginUrl.searchParams.set('message', 'Your login link expired. Please request a new one.')
+        return NextResponse.redirect(loginUrl)
+      }
       authError = error.message
     }
   } else if (token_hash && type) {

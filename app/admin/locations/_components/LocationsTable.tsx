@@ -18,6 +18,7 @@ import ReauthorizeButton from './ReauthorizeButton'
 import SubscribeButton from './SubscribeButton'
 import ConnectLocationButton from './ConnectLocationButton'
 import CancelSubscriptionButton from './CancelSubscriptionButton'
+import ActivateButton from './ActivateButton'
 
 interface LocationRow {
   id: string
@@ -41,6 +42,7 @@ interface Props {
   rows: LocationRow[]
   designs: { slug: string; name: string }[]
   unconnectedLocations: { id: string; name: string }[]
+  plans?: { ghl_plan_id: string; name: string; price_monthly: number | null }[]
 }
 
 type SortCol = 'name' | 'dateAdded' | 'connected' | 'users' | 'design' | 'plan' | 'price' | 'totalPaid' | 'totalPaidVat'
@@ -78,7 +80,7 @@ function HeaderCell({ col, children, sortCol, sortDir, onToggle, align }: Header
   )
 }
 
-export default function LocationsTable({ rows, designs, unconnectedLocations }: Props) {
+export default function LocationsTable({ rows, designs, unconnectedLocations, plans }: Props) {
   const [search, setSearch] = useState('')
   const [connectedFilter, setConnectedFilter] = useState<'all' | 'yes' | 'no'>('all')
   const [usersFilter, setUsersFilter] = useState<'all' | 'with' | 'without'>('all')
@@ -355,12 +357,11 @@ export default function LocationsTable({ rows, designs, unconnectedLocations }: 
                     <td className="px-3 py-3">
                       <div className="flex items-center justify-end gap-1">
                         {row.connected && hasDesigns ? (
-                          <>
-                            {row.needsOAuth && row.design && (
-                              <ReauthorizeButton designSlug={row.design} />
-                            )}
+                          <div className="flex items-center gap-1">
+                            <ActivateButton locationId={row.id} isActive={row.subscribed} currentPlanId={row.planId} plans={plans ?? []} />
+                            {row.needsOAuth && row.design && <ReauthorizeButton designSlug={row.design} />}
                             <DisconnectButton locationId={row.id} />
-                          </>
+                          </div>
                         ) : !hasDesigns && row.subscribed ? (
                           <CancelSubscriptionButton locationId={row.id} />
                         ) : hasDesigns && !row.connected ? (
