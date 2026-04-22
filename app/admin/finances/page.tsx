@@ -44,35 +44,58 @@ export default async function FinancesPage() {
     const { data: conns } = await sb.from('ghl_connections').select('location_id, access_token, refresh_token, expires_at, company_id').not('refresh_token', 'is', null).limit(5)
     for (const conn of conns ?? []) {
       const token = await refreshIfNeeded(conn.location_id, conn)
-      // Try direct first (refreshIfNeeded may have already exchanged)
-      let affRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/affiliates`, {
-        headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
+      // Get location token for affiliate API
+      const cid = conn.company_id ?? process.env.GHL_COMPANY_ID ?? ''
+      const ltRes = await fetch('https://services.leadconnectorhq.com/oauth/locationToken', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Bearer ${conn.access_token}`, Version: '2021-07-28' },
+        body: new URLSearchParams({ companyId: cid, locationId: conn.location_id }),
       })
-      // If 401, try location token exchange
-      if (affRes.status === 401) {
-        const cid = conn.company_id ?? process.env.GHL_COMPANY_ID ?? ''
-        const ltRes = await fetch('https://services.leadconnectorhq.com/oauth/locationToken', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Bearer ${conn.access_token}`, Version: '2021-07-28' },
-          body: new URLSearchParams({ companyId: cid, locationId: conn.location_id }),
-        })
-        if (ltRes.ok) {
-          const { access_token: locToken } = await ltRes.json()
-          if (locToken) {
-            affRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/affiliates`, {
-              headers: { Authorization: `Bearer ${locToken}`, Version: '2021-07-28' },
-            })
-          }
-        }
-      }
+      if (!ltRes.ok) continue
+      const { access_token: affToken } = await ltRes.json()
+      if (!affToken) continue
+
+      const affRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/affiliates`, {
+        headers: { Authorization: `Bearer ${affToken}`, Version: '2021-07-28' },
+      })
       if (!affRes.ok) continue
       const affData = await affRes.json()
-      for (const a of (affData.affiliates ?? []) as { owned?: number; createdAt?: string }[]) {
-        const owed = a.owned ?? 0
-        affiliateTotalOwed += owed
-        if (owed > 0 && a.createdAt) {
-          const months = Math.max(1, Math.round((Date.now() - new Date(a.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 30)))
-          affiliateMonthlyCost += owed / months
+      // Get campaign commission rates
+      for (const a of (affData.affiliates ?? []) as { _id?: string; owned?: number; campaignIds?: string[]; customer?: number }[]) {
+        affiliateTotalOwed += a.owned ?? 0
+        // Get commission rate from campaign
+        let commRate = 0
+        if (a.campaignIds?.[0]) {
+          const campRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/campaigns/${a.campaignIds[0]}`, {
+            headers: { Authorization: `Bearer ${affToken}`, Version: '2021-07-28' },
+          })
+          if (campRes.ok) {
+            const camp = await campRes.json()
+            commRate = (camp.commissionV2?.[0]?.defaultCommission?.commission ?? 0) / 100
+          }
+        }
+        // Get customer plan prices
+        if (commRate > 0 && a._id) {
+          const custRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/affiliates/${a._id}/customers`, {
+            headers: { Authorization: `Bearer ${affToken}`, Version: '2021-07-28' },
+          })
+          if (custRes.ok) {
+            const custData2 = await custRes.json()
+            for (const c of custData2.customers ?? []) {
+              const email = (c.email as string | undefined)?.toLowerCase()
+              if (email) {
+                // Match to location plan
+                const { data: prof } = await sb.from('profiles').select('location_id').eq('email', email).maybeSingle()
+                if (prof?.location_id) {
+                  const { data: loc } = await sb.from('locations').select('ghl_plan_id').eq('location_id', prof.location_id).single()
+                  if (loc?.ghl_plan_id) {
+                    const { data: plan } = await sb.from('ghl_plans').select('price_monthly').eq('ghl_plan_id', loc.ghl_plan_id).single()
+                    if (plan?.price_monthly) affiliateMonthlyCost += Number(plan.price_monthly) * commRate
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

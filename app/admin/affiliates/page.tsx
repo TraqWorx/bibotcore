@@ -35,6 +35,8 @@ interface AffiliateCustomer {
   email?: string
   createdAt?: string
   type?: string
+  planName?: string
+  planPrice?: number
 }
 
 interface AffiliateDisplay extends Affiliate {
@@ -63,7 +65,7 @@ async function getLocationToken(companyToken: string, locationId: string, compan
   }
 }
 
-async function fetchAffiliateDetails(locationId: string, locToken: string, affiliate: Affiliate): Promise<{ commissionPercent: number | null; customers: AffiliateCustomer[] }> {
+async function fetchAffiliateDetails(locationId: string, locToken: string, affiliate: Affiliate, planLookup: (email: string) => { planName: string; planPrice: number } | null): Promise<{ commissionPercent: number | null; customers: AffiliateCustomer[] }> {
   let commissionPercent: number | null = null
   let customers: AffiliateCustomer[] = []
   try {
@@ -83,13 +85,19 @@ async function fetchAffiliateDetails(locationId: string, locToken: string, affil
     })
     if (custRes.ok) {
       const custData = await custRes.json()
-      customers = (custData.customers ?? []).map((c: Record<string, unknown>) => ({
-        firstName: c.firstName as string | undefined,
-        lastName: c.lastName as string | undefined,
-        email: c.email as string | undefined,
-        createdAt: c.createdAt as string | undefined,
-        type: c.type as string | undefined,
-      }))
+      customers = (custData.customers ?? []).map((c: Record<string, unknown>) => {
+        const email = c.email as string | undefined
+        const plan = email ? planLookup(email) : null
+        return {
+          firstName: c.firstName as string | undefined,
+          lastName: c.lastName as string | undefined,
+          email,
+          createdAt: c.createdAt as string | undefined,
+          type: c.type as string | undefined,
+          planName: plan?.planName,
+          planPrice: plan?.planPrice,
+        }
+      })
     }
   } catch { /* ignore */ }
   return { commissionPercent, customers }
@@ -146,8 +154,27 @@ export default async function AffiliatesPage() {
     .not('refresh_token', 'is', null)
 
   const allAffiliates: AffiliateDisplay[] = []
-  const { data: locations } = await sb.from('locations').select('location_id, name').eq('agency_id', profile.agency_id)
+  const { data: locations } = await sb.from('locations').select('location_id, name, ghl_plan_id').eq('agency_id', profile.agency_id)
   const nameMap = new Map((locations ?? []).map((l) => [l.location_id, l.name]))
+
+  // Build plan lookup: email → { planName, planPrice }
+  const { data: ghlPlans } = await sb.from('ghl_plans').select('ghl_plan_id, name, price_monthly')
+  const planById: Record<string, { name: string; price: number }> = {}
+  for (const p of ghlPlans ?? []) {
+    if (p.price_monthly != null) planById[p.ghl_plan_id] = { name: p.name, price: Number(p.price_monthly) }
+  }
+
+  const { data: profiles } = await sb.from('profiles').select('email, location_id').eq('agency_id', profile.agency_id)
+  const emailToPlan = new Map<string, { planName: string; planPrice: number }>()
+  for (const p of profiles ?? []) {
+    if (p.email && p.location_id) {
+      const loc = (locations ?? []).find((l) => l.location_id === p.location_id)
+      if (loc?.ghl_plan_id && planById[loc.ghl_plan_id]) {
+        emailToPlan.set(p.email.toLowerCase(), { planName: planById[loc.ghl_plan_id].name, planPrice: planById[loc.ghl_plan_id].price })
+      }
+    }
+  }
+  const planLookup = (email: string) => emailToPlan.get(email.toLowerCase()) ?? null
 
   for (const conn of connections ?? []) {
     const token = await refreshIfNeeded(conn.location_id, conn)
@@ -158,7 +185,7 @@ export default async function AffiliatesPage() {
     for (const a of affiliates) {
       let details = { commissionPercent: null as number | null, customers: [] as AffiliateCustomer[] }
       if (locToken) {
-        details = await fetchAffiliateDetails(conn.location_id, locToken, a)
+        details = await fetchAffiliateDetails(conn.location_id, locToken, a, planLookup)
       }
       allAffiliates.push({
         ...a,

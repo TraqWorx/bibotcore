@@ -8,6 +8,8 @@ interface AffiliateCustomer {
   email?: string
   createdAt?: string
   type?: string
+  planName?: string
+  planPrice?: number
 }
 
 interface AffiliateRow {
@@ -105,37 +107,39 @@ export default function AffiliatesTable({ affiliates }: { affiliates: AffiliateR
                               <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400">
                                 <th className="pb-2">Customer</th>
                                 <th className="pb-2">Email</th>
+                                <th className="pb-2">Plan</th>
                                 <th className="pb-2">Connected</th>
                                 <th className="pb-2 text-center">Months</th>
-                                <th className="pb-2 text-right">Monthly Commission</th>
-                                <th className="pb-2 text-right">Total Commission</th>
+                                <th className="pb-2 text-right">Monthly</th>
+                                <th className="pb-2 text-right">Total</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                               {a.customers.map((c, i) => {
                                 const months = c.createdAt ? monthsSince(c.createdAt) : 0
-                                // Estimate: total owed / total customers gives avg per customer
-                                const perCustomerTotal = (a.customer ?? 0) > 0 ? (a.owned ?? 0) / (a.customer ?? 1) : 0
-                                const monthlyCommission = months > 0 ? perCustomerTotal / months : 0
+                                const commRate = (a.commissionPercent ?? 0) / 100
+                                const monthlyCommission = (c.planPrice ?? 0) * commRate
+                                const totalCommission = monthlyCommission * months
                                 return (
                                   <tr key={i}>
                                     <td className="py-2 font-medium text-gray-900">
                                       {(`${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || '—')}
                                     </td>
                                     <td className="py-2 text-gray-500">{c.email ?? '—'}</td>
+                                    <td className="py-2 text-gray-400 text-[11px]">{c.planName ? `${c.planName} (€${c.planPrice})` : '—'}</td>
                                     <td className="py-2 text-gray-500">{c.createdAt ? formatDate(c.createdAt) : '—'}</td>
                                     <td className="py-2 text-center font-semibold">{months}</td>
                                     <td className="py-2 text-right tabular-nums">{formatMoney(monthlyCommission, a.currency)}</td>
-                                    <td className="py-2 text-right font-semibold tabular-nums text-red-600">{formatMoney(perCustomerTotal, a.currency)}</td>
+                                    <td className="py-2 text-right font-semibold tabular-nums text-red-600">{formatMoney(totalCommission, a.currency)}</td>
                                   </tr>
                                 )
                               })}
                             </tbody>
                             <tfoot>
                               <tr className="border-t border-gray-200">
-                                <td colSpan={4} className="pt-2 font-bold text-gray-900">Total</td>
+                                <td colSpan={5} className="pt-2 font-bold text-gray-900">Total</td>
                                 <td className="pt-2 text-right font-bold tabular-nums">
-                                  {formatMoney(a.customers.length > 0 && a.createdAt ? (a.owned ?? 0) / monthsSince(a.createdAt) : 0, a.currency)}/mo
+                                  {formatMoney(a.customers.reduce((s, c) => s + (c.planPrice ?? 0) * ((a.commissionPercent ?? 0) / 100), 0), a.currency)}/mo
                                 </td>
                                 <td className="pt-2 text-right font-bold tabular-nums text-red-600">{formatMoney(a.owned, a.currency)}</td>
                               </tr>
