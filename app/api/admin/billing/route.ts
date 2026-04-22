@@ -1,0 +1,91 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { getStripe } from '@/lib/stripe/stripe'
+
+export async function GET(req: NextRequest) {
+  const locationId = req.nextUrl.searchParams.get('locationId')
+  if (!locationId) return NextResponse.json({ error: 'locationId required' }, { status: 400 })
+
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const sb = createAdminClient()
+  const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin' && profile?.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  try {
+    const stripe = getStripe()
+
+    // Find Stripe customers linked to this location
+    const customers = await stripe.customers.list({ limit: 100 })
+    const locationCustomerIds: string[] = []
+    for (const c of customers.data) {
+      const locId = c.metadata?.locationId ?? c.metadata?.location
+      if (locId === locationId) locationCustomerIds.push(c.id)
+    }
+
+    // Also match by email: profiles with this location → their emails → Stripe customers
+    const { data: profiles } = await sb.from('profiles').select('email').eq('location_id', locationId)
+    const locationEmails = new Set((profiles ?? []).map(p => p.email?.toLowerCase()).filter(Boolean))
+    for (const c of customers.data) {
+      if (c.email && locationEmails.has(c.email.toLowerCase()) && !locationCustomerIds.includes(c.id)) {
+        locationCustomerIds.push(c.id)
+      }
+    }
+
+    if (locationCustomerIds.length === 0) {
+      return NextResponse.json({ payments: [] })
+    }
+
+    // Get all invoices for these customers
+    const payments: {
+      id: string
+      date: string
+      amount: number
+      stripeFee: number
+      net: number
+      status: string
+      customerEmail: string
+      invoiceUrl: string | null
+    }[] = []
+
+    for (const custId of locationCustomerIds) {
+      const invoices = await stripe.invoices.list({
+        customer: custId,
+        limit: 100,
+        expand: ['data.charge.balance_transaction'],
+      })
+
+      for (const inv of invoices.data) {
+        if (inv.status !== 'paid') continue
+        let stripeFee = 0
+        let net = inv.amount_paid
+        if (inv.charge && typeof inv.charge === 'object') {
+          const bt = inv.charge.balance_transaction
+          if (bt && typeof bt === 'object') {
+            stripeFee = bt.fee
+            net = bt.net
+          }
+        }
+        payments.push({
+          id: inv.id,
+          date: new Date((inv.status_transitions?.paid_at ?? inv.created) * 1000).toISOString(),
+          amount: inv.amount_paid,
+          stripeFee,
+          net,
+          status: inv.status,
+          customerEmail: inv.customer_email ?? '',
+          invoiceUrl: inv.hosted_invoice_url ?? null,
+        })
+      }
+    }
+
+    payments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+    return NextResponse.json({ payments })
+  } catch (err) {
+    console.error('[admin/billing]', err)
+    return NextResponse.json({ error: 'Failed to fetch billing data' }, { status: 500 })
+  }
+}
