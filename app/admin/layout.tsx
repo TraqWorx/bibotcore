@@ -36,7 +36,10 @@ const getAdminData = cache(async () => {
 
   // Bibot-only nav items
   if (isBibotAgency(agencyId)) {
-    navLinks.push({ href: '/admin/affiliates', label: 'Affiliates' })
+    navLinks.push(
+      { href: '/admin/finances', label: 'Finances' },
+      { href: '/admin/affiliates', label: 'Affiliates' },
+    )
   }
 
   // Agencies with installed designs get Designs + Plan Mapping
