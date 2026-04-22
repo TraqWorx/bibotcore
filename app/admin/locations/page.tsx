@@ -129,14 +129,12 @@ export default async function LocationsPage({
 
   const planByLocation: Record<string, string | null> = {}
   const churnedLocations = new Set<string>()
-  const manualPlanLocations = new Set<string>()
-  const locationMeta: Record<string, { ghl_date_added?: string | null; churned_at?: string | null }> = {}
+  const locationMeta: Record<string, { ghl_date_added?: string | null; churned_at?: string | null; subscribed_at?: string | null }> = {}
   for (const row of locationPlanRows ?? []) {
     const r = row as { location_id: string; ghl_plan_id?: string | null; ghl_date_added?: string | null; churned_at?: string | null; subscribed_at?: string | null }
     planByLocation[r.location_id] = r.ghl_plan_id ?? null
-    locationMeta[r.location_id] = { ghl_date_added: r.ghl_date_added, churned_at: r.churned_at }
+    locationMeta[r.location_id] = { ghl_date_added: r.ghl_date_added, churned_at: r.churned_at, subscribed_at: r.subscribed_at }
     if (r.churned_at) churnedLocations.add(r.location_id)
-    if (r.subscribed_at) manualPlanLocations.add(r.location_id)
   }
 
   const designByLocation: Record<string, string | null> = {}
@@ -195,6 +193,7 @@ export default async function LocationsPage({
       totalPaid,
       totalPaidVat: totalPaid != null ? Math.round(totalPaid * 1.22 * 100) / 100 : null,
       churned,
+      manualPlan: !!locationMeta[l.id]?.subscribed_at,
     }
   })
 

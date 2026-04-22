@@ -101,9 +101,6 @@ export async function syncSubscriptionsCore(): Promise<{ synced: number; error?:
     if (detail.saasPlanId) {
       // Active subscription
       const updates: Record<string, unknown> = { ...base, ghl_plan_id: detail.saasPlanId }
-      if (!existing?.subscribed_at) {
-        updates.subscribed_at = detail.dateAdded ?? new Date().toISOString()
-      }
       updates.churned_at = null
       const { error } = await supabase
         .from('locations')
@@ -112,9 +109,6 @@ export async function syncSubscriptionsCore(): Promise<{ synced: number; error?:
     } else if (detail.canceled && detail.lastPlanId) {
       // Canceled subscription — keep plan ID for revenue, mark as churned
       const updates: Record<string, unknown> = { ...base, ghl_plan_id: detail.lastPlanId }
-      if (!existing?.subscribed_at) {
-        updates.subscribed_at = detail.dateAdded ?? new Date().toISOString()
-      }
       if (!existing?.churned_at) {
         // Use Stripe canceled_at if available, otherwise fall back to now()
         updates.churned_at = detail.stripeCanceledAt ?? new Date().toISOString()
