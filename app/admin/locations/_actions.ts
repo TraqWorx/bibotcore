@@ -202,6 +202,45 @@ export async function setLocationPlan(
       .update(updateData)
       .eq('location_id', locationId)
     if (error) return { error: error.message }
+
+    // Auto-link profiles for this location (needed for affiliate tracking on PayPal customers)
+    if (ghlPlanId) {
+      try {
+        const { data: loc } = await supabase.from('locations').select('agency_id').eq('location_id', locationId).single()
+        if (loc?.agency_id) {
+          // Get GHL users for this location via agency token
+          const agencyToken = process.env.GHL_AGENCY_TOKEN
+          const companyId = process.env.GHL_COMPANY_ID
+          if (agencyToken && companyId) {
+            const res = await fetch(
+              `https://services.leadconnectorhq.com/users/search?companyId=${companyId}&locationId=${locationId}&limit=100`,
+              { headers: { Authorization: `Bearer ${agencyToken}`, Version: '2021-07-28' }, cache: 'no-store' }
+            )
+            if (res.ok) {
+              const data = await res.json()
+              for (const u of (data?.users ?? []) as { email?: string }[]) {
+                if (!u.email) continue
+                const email = u.email.toLowerCase()
+                const { data: existing } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle()
+                if (!existing) {
+                  const { data: created } = await supabase.auth.admin.createUser({ email, email_confirm: true })
+                  if (created?.user) {
+                    await supabase.from('profiles').upsert(
+                      { id: created.user.id, email, role: 'agency', agency_id: loc.agency_id, location_id: locationId },
+                      { onConflict: 'id' },
+                    )
+                  }
+                } else {
+                  // Update location_id if not set
+                  await supabase.from('profiles').update({ location_id: locationId, agency_id: loc.agency_id }).eq('id', existing.id).is('location_id', null)
+                }
+              }
+            }
+          }
+        }
+      } catch { /* ignore — profile linking is best-effort */ }
+    }
+
     revalidatePath('/admin/locations')
     revalidatePath('/admin')
   } catch (err) {
