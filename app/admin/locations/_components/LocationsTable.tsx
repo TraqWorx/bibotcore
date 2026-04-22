@@ -356,16 +356,15 @@ export default function LocationsTable({ rows, designs, unconnectedLocations, pl
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        {row.connected && hasDesigns ? (
+                        {hasDesigns ? (
                           <div className="flex items-center gap-1">
                             <ActivateButton locationId={row.id} isActive={row.subscribed} currentPlanId={row.planId} plans={plans ?? []} />
-                            {row.needsOAuth && row.design && <ReauthorizeButton designSlug={row.design} />}
-                            <DisconnectButton locationId={row.id} />
+                            {row.connected && row.needsOAuth && row.design && <ReauthorizeButton designSlug={row.design} />}
+                            {row.connected && <DisconnectButton locationId={row.id} />}
+                            {!row.connected && <ConnectButton designs={designs} unconnectedLocations={unconnectedLocations} preselectedId={row.id} />}
                           </div>
-                        ) : !hasDesigns && row.subscribed ? (
+                        ) : row.subscribed ? (
                           <CancelSubscriptionButton locationId={row.id} />
-                        ) : hasDesigns && !row.connected ? (
-                          <ConnectButton designs={designs} unconnectedLocations={unconnectedLocations} preselectedId={row.id} />
                         ) : null}
                       </div>
                     </td>
