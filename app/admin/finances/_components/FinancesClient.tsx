@@ -20,7 +20,7 @@ function monthlyCost(cost: Cost): number {
   return cost.frequency === 'annual' ? cost.amount / 12 : cost.amount
 }
 
-export default function FinancesClient({ costs, mrr, affiliateMonthlyCost = 0, affiliateTotalOwed = 0 }: { costs: Cost[]; mrr: number; affiliateMonthlyCost?: number; affiliateTotalOwed?: number }) {
+export default function FinancesClient({ costs, mrr, monthlyVat = 0, affiliateMonthlyCost = 0, affiliateTotalOwed = 0 }: { costs: Cost[]; mrr: number; monthlyVat?: number; affiliateMonthlyCost?: number; affiliateTotalOwed?: number }) {
   const router = useRouter()
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -31,8 +31,7 @@ export default function FinancesClient({ costs, mrr, affiliateMonthlyCost = 0, a
   const [error, setError] = useState<string | null>(null)
 
   const totalMonthlyCosts = costs.reduce((s, c) => s + monthlyCost(c), 0) + affiliateMonthlyCost
-  const monthlyVat = mrr * 0.22
-  const monthlyProfit = mrr - totalMonthlyCosts - monthlyVat
+  const monthlyProfit = mrr - totalMonthlyCosts
 
   function startEdit(cost: Cost) {
     setEditingId(cost.id)
@@ -106,14 +105,14 @@ export default function FinancesClient({ costs, mrr, affiliateMonthlyCost = 0, a
         <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">VAT 22%</p>
           <p className="mt-2 text-3xl font-black text-amber-600">{'\u20AC'}{formatEur(monthlyVat)}</p>
-          <p className="mt-0.5 text-xs text-gray-400">owed to government</p>
+          <p className="mt-0.5 text-xs text-gray-400">collected for government</p>
         </div>
         <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Monthly Profit</p>
           <p className={`mt-2 text-3xl font-black ${monthlyProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {'\u20AC'}{formatEur(monthlyProfit)}
           </p>
-          <p className="mt-0.5 text-xs text-gray-400">after costs + VAT</p>
+          <p className="mt-0.5 text-xs text-gray-400">MRR minus costs</p>
         </div>
       </div>
 
@@ -228,15 +227,6 @@ export default function FinancesClient({ costs, mrr, affiliateMonthlyCost = 0, a
               <td className="px-5 py-3" />
               <td className="px-5 py-3" />
               <td className="px-5 py-3 text-right font-black tabular-nums text-gray-900">{'\u20AC'}{formatEur(totalMonthlyCosts)}/mo</td>
-              <td className="px-5 py-3" />
-            </tr>
-            <tr className="bg-amber-50/50">
-              <td className="px-5 py-3 font-bold text-amber-700">VAT 22% on Revenue</td>
-              <td className="px-5 py-3" />
-              <td className="px-5 py-3">
-                <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-amber-50 text-amber-700">monthly</span>
-              </td>
-              <td className="px-5 py-3 text-right font-black tabular-nums text-amber-700">{'\u20AC'}{formatEur(monthlyVat)}/mo</td>
               <td className="px-5 py-3" />
             </tr>
           </tfoot>

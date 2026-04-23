@@ -114,7 +114,7 @@ export default async function FinancesPage() {
         <h1 className={ad.pageTitle}>Finances</h1>
         <p className={ad.pageSubtitle}>Track your costs and profitability</p>
       </div>
-      <FinancesClient costs={typedCosts} mrr={mrr} affiliateMonthlyCost={affiliateMonthlyCost} affiliateTotalOwed={affiliateTotalOwed} />
+      <FinancesClient costs={typedCosts} mrr={mrr} monthlyVat={mrr * 0.22} affiliateMonthlyCost={affiliateMonthlyCost} affiliateTotalOwed={affiliateTotalOwed} />
     </div>
   )
 }
