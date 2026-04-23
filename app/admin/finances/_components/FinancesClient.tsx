@@ -40,6 +40,7 @@ interface VatQuarter {
 
 export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwed = 0, vatQuarters = [], accontoIva = 0, vatPayments = [], vatStatusMap = {}, affiliateMonthlyCost = 0, affiliateTotalOwed = 0 }: { costs: Cost[]; mrr: number; monthlyVat?: number; totalVatOwed?: number; vatQuarters?: VatQuarter[]; accontoIva?: number; vatPayments?: VatPayment[]; vatStatusMap?: Record<string, { status: 'pending' | 'paid' | 'partial'; amountPaid: number }>; affiliateMonthlyCost?: number; affiliateTotalOwed?: number }) {
   const router = useRouter()
+  const [localCosts, setLocalCosts] = useState(costs)
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -49,7 +50,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const totalMonthlyCosts = costs.reduce((s, c) => s + monthlyCost(c), 0) + affiliateMonthlyCost
+  const totalMonthlyCosts = localCosts.reduce((s, c) => s + monthlyCost(c), 0) + affiliateMonthlyCost
   const monthlyProfit = mrr - totalMonthlyCosts
 
   function startEdit(cost: Cost) {
@@ -79,32 +80,31 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
   }
 
   async function handleSave() {
-    setLoading(true)
     setError(null)
     const amt = parseFloat(amount)
-    if (isNaN(amt) || amt <= 0) { setError('Enter a valid amount'); setLoading(false); return }
+    if (isNaN(amt) || amt <= 0) { setError('Enter a valid amount'); return }
 
-    let result
+    const newCost: Cost = { id: editingId ?? `temp-${Date.now()}`, name, amount: amt, frequency, paymentDate: paymentDate || null }
+
+    // Optimistic update
     if (editingId) {
-      result = await updateCost(editingId, name, amt, frequency, paymentDate || undefined)
+      setLocalCosts((prev) => prev.map((c) => c.id === editingId ? newCost : c))
     } else {
-      result = await addCost(name, amt, frequency, paymentDate || undefined)
+      setLocalCosts((prev) => [...prev, newCost])
     }
-    if (result?.error) {
-      setError(result.error)
-    } else {
-      cancel()
-      router.refresh()
-    }
-    setLoading(false)
+    cancel()
+
+    // Save in background
+    const result = editingId
+      ? await updateCost(editingId, name, amt, frequency, paymentDate || undefined)
+      : await addCost(name, amt, frequency, paymentDate || undefined)
+    if (result?.error) setError(result.error)
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Remove this cost?')) return
-    setLoading(true)
+    setLocalCosts((prev) => prev.filter((c) => c.id !== id))
     await deleteCost(id)
-    setLoading(false)
-    router.refresh()
   }
 
   const inputClass = 'rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/10'
@@ -121,7 +121,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
         <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Monthly Costs</p>
           <p className="mt-2 text-3xl font-black text-red-600">{'\u20AC'}{formatEur(totalMonthlyCosts)}</p>
-          <p className="mt-0.5 text-xs text-gray-400">{costs.length} cost{costs.length !== 1 ? 's' : ''}</p>
+          <p className="mt-0.5 text-xs text-gray-400">{localCosts.length} cost{costs.length !== 1 ? 's' : ''}</p>
         </div>
         <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Monthly Profit</p>
@@ -172,7 +172,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
                 <td className="px-5 py-3.5" />
               </tr>
             )}
-            {costs.map((cost) => (
+            {localCosts.map((cost) => (
               editingId === cost.id ? (
                 <tr key={cost.id} className="bg-brand/5">
                   <td className="px-5 py-3"><input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass + ' w-full'} /></td>
@@ -205,7 +205,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
                       {cost.frequency}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-xs text-gray-500">{cost.paymentDate ? new Date(cost.paymentDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                  <td className="px-5 py-3.5 text-xs text-gray-500">{cost.paymentDate ? new Date(cost.paymentDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }) : '—'}</td>
                   <td className="px-5 py-3.5 text-right font-bold tabular-nums text-gray-900">{'\u20AC'}{formatEur(monthlyCost(cost))}</td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-1">
