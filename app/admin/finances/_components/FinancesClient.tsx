@@ -58,7 +58,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
     setName(cost.name)
     setAmount(String(cost.amount))
     setFrequency(cost.frequency)
-    setPaymentDate(cost.paymentDate ?? '')
+    setPaymentDate(cost.paymentDate ? (cost.paymentDate.length > 2 ? String(new Date(cost.paymentDate).getMonth() + 1).padStart(2, '0') : cost.paymentDate) : '')
     setAdding(false)
     setError(null)
   }
@@ -183,7 +183,13 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
                       <option value="annual">Annual</option>
                     </select>
                   </td>
-                  <td className="px-5 py-3"><input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className={inputClass + ' w-36'} /></td>
+                  <td className="px-5 py-3"><select value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className={inputClass}>
+                      <option value="">—</option>
+                      <option value="01">Jan</option><option value="02">Feb</option><option value="03">Mar</option>
+                      <option value="04">Apr</option><option value="05">May</option><option value="06">Jun</option>
+                      <option value="07">Jul</option><option value="08">Aug</option><option value="09">Sep</option>
+                      <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+                    </select></td>
                   <td className="px-5 py-3 text-right text-xs text-gray-400">
                     {'\u20AC'}{formatEur(frequency === 'annual' ? parseFloat(amount || '0') / 12 : parseFloat(amount || '0'))}
                   </td>
@@ -205,7 +211,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
                       {cost.frequency}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-xs text-gray-500">{cost.paymentDate ? new Date(cost.paymentDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }) : '—'}</td>
+                  <td className="px-5 py-3.5 text-xs text-gray-500">{cost.paymentDate ? ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(cost.paymentDate) - 1] ?? cost.paymentDate : '—'}</td>
                   <td className="px-5 py-3.5 text-right font-bold tabular-nums text-gray-900">{'\u20AC'}{formatEur(monthlyCost(cost))}</td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -228,7 +234,13 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
                     <option value="annual">Annual</option>
                   </select>
                 </td>
-                <td className="px-5 py-3"><input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className={inputClass + ' w-36'} /></td>
+                <td className="px-5 py-3"><select value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className={inputClass}>
+                      <option value="">—</option>
+                      <option value="01">Jan</option><option value="02">Feb</option><option value="03">Mar</option>
+                      <option value="04">Apr</option><option value="05">May</option><option value="06">Jun</option>
+                      <option value="07">Jul</option><option value="08">Aug</option><option value="09">Sep</option>
+                      <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+                    </select></td>
                 <td className="px-5 py-3 text-right text-xs text-gray-400">
                   {'\u20AC'}{formatEur(frequency === 'annual' ? parseFloat(amount || '0') / 12 : parseFloat(amount || '0'))}
                 </td>
