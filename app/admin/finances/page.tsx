@@ -93,9 +93,36 @@ export default async function FinancesPage() {
     { q: 4, months: [9, 10, 11], label: 'Oct - Dec', deadlineMonth: 2, deadlineDay: 16, deadlineNextYear: true },
   ]
 
-  // Calculate for current year and previous year (for acconto)
+  // Calculate VAT per quarter from actual Stripe charges
   const currentYear = new Date().getFullYear()
   const years = [currentYear - 1, currentYear]
+
+  // Fetch all Stripe charges for VAT calculation
+  let allCharges: { amount: number; created: number }[] = []
+  try {
+    const Stripe = (await import('stripe')).default
+    const ghlStripeKey = process.env.STRIPE_GHL_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY
+    if (ghlStripeKey) {
+      const stripe = new Stripe(ghlStripeKey)
+      const oldestStart = Math.floor(new Date(currentYear - 1, 0, 1).getTime() / 1000)
+      let hasMore = true
+      let startingAfter: string | undefined
+      while (hasMore) {
+        const page = await stripe.charges.list({
+          created: { gte: oldestStart },
+          limit: 100,
+          ...(startingAfter ? { starting_after: startingAfter } : {}),
+        })
+        for (const c of page.data) {
+          if (c.status === 'succeeded' && c.amount > 500) { // exclude test charges
+            allCharges.push({ amount: c.amount, created: c.created })
+          }
+        }
+        hasMore = page.has_more
+        if (page.data.length > 0) startingAfter = page.data[page.data.length - 1].id
+      }
+    }
+  } catch { /* ignore Stripe errors */ }
 
   const vatQuarters: VatQuarter[] = []
   let totalVatOwed = 0
@@ -104,16 +131,13 @@ export default async function FinancesPage() {
     for (const qd of quarterDefs) {
       const rangeStart = new Date(year, qd.months[0], 1)
       const rangeEnd = new Date(year, qd.months[2] + 1, 0, 23, 59, 59)
-      let quarterVat = 0
+      const rangeStartTs = Math.floor(rangeStart.getTime() / 1000)
+      const rangeEndTs = Math.floor(rangeEnd.getTime() / 1000)
 
-      for (const loc of allLocations ?? []) {
-        const r = loc as { ghl_plan_id?: string | null; ghl_date_added?: string | null; churned_at?: string | null }
-        if (!r.ghl_plan_id || !planPrices[r.ghl_plan_id] || !r.ghl_date_added) continue
-        const locStart = new Date(r.ghl_date_added)
-        const locEnd = r.churned_at ? new Date(r.churned_at) : null
-        const proratedRevenue = getProratedRevenueInRange(locStart, locEnd, rangeStart, rangeEnd, planPrices[r.ghl_plan_id])
-        quarterVat += proratedRevenue * 0.22
-      }
+      // Sum gross charges in this quarter, VAT = gross - (gross / 1.22)
+      const quarterCharges = allCharges.filter(c => c.created >= rangeStartTs && c.created <= rangeEndTs)
+      const quarterGross = quarterCharges.reduce((s, c) => s + c.amount, 0) / 100
+      const quarterVat = quarterGross - (quarterGross / 1.22) // VAT included in gross
 
       if (quarterVat > 0) {
         const deadlineYear = qd.deadlineNextYear ? year + 1 : year
