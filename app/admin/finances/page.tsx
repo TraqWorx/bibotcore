@@ -38,17 +38,84 @@ export default async function FinancesPage() {
     }
   }
 
-  // Calculate total VAT owed (cumulative across all locations and their active months)
+  // Calculate VAT per quarter per location
+  // Italian quarterly VAT schedule:
+  // Q1 (Jan-Mar) → pay by 16/05
+  // Q2 (Apr-Jun) → pay by 20/08
+  // Q3 (Jul-Sep) → pay by 16/11
+  // Q4 (Oct-Dec) → pay by 16/03 next year
+  // Acconto IVA (27/12) → 88% of Q4 previous year
+
+  interface VatQuarter {
+    quarter: string       // e.g. "Q1 2026"
+    period: string        // e.g. "Jan - Mar 2026"
+    paymentDeadline: string // e.g. "16/05/2026"
+    vatAmount: number
+    year: number
+    q: number
+  }
+
+  function getActiveMonthsInRange(startDate: Date, endDate: Date | null, rangeStart: Date, rangeEnd: Date): number {
+    const locStart = startDate > rangeStart ? startDate : rangeStart
+    const locEnd = endDate && endDate < rangeEnd ? endDate : rangeEnd
+    if (locStart >= locEnd) return 0
+    // Count months
+    let months = 0
+    const cursor = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1)
+    while (cursor < rangeEnd) {
+      if (cursor >= locStart && cursor < locEnd) months++
+      cursor.setMonth(cursor.getMonth() + 1)
+    }
+    return months
+  }
+
+  const quarterDefs = [
+    { q: 1, months: [0, 1, 2], label: 'Jan - Mar', deadlineMonth: 4, deadlineDay: 16 },
+    { q: 2, months: [3, 4, 5], label: 'Apr - Jun', deadlineMonth: 7, deadlineDay: 20 },
+    { q: 3, months: [6, 7, 8], label: 'Jul - Sep', deadlineMonth: 10, deadlineDay: 16 },
+    { q: 4, months: [9, 10, 11], label: 'Oct - Dec', deadlineMonth: 2, deadlineDay: 16, deadlineNextYear: true },
+  ]
+
+  // Calculate for current year and previous year (for acconto)
+  const currentYear = new Date().getFullYear()
+  const years = [currentYear - 1, currentYear]
+
+  const vatQuarters: VatQuarter[] = []
   let totalVatOwed = 0
-  for (const loc of allLocations ?? []) {
-    const r = loc as { ghl_plan_id?: string | null; ghl_date_added?: string | null; churned_at?: string | null }
-    if (r.ghl_plan_id && planPrices[r.ghl_plan_id] && r.ghl_date_added) {
-      const start = new Date(r.ghl_date_added)
-      const end = r.churned_at ? new Date(r.churned_at) : new Date()
-      const months = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)))
-      totalVatOwed += planPrices[r.ghl_plan_id] * months * 0.22
+
+  for (const year of years) {
+    for (const qd of quarterDefs) {
+      const rangeStart = new Date(year, qd.months[0], 1)
+      const rangeEnd = new Date(year, qd.months[2] + 1, 0, 23, 59, 59)
+      let quarterVat = 0
+
+      for (const loc of allLocations ?? []) {
+        const r = loc as { ghl_plan_id?: string | null; ghl_date_added?: string | null; churned_at?: string | null }
+        if (!r.ghl_plan_id || !planPrices[r.ghl_plan_id] || !r.ghl_date_added) continue
+        const locStart = new Date(r.ghl_date_added)
+        const locEnd = r.churned_at ? new Date(r.churned_at) : null
+        const activeMonths = getActiveMonthsInRange(locStart, locEnd, rangeStart, rangeEnd)
+        quarterVat += planPrices[r.ghl_plan_id] * activeMonths * 0.22
+      }
+
+      if (quarterVat > 0) {
+        const deadlineYear = qd.deadlineNextYear ? year + 1 : year
+        vatQuarters.push({
+          quarter: `Q${qd.q} ${year}`,
+          period: `${qd.label} ${year}`,
+          paymentDeadline: `${String(qd.deadlineDay).padStart(2, '0')}/${String(qd.deadlineMonth + 1).padStart(2, '0')}/${deadlineYear}`,
+          vatAmount: quarterVat,
+          year,
+          q: qd.q,
+        })
+        totalVatOwed += quarterVat
+      }
     }
   }
+
+  // Acconto IVA (27/12 current year) = 88% of Q4 previous year
+  const q4PrevYear = vatQuarters.find((v) => v.year === currentYear - 1 && v.q === 4)
+  const accontoIva = q4PrevYear ? q4PrevYear.vatAmount * 0.88 : 0
 
   // Fetch affiliate monthly cost (owed ÷ months active)
   let affiliateMonthlyCost = 0
@@ -133,6 +200,8 @@ export default async function FinancesPage() {
         mrr={mrr}
         monthlyVat={mrr * 0.22}
         totalVatOwed={totalVatOwed}
+        vatQuarters={vatQuarters}
+        accontoIva={accontoIva}
         vatPayments={(vatPayments ?? []).map(p => ({ id: p.id as string, amount: Number(p.amount), period: p.period as string, notes: p.notes as string | null, paid_at: p.paid_at as string }))}
         affiliateMonthlyCost={affiliateMonthlyCost}
         affiliateTotalOwed={affiliateTotalOwed}

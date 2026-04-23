@@ -28,7 +28,16 @@ interface VatPayment {
   paid_at: string
 }
 
-export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwed = 0, vatPayments = [], affiliateMonthlyCost = 0, affiliateTotalOwed = 0 }: { costs: Cost[]; mrr: number; monthlyVat?: number; totalVatOwed?: number; vatPayments?: VatPayment[]; affiliateMonthlyCost?: number; affiliateTotalOwed?: number }) {
+interface VatQuarter {
+  quarter: string
+  period: string
+  paymentDeadline: string
+  vatAmount: number
+  year: number
+  q: number
+}
+
+export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwed = 0, vatQuarters = [], accontoIva = 0, vatPayments = [], affiliateMonthlyCost = 0, affiliateTotalOwed = 0 }: { costs: Cost[]; mrr: number; monthlyVat?: number; totalVatOwed?: number; vatQuarters?: VatQuarter[]; accontoIva?: number; vatPayments?: VatPayment[]; affiliateMonthlyCost?: number; affiliateTotalOwed?: number }) {
   const router = useRouter()
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -244,12 +253,12 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
       {error && <p className="text-xs font-medium text-red-600">{error}</p>}
 
       {/* VAT Tracking */}
-      <VatTracker totalVatOwed={totalVatOwed} vatPayments={vatPayments} />
+      <VatTracker totalVatOwed={totalVatOwed} vatQuarters={vatQuarters} accontoIva={accontoIva} vatPayments={vatPayments} />
     </div>
   )
 }
 
-function VatTracker({ totalVatOwed, vatPayments }: { totalVatOwed: number; vatPayments: VatPayment[] }) {
+function VatTracker({ totalVatOwed, vatQuarters, accontoIva, vatPayments }: { totalVatOwed: number; vatQuarters: VatQuarter[]; accontoIva: number; vatPayments: VatPayment[] }) {
   const router = useRouter()
   const [adding, setAdding] = useState(false)
   const [amount, setAmount] = useState('')
@@ -318,7 +327,66 @@ function VatTracker({ totalVatOwed, vatPayments }: { totalVatOwed: number; vatPa
         </div>
       </div>
 
-      {/* Payments table */}
+      {/* Quarterly VAT Schedule */}
+      <div className="border-b border-gray-100 px-5 py-3 bg-gray-50/50">
+        <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Quarterly Schedule</p>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
+            <th className="px-5 py-2">Quarter</th>
+            <th className="px-5 py-2">Period</th>
+            <th className="px-5 py-2">Payment Deadline</th>
+            <th className="px-5 py-2 text-right">VAT Due</th>
+            <th className="px-5 py-2 text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {vatQuarters.map((vq) => {
+            const isPast = new Date(vq.paymentDeadline.split('/').reverse().join('-')) < new Date()
+            const paid = vatPayments.some((p) => p.period.toLowerCase().includes(vq.quarter.toLowerCase()))
+            return (
+              <tr key={vq.quarter} className="hover:bg-gray-50/50 transition-colors">
+                <td className="px-5 py-2.5 font-semibold text-gray-900">{vq.quarter}</td>
+                <td className="px-5 py-2.5 text-gray-500 text-xs">{vq.period}</td>
+                <td className="px-5 py-2.5 text-xs">
+                  <span className={isPast && !paid ? 'text-red-600 font-semibold' : 'text-gray-500'}>{vq.paymentDeadline}</span>
+                </td>
+                <td className="px-5 py-2.5 text-right font-bold tabular-nums text-amber-700">{'\u20AC'}{formatEur(vq.vatAmount)}</td>
+                <td className="px-5 py-2.5 text-center">
+                  {paid ? (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Paid</span>
+                  ) : isPast ? (
+                    <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">Overdue</span>
+                  ) : (
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Pending</span>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+          {accontoIva > 0 && (
+            <tr className="bg-blue-50/30 hover:bg-blue-50/50 transition-colors">
+              <td className="px-5 py-2.5 font-semibold text-blue-900">Acconto IVA</td>
+              <td className="px-5 py-2.5 text-blue-700 text-xs">88% of Q4 {new Date().getFullYear() - 1}</td>
+              <td className="px-5 py-2.5 text-xs text-blue-600">27/12/{new Date().getFullYear()}</td>
+              <td className="px-5 py-2.5 text-right font-bold tabular-nums text-blue-700">{'\u20AC'}{formatEur(accontoIva)}</td>
+              <td className="px-5 py-2.5 text-center">
+                {vatPayments.some((p) => p.period.toLowerCase().includes('acconto')) ? (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Paid</span>
+                ) : (
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">Pending</span>
+                )}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      {/* Payments recorded */}
+      <div className="border-t border-gray-200 border-b border-gray-100 px-5 py-3 bg-gray-50/50">
+        <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Payments Recorded</p>
+      </div>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
