@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { DemoContactsView } from '../_components/DemoViews'
+import { ApuliaDemoContactsView } from '../_components/ApuliaDemoViews'
 
 export default async function DesignDemoContactsPage({
   params,
@@ -7,6 +8,7 @@ export default async function DesignDemoContactsPage({
   params: Promise<{ design: string }>
 }) {
   const { design } = await params
-  if (design !== 'simfonia') notFound()
-  return <DemoContactsView />
+  if (design === 'apulia-tourism') return <ApuliaDemoContactsView />
+  if (design === 'simfonia') return <DemoContactsView />
+  notFound()
 }

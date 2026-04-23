@@ -475,3 +475,159 @@ export const demoWorkflows = [
   { id: 'wf-2', name: 'Contatto qualificato > proposta', status: 'active', version: 2 },
   { id: 'wf-3', name: 'Mancata risposta > follow-up', status: 'draft', version: 1 },
 ]
+
+// ─── Apulia Tourism Demo Data ─────────────────────────────────────────────
+
+export const apuliaTourismDemoTheme: DesignTheme = {
+  primaryColor: '#0f2b46',
+  secondaryColor: '#e6853e',
+  companyName: 'Apulia Tourism',
+  logoText: 'AT',
+  logoUrl: '',
+}
+
+export const apuliaTourismDemoDashboard = {
+  totalContacts: 84,
+  targetAnnuale: 500,
+  switchOutTotal: 3,
+  isAdmin: true,
+  closedDays: [],
+  gareRows: [
+    { categoria: 'hotel', obiettivo: 200, tag: 'hotel' },
+    { categoria: 'tour-operator', obiettivo: 150, tag: 'tour-operator' },
+    { categoria: 'restaurant', obiettivo: 100, tag: 'restaurant' },
+    { categoria: 'b&b', obiettivo: 50, tag: 'b&b' },
+  ],
+  categoryData: [
+    {
+      slug: 'hotel',
+      label: 'Hotel',
+      total: 32,
+      switchOutCount: 1,
+      providers: [
+        { provider: 'Booking.com', count: 14 },
+        { provider: 'Expedia', count: 10 },
+        { provider: 'Direct', count: 8 },
+      ],
+    },
+    {
+      slug: 'tour-operator',
+      label: 'Tour Operator',
+      total: 24,
+      switchOutCount: 1,
+      providers: [
+        { provider: 'Viator', count: 10 },
+        { provider: 'GetYourGuide', count: 8 },
+        { provider: 'Local', count: 6 },
+      ],
+    },
+    {
+      slug: 'restaurant',
+      label: 'Restaurant',
+      total: 18,
+      switchOutCount: 1,
+      providers: [
+        { provider: 'TheFork', count: 9 },
+        { provider: 'TripAdvisor', count: 6 },
+        { provider: 'Google', count: 3 },
+      ],
+    },
+    {
+      slug: 'b&b',
+      label: 'B&B',
+      total: 10,
+      switchOutCount: 0,
+      providers: [
+        { provider: 'Airbnb', count: 5 },
+        { provider: 'Booking.com', count: 3 },
+        { provider: 'Direct', count: 2 },
+      ],
+    },
+  ],
+  contactsTrend: Array.from({ length: 30 }, (_, i) => ({
+    date: `2026-04-${String(i + 1).padStart(2, '0')}`,
+    count: Math.floor(Math.random() * 5) + 1,
+  })),
+  appointmentPreview: [
+    { id: 'at-1', title: 'Hotel onboarding', startTime: '2026-04-24T09:00:00+02:00', status: 'confirmed', contactName: 'Maria Bianchi' },
+    { id: 'at-2', title: 'Tour package review', startTime: '2026-04-24T11:00:00+02:00', status: 'confirmed', contactName: 'Giuseppe Ferro' },
+    { id: 'at-3', title: 'Partnership meeting', startTime: '2026-04-24T14:30:00+02:00', status: 'new', contactName: 'Francesca Moretti' },
+  ],
+}
+
+export const apuliaTourismDemoConversations = [
+  {
+    id: 'at-conv-1',
+    contactId: 'dc-1',
+    contactName: 'Maria Bianchi',
+    type: 'TYPE_WHATSAPP',
+    lastMessageBody: 'Perfetto, ci vediamo domani alle 9.',
+    lastMessageDate: '2026-04-23T14:20:00+02:00',
+    lastMessageDirection: 'inbound',
+    unreadCount: 1,
+    assignedTo: 'at-u-1',
+  },
+  {
+    id: 'at-conv-2',
+    contactId: 'dc-2',
+    contactName: 'Giuseppe Ferro',
+    type: 'TYPE_SMS',
+    lastMessageBody: 'Ho ricevuto il listino, grazie.',
+    lastMessageDate: '2026-04-23T11:05:00+02:00',
+    lastMessageDirection: 'inbound',
+    unreadCount: 0,
+    assignedTo: 'at-u-1',
+  },
+  {
+    id: 'at-conv-3',
+    contactId: 'dc-3',
+    contactName: 'Anna Russo',
+    type: 'TYPE_EMAIL',
+    lastMessageBody: 'Quando possiamo fissare una call?',
+    lastMessageDate: '2026-04-22T16:40:00+02:00',
+    lastMessageDirection: 'inbound',
+    unreadCount: 1,
+    assignedTo: 'at-u-2',
+  },
+]
+
+export const apuliaTourismDemoConversationUsers = [
+  { id: 'at-u-1', name: 'Daniela Pugliese', email: 'daniela@apuliatourism.demo' },
+  { id: 'at-u-2', name: 'Antonio Ferrara', email: 'antonio@apuliatourism.demo' },
+]
+
+export const apuliaTourismDemoCurrentUserEmail = 'daniela@apuliatourism.demo'
+
+export const apuliaTourismDemoConversationMessages: Record<string, {
+  id: string
+  body: string
+  direction: string
+  type?: string | number
+  dateAdded: string
+  status?: string
+}[]> = {
+  'at-conv-1': [
+    { id: 'at-m-1', body: 'Buongiorno, vorremmo inserire il vostro hotel nel nostro circuito turistico.', direction: 'outbound', dateAdded: '2026-04-23T10:00:00+02:00', type: 'TYPE_WHATSAPP', status: 'delivered' },
+    { id: 'at-m-2', body: 'Ottimo, mi interessa molto! Possiamo vederci?', direction: 'inbound', dateAdded: '2026-04-23T10:15:00+02:00', type: 'TYPE_WHATSAPP' },
+    { id: 'at-m-3', body: 'Certo, domani alle 9 va bene?', direction: 'outbound', dateAdded: '2026-04-23T14:10:00+02:00', type: 'TYPE_WHATSAPP', status: 'delivered' },
+    { id: 'at-m-4', body: 'Perfetto, ci vediamo domani alle 9.', direction: 'inbound', dateAdded: '2026-04-23T14:20:00+02:00', type: 'TYPE_WHATSAPP' },
+  ],
+  'at-conv-2': [
+    { id: 'at-m-5', body: 'Ti invio il listino aggiornato per la stagione estiva.', direction: 'outbound', dateAdded: '2026-04-23T10:30:00+02:00', type: 'TYPE_SMS', status: 'sent' },
+    { id: 'at-m-6', body: 'Ho ricevuto il listino, grazie.', direction: 'inbound', dateAdded: '2026-04-23T11:05:00+02:00', type: 'TYPE_SMS' },
+  ],
+  'at-conv-3': [
+    { id: 'at-m-7', body: 'Quando possiamo fissare una call?', direction: 'inbound', dateAdded: '2026-04-22T16:40:00+02:00', type: 'TYPE_EMAIL' },
+  ],
+}
+
+export const apuliaTourismDemoContactNotes: Record<string, {
+  id: string
+  body: string
+  dateAdded: string
+  createdBy?: string
+}[]> = {
+  'dc-1': [
+    { id: 'at-n-1', body: 'Hotel 4 stelle, 45 camere. Interessata a pacchetti turistici per la stagione estiva.', dateAdded: '2026-04-23T10:05:00+02:00', createdBy: 'at-u-1' },
+  ],
+}

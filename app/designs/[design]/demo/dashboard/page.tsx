@@ -1,5 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 
+const SUPPORTED = ['simfonia', 'apulia-tourism']
+
 export default async function DesignDemoDashboardAliasPage({
   params,
 }: {
@@ -7,7 +9,7 @@ export default async function DesignDemoDashboardAliasPage({
 }) {
   const { design } = await params
 
-  if (design !== 'simfonia') {
+  if (!SUPPORTED.includes(design)) {
     notFound()
   }
 

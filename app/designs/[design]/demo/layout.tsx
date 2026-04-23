@@ -1,9 +1,12 @@
-import Sidebar from '@/app/designs/simfonia/_components/Sidebar'
+import SimfoniaSidebar from '@/app/designs/simfonia/_components/Sidebar'
+import ApuliaSidebar from '@/app/designs/apulia-tourism/_components/Sidebar'
 import '@/app/designs/simfonia/shell.css'
 import { DEFAULT_MODULES } from '@/lib/types/design'
 import { resolveSimfoniaShell } from '@/lib/simfonia/shellTheme'
 import { notFound } from 'next/navigation'
-import { demoTheme } from './_lib/demoData'
+import { demoTheme, apuliaTourismDemoTheme } from './_lib/demoData'
+
+const SUPPORTED_DESIGNS = ['simfonia', 'apulia-tourism'] as const
 
 export default async function DesignDemoLayout({
   children,
@@ -14,14 +17,15 @@ export default async function DesignDemoLayout({
 }) {
   const { design } = await params
 
-  if (design !== 'simfonia') {
+  if (!SUPPORTED_DESIGNS.includes(design as (typeof SUPPORTED_DESIGNS)[number])) {
     notFound()
   }
 
-  const shell = resolveSimfoniaShell(demoTheme)
+  const theme = design === 'apulia-tourism' ? apuliaTourismDemoTheme : demoTheme
+  const shell = resolveSimfoniaShell(theme)
   const cssVars = `:root {
-    --brand: ${demoTheme.secondaryColor};
-    --accent: ${demoTheme.secondaryColor};
+    --brand: ${theme.secondaryColor};
+    --accent: ${theme.secondaryColor};
     --foreground: ${shell.foreground};
     --shell-bg: ${shell.shellBg};
     --shell-surface: ${shell.shellSurface};
@@ -35,12 +39,14 @@ export default async function DesignDemoLayout({
     --shell-sidebar: ${shell.shellSidebar};
   }`
 
+  const SidebarComponent = design === 'apulia-tourism' ? ApuliaSidebar : SimfoniaSidebar
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: cssVars }} />
       <div className="simfonia-shell flex min-h-screen">
-        <Sidebar
-          theme={demoTheme}
+        <SidebarComponent
+          theme={theme}
           modules={DEFAULT_MODULES}
           locationId=""
           demoMode

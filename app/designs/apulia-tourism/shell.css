@@ -1,0 +1,62 @@
+/* Simfonia app shell — applied only under .simfonia-shell (see layout.tsx) */
+
+.simfonia-shell {
+  min-height: 100vh;
+  background: var(--shell-bg);
+  color: var(--foreground);
+  background-image:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--brand) 8%, transparent), transparent 24%),
+    radial-gradient(circle at 82% 12%, color-mix(in srgb, var(--shell-tint) 72%, transparent), transparent 18%);
+}
+
+.simfonia-shell .sf-sidebar {
+  transition:
+    background 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    width 220ms ease;
+}
+
+.simfonia-shell .sf-brand-shell,
+.simfonia-shell .sf-brand-card,
+.simfonia-shell .sf-nav-link,
+.simfonia-shell .sf-card,
+.simfonia-shell .sf-card-muted,
+.simfonia-shell .sf-panel,
+.simfonia-shell .sf-form-card,
+.simfonia-shell .sf-stat-tile,
+.simfonia-shell .sf-table-shell,
+.simfonia-shell .sf-calendar-week,
+.simfonia-shell .sf-inbox,
+.simfonia-shell .sf-primary-btn,
+.simfonia-shell .sf-secondary-btn,
+.simfonia-shell .sf-input {
+  transition:
+    background 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    color 220ms ease,
+    border-radius 220ms ease,
+    backdrop-filter 220ms ease,
+    transform 220ms ease;
+}
+
+.simfonia-shell .sf-nav-link[data-active='true'] .sf-nav-icon {
+  color: var(--brand);
+}
+
+.simfonia-shell header.app-top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--shell-bg) 88%, white 12%);
+}
+
+.simfonia-shell header.app-top-bar::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  background: var(--shell-line);
+}

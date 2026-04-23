@@ -1,6 +1,7 @@
-import DashboardClient from '@/app/designs/simfonia/dashboard/_components/DashboardClient'
+import SimfoniaDashboard from '@/app/designs/simfonia/dashboard/_components/DashboardClient'
+import ApuliaDashboard from '@/app/designs/apulia-tourism/dashboard/_components/DashboardClient'
 import { notFound } from 'next/navigation'
-import { demoDashboardData } from './_lib/demoData'
+import { demoDashboardData, apuliaTourismDemoDashboard } from './_lib/demoData'
 
 export default async function DesignDemoDashboardPage({
   params,
@@ -9,9 +10,13 @@ export default async function DesignDemoDashboardPage({
 }) {
   const { design } = await params
 
-  if (design !== 'simfonia') {
-    notFound()
+  if (design === 'apulia-tourism') {
+    return <ApuliaDashboard locationId="demo-apulia-tourism" demoData={apuliaTourismDemoDashboard} demoMode />
   }
 
-  return <DashboardClient locationId="demo-simfonia" demoData={demoDashboardData} demoMode />
+  if (design === 'simfonia') {
+    return <SimfoniaDashboard locationId="demo-simfonia" demoData={demoDashboardData} demoMode />
+  }
+
+  notFound()
 }

@@ -74,9 +74,9 @@ export default function DesignsTable({ rows }: { rows: DesignRow[] }) {
                     >
                       Settings
                     </Link>
-                    {row.slug === 'simfonia' ? (
+                    {['simfonia', 'apulia-tourism'].includes(row.slug) ? (
                       <Link
-                        href="/designs/simfonia/demo"
+                        href={`/designs/${row.slug}/demo`}
                         className="text-xs font-bold text-brand underline-offset-4 transition-colors hover:underline"
                       >
                         Demo
