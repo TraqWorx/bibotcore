@@ -14,13 +14,13 @@ async function getAgencyId(): Promise<string> {
   return profile.agency_id
 }
 
-export async function addCost(name: string, amount: number, frequency: 'monthly' | 'annual'): Promise<{ error: string } | undefined> {
+export async function addCost(name: string, amount: number, frequency: 'monthly' | 'annual', paymentDate?: string): Promise<{ error: string } | undefined> {
   try {
     const agencyId = await getAgencyId()
     if (!name.trim()) return { error: 'Name is required' }
     if (amount <= 0) return { error: 'Amount must be greater than 0' }
     const sb = createAdminClient()
-    const { error } = await sb.from('agency_costs').insert({ agency_id: agencyId, name: name.trim(), amount, frequency })
+    const { error } = await sb.from('agency_costs').insert({ agency_id: agencyId, name: name.trim(), amount, frequency, payment_date: paymentDate || null })
     if (error) return { error: error.message }
     revalidatePath('/admin/finances')
   } catch (err) {
@@ -28,13 +28,13 @@ export async function addCost(name: string, amount: number, frequency: 'monthly'
   }
 }
 
-export async function updateCost(id: string, name: string, amount: number, frequency: 'monthly' | 'annual'): Promise<{ error: string } | undefined> {
+export async function updateCost(id: string, name: string, amount: number, frequency: 'monthly' | 'annual', paymentDate?: string): Promise<{ error: string } | undefined> {
   try {
     const agencyId = await getAgencyId()
     if (!name.trim()) return { error: 'Name is required' }
     if (amount <= 0) return { error: 'Amount must be greater than 0' }
     const sb = createAdminClient()
-    const { error } = await sb.from('agency_costs').update({ name: name.trim(), amount, frequency, updated_at: new Date().toISOString() }).eq('id', id).eq('agency_id', agencyId)
+    const { error } = await sb.from('agency_costs').update({ name: name.trim(), amount, frequency, payment_date: paymentDate || null, updated_at: new Date().toISOString() }).eq('id', id).eq('agency_id', agencyId)
     if (error) return { error: error.message }
     revalidatePath('/admin/finances')
   } catch (err) {

@@ -21,7 +21,7 @@ export default async function FinancesPage() {
   const [{ data: locations }, { data: ghlPlans }, { data: costs }, { data: vatPayments }, { data: allLocations }, { data: vatStatuses }] = await Promise.all([
     sb.from('locations').select('ghl_plan_id').eq('agency_id', agencyId).not('ghl_plan_id', 'is', null).is('churned_at', null),
     sb.from('ghl_plans').select('ghl_plan_id, price_monthly'),
-    sb.from('agency_costs').select('id, name, amount, frequency').eq('agency_id', agencyId).order('created_at'),
+    sb.from('agency_costs').select('id, name, amount, frequency, payment_date').eq('agency_id', agencyId).order('created_at'),
     sb.from('vat_payments').select('id, amount, period, notes, paid_at').eq('agency_id', agencyId).order('paid_at', { ascending: false }),
     sb.from('locations').select('ghl_plan_id, ghl_date_added, churned_at').eq('agency_id', agencyId).not('ghl_plan_id', 'is', null),
     sb.from('vat_quarter_status').select('quarter, status, amount_paid').eq('agency_id', agencyId),
@@ -228,6 +228,7 @@ export default async function FinancesPage() {
     name: c.name as string,
     amount: Number(c.amount),
     frequency: c.frequency as 'monthly' | 'annual',
+    paymentDate: c.payment_date as string | null,
   }))
 
   return (

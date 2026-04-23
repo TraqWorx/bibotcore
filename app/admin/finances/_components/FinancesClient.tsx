@@ -10,6 +10,7 @@ interface Cost {
   name: string
   amount: number
   frequency: 'monthly' | 'annual'
+  paymentDate: string | null
 }
 
 function formatEur(n: number) {
@@ -44,6 +45,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
   const [frequency, setFrequency] = useState<'monthly' | 'annual'>('monthly')
+  const [paymentDate, setPaymentDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,6 +57,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
     setName(cost.name)
     setAmount(String(cost.amount))
     setFrequency(cost.frequency)
+    setPaymentDate(cost.paymentDate ?? '')
     setAdding(false)
     setError(null)
   }
@@ -65,6 +68,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
     setName('')
     setAmount('')
     setFrequency('monthly')
+    setPaymentDate('')
     setError(null)
   }
 
@@ -82,9 +86,9 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
 
     let result
     if (editingId) {
-      result = await updateCost(editingId, name, amt, frequency)
+      result = await updateCost(editingId, name, amt, frequency, paymentDate || undefined)
     } else {
-      result = await addCost(name, amt, frequency)
+      result = await addCost(name, amt, frequency, paymentDate || undefined)
     }
     if (result?.error) {
       setError(result.error)
@@ -150,6 +154,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
               <th className="px-5 py-3">Name</th>
               <th className="px-5 py-3 text-right">Amount</th>
               <th className="px-5 py-3">Frequency</th>
+              <th className="px-5 py-3">Date</th>
               <th className="px-5 py-3 text-right">Monthly</th>
               <th className="px-5 py-3" />
             </tr>
@@ -162,6 +167,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
                 <td className="px-5 py-3.5">
                   <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-amber-50 text-amber-700">from GHL</span>
                 </td>
+                <td className="px-5 py-3.5" />
                 <td className="px-5 py-3.5 text-right font-bold tabular-nums text-gray-900">{'\u20AC'}{formatEur(affiliateMonthlyCost)}</td>
                 <td className="px-5 py-3.5" />
               </tr>
@@ -177,6 +183,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
                       <option value="annual">Annual</option>
                     </select>
                   </td>
+                  <td className="px-5 py-3"><input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className={inputClass + ' w-36'} /></td>
                   <td className="px-5 py-3 text-right text-xs text-gray-400">
                     {'\u20AC'}{formatEur(frequency === 'annual' ? parseFloat(amount || '0') / 12 : parseFloat(amount || '0'))}
                   </td>
@@ -198,6 +205,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
                       {cost.frequency}
                     </span>
                   </td>
+                  <td className="px-5 py-3.5 text-xs text-gray-500">{cost.paymentDate ? new Date(cost.paymentDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
                   <td className="px-5 py-3.5 text-right font-bold tabular-nums text-gray-900">{'\u20AC'}{formatEur(monthlyCost(cost))}</td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -220,6 +228,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
                     <option value="annual">Annual</option>
                   </select>
                 </td>
+                <td className="px-5 py-3"><input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className={inputClass + ' w-36'} /></td>
                 <td className="px-5 py-3 text-right text-xs text-gray-400">
                   {'\u20AC'}{formatEur(frequency === 'annual' ? parseFloat(amount || '0') / 12 : parseFloat(amount || '0'))}
                 </td>
@@ -235,12 +244,13 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
             )}
 
             {costs.length === 0 && !adding && (
-              <tr><td colSpan={5} className="px-5 py-8 text-center text-gray-400">No costs added yet</td></tr>
+              <tr><td colSpan={6} className="px-5 py-8 text-center text-gray-400">No costs added yet</td></tr>
             )}
           </tbody>
           <tfoot>
             <tr className="border-t border-gray-200 bg-gray-50/50">
               <td className="px-5 py-3 font-bold text-gray-900">Total Costs</td>
+              <td className="px-5 py-3" />
               <td className="px-5 py-3" />
               <td className="px-5 py-3" />
               <td className="px-5 py-3 text-right font-black tabular-nums text-gray-900">{'\u20AC'}{formatEur(totalMonthlyCosts)}/mo</td>
