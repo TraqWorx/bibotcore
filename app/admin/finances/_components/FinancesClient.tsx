@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { addCost, updateCost, deleteCost, addVatPayment, deleteVatPayment } from '../_actions'
+import { addCost, updateCost, deleteCost, updateVatQuarterStatus } from '../_actions'
 import { ad } from '@/lib/admin/ui'
 
 interface Cost {

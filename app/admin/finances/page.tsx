@@ -56,18 +56,34 @@ export default async function FinancesPage() {
     q: number
   }
 
-  function getActiveMonthsInRange(startDate: Date, endDate: Date | null, rangeStart: Date, rangeEnd: Date): number {
-    const locStart = startDate > rangeStart ? startDate : rangeStart
-    const locEnd = endDate && endDate < rangeEnd ? endDate : rangeEnd
-    if (locStart >= locEnd) return 0
-    // Count months
-    let months = 0
+  /** Calculate prorated revenue for a location in a date range.
+   *  Returns the sum of (planPrice × fraction of month active) for each month in the range.
+   *  Partial months are prorated by days (days active / days in month). */
+  function getProratedRevenueInRange(locStartRaw: Date, locEndRaw: Date | null, rangeStart: Date, rangeEnd: Date, monthlyPrice: number): number {
+    let total = 0
+    // Normalize to local dates (strip timezone)
+    const locStart = new Date(locStartRaw.getFullYear(), locStartRaw.getMonth(), locStartRaw.getDate())
+    const locEnd = locEndRaw ? new Date(locEndRaw.getFullYear(), locEndRaw.getMonth(), locEndRaw.getDate()) : null
+
     const cursor = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1)
-    while (cursor < rangeEnd) {
-      if (cursor >= locStart && cursor < locEnd) months++
+    while (cursor <= rangeEnd) {
+      const y = cursor.getFullYear(), m = cursor.getMonth()
+      const monthStart = new Date(y, m, 1)
+      const monthEnd = new Date(y, m + 1, 0) // last day of month
+      const daysInMonth = monthEnd.getDate()
+
+      const effStart = locStart > monthStart ? locStart : monthStart
+      const effEnd = locEnd && locEnd < monthEnd ? locEnd : monthEnd
+
+      if (effStart <= effEnd) {
+        const daysActive = Math.round((effEnd.getTime() - effStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+        const fraction = Math.min(daysActive / daysInMonth, 1)
+        total += monthlyPrice * fraction
+      }
+
       cursor.setMonth(cursor.getMonth() + 1)
     }
-    return months
+    return total
   }
 
   const quarterDefs = [
@@ -95,8 +111,8 @@ export default async function FinancesPage() {
         if (!r.ghl_plan_id || !planPrices[r.ghl_plan_id] || !r.ghl_date_added) continue
         const locStart = new Date(r.ghl_date_added)
         const locEnd = r.churned_at ? new Date(r.churned_at) : null
-        const activeMonths = getActiveMonthsInRange(locStart, locEnd, rangeStart, rangeEnd)
-        quarterVat += planPrices[r.ghl_plan_id] * activeMonths * 0.22
+        const proratedRevenue = getProratedRevenueInRange(locStart, locEnd, rangeStart, rangeEnd, planPrices[r.ghl_plan_id])
+        quarterVat += proratedRevenue * 0.22
       }
 
       if (quarterVat > 0) {
