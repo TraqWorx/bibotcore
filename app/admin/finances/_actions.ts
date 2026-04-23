@@ -42,6 +42,32 @@ export async function updateCost(id: string, name: string, amount: number, frequ
   }
 }
 
+export async function addVatPayment(amount: number, period: string, notes?: string): Promise<{ error: string } | undefined> {
+  try {
+    const agencyId = await getAgencyId()
+    if (amount <= 0) return { error: 'Amount must be greater than 0' }
+    if (!period.trim()) return { error: 'Period is required' }
+    const sb = createAdminClient()
+    const { error } = await sb.from('vat_payments').insert({ agency_id: agencyId, amount, period: period.trim(), notes: notes?.trim() || null })
+    if (error) return { error: error.message }
+    revalidatePath('/admin/finances')
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to add payment' }
+  }
+}
+
+export async function deleteVatPayment(id: string): Promise<{ error: string } | undefined> {
+  try {
+    const agencyId = await getAgencyId()
+    const sb = createAdminClient()
+    const { error } = await sb.from('vat_payments').delete().eq('id', id).eq('agency_id', agencyId)
+    if (error) return { error: error.message }
+    revalidatePath('/admin/finances')
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to delete payment' }
+  }
+}
+
 export async function deleteCost(id: string): Promise<{ error: string } | undefined> {
   try {
     const agencyId = await getAgencyId()

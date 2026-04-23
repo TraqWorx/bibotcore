@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { addCost, updateCost, deleteCost } from '../_actions'
+import { addCost, updateCost, deleteCost, addVatPayment, deleteVatPayment } from '../_actions'
 import { ad } from '@/lib/admin/ui'
 
 interface Cost {
@@ -20,7 +20,15 @@ function monthlyCost(cost: Cost): number {
   return cost.frequency === 'annual' ? cost.amount / 12 : cost.amount
 }
 
-export default function FinancesClient({ costs, mrr, monthlyVat = 0, affiliateMonthlyCost = 0, affiliateTotalOwed = 0 }: { costs: Cost[]; mrr: number; monthlyVat?: number; affiliateMonthlyCost?: number; affiliateTotalOwed?: number }) {
+interface VatPayment {
+  id: string
+  amount: number
+  period: string
+  notes: string | null
+  paid_at: string
+}
+
+export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwed = 0, vatPayments = [], affiliateMonthlyCost = 0, affiliateTotalOwed = 0 }: { costs: Cost[]; mrr: number; monthlyVat?: number; totalVatOwed?: number; vatPayments?: VatPayment[]; affiliateMonthlyCost?: number; affiliateTotalOwed?: number }) {
   const router = useRouter()
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -91,7 +99,7 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, affiliateMo
   return (
     <div className="space-y-6">
       {/* Stats cards */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">MRR</p>
           <p className="mt-2 text-3xl font-black text-emerald-600">{'\u20AC'}{formatEur(mrr)}</p>
@@ -103,16 +111,16 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, affiliateMo
           <p className="mt-0.5 text-xs text-gray-400">{costs.length} cost{costs.length !== 1 ? 's' : ''}</p>
         </div>
         <div className={ad.panel}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">VAT 22%</p>
-          <p className="mt-2 text-3xl font-black text-amber-600">{'\u20AC'}{formatEur(monthlyVat)}</p>
-          <p className="mt-0.5 text-xs text-gray-400">collected for government</p>
-        </div>
-        <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Monthly Profit</p>
           <p className={`mt-2 text-3xl font-black ${monthlyProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {'\u20AC'}{formatEur(monthlyProfit)}
           </p>
           <p className="mt-0.5 text-xs text-gray-400">MRR minus costs</p>
+        </div>
+        <div className={ad.panel}>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Monthly VAT</p>
+          <p className="mt-2 text-3xl font-black text-amber-600">{'\u20AC'}{formatEur(monthlyVat)}</p>
+          <p className="mt-0.5 text-xs text-gray-400">22% collected for gov</p>
         </div>
       </div>
 
@@ -234,6 +242,126 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, affiliateMo
       </div>
 
       {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+
+      {/* VAT Tracking */}
+      <VatTracker totalVatOwed={totalVatOwed} vatPayments={vatPayments} />
+    </div>
+  )
+}
+
+function VatTracker({ totalVatOwed, vatPayments }: { totalVatOwed: number; vatPayments: VatPayment[] }) {
+  const router = useRouter()
+  const [adding, setAdding] = useState(false)
+  const [amount, setAmount] = useState('')
+  const [period, setPeriod] = useState('')
+  const [notes, setNotes] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const totalPaid = vatPayments.reduce((s, p) => s + p.amount, 0)
+  const due = totalVatOwed - totalPaid
+
+  async function handleAdd() {
+    const amt = parseFloat(amount)
+    if (isNaN(amt) || amt <= 0) { setError('Enter a valid amount'); return }
+    if (!period.trim()) { setError('Enter a period'); return }
+    setLoading(true)
+    setError(null)
+    const result = await addVatPayment(amt, period, notes || undefined)
+    if (result?.error) {
+      setError(result.error)
+    } else {
+      setAdding(false)
+      setAmount('')
+      setPeriod('')
+      setNotes('')
+      router.refresh()
+    }
+    setLoading(false)
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Remove this VAT payment?')) return
+    await deleteVatPayment(id)
+    router.refresh()
+  }
+
+  const inputClass = 'rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/10'
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-amber-100 bg-amber-50/30 px-5 py-4">
+        <div>
+          <h2 className="text-sm font-bold text-gray-900">VAT Tracker</h2>
+          <p className="text-xs text-gray-400 mt-0.5">22% VAT collected on all revenue</p>
+        </div>
+        {!adding && (
+          <button onClick={() => setAdding(true)} className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
+            Record Payment
+          </button>
+        )}
+      </div>
+
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-4 border-b border-gray-100 px-5 py-4">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Total VAT Owed</p>
+          <p className="mt-1 text-lg font-black text-amber-600">{'\u20AC'}{formatEur(totalVatOwed)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Paid</p>
+          <p className="mt-1 text-lg font-black text-emerald-600">{'\u20AC'}{formatEur(totalPaid)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Due</p>
+          <p className={`mt-1 text-lg font-black ${due > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{'\u20AC'}{formatEur(due)}</p>
+        </div>
+      </div>
+
+      {/* Payments table */}
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
+            <th className="px-5 py-3">Period</th>
+            <th className="px-5 py-3 text-right">Amount</th>
+            <th className="px-5 py-3">Notes</th>
+            <th className="px-5 py-3">Paid On</th>
+            <th className="px-5 py-3" />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {vatPayments.map((p) => (
+            <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
+              <td className="px-5 py-3.5 font-medium text-gray-900">{p.period}</td>
+              <td className="px-5 py-3.5 text-right font-semibold tabular-nums text-emerald-600">{'\u20AC'}{formatEur(p.amount)}</td>
+              <td className="px-5 py-3.5 text-xs text-gray-500">{p.notes ?? '—'}</td>
+              <td className="px-5 py-3.5 text-xs text-gray-400">{new Date(p.paid_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+              <td className="px-5 py-3.5 text-right">
+                <button onClick={() => handleDelete(p.id)} className="rounded-lg border border-red-200 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50">Remove</button>
+              </td>
+            </tr>
+          ))}
+          {adding && (
+            <tr className="bg-amber-50/30">
+              <td className="px-5 py-3"><input type="text" value={period} onChange={(e) => setPeriod(e.target.value)} placeholder="e.g. Q1 2026" className={inputClass + ' w-full'} autoFocus /></td>
+              <td className="px-5 py-3"><input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" className={inputClass + ' w-24 text-right'} step="0.01" /></td>
+              <td className="px-5 py-3"><input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" className={inputClass + ' w-full'} /></td>
+              <td className="px-5 py-3" />
+              <td className="px-5 py-3 text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <button onClick={handleAdd} disabled={loading} className="rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50">{loading ? '...' : 'Save'}</button>
+                  <button onClick={() => { setAdding(false); setError(null) }} className="rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] text-gray-500 hover:bg-gray-50">Cancel</button>
+                </div>
+              </td>
+            </tr>
+          )}
+          {vatPayments.length === 0 && !adding && (
+            <tr><td colSpan={5} className="px-5 py-8 text-center text-gray-400">No VAT payments recorded yet</td></tr>
+          )}
+        </tbody>
+      </table>
+
+      {error && <p className="px-5 py-2 text-xs font-medium text-red-600">{error}</p>}
     </div>
   )
 }

@@ -18,10 +18,12 @@ export default async function FinancesPage() {
   const agencyId = profile.agency_id
 
   // Get MRR from locations with plans
-  const [{ data: locations }, { data: ghlPlans }, { data: costs }] = await Promise.all([
+  const [{ data: locations }, { data: ghlPlans }, { data: costs }, { data: vatPayments }, { data: allLocations }] = await Promise.all([
     sb.from('locations').select('ghl_plan_id').eq('agency_id', agencyId).not('ghl_plan_id', 'is', null).is('churned_at', null),
     sb.from('ghl_plans').select('ghl_plan_id, price_monthly'),
     sb.from('agency_costs').select('id, name, amount, frequency').eq('agency_id', agencyId).order('created_at'),
+    sb.from('vat_payments').select('id, amount, period, notes, paid_at').eq('agency_id', agencyId).order('paid_at', { ascending: false }),
+    sb.from('locations').select('ghl_plan_id, ghl_date_added, churned_at').eq('agency_id', agencyId).not('ghl_plan_id', 'is', null),
   ])
 
   const planPrices: Record<string, number> = {}
@@ -33,6 +35,18 @@ export default async function FinancesPage() {
   for (const loc of locations ?? []) {
     if (loc.ghl_plan_id && planPrices[loc.ghl_plan_id]) {
       mrr += planPrices[loc.ghl_plan_id]
+    }
+  }
+
+  // Calculate total VAT owed (cumulative across all locations and their active months)
+  let totalVatOwed = 0
+  for (const loc of allLocations ?? []) {
+    const r = loc as { ghl_plan_id?: string | null; ghl_date_added?: string | null; churned_at?: string | null }
+    if (r.ghl_plan_id && planPrices[r.ghl_plan_id] && r.ghl_date_added) {
+      const start = new Date(r.ghl_date_added)
+      const end = r.churned_at ? new Date(r.churned_at) : new Date()
+      const months = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)))
+      totalVatOwed += planPrices[r.ghl_plan_id] * months * 0.22
     }
   }
 
@@ -114,7 +128,15 @@ export default async function FinancesPage() {
         <h1 className={ad.pageTitle}>Finances</h1>
         <p className={ad.pageSubtitle}>Track your costs and profitability</p>
       </div>
-      <FinancesClient costs={typedCosts} mrr={mrr} monthlyVat={mrr * 0.22} affiliateMonthlyCost={affiliateMonthlyCost} affiliateTotalOwed={affiliateTotalOwed} />
+      <FinancesClient
+        costs={typedCosts}
+        mrr={mrr}
+        monthlyVat={mrr * 0.22}
+        totalVatOwed={totalVatOwed}
+        vatPayments={(vatPayments ?? []).map(p => ({ id: p.id as string, amount: Number(p.amount), period: p.period as string, notes: p.notes as string | null, paid_at: p.paid_at as string }))}
+        affiliateMonthlyCost={affiliateMonthlyCost}
+        affiliateTotalOwed={affiliateTotalOwed}
+      />
     </div>
   )
 }
