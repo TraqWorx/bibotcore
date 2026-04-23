@@ -68,6 +68,24 @@ export async function deleteVatPayment(id: string): Promise<{ error: string } | 
   }
 }
 
+export async function updateVatQuarterStatus(quarter: string, status: 'pending' | 'paid' | 'partial', amountPaid?: number): Promise<{ error: string } | undefined> {
+  try {
+    const agencyId = await getAgencyId()
+    const sb = createAdminClient()
+    const { error } = await sb.from('vat_quarter_status').upsert({
+      agency_id: agencyId,
+      quarter,
+      status,
+      amount_paid: amountPaid ?? 0,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'agency_id,quarter' })
+    if (error) return { error: error.message }
+    revalidatePath('/admin/finances')
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to update status' }
+  }
+}
+
 export async function deleteCost(id: string): Promise<{ error: string } | undefined> {
   try {
     const agencyId = await getAgencyId()

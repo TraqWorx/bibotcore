@@ -18,12 +18,13 @@ export default async function FinancesPage() {
   const agencyId = profile.agency_id
 
   // Get MRR from locations with plans
-  const [{ data: locations }, { data: ghlPlans }, { data: costs }, { data: vatPayments }, { data: allLocations }] = await Promise.all([
+  const [{ data: locations }, { data: ghlPlans }, { data: costs }, { data: vatPayments }, { data: allLocations }, { data: vatStatuses }] = await Promise.all([
     sb.from('locations').select('ghl_plan_id').eq('agency_id', agencyId).not('ghl_plan_id', 'is', null).is('churned_at', null),
     sb.from('ghl_plans').select('ghl_plan_id, price_monthly'),
     sb.from('agency_costs').select('id, name, amount, frequency').eq('agency_id', agencyId).order('created_at'),
     sb.from('vat_payments').select('id, amount, period, notes, paid_at').eq('agency_id', agencyId).order('paid_at', { ascending: false }),
     sb.from('locations').select('ghl_plan_id, ghl_date_added, churned_at').eq('agency_id', agencyId).not('ghl_plan_id', 'is', null),
+    sb.from('vat_quarter_status').select('quarter, status, amount_paid').eq('agency_id', agencyId),
   ])
 
   const planPrices: Record<string, number> = {}
@@ -202,6 +203,7 @@ export default async function FinancesPage() {
         totalVatOwed={totalVatOwed}
         vatQuarters={vatQuarters}
         accontoIva={accontoIva}
+        vatStatusMap={Object.fromEntries((vatStatuses ?? []).map(s => [s.quarter, { status: s.status as 'pending' | 'paid' | 'partial', amountPaid: Number(s.amount_paid) }]))}
         vatPayments={(vatPayments ?? []).map(p => ({ id: p.id as string, amount: Number(p.amount), period: p.period as string, notes: p.notes as string | null, paid_at: p.paid_at as string }))}
         affiliateMonthlyCost={affiliateMonthlyCost}
         affiliateTotalOwed={affiliateTotalOwed}

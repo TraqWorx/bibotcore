@@ -37,7 +37,7 @@ interface VatQuarter {
   q: number
 }
 
-export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwed = 0, vatQuarters = [], accontoIva = 0, vatPayments = [], affiliateMonthlyCost = 0, affiliateTotalOwed = 0 }: { costs: Cost[]; mrr: number; monthlyVat?: number; totalVatOwed?: number; vatQuarters?: VatQuarter[]; accontoIva?: number; vatPayments?: VatPayment[]; affiliateMonthlyCost?: number; affiliateTotalOwed?: number }) {
+export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwed = 0, vatQuarters = [], accontoIva = 0, vatPayments = [], vatStatusMap = {}, affiliateMonthlyCost = 0, affiliateTotalOwed = 0 }: { costs: Cost[]; mrr: number; monthlyVat?: number; totalVatOwed?: number; vatQuarters?: VatQuarter[]; accontoIva?: number; vatPayments?: VatPayment[]; vatStatusMap?: Record<string, { status: 'pending' | 'paid' | 'partial'; amountPaid: number }>; affiliateMonthlyCost?: number; affiliateTotalOwed?: number }) {
   const router = useRouter()
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -253,62 +253,32 @@ export default function FinancesClient({ costs, mrr, monthlyVat = 0, totalVatOwe
       {error && <p className="text-xs font-medium text-red-600">{error}</p>}
 
       {/* VAT Tracking */}
-      <VatTracker totalVatOwed={totalVatOwed} vatQuarters={vatQuarters} accontoIva={accontoIva} vatPayments={vatPayments} />
+      <VatTracker totalVatOwed={totalVatOwed} vatQuarters={vatQuarters} accontoIva={accontoIva} vatStatusMap={vatStatusMap} />
     </div>
   )
 }
 
-function VatTracker({ totalVatOwed, vatQuarters, accontoIva, vatPayments }: { totalVatOwed: number; vatQuarters: VatQuarter[]; accontoIva: number; vatPayments: VatPayment[] }) {
+function VatTracker({ totalVatOwed, vatQuarters, accontoIva, vatStatusMap }: { totalVatOwed: number; vatQuarters: VatQuarter[]; accontoIva: number; vatStatusMap: Record<string, { status: 'pending' | 'paid' | 'partial'; amountPaid: number }> }) {
   const router = useRouter()
-  const [adding, setAdding] = useState(false)
-  const [amount, setAmount] = useState('')
-  const [period, setPeriod] = useState('')
-  const [notes, setNotes] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [updating, setUpdating] = useState<string | null>(null)
 
-  const totalPaid = vatPayments.reduce((s, p) => s + p.amount, 0)
+  const totalPaid = Object.values(vatStatusMap).reduce((s, v) => s + v.amountPaid, 0)
   const due = totalVatOwed - totalPaid
 
-  async function handleAdd() {
-    const amt = parseFloat(amount)
-    if (isNaN(amt) || amt <= 0) { setError('Enter a valid amount'); return }
-    if (!period.trim()) { setError('Enter a period'); return }
-    setLoading(true)
-    setError(null)
-    const result = await addVatPayment(amt, period, notes || undefined)
-    if (result?.error) {
-      setError(result.error)
-    } else {
-      setAdding(false)
-      setAmount('')
-      setPeriod('')
-      setNotes('')
-      router.refresh()
-    }
-    setLoading(false)
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm('Remove this VAT payment?')) return
-    await deleteVatPayment(id)
+  async function handleStatusChange(quarter: string, status: 'pending' | 'paid' | 'partial', vatAmount: number) {
+    setUpdating(quarter)
+    const { updateVatQuarterStatus } = await import('../_actions')
+    const amountPaid = status === 'paid' ? vatAmount : status === 'partial' ? vatAmount / 2 : 0
+    await updateVatQuarterStatus(quarter, status, amountPaid)
+    setUpdating(null)
     router.refresh()
   }
 
-  const inputClass = 'rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/10'
-
   return (
     <div className="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-amber-100 bg-amber-50/30 px-5 py-4">
-        <div>
-          <h2 className="text-sm font-bold text-gray-900">VAT Tracker</h2>
-          <p className="text-xs text-gray-400 mt-0.5">22% VAT collected on all revenue</p>
-        </div>
-        {!adding && (
-          <button onClick={() => setAdding(true)} className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
-            Record Payment
-          </button>
-        )}
+      <div className="border-b border-amber-100 bg-amber-50/30 px-5 py-4">
+        <h2 className="text-sm font-bold text-gray-900">VAT Tracker</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Italian quarterly VAT schedule (22% on revenue)</p>
       </div>
 
       {/* Summary */}
@@ -327,109 +297,77 @@ function VatTracker({ totalVatOwed, vatQuarters, accontoIva, vatPayments }: { to
         </div>
       </div>
 
-      {/* Quarterly VAT Schedule */}
-      <div className="border-b border-gray-100 px-5 py-3 bg-gray-50/50">
-        <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Quarterly Schedule</p>
-      </div>
+      {/* Quarterly Schedule */}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
             <th className="px-5 py-2">Quarter</th>
             <th className="px-5 py-2">Period</th>
-            <th className="px-5 py-2">Payment Deadline</th>
+            <th className="px-5 py-2">Deadline</th>
             <th className="px-5 py-2 text-right">VAT Due</th>
-            <th className="px-5 py-2 text-center">Status</th>
+            <th className="px-5 py-2">Status</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
           {vatQuarters.map((vq) => {
-            const isPast = new Date(vq.paymentDeadline.split('/').reverse().join('-')) < new Date()
-            const paid = vatPayments.some((p) => p.period.toLowerCase().includes(vq.quarter.toLowerCase()))
+            const savedStatus = vatStatusMap[vq.quarter]
+            const status = savedStatus?.status ?? 'pending'
             return (
               <tr key={vq.quarter} className="hover:bg-gray-50/50 transition-colors">
                 <td className="px-5 py-2.5 font-semibold text-gray-900">{vq.quarter}</td>
                 <td className="px-5 py-2.5 text-gray-500 text-xs">{vq.period}</td>
-                <td className="px-5 py-2.5 text-xs">
-                  <span className={isPast && !paid ? 'text-red-600 font-semibold' : 'text-gray-500'}>{vq.paymentDeadline}</span>
-                </td>
+                <td className="px-5 py-2.5 text-xs text-gray-500">{vq.paymentDeadline}</td>
                 <td className="px-5 py-2.5 text-right font-bold tabular-nums text-amber-700">{'\u20AC'}{formatEur(vq.vatAmount)}</td>
-                <td className="px-5 py-2.5 text-center">
-                  {paid ? (
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Paid</span>
-                  ) : isPast ? (
-                    <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">Overdue</span>
-                  ) : (
-                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Pending</span>
-                  )}
+                <td className="px-5 py-2.5">
+                  <select
+                    value={status}
+                    onChange={(e) => handleStatusChange(vq.quarter, e.target.value as 'pending' | 'paid' | 'partial', vq.vatAmount)}
+                    disabled={updating === vq.quarter}
+                    className={`rounded-lg border px-2 py-1 text-[11px] font-semibold outline-none ${
+                      status === 'paid' ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : status === 'partial' ? 'border-amber-200 bg-amber-50 text-amber-700'
+                      : 'border-gray-200 bg-gray-50 text-gray-600'
+                    }`}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="partial">Partial</option>
+                  </select>
                 </td>
               </tr>
             )
           })}
-          {accontoIva > 0 && (
-            <tr className="bg-blue-50/30 hover:bg-blue-50/50 transition-colors">
-              <td className="px-5 py-2.5 font-semibold text-blue-900">Acconto IVA</td>
-              <td className="px-5 py-2.5 text-blue-700 text-xs">88% of Q4 {new Date().getFullYear() - 1}</td>
-              <td className="px-5 py-2.5 text-xs text-blue-600">27/12/{new Date().getFullYear()}</td>
-              <td className="px-5 py-2.5 text-right font-bold tabular-nums text-blue-700">{'\u20AC'}{formatEur(accontoIva)}</td>
-              <td className="px-5 py-2.5 text-center">
-                {vatPayments.some((p) => p.period.toLowerCase().includes('acconto')) ? (
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Paid</span>
-                ) : (
-                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">Pending</span>
-                )}
-              </td>
-            </tr>
-          )}
+          {accontoIva > 0 && (() => {
+            const accontoKey = `Acconto ${new Date().getFullYear()}`
+            const savedStatus = vatStatusMap[accontoKey]
+            const status = savedStatus?.status ?? 'pending'
+            return (
+              <tr className="bg-blue-50/30 hover:bg-blue-50/50 transition-colors">
+                <td className="px-5 py-2.5 font-semibold text-blue-900">Acconto IVA</td>
+                <td className="px-5 py-2.5 text-blue-700 text-xs">88% of Q4 {new Date().getFullYear() - 1}</td>
+                <td className="px-5 py-2.5 text-xs text-blue-600">27/12/{new Date().getFullYear()}</td>
+                <td className="px-5 py-2.5 text-right font-bold tabular-nums text-blue-700">{'\u20AC'}{formatEur(accontoIva)}</td>
+                <td className="px-5 py-2.5">
+                  <select
+                    value={status}
+                    onChange={(e) => handleStatusChange(accontoKey, e.target.value as 'pending' | 'paid' | 'partial', accontoIva)}
+                    disabled={updating === accontoKey}
+                    className={`rounded-lg border px-2 py-1 text-[11px] font-semibold outline-none ${
+                      status === 'paid' ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : status === 'partial' ? 'border-amber-200 bg-amber-50 text-amber-700'
+                      : 'border-blue-200 bg-blue-50 text-blue-600'
+                    }`}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="partial">Partial</option>
+                  </select>
+                </td>
+              </tr>
+            )
+          })()}
         </tbody>
       </table>
-
-      {/* Payments recorded */}
-      <div className="border-t border-gray-200 border-b border-gray-100 px-5 py-3 bg-gray-50/50">
-        <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Payments Recorded</p>
-      </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
-            <th className="px-5 py-3">Period</th>
-            <th className="px-5 py-3 text-right">Amount</th>
-            <th className="px-5 py-3">Notes</th>
-            <th className="px-5 py-3">Paid On</th>
-            <th className="px-5 py-3" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {vatPayments.map((p) => (
-            <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
-              <td className="px-5 py-3.5 font-medium text-gray-900">{p.period}</td>
-              <td className="px-5 py-3.5 text-right font-semibold tabular-nums text-emerald-600">{'\u20AC'}{formatEur(p.amount)}</td>
-              <td className="px-5 py-3.5 text-xs text-gray-500">{p.notes ?? '—'}</td>
-              <td className="px-5 py-3.5 text-xs text-gray-400">{new Date(p.paid_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-              <td className="px-5 py-3.5 text-right">
-                <button onClick={() => handleDelete(p.id)} className="rounded-lg border border-red-200 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50">Remove</button>
-              </td>
-            </tr>
-          ))}
-          {adding && (
-            <tr className="bg-amber-50/30">
-              <td className="px-5 py-3"><input type="text" value={period} onChange={(e) => setPeriod(e.target.value)} placeholder="e.g. Q1 2026" className={inputClass + ' w-full'} autoFocus /></td>
-              <td className="px-5 py-3"><input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" className={inputClass + ' w-24 text-right'} step="0.01" /></td>
-              <td className="px-5 py-3"><input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" className={inputClass + ' w-full'} /></td>
-              <td className="px-5 py-3" />
-              <td className="px-5 py-3 text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <button onClick={handleAdd} disabled={loading} className="rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50">{loading ? '...' : 'Save'}</button>
-                  <button onClick={() => { setAdding(false); setError(null) }} className="rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] text-gray-500 hover:bg-gray-50">Cancel</button>
-                </div>
-              </td>
-            </tr>
-          )}
-          {vatPayments.length === 0 && !adding && (
-            <tr><td colSpan={5} className="px-5 py-8 text-center text-gray-400">No VAT payments recorded yet</td></tr>
-          )}
-        </tbody>
-      </table>
-
-      {error && <p className="px-5 py-2 text-xs font-medium text-red-600">{error}</p>}
     </div>
   )
 }
