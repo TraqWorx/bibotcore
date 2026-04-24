@@ -24,6 +24,7 @@ interface UnrepliedConvo {
 }
 
 interface DashboardData {
+  ghlConnected?: boolean
   totalContacts: number
   unrepliedCount: number
   unrepliedConversations: UnrepliedConvo[]
@@ -112,6 +113,14 @@ export default function DashboardClient({
   return (
     <div className="space-y-6">
       <SimfoniaPageHeader eyebrow="Panoramica" title="Dashboard" description="Contatti e campagne di messaggistica a colpo d'occhio." />
+
+      {/* GHL connection warning */}
+      {data.ghlConnected === false && !demoMode && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3">
+          <p className="text-sm font-semibold text-amber-800">Connessione GHL scaduta</p>
+          <p className="mt-0.5 text-xs text-amber-600">I dati in tempo reale non sono disponibili. Vai su Admin → Locations e riconnetti GHL per aggiornare conversazioni, contatti e template.</p>
+        </div>
+      )}
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

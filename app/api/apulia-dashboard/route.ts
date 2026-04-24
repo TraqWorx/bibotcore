@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
+    ghlConnected: !!ghl,
     totalContacts,
     unrepliedCount: unreplied.length,
     unrepliedConversations: unreplied.slice(0, 5).map((c) => ({

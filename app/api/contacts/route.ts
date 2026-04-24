@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const PAGE_SIZE = Math.min(parseInt(sp.get('pageSize') ?? String(DEFAULT_PAGE_SIZE)), 500)
+  const idsOnly = sp.get('idsOnly') === 'true'
+  const PAGE_SIZE = idsOnly ? 10000 : Math.min(parseInt(sp.get('pageSize') ?? String(DEFAULT_PAGE_SIZE)), 500)
   const page = Math.max(1, parseInt(sp.get('page') ?? '1'))
   const search = sp.get('search') ?? null
   const tag = sp.get('tag') ?? null
@@ -43,6 +44,18 @@ export async function GET(req: NextRequest) {
   const sb = createAdminClient()
   const offset = (page - 1) * PAGE_SIZE
 
+  const city = sp.get('city') ?? null
+
+  // Fast path: return only IDs for "select all" operations
+  if (idsOnly) {
+    let idQuery = sb.from('cached_contacts').select('ghl_id').eq('location_id', locationId)
+    if (search) { const s = `%${search}%`; idQuery = idQuery.or(`first_name.ilike.${s},last_name.ilike.${s},email.ilike.${s},phone.ilike.${s},city.ilike.${s}`) }
+    if (tag) { for (const t of tag.split(',').map((t) => t.trim()).filter(Boolean)) idQuery = idQuery.contains('tags', [t]) }
+    if (city) idQuery = idQuery.ilike('city', city)
+    const { data } = await idQuery.limit(10000)
+    return NextResponse.json({ ids: (data ?? []).map((r) => r.ghl_id) })
+  }
+
   // Build main contacts query
   let query = sb
     .from('cached_contacts')
@@ -50,8 +63,6 @@ export async function GET(req: NextRequest) {
     .eq('location_id', locationId)
     .order('date_added', { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1)
-
-  const city = sp.get('city') ?? null
 
   if (search) {
     const s = `%${search}%`

@@ -120,11 +120,34 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
   // Contacts are already filtered server-side when a smart list is active
   const filtered = contacts
 
-  const allSelected = filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id))
+  const allPageSelected = filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id))
+  const [allContactsSelected, setAllContactsSelected] = useState(false)
 
   function toggleAll() {
-    if (allSelected) setSelectedIds(new Set())
-    else setSelectedIds(new Set(filtered.map((c) => c.id)))
+    if (allPageSelected) {
+      setSelectedIds(new Set())
+      setAllContactsSelected(false)
+    } else {
+      setSelectedIds(new Set(filtered.map((c) => c.id)))
+    }
+  }
+
+  async function selectAllContacts() {
+    // Fetch all contact IDs from server
+    let filterParams = ''
+    if (search) filterParams += `&search=${encodeURIComponent(search)}`
+    if (activeList) {
+      const list = smartLists.find((l) => l.id === activeList)
+      if (list) {
+        if (list.field === 'city') filterParams += `&city=${encodeURIComponent(list.value)}`
+        else if (list.field === 'tags') filterParams += `&tag=${encodeURIComponent(list.value)}`
+      }
+    }
+    const res = await fetch(`/api/contacts?locationId=${locationId}&pageSize=500&page=1${filterParams}&idsOnly=true`)
+    const data = await res.json()
+    const allIds = (data.ids ?? data.contacts?.map((c: { id: string }) => c.id) ?? []) as string[]
+    setSelectedIds(new Set(allIds))
+    setAllContactsSelected(true)
   }
 
   function toggleOne(id: string) {
@@ -265,6 +288,22 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
         style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)', color: 'var(--foreground)' }}
       />
 
+      {/* Select all banner */}
+      {allPageSelected && totalContacts > PAGE_SIZE && !allContactsSelected && (
+        <div className="flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-xs" style={{ borderColor: 'var(--brand)', backgroundColor: 'color-mix(in srgb, var(--brand) 5%, transparent)', color: 'var(--brand)' }}>
+          <span>{filtered.length} contatti selezionati in questa pagina.</span>
+          <button onClick={selectAllContacts} className="font-bold underline">
+            Seleziona tutti i {totalContacts.toLocaleString()} contatti
+          </button>
+        </div>
+      )}
+      {allContactsSelected && (
+        <div className="flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-xs" style={{ borderColor: 'var(--brand)', backgroundColor: 'color-mix(in srgb, var(--brand) 5%, transparent)', color: 'var(--brand)' }}>
+          <span>Tutti i {selectedIds.size.toLocaleString()} contatti selezionati.</span>
+          <button onClick={() => { setSelectedIds(new Set()); setAllContactsSelected(false) }} className="font-bold underline">Deseleziona</button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border shadow-sm" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
         {loading ? (
@@ -276,7 +315,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
             <thead>
               <tr style={{ borderBottom: '1px solid var(--shell-line)' }}>
                 <th className="px-4 py-3 text-left">
-                  <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
+                  <input type="checkbox" checked={allPageSelected} onChange={toggleAll} className="rounded" />
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Nome</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Telefono</th>
