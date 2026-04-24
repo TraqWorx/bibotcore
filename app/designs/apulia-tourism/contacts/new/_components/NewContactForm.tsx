@@ -207,7 +207,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
       setError(result.error)
       setSaving(false)
     } else {
-      router.push(`/designs/simfonia/contacts?locationId=${locationId}&newContact=${result.contactId}`)
+      router.push(`/designs/apulia-tourism/contacts?locationId=${locationId}&newContact=${result.contactId}`)
     }
   }
 
@@ -472,7 +472,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
           <div className={`flex flex-wrap gap-3 ${error ? '' : 'ml-auto'}`}>
             <button
               type="button"
-              onClick={() => router.push(`/designs/simfonia/contacts?locationId=${locationId}`)}
+              onClick={() => router.push(`/designs/apulia-tourism/contacts?locationId=${locationId}`)}
               className={sf.secondaryBtn}
             >
               Annulla

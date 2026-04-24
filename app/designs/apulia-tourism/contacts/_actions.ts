@@ -270,8 +270,8 @@ export async function updateContact(
     // Write-through: update cache with the returned contact data
     const updatedContact = result?.contact ?? { ...data, id: contactId }
     await writeThroughContact(ghl.locationId, updatedContact as Record<string, unknown>)
-    revalidatePath('/designs/simfonia/contacts', 'page')
-    revalidatePath('/designs/simfonia/dashboard', 'page')
+    revalidatePath('/designs/apulia-tourism/contacts', 'page')
+    revalidatePath('/designs/apulia-tourism/dashboard', 'page')
     return {}
   } catch (err) {
     console.error('[updateContact] FAILED:', err instanceof Error ? err.message : err)
@@ -290,8 +290,8 @@ export async function deleteContact(
     await ghl.contacts.delete(contactId)
     // Write-through: remove from cache
     await writeThroughContactDelete(ghl.locationId, contactId)
-    revalidatePath('/designs/simfonia/contacts', 'page')
-    revalidatePath('/designs/simfonia/dashboard', 'page')
+    revalidatePath('/designs/apulia-tourism/contacts', 'page')
+    revalidatePath('/designs/apulia-tourism/dashboard', 'page')
     return {}
   } catch (err) {
     const { translateGhlError } = await import('@/lib/utils/ghlErrors')

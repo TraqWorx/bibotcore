@@ -97,7 +97,7 @@ export default async function ContactProfilePage({
   return (
     <div className="space-y-8">
       <Link
-        href={`/designs/simfonia/contacts${q}`}
+        href={`/designs/apulia-tourism/contacts${q}`}
         className="inline-flex items-center gap-2 text-sm font-bold text-brand transition hover:underline hover:underline-offset-4"
       >
         ← Contatti

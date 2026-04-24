@@ -37,7 +37,7 @@ export async function createContact(data: {
     return { error: translateGhlError(err, 'Errore nella creazione del contatto') }
   }
 
-  revalidatePath('/designs/simfonia/contacts', 'page')
-  revalidatePath('/designs/simfonia/dashboard', 'page')
+  revalidatePath('/designs/apulia-tourism/contacts', 'page')
+  revalidatePath('/designs/apulia-tourism/dashboard', 'page')
   return { contactId }
 }

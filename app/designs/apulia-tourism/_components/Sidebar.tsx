@@ -44,6 +44,12 @@ function NavGlyph({ name }: { name: string }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
         </svg>
       )
+    case 'campaigns':
+      return (
+        <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.65} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+        </svg>
+      )
     case 'settings':
       return (
         <svg className={c} fill="none" viewBox="0 0 24 24" strokeWidth={1.65} stroke="currentColor">
@@ -60,6 +66,7 @@ const MODULE_NAV = [
   { key: 'dashboard', label: 'Dashboard', path: '/designs/apulia-tourism/dashboard' },
   { key: 'contacts', label: 'Contacts', path: '/designs/apulia-tourism/contacts' },
   { key: 'conversations', label: 'Conversations', path: '/designs/apulia-tourism/conversations' },
+  { key: 'campaigns', label: 'Campaigns', path: '/designs/apulia-tourism/campaigns' },
   { key: 'settings', label: 'Settings', path: '/designs/apulia-tourism/settings' },
 ] as const
 

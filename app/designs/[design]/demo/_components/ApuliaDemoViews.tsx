@@ -2,6 +2,7 @@
 
 import ContactsClient from '@/app/designs/apulia-tourism/contacts/_components/ContactsClient'
 import ConversationsClient from '@/app/designs/apulia-tourism/conversations/_components/ConversationsClient'
+import CampaignsClient from '@/app/designs/apulia-tourism/campaigns/_components/CampaignsClient'
 import SettingsClient from '@/app/designs/apulia-tourism/settings/_components/SettingsClient'
 import {
   apuliaTourismDemoConversations,
@@ -13,6 +14,10 @@ import {
 
 export function ApuliaDemoContactsView() {
   return <ContactsClient locationId="demo-apulia-tourism" demoMode />
+}
+
+export function ApuliaDemoCampaignsView() {
+  return <CampaignsClient locationId="demo-apulia-tourism" demoMode />
 }
 
 export function ApuliaDemoSettingsView() {
