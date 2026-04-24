@@ -53,7 +53,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
   // Load contacts
   useEffect(() => {
     if (demoMode) return
-    fetch('/api/ghl/contacts?locationId=' + locationId + '&limit=500')
+    fetch('/api/contacts?locationId=' + locationId)
       .then((r) => r.json())
       .then((data) => {
         const raw = data.contacts ?? []
@@ -64,7 +64,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
           }
           return {
             id: c.id as string,
-            contactName: (c.contactName ?? c.name ?? `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim()) as string,
+            contactName: (`${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || c.contactName || '—') as string,
             email: (c.email as string) ?? null,
             phone: (c.phone as string) ?? null,
             city: (c.city as string) ?? null,

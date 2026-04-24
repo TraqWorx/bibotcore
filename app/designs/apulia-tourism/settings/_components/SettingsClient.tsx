@@ -71,7 +71,6 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
 
   const sections = [
     { id: 'general', label: 'Generale' },
-    { id: 'messaging', label: 'Messaggistica' },
     { id: 'drip', label: 'Invio Graduale' },
     { id: 'automation', label: 'Automazione' },
     { id: 'notifications', label: 'Notifiche' },
@@ -153,29 +152,6 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
             </Section>
           )}
 
-          {/* Messaging */}
-          {activeSection === 'messaging' && (
-            <Section title="Messaggio di Benvenuto">
-              <Toggle
-                label="Invia messaggio di benvenuto ai nuovi contatti"
-                checked={settings.welcomeMessageEnabled}
-                onChange={(v) => update('welcomeMessageEnabled', v)}
-              />
-              {settings.welcomeMessageEnabled && (
-                <Field label="Messaggio di Benvenuto">
-                  <textarea
-                    value={settings.welcomeMessage}
-                    onChange={(e) => update('welcomeMessage', e.target.value)}
-                    placeholder="Scrivi il tuo messaggio di benvenuto…"
-                    rows={3}
-                    className="w-full rounded-xl border px-3 py-2 text-sm outline-none resize-none"
-                    style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-canvas)', color: 'var(--foreground)' }}
-                  />
-                </Field>
-              )}
-            </Section>
-          )}
-
           {/* Drip Feed */}
           {activeSection === 'drip' && (
             <Section title="Impostazioni Invio Graduale">
@@ -218,8 +194,9 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
           {/* Automation */}
           {activeSection === 'automation' && (
             <Section title="Risposta Automatica">
+              <p className="text-xs" style={{ color: 'var(--shell-muted)' }}>Invia una risposta automatica solo al primo messaggio ricevuto da un nuovo contatto. I messaggi successivi non riceveranno risposta automatica.</p>
               <Toggle
-                label="Attiva risposta automatica per messaggi in arrivo"
+                label="Attiva risposta automatica al primo messaggio"
                 checked={settings.autoReplyEnabled}
                 onChange={(v) => update('autoReplyEnabled', v)}
               />
