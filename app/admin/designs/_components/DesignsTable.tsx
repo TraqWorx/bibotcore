@@ -74,14 +74,21 @@ export default function DesignsTable({ rows }: { rows: DesignRow[] }) {
                     >
                       Settings
                     </Link>
-                    {['simfonia', 'apulia-tourism'].includes(row.slug) ? (
-                      <Link
-                        href={`/designs/${row.slug}/demo`}
-                        className="text-xs font-bold text-brand underline-offset-4 transition-colors hover:underline"
-                      >
-                        Demo
-                      </Link>
-                    ) : null}
+                    {(() => {
+                      const demoMap: Record<string, string> = {
+                        'simfonia': '/designs/simfonia/demo',
+                        'apulian-tourism-service': '/designs/apulia-tourism/demo',
+                      }
+                      const demoHref = demoMap[row.slug]
+                      return demoHref ? (
+                        <Link
+                          href={demoHref}
+                          className="text-xs font-bold text-brand underline-offset-4 transition-colors hover:underline"
+                        >
+                          Demo
+                        </Link>
+                      ) : null
+                    })()}
                     <DuplicateButton slug={row.slug} />
                     <form action={deleteDesign.bind(null, row.slug) as unknown as string}>
                       <button
