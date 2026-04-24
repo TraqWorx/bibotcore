@@ -1,6 +1,5 @@
 'use server'
 
-import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 import { runDesignInstaller } from '@/lib/designInstaller/runDesignInstaller'
@@ -270,9 +269,9 @@ export async function installDesign(
 
     await runDesignInstaller(locationId, designSlug)
 
-    redirect('/admin/locations')
+    revalidatePath('/admin/locations')
+    return undefined
   } catch (err) {
-    if ((err as { digest?: string }).digest?.startsWith('NEXT_REDIRECT')) throw err
     return { error: err instanceof Error ? err.message : 'Failed to install design' }
   }
 }
@@ -282,9 +281,9 @@ export async function removeDesign(locationId: string): Promise<{ error: string 
     await assertSuperAdmin()
     const supabase = createAdminClient()
     await supabase.from('installs').update({ design_slug: null, configured: false }).eq('location_id', locationId)
-    redirect('/admin/locations')
+    revalidatePath('/admin/locations')
+    return undefined
   } catch (err) {
-    if ((err as { digest?: string }).digest?.startsWith('NEXT_REDIRECT')) throw err
     return { error: err instanceof Error ? err.message : 'Failed to remove design' }
   }
 }
