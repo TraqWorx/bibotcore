@@ -1,81 +1,80 @@
 'use client'
 
-import { useState } from 'react'
-import Link from 'next/link'
 import useSWR from 'swr'
+import Link from 'next/link'
 import SimfoniaPageHeader from '../../_components/SimfoniaPageHeader'
-import { sf } from '@/lib/simfonia/ui'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-const CATEGORY_STYLES: Record<string, { border: string; accent: string; bg: string }> = {
-  telefonia:       { border: 'border-[var(--shell-line)]', accent: 'text-brand', bg: 'bg-[var(--shell-soft)]' },
-  energia:         { border: 'border-[#f0debb]', accent: 'text-[#9a6f1f]', bg: 'bg-[#fbf4e2]' },
-  connettivita:    { border: 'border-[#cfe5d3]', accent: 'text-[#4f8662]', bg: 'bg-[#eaf5ec]' },
-  intrattenimento: { border: 'border-[#e6ddf1]', accent: 'text-[#7d66ad]', bg: 'bg-[#f3eef9]' },
-}
-
-function countWorkingDays(start: Date, end: Date, closedDays: Set<string> = new Set()): number {
-  let count = 0
-  const cur = new Date(start)
-  cur.setHours(0, 0, 0, 0)
-  const endDay = new Date(end)
-  endDay.setHours(0, 0, 0, 0)
-  while (cur <= endDay) {
-    const d = cur.getDay()
-    const iso = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`
-    if (d !== 0 && d !== 6 && !closedDays.has(iso)) count++
-    cur.setDate(cur.getDate() + 1)
-  }
-  return count
-}
-
-interface CategoryData {
-  slug: string
-  label: string
-  total: number
-  providers: { provider: string; count: number }[]
-  switchOutCount: number
-}
-
-interface TrendPoint {
-  date: string
-  count: number
-}
-
-interface AppointmentPreview {
+interface Campaign {
   id: string
-  title: string
-  startTime?: string | null
+  type: string
+  message: string
   status: string
-  contactName: string | null
+  total: number
+  sent: number
+  createdAt: string
+}
+
+interface UnrepliedConvo {
+  id: string
+  contactName: string
+  lastMessage: string
+  lastMessageDate: string
 }
 
 interface DashboardData {
   totalContacts: number
-  targetAnnuale: number
-  categoryData: CategoryData[]
-  switchOutTotal: number
-  isAdmin: boolean
-  gareRows: { categoria: string; obiettivo: number; tag: string }[]
-  closedDays: string[]
-  contactsTrend: TrendPoint[]
-  appointmentPreview: AppointmentPreview[]
+  unrepliedCount: number
+  unrepliedConversations: UnrepliedConvo[]
+  campaigns: {
+    total: number
+    active: number
+    completed: number
+    totalSent: number
+    totalPending: number
+  }
+  recentCampaigns: Campaign[]
+  nextBatch: {
+    jobId: string
+    scheduledAt: string
+    batchSize: number
+    remaining: number
+  } | null
 }
 
-function formatInt(value: number) {
-  const sign = value < 0 ? '-' : ''
-  const digits = Math.abs(Math.trunc(value)).toString()
-  return `${sign}${digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`
+const DEMO_DATA: DashboardData = {
+  totalContacts: 84,
+  unrepliedCount: 7,
+  unrepliedConversations: [
+    { id: 'uc-1', contactName: 'Maria Bianchi', lastMessage: 'Perfetto, ci vediamo domani', lastMessageDate: '2026-04-24T09:15:00Z' },
+    { id: 'uc-2', contactName: 'Giuseppe Ferro', lastMessage: 'Ho ricevuto il listino', lastMessageDate: '2026-04-24T08:00:00Z' },
+    { id: 'uc-3', contactName: 'Anna Russo', lastMessage: 'Quando possiamo fissare?', lastMessageDate: '2026-04-23T16:40:00Z' },
+  ],
+  campaigns: { total: 6, active: 2, completed: 4, totalSent: 312, totalPending: 48 },
+  recentCampaigns: [
+    { id: 'c-1', type: 'SMS', message: 'Offerta speciale estate 2026 — scopri i nostri pacchetti!', status: 'active', total: 40, sent: 22, createdAt: '2026-04-24T07:00:00Z' },
+    { id: 'c-2', type: 'WhatsApp', message: 'Reminder: conferma il tuo appuntamento', status: 'active', total: 15, sent: 7, createdAt: '2026-04-23T14:00:00Z' },
+    { id: 'c-3', type: 'SMS', message: 'Benvenuto nel circuito Apulian Tourism!', status: 'completed', total: 84, sent: 84, createdAt: '2026-04-20T09:00:00Z' },
+    { id: 'c-4', type: 'WhatsApp', message: 'Nuova partnership attiva — rispondi per info', status: 'completed', total: 50, sent: 50, createdAt: '2026-04-18T10:00:00Z' },
+    { id: 'c-5', type: 'SMS', message: 'Follow-up primo contatto', status: 'completed', total: 63, sent: 63, createdAt: '2026-04-15T08:30:00Z' },
+  ],
+  nextBatch: { jobId: 'c-1', scheduledAt: '2026-04-24T13:00:00Z', batchSize: 10, remaining: 18 },
 }
 
-function sameDay(date: Date, iso: string) {
-  const target = new Date(iso)
-  return (
-    date.getFullYear() === target.getFullYear() &&
-    date.getMonth() === target.getMonth() &&
-    date.getDate() === target.getDate()
-  )
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return `${days}d ago`
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 export default function DashboardClient({
@@ -88,599 +87,261 @@ export default function DashboardClient({
   demoMode?: boolean
 }) {
   const { data: swrData, isLoading } = useSWR<DashboardData>(
-    demoData ? null : `/api/dashboard?locationId=${locationId}`,
+    demoMode ? null : `/api/apulia-dashboard?locationId=${locationId}`,
     fetcher,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 10000,
-    }
+    { revalidateOnFocus: false, dedupingInterval: 15000 }
   )
-  const data = demoData ?? swrData
-
-  const now = new Date()
-  const q = demoMode ? '' : `?locationId=${locationId}`
-  const [selectedDay, setSelectedDay] = useState(() => new Date().getDate())
-  const [hoveredPoint, setHoveredPoint] = useState<number | null>(null)
+  const data = demoMode ? (demoData ?? DEMO_DATA) : swrData
 
   if (isLoading || !data) {
     return (
-      <div className="space-y-8">
-        <SimfoniaPageHeader eyebrow="Home" title="Dashboard" description="Caricamento dati…" />
+      <div className="space-y-6">
+        <SimfoniaPageHeader eyebrow="Overview" title="Dashboard" description="Loading…" />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className={`${sf.statTile} h-32 animate-pulse bg-gray-100/80`} />
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className={`${sf.statTile} h-44 animate-pulse bg-gray-100/80`} />
+            <div key={i} className="h-28 animate-pulse rounded-2xl" style={{ backgroundColor: 'var(--shell-soft)' }} />
           ))}
         </div>
       </div>
     )
   }
 
-  const {
-    totalContacts, targetAnnuale, categoryData, switchOutTotal,
-    isAdmin, gareRows, closedDays: closedDaysArr, contactsTrend, appointmentPreview,
-  } = data as DashboardData
-
-  const closedDays = new Set(closedDaysArr ?? [])
-
-  // Working day stats
-  const year = now.getFullYear()
-  const jan1 = new Date(year, 0, 1)
-  const dec31 = new Date(year, 11, 31)
-  const wdPassed = countWorkingDays(jan1, now, closedDays)
-  const wdTotal = countWorkingDays(jan1, dec31, closedDays)
-  const wdRemaining = wdTotal - wdPassed
-  const pctTempo = Math.round((wdPassed / wdTotal) * 100)
-
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  const mwdPassed = countWorkingDays(monthStart, now, closedDays)
-  const mwdTotal = countWorkingDays(monthStart, monthEnd, closedDays)
-  const mwdPct = mwdTotal > 0 ? Math.round((mwdPassed / mwdTotal) * 100) : 0
-
-  const contratti = totalContacts
-  const pctContratti = targetAnnuale > 0 ? (contratti / targetAnnuale) * 100 : 0
-  const diff = pctContratti - pctTempo
-  const perfStatus: 'green' | 'yellow' | 'red' = diff > 2 ? 'green' : diff >= -2 ? 'yellow' : 'red'
-  const perfConfig = {
-    green:  { panel: 'border-emerald-200/80 bg-emerald-50/80 text-emerald-900', pill: 'bg-emerald-200/80 text-emerald-900', label: 'In target' },
-    yellow: { panel: 'border-amber-200/80 bg-amber-50/80 text-amber-950', pill: 'bg-amber-200/80 text-amber-950', label: 'Attenzione' },
-    red:    { panel: 'border-red-200/80 bg-red-50/80 text-red-950', pill: 'bg-red-200/80 text-red-950', label: 'Sotto target' },
-  }[perfStatus]
-
-  const monthDays = (() => {
-    const first = new Date(now.getFullYear(), now.getMonth(), 1)
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-    const startOffset = first.getDay()
-    const cells: Array<number | null> = []
-    for (let i = 0; i < startOffset; i++) cells.push(null)
-    for (let i = 1; i <= daysInMonth; i++) cells.push(i)
-    while (cells.length % 7 !== 0) cells.push(null)
-    return cells
-  })()
-
-  const selectedAppointments = appointmentPreview.filter((item) => {
-    if (!item.startTime) return false
-    const date = new Date(item.startTime)
-    return (
-      date.getFullYear() === now.getFullYear() &&
-      date.getMonth() === now.getMonth() &&
-      date.getDate() === selectedDay
-    )
-  })
-
-  const maxTrend = Math.max(...contactsTrend.map((item) => item.count), 1)
-  const trendTotal = contactsTrend.reduce((sum, point) => sum + point.count, 0)
-  const trendAverage = Number((trendTotal / Math.max(contactsTrend.length, 1)).toFixed(1))
-  const trendToday = contactsTrend.at(-1)?.count ?? 0
-  const trendTicks = [...new Set([maxTrend, Math.max(Math.round(maxTrend / 2), 1), 0])].sort((a, b) => b - a)
-  const chartWidth = Math.max((contactsTrend.length - 1) * 12 + 4, 100)
-  const cx0 = 2
-  const cx1 = chartWidth - 2
-  const cy0 = 8
-  const cy1 = 46
-  const cvb = `0 0 ${chartWidth} 54`
-  const chartPoints = contactsTrend.map((point, index) => {
-    const x = cx0 + (index / Math.max(contactsTrend.length - 1, 1)) * (cx1 - cx0)
-    const y = cy1 - (point.count / maxTrend) * (cy1 - cy0)
-    return { x, y, point }
-  })
-  const chartLine = chartPoints.map(({ x, y }) => `${x},${y}`).join(' ')
-  const chartArea = `${cx0},${cy1} ${chartLine} ${cx1},${cy1}`
-  const xLabelPoints = chartPoints.filter((_, i) => i === 0 || i === chartPoints.length - 1 || i % 5 === 0)
-  const hoveredTrendPoint = hoveredPoint !== null ? chartPoints[hoveredPoint] : null
-  const miniCalendarDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
-  const calendarWidget = (
-    <aside className="flex h-full flex-col overflow-hidden rounded-[28px] border border-[var(--shell-line)] bg-[var(--shell-surface)] shadow-[0_18px_40px_-32px_rgba(23,21,18,0.22)]">
-      {/* Header */}
-      <div className="px-5 pt-5 pb-4">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-widest text-[var(--shell-muted)]">Agenda</p>
-          {demoMode ? (
-            <span className="text-xs font-medium text-brand">Apri calendario</span>
-          ) : (
-            <Link href={`/designs/simfonia/calendar${q}`} className="text-xs font-medium text-brand hover:underline underline-offset-2">
-              Apri calendario
-            </Link>
-          )}
-        </div>
-        <h2 className="mt-1.5 text-lg font-bold text-[var(--foreground)] capitalize">
-          {now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
-        </h2>
-      </div>
-
-      {/* Mini calendar */}
-      <div className="px-5 pb-4">
-        <div className="rounded-[24px] border border-[var(--shell-line)] bg-[var(--shell-soft)] px-3 py-3">
-        <div className="grid grid-cols-7 gap-y-1 text-center text-[10px] font-semibold uppercase tracking-wider text-[var(--shell-muted)]">
-          {miniCalendarDays.map((day) => (
-            <span key={day} className="py-1">{day.slice(0, 2)}</span>
-          ))}
-        </div>
-        <div className="mt-1 grid grid-cols-7 gap-y-0.5">
-          {monthDays.map((day, index) => {
-            const hasAppointments = day
-              ? appointmentPreview.some((item) => item.startTime && sameDay(new Date(now.getFullYear(), now.getMonth(), day), item.startTime))
-              : false
-            const isSelected = day === selectedDay
-            const isToday = day === now.getDate()
-            return (
-              <button
-                key={`${day ?? 'empty'}-${index}`}
-                type="button"
-                onClick={() => { if (day) setSelectedDay(day) }}
-                disabled={!day}
-                className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-medium transition-all ${
-                  isSelected
-                    ? 'bg-brand text-white shadow-sm'
-                    : isToday
-                      ? 'font-bold text-brand ring-1 ring-brand/30'
-                      : hasAppointments
-                        ? 'bg-brand/10 text-[var(--foreground)]'
-                        : day
-                          ? 'text-[var(--shell-muted)] hover:bg-white/80'
-                          : 'text-transparent'
-                }`}
-              >
-                {day ?? ''}
-              </button>
-            )
-          })}
-        </div>
-        </div>
-      </div>
-
-      {/* Divider */}
-      <div className="mx-5 border-t border-[var(--shell-line)]" />
-
-      {/* Schedule */}
-      <div className="flex-1 px-5 pt-4 pb-5">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-semibold text-[var(--foreground)]">
-            {selectedDay === now.getDate() ? 'Oggi' : `${selectedDay} ${now.toLocaleDateString('it-IT', { month: 'short' })}`}
-          </p>
-          <span className="rounded-full bg-[var(--shell-canvas)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--shell-muted)]">
-            {selectedAppointments.length}
-          </span>
-        </div>
-        {selectedAppointments.length > 0 ? (
-          <div className="space-y-2">
-            {selectedAppointments.slice(0, 4).map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center gap-3 rounded-xl border border-[var(--shell-line)] bg-[var(--shell-canvas)] px-3.5 py-3 transition-colors hover:bg-[var(--shell-soft)]"
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-[11px] font-bold text-brand">
-                  {item.startTime
-                    ? new Date(item.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
-                    : '--:--'}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-[var(--foreground)]">{item.title}</p>
-                  <p className="truncate text-xs text-[var(--shell-muted)]">{item.contactName ?? 'Nessun contatto'}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-[var(--shell-line)] bg-[var(--shell-canvas)] px-4 py-5 text-center text-sm text-[var(--shell-muted)]">
-            Nessun appuntamento
-          </div>
-        )}
-      </div>
-    </aside>
-  )
+  const qs = demoMode ? '' : `?locationId=${locationId}`
 
   return (
-    <div className="space-y-8">
-      <SimfoniaPageHeader
-        eyebrow="Home"
-        title="Dashboard"
-        description={
-          <>
-            {isAdmin ? 'Panoramica operativa' : 'I tuoi risultati'} — {now.getFullYear()}
-          </>
-        }
-        actions={
-          demoMode ? (
-            <span
-              className={sf.primaryBtn}
-              style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', opacity: 0.92, cursor: 'default' }}
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              Nuovo contatto
-            </span>
-          ) : (
-            <Link
-              href={`/designs/simfonia/contacts/new${q}`}
-              className={sf.primaryBtn}
-              style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)' }}
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              Nuovo contatto
-            </Link>
-          )
-        }
-      />
+    <div className="space-y-6">
+      <SimfoniaPageHeader eyebrow="Overview" title="Dashboard" description="Contacts & messaging campaigns at a glance." />
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.75fr)_minmax(340px,0.85fr)] xl:items-start">
-        <div className="space-y-5">
-          <section className="overflow-hidden rounded-[30px] border border-[var(--shell-line)] bg-[var(--shell-surface)] shadow-[0_18px_42px_-32px_rgba(23,21,18,0.2)]">
-          <div className="border-b border-[var(--shell-line)] px-6 py-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className={sf.sectionLabel}>Quadro generale</p>
-                <h2 className="mt-2 text-2xl font-bold tracking-tight text-[var(--foreground)]">
-                  {isAdmin ? 'Panoramica performance' : 'I numeri di oggi'}
-                </h2>
-                <p className="mt-1 text-sm text-[var(--shell-muted)]">
-                  Una lettura rapida dei risultati, del ritmo attuale e dei punti che richiedono attenzione.
-                </p>
-              </div>
-              {isAdmin ? (
-                <div className={`rounded-2xl border px-4 py-3 shadow-sm ${perfConfig.panel}`}>
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${perfConfig.pill}`}>
-                    {perfConfig.label}
-                  </span>
-                  <p className="mt-2 text-sm font-medium">
-                    {pctContratti.toFixed(1)}% fatto vs {pctTempo}% atteso
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="space-y-5 px-6 py-6">
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <div className={`${sf.statTile} min-h-[124px]`}>
-                <p className={sf.sectionLabel}>Contatti totali</p>
-                <p className="mt-3 text-4xl font-black tabular-nums text-[var(--foreground)]">{formatInt(totalContacts)}</p>
-                <p className="mt-2 text-xs text-[var(--shell-muted)]">Base clienti attiva nella location</p>
-              </div>
-
-              <div className={`${sf.statTile} min-h-[124px]`}>
-                <p className={sf.sectionLabel}>Switch out</p>
-                <p className={`mt-3 text-4xl font-black tabular-nums ${switchOutTotal > 0 ? 'text-red-600' : 'text-[var(--foreground)]'}`}>{switchOutTotal}</p>
-                <p className="mt-2 text-xs text-[var(--shell-muted)]">
-                  {switchOutTotal > 0 ? 'Richiedono attenzione immediata' : 'Nessun caso critico al momento'}
-                </p>
-              </div>
-
-              <div className={`${sf.statTile} min-h-[124px] ${isAdmin ? 'border-brand/20' : ''}`}>
-                <p className={sf.sectionLabel}>{isAdmin ? 'Target annuale' : 'Media mese'}</p>
-                <p className="mt-3 text-4xl font-black tabular-nums text-brand">
-                  {isAdmin ? formatInt(targetAnnuale) : trendAverage}
-                </p>
-                <p className="mt-2 text-xs text-[var(--shell-muted)]">
-                  {isAdmin ? 'Contratti obiettivo' : 'Nuovi contatti medi al giorno'}
-                </p>
-              </div>
-
-              <div className={`${sf.statTile} min-h-[124px] ${isAdmin ? 'border-brand/20' : ''}`}>
-                <p className={sf.sectionLabel}>{isAdmin ? 'Avanzamento' : 'Appuntamenti mese'}</p>
-                <p className="mt-3 text-4xl font-black tabular-nums text-[var(--foreground)]">
-                  {isAdmin ? `${pctContratti.toFixed(1)}%` : appointmentPreview.length}
-                </p>
-                <p className="mt-2 text-xs text-[var(--shell-muted)]">
-                  {isAdmin ? `Ritmo atteso: ${pctTempo}%` : 'Appuntamenti previsti nel mese corrente'}
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <div className={`${sf.card} h-fit p-5`}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className={sf.sectionLabel}>Andamento</p>
-                    <p className="mt-1 text-sm text-[var(--shell-muted)]">
-                      {isAdmin
-                        ? `Differenza ritmo: ${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`
-                        : `${trendTotal} nuovi contatti nel mese`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-6 text-right">
-                    <div>
-                      <p className="text-2xl font-bold tabular-nums text-[var(--foreground)]">{wdPassed}</p>
-                      <p className="text-[11px] text-[var(--shell-muted)]">gg. passati</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold tabular-nums text-[var(--foreground)]">{wdRemaining}</p>
-                      <p className="text-[11px] text-[var(--shell-muted)]">gg. restanti</p>
-                    </div>
-                  </div>
-                </div>
-
-                {isAdmin ? (
-                  <div className="mt-4 rounded-[22px] border border-[var(--shell-line)] bg-[var(--shell-canvas)] p-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-[var(--shell-muted)]">Contratti chiusi</span>
-                      <span className="font-semibold tabular-nums text-[var(--foreground)]">{formatInt(contratti)}</span>
-                    </div>
-                    <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-[color:color-mix(in_srgb,var(--shell-soft)_65%,white_35%)]">
-                      <div
-                        className="h-full rounded-full transition-colors"
-                        style={{
-                          width: `${Math.min(pctContratti, 100)}%`,
-                          background: perfStatus === 'green' ? '#16a34a' : perfStatus === 'yellow' ? '#d97706' : '#dc2626',
-                        }}
-                      />
-                    </div>
-                    <p className="mt-3 text-xs text-[var(--shell-muted)]">
-                      {pctContratti.toFixed(1)}% del target raggiunto su {formatInt(targetAnnuale)} contratti.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mt-4 rounded-[22px] border border-[var(--shell-line)] bg-[var(--shell-canvas)] p-4">
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--shell-muted)]">Oggi</p>
-                        <p className="mt-1 text-2xl font-bold tabular-nums text-brand">{trendToday}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--shell-muted)]">Mese</p>
-                        <p className="mt-1 text-2xl font-bold tabular-nums text-[var(--foreground)]">{trendTotal}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--shell-muted)]">Media/g</p>
-                        <p className="mt-1 text-2xl font-bold tabular-nums text-[var(--foreground)]">{trendAverage}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="overflow-hidden rounded-[28px] border border-[var(--shell-line)] bg-[var(--shell-surface)] shadow-[0_18px_40px_-32px_rgba(23,21,18,0.22)]">
-          {/* Header */}
-          <div className="px-6 pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-[var(--shell-muted)]">Trend contatti</p>
-                <h2 className="mt-1 text-lg font-bold text-[var(--foreground)]">Nuovi contatti</h2>
-              </div>
-              <span className="rounded-full bg-[var(--shell-canvas)] px-3 py-1 text-[11px] font-semibold capitalize text-[var(--shell-muted)]">
-                {now.toLocaleDateString('it-IT', { month: 'long' })}
-              </span>
-            </div>
-
-            {/* Stats row */}
-            <div className="mt-5 flex gap-6">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--shell-muted)]">Totale</p>
-                <p className="mt-0.5 text-3xl font-bold tabular-nums text-[var(--foreground)]">{trendTotal}</p>
-              </div>
-              <div className="border-l border-[var(--shell-line)] pl-6">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--shell-muted)]">Oggi</p>
-                <p className="mt-0.5 text-3xl font-bold tabular-nums text-brand">{trendToday}</p>
-              </div>
-              <div className="border-l border-[var(--shell-line)] pl-6">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--shell-muted)]">Media/g</p>
-                <p className="mt-0.5 text-3xl font-bold tabular-nums text-[var(--foreground)]">{trendAverage}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 px-4 pb-4 sm:px-6 sm:pb-6">
-            <div className="rounded-[26px] border border-[color:color-mix(in_srgb,var(--brand)_20%,var(--shell-line))] bg-[var(--shell-soft)] px-5 py-5">
-              <div className="grid grid-cols-[34px_minmax(0,1fr)] gap-4">
-                <div className="flex flex-col justify-between py-2 text-[11px] font-semibold tabular-nums text-[var(--shell-muted)]">
-                {trendTicks.map((value) => (
-                  <span key={value}>{value}</span>
-                ))}
-              </div>
-              <div>
-                  <svg viewBox={cvb} className="w-full overflow-visible" style={{ height: 154 }}>
-                  <defs>
-                    <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--brand)" stopOpacity={demoMode ? '0.08' : '0.13'} />
-                      <stop offset="100%" stopColor="var(--brand)" stopOpacity="0.01" />
-                    </linearGradient>
-                  </defs>
-                  {trendTicks.map((value) => {
-                    const gy = cy1 - (value / maxTrend) * (cy1 - cy0)
-                    return (
-                      <line
-                        key={value}
-                        x1={cx0}
-                        y1={gy}
-                        x2={cx1}
-                        y2={gy}
-                        stroke="color-mix(in srgb, var(--shell-line) 92%, transparent)"
-                        strokeWidth="1"
-                      />
-                    )
-                  })}
-                  <polygon points={chartArea} fill="url(#trendFill)" />
-                    <polyline
-                      fill="none"
-                      stroke="var(--brand)"
-                      strokeWidth={demoMode ? '1.2' : '1.6'}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      points={chartLine}
-                    />
-                  {chartPoints.map(({ x, y, point }, index) => {
-                    const isHovered = hoveredPoint === index
-                    const showDot = true
-                    return (
-                      <g key={point.date} onMouseEnter={() => setHoveredPoint(index)} onMouseLeave={() => setHoveredPoint(null)} className="cursor-pointer">
-                        <circle cx={x} cy={y} r={demoMode ? '2.6' : '4.5'} fill="transparent" />
-                        {showDot && (
-                          <circle
-                            cx={x}
-                            cy={y}
-                            r={demoMode ? (isHovered ? 1.55 : 1.05) : (isHovered ? 2.1 : 1.4)}
-                            fill="white"
-                            stroke="var(--brand)"
-                            strokeWidth={demoMode ? (isHovered ? 1.05 : 0.8) : (isHovered ? 1.5 : 1.05)}
-                          />
-                        )}
-                      </g>
-                    )
-                  })}
-                  {hoveredTrendPoint && (
-                    <g
-                      transform={`translate(${Math.max(cx0 + 10, Math.min(cx1 - 10, hoveredTrendPoint.x))},${Math.max(cy0 + 8, hoveredTrendPoint.y - 7)})`}
-                      pointerEvents="none"
-                    >
-                      <rect x={-23} y={-16} width={46} height={19} rx={7} fill="var(--foreground)" opacity="0.94" />
-                      <text x="0" y="-8.2" textAnchor="middle" fontSize="4.2" fontWeight="600" fill="white" opacity="0.78">
-                        {new Date(hoveredTrendPoint.point.date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })}
-                      </text>
-                      <text x="0" y="-1" textAnchor="middle" fontSize="5.4" fontWeight="700" fill="white">
-                        {hoveredTrendPoint.point.count} contatti
-                      </text>
-                    </g>
-                  )}
-                </svg>
-                <div className="mt-3 grid text-[11px] font-medium text-[var(--shell-muted)]" style={{ gridTemplateColumns: `repeat(${xLabelPoints.length}, minmax(0, 1fr))` }}>
-                  {xLabelPoints.map(({ point }, i) => (
-                    <span
-                      key={point.date}
-                      className={`${i === 0 ? 'text-left' : i === xLabelPoints.length - 1 ? 'text-right' : 'text-center'}`}
-                    >
-                      {new Date(point.date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              </div>
-            </div>
-          </div>
-        </section>
-        </div>
-
-        <div className="xl:sticky xl:top-24">
-          {calendarWidget}
-        </div>
+      {/* ── KPI Cards ── */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <KpiCard
+          label="Total Contacts"
+          value={data.totalContacts}
+          icon={<IconContacts />}
+          href={`/designs/apulia-tourism/contacts${qs}`}
+        />
+        <KpiCard
+          label="Unreplied"
+          value={data.unrepliedCount}
+          icon={<IconUnreplied />}
+          accent={data.unrepliedCount > 0 ? 'warning' : undefined}
+          href={`/designs/apulia-tourism/conversations${qs}`}
+        />
+        <KpiCard
+          label="Messages Sent"
+          value={data.campaigns.totalSent}
+          icon={<IconSent />}
+        />
+        <KpiCard
+          label="Pending"
+          value={data.campaigns.totalPending}
+          icon={<IconPending />}
+          accent={data.campaigns.totalPending > 0 ? 'info' : undefined}
+        />
       </div>
 
-      {/* Categories */}
-      <section className={`${sf.panel}`}>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className={sf.sectionLabel}>Per categoria</h2>
-          {demoMode ? (
-            <span className="text-xs font-bold text-brand">Vai ai contatti</span>
-          ) : (
-            <Link href={`/designs/simfonia/contacts${q}`} className="text-xs font-bold text-brand underline-offset-4 hover:underline">
-              Vai ai contatti
-            </Link>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {categoryData.map((cat) => {
-            const style = CATEGORY_STYLES[cat.slug] ?? { border: 'border-gray-200', accent: 'text-gray-700', bg: 'bg-gray-50' }
-            const pctOfTotal = totalContacts > 0 ? (cat.total / totalContacts) * 100 : 0
-            return (
-              <Link
-                key={cat.slug}
-                href={`/designs/simfonia/contacts${q}&category=${cat.slug}`}
-                className={`group rounded-[28px] border-2 ${style.border} bg-[var(--shell-surface)] p-5 shadow-[0_14px_28px_-24px_rgba(23,21,18,0.2)] transition hover:border-brand/25 hover:shadow-md`}
-              >
-                <p className={`text-[11px] font-bold uppercase tracking-wider ${style.accent}`}>{cat.label}</p>
-                <div className="mt-3 flex items-baseline gap-1.5">
-                  <span className={`text-3xl font-black tabular-nums ${style.accent}`}>{formatInt(cat.total)}</span>
-                  <span className="text-sm font-semibold tabular-nums text-[#c6beb2]">contatti</span>
-                </div>
-                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[#efe8de]">
-                  <div className={`h-full rounded-full transition-colors ${style.bg}`} style={{ width: `${Math.min(pctOfTotal, 100)}%` }} />
-                </div>
-                <p className="mt-2 text-[11px] tabular-nums text-[var(--shell-muted)]">{pctOfTotal.toFixed(1)}% del totale</p>
-                {cat.providers.length > 0 && (
-                  <div className="mt-3 space-y-1 border-t border-[#efe8de] pt-3">
-                    {cat.providers.slice(0, 6).map((p) => (
-                      <div key={p.provider} className="flex items-center justify-between text-xs">
-                        <span className="mr-2 truncate text-[var(--shell-muted)]">{p.provider}</span>
-                        <span className="font-semibold tabular-nums text-[var(--foreground)]">{p.count}</span>
-                      </div>
-                    ))}
-                    {cat.providers.length > 6 && <p className="text-[10px] text-[var(--shell-muted)]">+{cat.providers.length - 6} altri</p>}
-                  </div>
-                )}
-              </Link>
-            )
-          })}
-        </div>
-      </section>
-
-      {/* Gare Mensili */}
-      {isAdmin && (
-        <section className={sf.panel}>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className={sf.sectionLabel}>
-              Gare — {now.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
-            </h2>
-            <Link href={`/designs/simfonia/settings${q}`} className="text-xs font-bold text-brand underline-offset-4 hover:underline">
-              Modifica obiettivi
-            </Link>
+      {/* ── Two-column layout ── */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Left: Campaigns */}
+        <div className="space-y-4">
+          {/* Campaign Stats */}
+          <div className="rounded-2xl border p-5" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
+            <h3 className="mb-3 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Campaigns</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <MiniStat label="Total" value={data.campaigns.total} />
+              <MiniStat label="Active" value={data.campaigns.active} color="var(--brand)" />
+              <MiniStat label="Completed" value={data.campaigns.completed} color="#16a34a" />
+            </div>
           </div>
 
-          {gareRows.length === 0 ? (
-            <div className="rounded-[22px] border border-dashed border-[var(--shell-line)] bg-[var(--shell-surface)] px-8 py-10 text-center">
-              <p className="text-sm font-medium text-[var(--shell-muted)]">Nessuna gara configurata.</p>
-              <p className="mt-1 text-xs text-[var(--shell-muted)]">Imposta obiettivi in Impostazioni → Gare mensili.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(gareRows.length, 4)}, minmax(0, 1fr))` }}>
-              {gareRows.map((g) => {
-                const attivato = 0 // Will be computed server-side in future
-                const pctRaggiunta = g.obiettivo > 0 ? (attivato / g.obiettivo) * 100 : 0
-                const isOnTrack = pctRaggiunta >= mwdPct
-                return (
-                  <div
-                    key={g.categoria}
-                    className={`${sf.statTile} ${isOnTrack ? 'border-emerald-200/80' : 'border-red-200/80'}`}
-                  >
-                    <p className={`${sf.sectionLabel} capitalize`}>{g.categoria}</p>
-                    <div className="mt-3 flex items-baseline gap-1.5">
-                      <span className="text-3xl font-black tabular-nums text-[var(--foreground)]">{attivato}</span>
-                      <span className="text-lg font-semibold tabular-nums text-[#c6beb2]">/ {g.obiettivo}</span>
-                    </div>
-                    <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[#efe8de]">
-                      <div
-                        className={`h-full rounded-full transition-colors ${isOnTrack ? 'bg-emerald-500' : 'bg-red-500'}`}
-                        style={{ width: `${Math.min(pctRaggiunta, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
+          {/* Next Batch */}
+          {data.nextBatch && (
+            <div className="rounded-2xl border p-5" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
+              <h3 className="mb-2 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Next Scheduled Batch</h3>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--shell-soft)' }}>
+                  <svg className="h-5 w-5" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>{formatDate(data.nextBatch.scheduledAt)}</p>
+                  <p className="text-xs" style={{ color: 'var(--shell-muted)' }}>
+                    {data.nextBatch.batchSize} messages · {data.nextBatch.remaining} remaining
+                  </p>
+                </div>
+              </div>
             </div>
           )}
-        </section>
-      )}
 
+          {/* Recent Campaigns */}
+          <div className="rounded-2xl border" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
+            <div className="border-b px-5 py-3" style={{ borderColor: 'var(--shell-line)' }}>
+              <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Recent Campaigns</h3>
+            </div>
+            {data.recentCampaigns.length === 0 ? (
+              <p className="px-5 py-6 text-center text-xs" style={{ color: 'var(--shell-muted)' }}>No campaigns yet. Select contacts and send your first message.</p>
+            ) : (
+              <div className="divide-y" style={{ borderColor: 'var(--shell-line)' }}>
+                {data.recentCampaigns.map((c) => (
+                  <div key={c.id} className="flex items-center gap-3 px-5 py-3">
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold ${c.type === 'WhatsApp' ? 'bg-emerald-50 text-emerald-700' : ''}`} style={c.type !== 'WhatsApp' ? { backgroundColor: 'var(--shell-soft)', color: 'var(--brand)' } : {}}>
+                      {c.type === 'WhatsApp' ? 'WA' : 'SMS'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium" style={{ color: 'var(--foreground)' }}>{c.message}</p>
+                      <div className="mt-0.5 flex items-center gap-2 text-[10px]" style={{ color: 'var(--shell-muted)' }}>
+                        <span>{timeAgo(c.createdAt)}</span>
+                        <span>·</span>
+                        <span>{c.sent}/{c.total} sent</span>
+                      </div>
+                    </div>
+                    <StatusBadge status={c.status} />
+                    {/* Progress bar */}
+                    <div className="w-16">
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--shell-soft)' }}>
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${(c.sent / c.total) * 100}%`, backgroundColor: c.status === 'completed' ? '#16a34a' : 'var(--brand)' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Unreplied + Quick Actions */}
+        <div className="space-y-4">
+          {/* Unreplied Conversations */}
+          <div className="rounded-2xl border" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
+            <div className="flex items-center justify-between border-b px-5 py-3" style={{ borderColor: 'var(--shell-line)' }}>
+              <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Unreplied Conversations</h3>
+              {data.unrepliedCount > 0 && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">{data.unrepliedCount}</span>
+              )}
+            </div>
+            {data.unrepliedConversations.length === 0 ? (
+              <div className="px-5 py-6 text-center">
+                <p className="text-xs font-medium" style={{ color: 'var(--brand)' }}>All caught up!</p>
+                <p className="mt-0.5 text-[10px]" style={{ color: 'var(--shell-muted)' }}>No pending replies</p>
+              </div>
+            ) : (
+              <div className="divide-y" style={{ borderColor: 'var(--shell-line)' }}>
+                {data.unrepliedConversations.map((c) => (
+                  <div key={c.id} className="px-5 py-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold" style={{ color: 'var(--foreground)' }}>{c.contactName}</p>
+                      <span className="text-[10px]" style={{ color: 'var(--shell-muted)' }}>{timeAgo(c.lastMessageDate)}</span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--shell-muted)' }}>{c.lastMessage}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {data.unrepliedCount > 3 && (
+              <div className="border-t px-5 py-2.5" style={{ borderColor: 'var(--shell-line)' }}>
+                <Link href={`/designs/apulia-tourism/conversations${qs}`} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
+                  View all →
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Actions */}
+          <div className="rounded-2xl border p-5" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
+            <h3 className="mb-3 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Quick Actions</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href={`/designs/apulia-tourism/contacts${qs}`}
+                className="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold transition hover:bg-black/[0.02]"
+                style={{ borderColor: 'var(--shell-line)', color: 'var(--foreground)' }}
+              >
+                <svg className="h-4 w-4" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+                View Contacts
+              </Link>
+              <Link
+                href={`/designs/apulia-tourism/contacts/new${qs}`}
+                className="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold transition hover:bg-black/[0.02]"
+                style={{ borderColor: 'var(--shell-line)', color: 'var(--foreground)' }}
+              >
+                <svg className="h-4 w-4" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" /></svg>
+                Add Contact
+              </Link>
+              <Link
+                href={`/designs/apulia-tourism/conversations${qs}`}
+                className="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold transition hover:bg-black/[0.02]"
+                style={{ borderColor: 'var(--shell-line)', color: 'var(--foreground)' }}
+              >
+                <svg className="h-4 w-4" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" /></svg>
+                Conversations
+              </Link>
+              <Link
+                href={`/designs/apulia-tourism/contacts${qs}`}
+                className="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold transition hover:bg-black/[0.02]"
+                style={{ borderColor: 'var(--shell-line)', color: 'var(--foreground)' }}
+              >
+                <svg className="h-4 w-4" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" /></svg>
+                New Campaign
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
+}
+
+/* ── Sub-components ── */
+
+function KpiCard({ label, value, icon, accent, href }: { label: string; value: number; icon: React.ReactNode; accent?: 'warning' | 'info'; href?: string }) {
+  const content = (
+    <div
+      className="rounded-2xl border p-4 transition hover:shadow-sm"
+      style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: accent === 'warning' ? '#fef3c7' : accent === 'info' ? '#dbeafe' : 'var(--shell-soft)' }}>
+          {icon}
+        </div>
+      </div>
+      <p className="mt-3 text-2xl font-bold tabular-nums" style={{ color: 'var(--foreground)' }}>{value.toLocaleString()}</p>
+      <p className="mt-0.5 text-[11px] font-medium" style={{ color: 'var(--shell-muted)' }}>{label}</p>
+    </div>
+  )
+  return href ? <Link href={href}>{content}</Link> : content
+}
+
+function MiniStat({ label, value, color }: { label: string; value: number; color?: string }) {
+  return (
+    <div className="text-center">
+      <p className="text-xl font-bold tabular-nums" style={{ color: color ?? 'var(--foreground)' }}>{value}</p>
+      <p className="text-[10px] font-medium" style={{ color: 'var(--shell-muted)' }}>{label}</p>
+    </div>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const styles = status === 'active'
+    ? 'bg-amber-50 text-amber-700'
+    : status === 'completed'
+      ? 'bg-emerald-50 text-emerald-700'
+      : 'bg-gray-100 text-gray-500'
+  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${styles}`}>{status}</span>
+}
+
+function IconContacts() {
+  return <svg className="h-4.5 w-4.5" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+}
+
+function IconUnreplied() {
+  return <svg className="h-4.5 w-4.5 text-amber-600" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+}
+
+function IconSent() {
+  return <svg className="h-4.5 w-4.5" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" /></svg>
+}
+
+function IconPending() {
+  return <svg className="h-4.5 w-4.5 text-blue-600" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
 }

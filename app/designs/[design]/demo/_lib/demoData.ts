@@ -486,74 +486,7 @@ export const apuliaTourismDemoTheme: DesignTheme = {
   logoUrl: '/brands/apulia-tourism-logo.png',
 }
 
-export const apuliaTourismDemoDashboard = {
-  totalContacts: 84,
-  targetAnnuale: 500,
-  switchOutTotal: 3,
-  isAdmin: true,
-  closedDays: [],
-  gareRows: [
-    { categoria: 'hotel', obiettivo: 200, tag: 'hotel' },
-    { categoria: 'tour-operator', obiettivo: 150, tag: 'tour-operator' },
-    { categoria: 'restaurant', obiettivo: 100, tag: 'restaurant' },
-    { categoria: 'b&b', obiettivo: 50, tag: 'b&b' },
-  ],
-  categoryData: [
-    {
-      slug: 'hotel',
-      label: 'Hotel',
-      total: 32,
-      switchOutCount: 1,
-      providers: [
-        { provider: 'Booking.com', count: 14 },
-        { provider: 'Expedia', count: 10 },
-        { provider: 'Direct', count: 8 },
-      ],
-    },
-    {
-      slug: 'tour-operator',
-      label: 'Tour Operator',
-      total: 24,
-      switchOutCount: 1,
-      providers: [
-        { provider: 'Viator', count: 10 },
-        { provider: 'GetYourGuide', count: 8 },
-        { provider: 'Local', count: 6 },
-      ],
-    },
-    {
-      slug: 'restaurant',
-      label: 'Restaurant',
-      total: 18,
-      switchOutCount: 1,
-      providers: [
-        { provider: 'TheFork', count: 9 },
-        { provider: 'TripAdvisor', count: 6 },
-        { provider: 'Google', count: 3 },
-      ],
-    },
-    {
-      slug: 'b&b',
-      label: 'B&B',
-      total: 10,
-      switchOutCount: 0,
-      providers: [
-        { provider: 'Airbnb', count: 5 },
-        { provider: 'Booking.com', count: 3 },
-        { provider: 'Direct', count: 2 },
-      ],
-    },
-  ],
-  contactsTrend: Array.from({ length: 30 }, (_, i) => ({
-    date: `2026-04-${String(i + 1).padStart(2, '0')}`,
-    count: Math.floor(Math.random() * 5) + 1,
-  })),
-  appointmentPreview: [
-    { id: 'at-1', title: 'Hotel onboarding', startTime: '2026-04-24T09:00:00+02:00', status: 'confirmed', contactName: 'Maria Bianchi' },
-    { id: 'at-2', title: 'Tour package review', startTime: '2026-04-24T11:00:00+02:00', status: 'confirmed', contactName: 'Giuseppe Ferro' },
-    { id: 'at-3', title: 'Partnership meeting', startTime: '2026-04-24T14:30:00+02:00', status: 'new', contactName: 'Francesca Moretti' },
-  ],
-}
+export const apuliaTourismDemoDashboard = undefined // uses built-in DEMO_DATA in the component
 
 export const apuliaTourismDemoConversations = [
   {
