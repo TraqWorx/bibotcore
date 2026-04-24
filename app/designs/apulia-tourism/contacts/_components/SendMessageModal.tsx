@@ -12,7 +12,6 @@ interface Template {
   id: string
   name: string
   body: string
-  status: string
 }
 
 interface Props {
@@ -22,9 +21,10 @@ interface Props {
 }
 
 export default function SendMessageModal({ locationId, contacts, onClose }: Props) {
+  const [messageType, setMessageType] = useState<'SMS' | 'WhatsApp'>('SMS')
   const [message, setMessage] = useState('')
   const [templates, setTemplates] = useState<Template[]>([])
-  const [templatesLoading, setTemplatesLoading] = useState(true)
+  const [templatesLoading, setTemplatesLoading] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [filePreview, setFilePreview] = useState<string | null>(null)
   const [sendMode, setSendMode] = useState<'now' | 'schedule' | 'drip'>('now')
@@ -40,21 +40,27 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
   const [showTemplates, setShowTemplates] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Fetch WhatsApp templates (Meta-approved)
+  // Fetch templates when message type changes
+  // SMS → snippets (type=sms), WhatsApp → Meta-approved templates (type=whatsapp)
   useEffect(() => {
-    fetch(`/api/ghl/templates?locationId=${locationId}`)
+    setTemplates([])
+    setTemplatesLoading(true)
+    setShowTemplates(false)
+    const type = messageType === 'WhatsApp' ? 'whatsapp' : 'sms'
+    fetch(`/api/ghl/templates?locationId=${locationId}&type=${type}`)
       .then((r) => r.json())
       .then((data) => {
         const all = (data.templates ?? []) as { id: string; name: string; body?: string; templateBody?: string; status?: string }[]
+        const filtered = messageType === 'WhatsApp'
+          ? all.filter((t) => (t.status ?? '').toUpperCase() === 'APPROVED')
+          : all
         setTemplates(
-          all
-            .filter((t) => t.status === 'APPROVED' || t.status === 'approved')
-            .map((t) => ({ id: t.id, name: t.name, body: t.body ?? t.templateBody ?? '', status: t.status ?? '' }))
+          filtered.map((t) => ({ id: t.id, name: t.name, body: t.body ?? t.templateBody ?? '' }))
         )
       })
       .catch(() => {})
       .finally(() => setTemplatesLoading(false))
-  }, [locationId])
+  }, [locationId, messageType])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -88,7 +94,6 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
     setError(null)
     setProgress(0)
 
-    // Upload file if present
     let attachmentUrl: string | null = null
     if (file) {
       try {
@@ -125,7 +130,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
           body: JSON.stringify({
             locationId,
             contactIds: contacts.map((c) => c.id),
-            type: 'SMS',
+            type: messageType,
             message: message.trim(),
             imageUrl: attachmentUrl,
             batchSize: batch,
@@ -155,7 +160,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
       body: JSON.stringify({
         locationId,
         contactId: contact.id,
-        type: 'SMS',
+        type: messageType,
         message: message.trim(),
         ...(attachmentUrl ? { attachments: [attachmentUrl] } : {}),
         ...(scheduledTimestamp ? { scheduledTimestamp } : {}),
@@ -175,7 +180,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
           <p className="font-bold text-gray-900">
             {sendMode === 'drip' ? 'Drip feed created!' : sendMode === 'schedule' ? 'Messages scheduled!' : 'Messages sent!'}
           </p>
-          <p className="mt-1 text-sm text-gray-500">{contacts.length} contacts</p>
+          <p className="mt-1 text-sm text-gray-500">{contacts.length} contacts via {messageType}</p>
           <button onClick={onClose} className="mt-4 rounded-xl bg-gray-900 px-6 py-2 text-sm font-semibold text-white">Done</button>
         </div>
       </div>
@@ -188,7 +193,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <div>
-            <h2 className="text-sm font-bold text-gray-900">Send SMS</h2>
+            <h2 className="text-sm font-bold text-gray-900">Send Message</h2>
             <p className="text-xs text-gray-500">{contacts.length} recipients selected</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -197,6 +202,23 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Message type toggle */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setMessageType('SMS')}
+              className={`flex-1 rounded-xl border py-2 text-sm font-semibold transition ${messageType === 'SMS' ? 'border-brand bg-brand/10 text-brand' : 'border-gray-200 text-gray-500'}`}
+              style={messageType === 'SMS' ? { borderColor: 'var(--brand, #3b82f6)', backgroundColor: 'color-mix(in srgb, var(--brand, #3b82f6) 10%, transparent)', color: 'var(--brand, #3b82f6)' } : {}}
+            >
+              SMS
+            </button>
+            <button
+              onClick={() => setMessageType('WhatsApp')}
+              className={`flex-1 rounded-xl border py-2 text-sm font-semibold transition ${messageType === 'WhatsApp' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-500'}`}
+            >
+              WhatsApp
+            </button>
+          </div>
+
           {/* Template picker */}
           <div className="relative">
             <button
@@ -205,7 +227,14 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-              {templatesLoading ? 'Loading templates…' : templates.length === 0 ? 'No approved templates' : `Use Template (${templates.length})`}
+              {templatesLoading
+                ? 'Loading…'
+                : templates.length === 0
+                  ? messageType === 'WhatsApp' ? 'No approved templates' : 'No snippets'
+                  : messageType === 'WhatsApp'
+                    ? `WhatsApp Templates (${templates.length})`
+                    : `SMS Snippets (${templates.length})`
+              }
             </button>
             {showTemplates && templates.length > 0 && (
               <div className="absolute left-0 top-full z-10 mt-1 max-h-60 w-80 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
@@ -216,7 +245,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
                     className="block w-full px-4 py-2.5 text-left text-xs transition hover:bg-gray-50 border-b border-gray-100 last:border-0"
                   >
                     <span className="font-semibold text-gray-900">{t.name}</span>
-                    <p className="mt-0.5 text-gray-500 line-clamp-2">{t.body}</p>
+                    {t.body && <p className="mt-0.5 text-gray-500 line-clamp-2">{t.body}</p>}
                   </button>
                 ))}
               </div>
@@ -227,7 +256,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Type your message..."
+            placeholder={messageType === 'WhatsApp' ? 'Select a template or type message…' : 'Type your message...'}
             rows={4}
             className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/10 resize-none"
           />

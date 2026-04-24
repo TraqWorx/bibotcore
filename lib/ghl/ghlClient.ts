@@ -288,7 +288,8 @@ export async function getGhlClient(locationId: string) {
         ),
     },
     templates: {
-      list: () => request(`/locations/${locationId}/templates?type=whatsapp`, {}, '2021-07-28'),
+      whatsapp: () => request(`/locations/${locationId}/templates?type=whatsapp`, {}, '2021-07-28'),
+      sms: () => request(`/locations/${locationId}/templates?type=sms`, {}, '2021-07-28'),
     },
   }
 }
