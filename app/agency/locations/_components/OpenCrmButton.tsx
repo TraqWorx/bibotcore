@@ -1,12 +1,13 @@
 'use client'
 
 import { ad } from '@/lib/admin/ui'
+import { designSlugToFolder } from '@/lib/designs/slugMap'
 
 export default function OpenCrmButton({ locationId, designSlug }: { locationId: string; designSlug: string }) {
   function handleClick() {
     localStorage.setItem('activeLocationId', locationId)
     document.cookie = `active_location_id=${locationId}; path=/; max-age=2592000; SameSite=Lax`
-    window.open(`/designs/${designSlug}/dashboard?locationId=${locationId}`, '_blank')
+    window.open(`/designs/${designSlugToFolder(designSlug)}/dashboard?locationId=${locationId}`, '_blank')
   }
 
   return (

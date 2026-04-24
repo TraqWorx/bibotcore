@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useMemo } from 'react'
 import { saveModuleOverrides } from '../_actions'
 import { ad } from '@/lib/admin/ui'
 
@@ -10,28 +10,52 @@ interface ModuleDef {
   description: string
 }
 
-const MODULES: ModuleDef[] = [
-  { key: 'dashboard',     label: 'Dashboard',      description: 'Analytics overview and tag categories' },
-  { key: 'contacts',      label: 'Contatti',       description: 'Contact list and details' },
-  { key: 'conversations', label: 'Conversazioni',  description: 'Chat and messaging' },
-  { key: 'pipeline',      label: 'Pipeline',       description: 'Opportunity board' },
-  { key: 'calendar',      label: 'Calendario',     description: 'Appointments and scheduling' },
-  { key: 'ai',            label: 'AI Assistant',   description: 'AI summaries, reply suggestions, Ask AI widget' },
-  { key: 'automations',   label: 'Automazioni',    description: 'GHL workflow list (read-only)' },
-  { key: 'portal',        label: 'Portale Clienti', description: 'Portal login per i clienti della location' },
-  { key: 'settings',      label: 'Impostazioni',   description: 'Location settings' },
+const SIMFONIA_MODULES: ModuleDef[] = [
+  { key: 'dashboard',     label: 'Dashboard',        description: 'Analytics overview and tag categories' },
+  { key: 'contacts',      label: 'Contatti',         description: 'Contact list and details' },
+  { key: 'conversations', label: 'Conversazioni',    description: 'Chat and messaging' },
+  { key: 'pipeline',      label: 'Pipeline',         description: 'Opportunity board' },
+  { key: 'calendar',      label: 'Calendario',       description: 'Appointments and scheduling' },
+  { key: 'ai',            label: 'AI Assistant',     description: 'AI summaries, reply suggestions, Ask AI widget' },
+  { key: 'automations',   label: 'Automazioni',      description: 'GHL workflow list (read-only)' },
+  { key: 'portal',        label: 'Portale Clienti',  description: 'Portal login per i clienti della location' },
+  { key: 'settings',      label: 'Impostazioni',     description: 'Location settings' },
 ]
+
+const APULIA_TOURISM_MODULES: ModuleDef[] = [
+  { key: 'dashboard',     label: 'Dashboard',        description: 'Campaign tracker and KPIs' },
+  { key: 'contacts',      label: 'Contatti',         description: 'Contact list, smart lists, bulk messaging' },
+  { key: 'conversations', label: 'Conversazioni',    description: 'SMS and WhatsApp inbox' },
+  { key: 'campaigns',     label: 'Campagne',         description: 'Bulk messaging campaigns tracker' },
+  { key: 'settings',      label: 'Impostazioni',     description: 'Messaging preferences and automations' },
+]
+
+const MODULES_BY_DESIGN: Record<string, ModuleDef[]> = {
+  'simfonia': SIMFONIA_MODULES,
+  'apulian-tourism-service': APULIA_TOURISM_MODULES,
+}
 
 interface Props {
   locationId: string
+  designSlug?: string
   designModules: Record<string, { enabled: boolean }>
   locationOverrides: Record<string, { enabled: boolean }>
 }
 
-export default function ModuleToggles({ locationId, designModules, locationOverrides }: Props) {
+export default function ModuleToggles({ locationId, designSlug, designModules, locationOverrides }: Props) {
+  const modules_list = useMemo(() => {
+    if (designSlug && MODULES_BY_DESIGN[designSlug]) return MODULES_BY_DESIGN[designSlug]
+    // Fallback: build from designModules keys
+    const keys = Object.keys(designModules)
+    if (keys.length > 0) {
+      return keys.map((key) => ({ key, label: key.charAt(0).toUpperCase() + key.slice(1), description: '' }))
+    }
+    return SIMFONIA_MODULES
+  }, [designSlug, designModules])
+
   // Build initial state: design defaults merged with location overrides
   const initialState: Record<string, boolean> = {}
-  for (const mod of MODULES) {
+  for (const mod of modules_list) {
     const designDefault = designModules[mod.key]?.enabled !== false
     const override = locationOverrides[mod.key]
     initialState[mod.key] = override !== undefined ? override.enabled : designDefault
@@ -50,7 +74,7 @@ export default function ModuleToggles({ locationId, designModules, locationOverr
   function handleSave() {
     setError(null)
     const overrides: Record<string, { enabled: boolean }> = {}
-    for (const mod of MODULES) {
+    for (const mod of modules_list) {
       overrides[mod.key] = { enabled: modules[mod.key] }
     }
     startTransition(async () => {
@@ -67,7 +91,7 @@ export default function ModuleToggles({ locationId, designModules, locationOverr
   return (
     <div>
       <div className="divide-y divide-gray-100">
-        {MODULES.map((mod) => {
+        {modules_list.map((mod) => {
           const designDefault = designModules[mod.key]?.enabled !== false
           const isOverridden = locationOverrides[mod.key] !== undefined
           const currentValue = modules[mod.key]
@@ -88,7 +112,7 @@ export default function ModuleToggles({ locationId, designModules, locationOverr
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-400">{mod.description}</p>
+                {mod.description && <p className="text-xs text-gray-400">{mod.description}</p>}
               </div>
               <button
                 type="button"

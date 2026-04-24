@@ -222,7 +222,7 @@ export default async function LocationDetailPage({
                   <h2 className="text-sm font-bold text-gray-900">Modules</h2>
                   <p className="text-xs text-gray-500">Enable or disable features for this location.</p>
                 </div>
-                <ModuleToggles locationId={locationId} designModules={designModules} locationOverrides={locationModuleOverrides} />
+                <ModuleToggles locationId={locationId} designSlug={install?.design_slug ?? undefined} designModules={designModules} locationOverrides={locationModuleOverrides} />
               </div>
             </>
           )}
