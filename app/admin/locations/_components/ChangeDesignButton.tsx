@@ -15,26 +15,16 @@ export default function ChangeDesignButton({ locationId, currentSlug, designs, c
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState(currentSlug || '')
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit() {
     if ((!selected && !currentSlug) || selected === currentSlug) { setOpen(false); return }
-    setLoading(true)
-    setError(null)
-    let result
-    if (selected === '__remove__') {
-      result = await removeDesign(locationId)
-    } else {
-      result = await installDesign(locationId, selected)
-    }
-    setLoading(false)
-    if (result?.error) {
-      setError(result.error)
-    } else {
-      setOpen(false)
-      router.refresh()
-    }
+    setOpen(false) // close immediately
+    const action = selected === '__remove__' ? removeDesign(locationId) : installDesign(locationId, selected)
+    action.then((result) => {
+      if (result?.error) setError(result.error)
+      else router.refresh()
+    })
   }
 
   if (!open) {
@@ -73,10 +63,9 @@ export default function ChangeDesignButton({ locationId, currentSlug, designs, c
       </select>
       <button
         onClick={handleSubmit}
-        disabled={loading}
-        className="rounded-xl bg-brand px-2.5 py-1 text-xs font-bold text-white shadow-sm transition hover:brightness-110 disabled:opacity-50"
+        className="rounded-xl bg-brand px-2.5 py-1 text-xs font-bold text-white shadow-sm transition hover:brightness-110"
       >
-        {loading ? '…' : 'Save'}
+        Save
       </button>
       <button
         onClick={() => setOpen(false)}

@@ -140,16 +140,34 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
 
   function handleSave() {
     if (!contactId || !contact) return
+    // Optimistic: update contact state immediately
+    const optimistic: ContactDetail = {
+      ...contact,
+      firstName: editData.firstName || contact.firstName,
+      lastName: editData.lastName || contact.lastName,
+      email: editData.email || contact.email,
+      phone: editData.phone || contact.phone,
+      companyName: editData.companyName || contact.companyName,
+      address1: editData.address1 || contact.address1,
+      city: editData.city || contact.city,
+      tags: editTags,
+    }
+    const prevContact = contact
+    const prevTags = [...(contact.tags ?? [])]
+    setContact(optimistic)
+    setTab('info')
     setSaveError(null)
+
+    // Sync in background
     startSave(async () => {
       const res = await updateContact(locationId, contactId, { ...editData, tags: editTags })
       if (res?.error) {
+        // Revert on failure
+        setContact(prevContact)
+        setEditTags(prevTags)
+        setTab('edit')
         setSaveError(res.error)
       } else {
-        setTab('info')
-        const updated = await getContactDetail(locationId, contactId)
-        setContact(updated)
-        if (updated) setEditTags([...(updated.tags ?? [])])
         onContactUpdated?.()
       }
     })
@@ -157,15 +175,17 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
 
   function handleSendMessage() {
     if (!contactId || !message.trim()) return
-    setSendResult(null)
+    const text = message.trim()
+    setMessage('') // clear immediately
+    setSendResult('Inviato!')
+    setTimeout(() => setSendResult(null), 2000)
+
+    // Send in background
     startSend(async () => {
-      const res = await sendMessageToContact(locationId, contactId, message.trim(), 'SMS')
+      const res = await sendMessageToContact(locationId, contactId, text, 'SMS')
       if (res?.error) {
         setSendResult(res.error)
-      } else {
-        setSendResult('Inviato!')
-        setMessage('')
-        setTimeout(() => setSendResult(null), 2000)
+        setMessage(text) // restore on failure
       }
     })
   }
