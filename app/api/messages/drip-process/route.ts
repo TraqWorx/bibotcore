@@ -8,7 +8,7 @@ import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
  * Protected by CRON_SECRET header.
  */
 export async function GET(req: NextRequest) {
-  const secret = req.headers.get('authorization')?.replace('Bearer ', '')
+  const secret = req.headers.get('authorization')?.replace('Bearer ', '') ?? req.nextUrl.searchParams.get('secret')
   if (secret !== process.env.CRON_SECRET && process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
