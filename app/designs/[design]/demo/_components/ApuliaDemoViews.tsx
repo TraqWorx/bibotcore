@@ -2,6 +2,7 @@
 
 import ContactsClient from '@/app/designs/apulia-tourism/contacts/_components/ContactsClient'
 import ConversationsClient from '@/app/designs/apulia-tourism/conversations/_components/ConversationsClient'
+import SettingsClient from '@/app/designs/apulia-tourism/settings/_components/SettingsClient'
 import {
   apuliaTourismDemoConversations,
   apuliaTourismDemoConversationUsers,
@@ -12,6 +13,10 @@ import {
 
 export function ApuliaDemoContactsView() {
   return <ContactsClient locationId="demo-apulia-tourism" demoMode />
+}
+
+export function ApuliaDemoSettingsView() {
+  return <SettingsClient locationId="demo-apulia-tourism" demoMode />
 }
 
 export function ApuliaDemoConversationsView() {

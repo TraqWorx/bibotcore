@@ -60,6 +60,7 @@ const MODULE_NAV = [
   { key: 'dashboard', label: 'Dashboard', path: '/designs/apulia-tourism/dashboard' },
   { key: 'contacts', label: 'Contacts', path: '/designs/apulia-tourism/contacts' },
   { key: 'conversations', label: 'Conversations', path: '/designs/apulia-tourism/conversations' },
+  { key: 'settings', label: 'Settings', path: '/designs/apulia-tourism/settings' },
 ] as const
 
 function hexToRgb(hex: string): string {
