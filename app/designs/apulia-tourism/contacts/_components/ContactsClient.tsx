@@ -278,10 +278,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
               {customFields.map((f) => <option key={f.key} value={f.key}>{f.name}</option>)}
             </select>
             {listField === 'city' ? (
-              <select value={listValue} onChange={(e) => setListValue(e.target.value)} className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none w-40">
-                <option value="">Seleziona città...</option>
-                {cities.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <CitySearchDropdown cities={cities} value={listValue} onChange={setListValue} />
             ) : (
               <input type="text" value={listValue} onChange={(e) => setListValue(e.target.value)} placeholder="Valore" className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none w-24" />
             )}
@@ -414,6 +411,44 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
           demoContact={demoMode ? contacts.find((c) => c.id === selectedContactId) ?? null : undefined}
         />
       )}
+    </div>
+  )
+}
+
+function CitySearchDropdown({ cities, value, onChange }: { cities: string[]; value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState(value)
+  const filtered = query
+    ? cities.filter((c) => c.toLowerCase().includes(query.toLowerCase())).slice(0, 15)
+    : cities.slice(0, 15)
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        placeholder="Cerca città..."
+        className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none w-40"
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute left-0 top-full z-20 mt-1 max-h-48 w-48 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+          {filtered.map((c) => (
+            <button
+              key={c}
+              onClick={() => { onChange(c); setQuery(c); setOpen(false) }}
+              className="block w-full px-3 py-1.5 text-left text-xs hover:bg-gray-50"
+            >
+              {c}
+            </button>
+          ))}
+          {cities.length > 15 && !query && (
+            <p className="px-3 py-1.5 text-[10px] text-gray-400">Digita per cercare tra {cities.length} città</p>
+          )}
+        </div>
+      )}
+      {open && <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />}
     </div>
   )
 }
