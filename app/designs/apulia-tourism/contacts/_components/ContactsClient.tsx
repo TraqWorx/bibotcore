@@ -50,17 +50,26 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
   const [listField, setListField] = useState('')
   const [listValue, setListValue] = useState('')
 
-  // Load contacts
+  // Load ALL contacts via pagination
   useEffect(() => {
     if (demoMode) return
-    fetch('/api/contacts?locationId=' + locationId)
-      .then((r) => r.json())
-      .then((data) => {
+    let cancelled = false
+    async function loadAll() {
+      let page = 1
+      let all: Contact[] = []
+      const fieldMap = new Map<string, string>()
+      while (true) {
+        const res = await fetch(`/api/contacts?locationId=${locationId}&pageSize=500&page=${page}`)
+        const data = await res.json()
         const raw = data.contacts ?? []
+        if (raw.length === 0) break
         const mapped = raw.map((c: Record<string, unknown>) => {
           const cf: Record<string, string> = {}
           for (const f of (c.customFields ?? []) as { id: string; value: unknown }[]) {
             if (f.value) cf[f.id] = String(f.value)
+          }
+          for (const [k] of Object.entries(cf)) {
+            if (!fieldMap.has(k)) fieldMap.set(k, k)
           }
           return {
             id: c.id as string,
@@ -73,22 +82,23 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
             customFields: cf,
           }
         })
-        setContacts(mapped)
-
-        const fieldMap = new Map<string, string>()
-        for (const c of mapped) {
-          for (const [k] of Object.entries(c.customFields)) {
-            if (!fieldMap.has(k)) fieldMap.set(k, k)
-          }
-        }
+        all = all.concat(mapped)
+        if (cancelled) return
+        setContacts([...all])
+        if (page >= (data.totalPages ?? 1)) break
+        page++
+      }
+      if (!cancelled) {
         setCustomFields([...fieldMap.entries()].map(([key, name]) => ({ key, name })))
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+        setLoading(false)
+      }
+    }
+    loadAll().catch(() => setLoading(false))
+    return () => { cancelled = true }
 
-    const saved = localStorage.getItem(`smartLists-${locationId}`)
-    if (saved) {
-      try { setSmartLists(JSON.parse(saved)) } catch { /* ignore */ }
+    const savedLists = localStorage.getItem(`smartLists-${locationId}`)
+    if (savedLists) {
+      try { setSmartLists(JSON.parse(savedLists as string)) } catch { /* ignore */ }
     }
   }, [locationId, demoMode])
 

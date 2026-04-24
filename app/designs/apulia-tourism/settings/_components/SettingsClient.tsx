@@ -9,13 +9,6 @@ interface LocationSettings {
   dripDefaultBatchSize: number
   dripDefaultInterval: number
   dripDefaultUnit: 'minutes' | 'hours' | 'days'
-  autoReplyEnabled: boolean
-  autoReplyMessage: string
-  notifyUnreplied: boolean
-  notifyUnrepliedMinutes: number
-  notifyCampaignComplete: boolean
-  welcomeMessageEnabled: boolean
-  welcomeMessage: string
 }
 
 const DEFAULT_SETTINGS: LocationSettings = {
@@ -24,13 +17,6 @@ const DEFAULT_SETTINGS: LocationSettings = {
   dripDefaultBatchSize: 10,
   dripDefaultInterval: 1,
   dripDefaultUnit: 'hours',
-  autoReplyEnabled: false,
-  autoReplyMessage: '',
-  notifyUnreplied: true,
-  notifyUnrepliedMinutes: 30,
-  notifyCampaignComplete: true,
-  welcomeMessageEnabled: false,
-  welcomeMessage: '',
 }
 
 export default function SettingsClient({ locationId, demoMode = false }: { locationId: string; demoMode?: boolean }) {
@@ -45,10 +31,6 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
       setSettings({
         ...DEFAULT_SETTINGS,
         companyName: 'Apulian Tourism',
-        autoReplyEnabled: true,
-        autoReplyMessage: 'Grazie per il messaggio! Ti risponderemo al più presto.',
-        welcomeMessageEnabled: true,
-        welcomeMessage: 'Benvenuto in Apulian Tourism! Come possiamo aiutarti?',
       })
       return
     }
@@ -72,8 +54,6 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
   const sections = [
     { id: 'general', label: 'Generale' },
     { id: 'drip', label: 'Invio Graduale' },
-    { id: 'automation', label: 'Automazione' },
-    { id: 'notifications', label: 'Notifiche' },
   ]
 
   return (
@@ -188,58 +168,6 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
                   <option value="days">giorni</option>
                 </select>
               </div>
-            </Section>
-          )}
-
-          {/* Automation */}
-          {activeSection === 'automation' && (
-            <Section title="Risposta Automatica">
-              <p className="text-xs" style={{ color: 'var(--shell-muted)' }}>Invia una risposta automatica solo al primo messaggio ricevuto da un nuovo contatto. I messaggi successivi non riceveranno risposta automatica.</p>
-              <Toggle
-                label="Attiva risposta automatica al primo messaggio"
-                checked={settings.autoReplyEnabled}
-                onChange={(v) => update('autoReplyEnabled', v)}
-              />
-              {settings.autoReplyEnabled && (
-                <Field label="Messaggio di Risposta Automatica">
-                  <textarea
-                    value={settings.autoReplyMessage}
-                    onChange={(e) => update('autoReplyMessage', e.target.value)}
-                    placeholder="Messaggio di risposta automatica…"
-                    rows={3}
-                    className="w-full rounded-xl border px-3 py-2 text-sm outline-none resize-none"
-                    style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-canvas)', color: 'var(--foreground)' }}
-                  />
-                </Field>
-              )}
-            </Section>
-          )}
-
-          {/* Notifications */}
-          {activeSection === 'notifications' && (
-            <Section title="Notifiche">
-              <Toggle
-                label="Notifica conversazioni senza risposta"
-                checked={settings.notifyUnreplied}
-                onChange={(v) => update('notifyUnreplied', v)}
-              />
-              {settings.notifyUnreplied && (
-                <Field label="Avvisa dopo (minuti)">
-                  <input
-                    type="number"
-                    value={settings.notifyUnrepliedMinutes}
-                    onChange={(e) => update('notifyUnrepliedMinutes', parseInt(e.target.value) || 30)}
-                    min="5"
-                    className="w-24 rounded-xl border px-3 py-2 text-sm outline-none"
-                    style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-canvas)', color: 'var(--foreground)' }}
-                  />
-                </Field>
-              )}
-              <Toggle
-                label="Notifica al completamento campagna"
-                checked={settings.notifyCampaignComplete}
-                onChange={(v) => update('notifyCampaignComplete', v)}
-              />
             </Section>
           )}
 

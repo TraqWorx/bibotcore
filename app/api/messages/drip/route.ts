@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 
 export async function POST(req: NextRequest) {
   try {
-    const { locationId, contactIds, type, message, imageUrl, batchSize, intervalMinutes } = await req.json()
+    const { locationId, contactIds, type, message, imageUrl, batchSize, intervalMinutes, startAt } = await req.json()
 
     if (!locationId || !contactIds?.length || !message?.trim()) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
       contact_ids: contactIds,
       batch_size: Math.max(1, batchSize || 10),
       interval_minutes: Math.max(1, intervalMinutes || 60),
+      start_at: startAt || null,
     })
 
     if (error) {

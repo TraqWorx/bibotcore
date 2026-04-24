@@ -33,6 +33,8 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
   const [dripBatchSize, setDripBatchSize] = useState('10')
   const [dripInterval, setDripInterval] = useState('1')
   const [dripUnit, setDripUnit] = useState<'minutes' | 'hours' | 'days'>('hours')
+  const [dripStartDate, setDripStartDate] = useState('')
+  const [dripStartTime, setDripStartTime] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -135,6 +137,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
             imageUrl: attachmentUrl,
             batchSize: batch,
             intervalMinutes,
+            startAt: dripStartDate && dripStartTime ? new Date(`${dripStartDate}T${dripStartTime}`).toISOString() : null,
           }),
         })
         if (res.ok) {
@@ -309,6 +312,17 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
 
           {/* Drip feed options */}
           {sendMode === 'drip' && (
+            <div className="space-y-3">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <p className="mb-1 text-xs text-gray-500">Data inizio</p>
+                <input type="date" value={dripStartDate} onChange={(e) => setDripStartDate(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none" />
+              </div>
+              <div className="flex-1">
+                <p className="mb-1 text-xs text-gray-500">Ora inizio</p>
+                <input type="time" value={dripStartTime} onChange={(e) => setDripStartTime(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none" />
+              </div>
+            </div>
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>Invia</span>
               <input type="number" value={dripBatchSize} onChange={(e) => setDripBatchSize(e.target.value)} className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-center text-sm outline-none" min="1" />
@@ -319,6 +333,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
                 <option value="hours">ore</option>
                 <option value="days">giorni</option>
               </select>
+            </div>
             </div>
           )}
 

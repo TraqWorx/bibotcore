@@ -5,7 +5,7 @@ import { parseCategoriaValue } from '@/lib/utils/categoryFields'
 
 export const dynamic = 'force-dynamic'
 
-const PAGE_SIZE = 50
+const DEFAULT_PAGE_SIZE = 50
 
 /**
  * GET /api/contacts — paginated contacts with filters.
@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  const PAGE_SIZE = Math.min(parseInt(sp.get('pageSize') ?? String(DEFAULT_PAGE_SIZE)), 500)
   const page = Math.max(1, parseInt(sp.get('page') ?? '1'))
   const search = sp.get('search') ?? null
   const tag = sp.get('tag') ?? null

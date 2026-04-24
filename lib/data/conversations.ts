@@ -56,22 +56,51 @@ export async function listConversations(
 async function fetchFromGhl(locationId: string): Promise<CachedConversation[]> {
   try {
     const ghl = await getGhlClient(locationId)
-    const data = await ghl.conversations.search('status=all&limit=100&sort=desc&sortBy=last_message_date')
-    const convos: Record<string, unknown>[] = data?.conversations ?? []
-    return convos.map((c) => ({
-      ghl_id: c.id as string,
-      location_id: locationId,
-      contact_ghl_id: (c.contactId as string) ?? null,
-      contact_name: (c.fullName as string) ?? (c.contactName as string) ?? null,
-      type: (c.type as string) ?? null,
-      last_message_body: (c.lastMessageBody as string) ?? null,
-      last_message_date: (c.lastMessageDate as string) ?? null,
-      last_message_direction: (c.lastMessageDirection as string) ?? null,
-      unread_count: typeof c.unreadCount === 'number' ? c.unreadCount : 0,
-      assigned_to: (c.assignedTo as string) ?? null,
-      raw: c,
-    }))
-  } catch {
+    const sb = createAdminClient()
+    let allConvos: CachedConversation[] = []
+    let startAfterId: string | undefined
+
+    // Paginate through all conversations (GHL max 100 per request)
+    for (let page = 0; page < 50; page++) {
+      const query = `status=all&limit=100&sort=desc&sortBy=last_message_date${startAfterId ? `&startAfterId=${startAfterId}` : ''}`
+      const data = await ghl.conversations.search(query)
+      const convos: Record<string, unknown>[] = data?.conversations ?? []
+      if (convos.length === 0) break
+
+      const mapped = convos.map((c) => ({
+        ghl_id: c.id as string,
+        location_id: locationId,
+        contact_ghl_id: (c.contactId as string) ?? null,
+        contact_name: (c.fullName as string) ?? (c.contactName as string) ?? null,
+        type: (c.type as string) ?? null,
+        last_message_body: (c.lastMessageBody as string) ?? null,
+        last_message_date: (c.lastMessageDate as string) ?? null,
+        last_message_direction: (c.lastMessageDirection as string) ?? null,
+        unread_count: typeof c.unreadCount === 'number' ? c.unreadCount : 0,
+        assigned_to: (c.assignedTo as string) ?? null,
+        raw: c,
+      }))
+      allConvos = allConvos.concat(mapped)
+      startAfterId = convos[convos.length - 1]?.id as string | undefined
+
+      if (convos.length < 100) break
+    }
+
+    // Cache in background
+    if (allConvos.length > 0) {
+      const rows = allConvos.map((c) => ({
+        ghl_id: c.ghl_id, location_id: locationId, contact_ghl_id: c.contact_ghl_id,
+        contact_name: c.contact_name, type: c.type, last_message_body: c.last_message_body,
+        last_message_date: c.last_message_date, last_message_direction: c.last_message_direction,
+        unread_count: c.unread_count, assigned_to: c.assigned_to,
+        synced_at: new Date().toISOString(),
+      }))
+      Promise.resolve(sb.from('cached_conversations').upsert(rows, { onConflict: 'location_id,ghl_id' })).catch(() => {})
+    }
+
+    return allConvos
+  } catch (err) {
+    console.error('[fetchFromGhl conversations]', err instanceof Error ? err.message : err)
     return []
   }
 }

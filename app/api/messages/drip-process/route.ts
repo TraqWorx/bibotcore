@@ -27,6 +27,10 @@ export async function GET(req: NextRequest) {
 
   for (const job of jobs) {
     const now = new Date()
+
+    // Skip if start_at is set and is in the future
+    if (job.start_at && new Date(job.start_at).getTime() > now.getTime()) continue
+
     const lastBatch = job.last_batch_at ? new Date(job.last_batch_at) : null
     const intervalMs = (job.interval_minutes ?? 60) * 60 * 1000
 
