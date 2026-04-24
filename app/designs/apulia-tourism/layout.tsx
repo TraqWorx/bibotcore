@@ -62,7 +62,7 @@ const getLayoutData = cache(async () => {
       designByLocation[i.location_id] = i.design_slug
     }
 
-    const locationIdsWithDesign = locationIds.filter((id) => designByLocation[id])
+    const locationIdsWithDesign = locationIds.filter((id) => designByLocation[id] === 'apulian-tourism-service')
     const nameById: Record<string, string> = {}
     for (const r of locationNames ?? []) nameById[r.location_id] = r.name
 

@@ -8,23 +8,30 @@ export async function GET(req: NextRequest) {
 
   const sb = createAdminClient()
 
-  // Parallel fetch: contacts count, conversations, drip jobs
-  const ghl = await getGhlClient(locationId)
-  const [contactsData, conversationsData, dripJobsResult] = await Promise.all([
-    ghl.contacts.list()
-      .catch(() => null),
-    ghl.conversations.search()
-      .catch(() => null),
+  // Parallel fetch: contacts count, conversations, drip jobs, cached count
+  let ghl
+  try {
+    ghl = await getGhlClient(locationId)
+  } catch (err) {
+    console.error('[apulia-dashboard] getGhlClient failed:', err)
+  }
+
+  const [contactsData, conversationsData, dripJobsResult, cachedCountResult] = await Promise.all([
+    ghl?.contacts.list().catch((err: unknown) => { console.error('[apulia-dashboard] contacts.list failed:', err); return null }) ?? Promise.resolve(null),
+    ghl?.conversations.search().catch((err: unknown) => { console.error('[apulia-dashboard] conversations.search failed:', err); return null }) ?? Promise.resolve(null),
     sb.from('drip_jobs')
       .select('*')
       .eq('location_id', locationId)
       .order('created_at', { ascending: false })
       .limit(20),
+    sb.from('cached_contacts').select('ghl_id', { count: 'exact', head: true }).eq('location_id', locationId),
   ])
 
-  // Contacts
+  // Contacts — use GHL total, fall back to cached count
   const contacts = (contactsData?.contacts ?? []) as { id: string }[]
-  const totalContacts = contactsData?.meta?.total ?? contactsData?.total ?? contacts.length ?? 0
+  const ghlTotal = contactsData?.meta?.total ?? contactsData?.total ?? contacts.length ?? 0
+  const cachedTotal = cachedCountResult.count ?? 0
+  const totalContacts = ghlTotal > 0 ? ghlTotal : cachedTotal
 
   // Conversations — count unreplied (last message direction = inbound)
   const conversations = (conversationsData?.conversations ?? []) as {
