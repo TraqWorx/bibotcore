@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import {
   getContactDetail,
   sendMessageToContact,
@@ -32,18 +32,43 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
 
   // Edit state
   const [editData, setEditData] = useState<Record<string, string>>({})
+  const [editTags, setEditTags] = useState<string[]>([])
   const [saving, startSave] = useTransition()
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Tag input state
+  const [tagInput, setTagInput] = useState('')
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
+  const [allLocationTags, setAllLocationTags] = useState<string[]>([])
+  const [showTagDropdown, setShowTagDropdown] = useState(false)
+  const tagInputRef = useRef<HTMLInputElement>(null)
 
   // Message state
   const [message, setMessage] = useState('')
   const [sending, startSend] = useTransition()
   const [sendResult, setSendResult] = useState<string | null>(null)
 
+  // Fetch location tags for autocomplete
+  useEffect(() => {
+    if (demoContact) {
+      setAllLocationTags(['hotel', 'premium', 'tour-operator', 'b&b', 'new', 'restaurant', 'partner'])
+      return
+    }
+    fetch(`/api/ghl/contacts?locationId=${locationId}&limit=1`)
+      .catch(() => {})
+    // Fetch tags from GHL
+    fetch(`/api/ghl/tags?locationId=${locationId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const tags = (data.tags ?? []) as { name: string }[]
+        setAllLocationTags(tags.map((t) => t.name))
+      })
+      .catch(() => {})
+  }, [locationId, demoContact])
+
   useEffect(() => {
     if (!contactId) return
 
-    // Demo mode: build contact from local data
     if (demoContact) {
       const parts = demoContact.contactName.split(' ')
       const c: ContactDetail = {
@@ -65,6 +90,7 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
         address1: '',
         city: c.city ?? '',
       })
+      setEditTags([...demoContact.tags])
       setTab('info')
       return
     }
@@ -84,23 +110,48 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
           address1: c.address1 ?? '',
           city: c.city ?? '',
         })
+        setEditTags([...(c.tags ?? [])])
       }
       setLoading(false)
     })
   }, [contactId, locationId, demoContact])
 
+  // Filter tag suggestions
+  useEffect(() => {
+    if (!tagInput.trim()) {
+      setTagSuggestions([])
+      return
+    }
+    const q = tagInput.toLowerCase()
+    setTagSuggestions(
+      allLocationTags.filter((t) => t.toLowerCase().includes(q) && !editTags.includes(t)).slice(0, 8)
+    )
+  }, [tagInput, allLocationTags, editTags])
+
+  function addTag(tag: string) {
+    const trimmed = tag.trim()
+    if (!trimmed || editTags.includes(trimmed)) return
+    setEditTags([...editTags, trimmed])
+    setTagInput('')
+    setShowTagDropdown(false)
+  }
+
+  function removeTag(tag: string) {
+    setEditTags(editTags.filter((t) => t !== tag))
+  }
+
   function handleSave() {
     if (!contactId || !contact) return
     setSaveError(null)
     startSave(async () => {
-      const res = await updateContact(locationId, contactId, editData)
+      const res = await updateContact(locationId, contactId, { ...editData, tags: editTags })
       if (res?.error) {
         setSaveError(res.error)
       } else {
         setTab('info')
-        // Refresh contact data
         const updated = await getContactDetail(locationId, contactId)
         setContact(updated)
+        if (updated) setEditTags([...(updated.tags ?? [])])
         onContactUpdated?.()
       }
     })
@@ -129,10 +180,8 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
 
   return (
     <>
-      {/* Backdrop */}
       <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
 
-      {/* Drawer */}
       <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l shadow-2xl" style={{ backgroundColor: 'var(--shell-surface)', borderColor: 'var(--shell-line)' }}>
         {/* Header */}
         <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'var(--shell-line)' }}>
@@ -189,7 +238,6 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
               <InfoRow label="Address" value={contact.address1} />
               <InfoRow label="City" value={contact.city} />
 
-              {/* Tags */}
               {contact.tags && contact.tags.length > 0 && (
                 <div>
                   <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Tags</p>
@@ -201,7 +249,6 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
                 </div>
               )}
 
-              {/* Custom fields */}
               {contact.customFields && contact.customFields.length > 0 && (
                 <div>
                   <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Custom Fields</p>
@@ -216,7 +263,6 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
                 </div>
               )}
 
-              {/* Opportunities */}
               {contact.opportunities && contact.opportunities.length > 0 && (
                 <div>
                   <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Opportunities</p>
@@ -246,6 +292,77 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
               <EditField label="Company" value={editData.companyName} onChange={(v) => setEditData({ ...editData, companyName: v })} />
               <EditField label="Address" value={editData.address1} onChange={(v) => setEditData({ ...editData, address1: v })} />
               <EditField label="City" value={editData.city} onChange={(v) => setEditData({ ...editData, city: v })} />
+
+              {/* Tags */}
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Tags</label>
+
+                {/* Current tags */}
+                {editTags.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {editTags.map((t) => (
+                      <span key={t} className="group flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: 'var(--shell-soft)', color: 'var(--brand)' }}>
+                        {t}
+                        <button onClick={() => removeTag(t)} className="ml-0.5 rounded-full opacity-60 transition hover:opacity-100">
+                          <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add tag input */}
+                <div className="relative">
+                  <input
+                    ref={tagInputRef}
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => { setTagInput(e.target.value); setShowTagDropdown(true) }}
+                    onFocus={() => setShowTagDropdown(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && tagInput.trim()) {
+                        e.preventDefault()
+                        addTag(tagInput)
+                      }
+                    }}
+                    placeholder="Type to add tag…"
+                    className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
+                    style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-canvas)', color: 'var(--foreground)' }}
+                  />
+
+                  {/* Suggestions dropdown */}
+                  {showTagDropdown && tagSuggestions.length > 0 && (
+                    <div className="absolute left-0 top-full z-10 mt-1 w-full max-h-40 overflow-y-auto rounded-xl border bg-white shadow-lg" style={{ borderColor: 'var(--shell-line)' }}>
+                      {tagSuggestions.map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => addTag(t)}
+                          className="block w-full px-3 py-2 text-left text-xs transition hover:bg-gray-50"
+                          style={{ color: 'var(--foreground)' }}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Show available tags when input is empty and focused */}
+                  {showTagDropdown && !tagInput && allLocationTags.filter((t) => !editTags.includes(t)).length > 0 && (
+                    <div className="absolute left-0 top-full z-10 mt-1 w-full max-h-40 overflow-y-auto rounded-xl border bg-white shadow-lg" style={{ borderColor: 'var(--shell-line)' }}>
+                      {allLocationTags.filter((t) => !editTags.includes(t)).slice(0, 12).map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => addTag(t)}
+                          className="block w-full px-3 py-2 text-left text-xs transition hover:bg-gray-50"
+                          style={{ color: 'var(--foreground)' }}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {saveError && <p className="text-xs font-medium text-red-600">{saveError}</p>}
 
