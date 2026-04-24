@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 interface Contact {
   id: string
@@ -14,19 +14,56 @@ interface Props {
   onClose: () => void
 }
 
+const SMS_TEMPLATES = [
+  { name: 'Welcome', text: 'Benvenuto! Siamo felici di averti con noi. Per qualsiasi informazione non esitare a contattarci.' },
+  { name: 'Follow-up', text: 'Ciao, volevamo sapere se hai avuto modo di valutare la nostra proposta. Restiamo a disposizione per qualsiasi domanda.' },
+  { name: 'Appointment reminder', text: 'Ti ricordiamo il tuo appuntamento previsto per domani. Per confermare o spostare rispondi a questo messaggio.' },
+  { name: 'Thank you', text: 'Grazie per aver scelto i nostri servizi! Speriamo di rivederti presto.' },
+  { name: 'Promo', text: 'Offerta speciale per te! Contattaci per scoprire le nostre promozioni attive.' },
+]
+
 export default function SendMessageModal({ locationId, contacts, onClose }: Props) {
-  const [messageType, setMessageType] = useState<'SMS' | 'WhatsApp'>('SMS')
   const [message, setMessage] = useState('')
-  const [imageUrl, setImageUrl] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [filePreview, setFilePreview] = useState<string | null>(null)
   const [sendMode, setSendMode] = useState<'now' | 'schedule' | 'drip'>('now')
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduleTime, setScheduleTime] = useState('')
   const [dripBatchSize, setDripBatchSize] = useState('10')
-  const [dripInterval, setDripInterval] = useState('60') // minutes
+  const [dripInterval, setDripInterval] = useState('1')
+  const [dripUnit, setDripUnit] = useState<'minutes' | 'hours' | 'days'>('hours')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [showTemplates, setShowTemplates] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setFile(f)
+    if (f.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = () => setFilePreview(reader.result as string)
+      reader.readAsDataURL(f)
+    } else {
+      setFilePreview(null)
+    }
+  }
+
+  function removeFile() {
+    setFile(null)
+    setFilePreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function getDripIntervalMinutes(): number {
+    const val = parseInt(dripInterval) || 1
+    if (dripUnit === 'days') return val * 1440
+    if (dripUnit === 'hours') return val * 60
+    return val
+  }
 
   async function handleSend() {
     if (!message.trim()) { setError('Write a message'); return }
@@ -34,36 +71,48 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
     setError(null)
     setProgress(0)
 
+    // Upload file if present
+    let attachmentUrl: string | null = null
+    if (file) {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('locationId', locationId)
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
+        if (uploadRes.ok) {
+          const data = await uploadRes.json()
+          attachmentUrl = data.url ?? null
+        }
+      } catch { /* proceed without attachment */ }
+    }
+
     try {
       if (sendMode === 'now') {
-        // Send all immediately
         for (let i = 0; i < contacts.length; i++) {
-          await sendOne(contacts[i])
+          await sendOne(contacts[i], undefined, attachmentUrl)
           setProgress(i + 1)
         }
       } else if (sendMode === 'schedule') {
-        // Schedule all at the specified time
         if (!scheduleDate || !scheduleTime) { setError('Select date and time'); setSending(false); return }
         const scheduledTs = new Date(`${scheduleDate}T${scheduleTime}`).toISOString()
         for (let i = 0; i < contacts.length; i++) {
-          await sendOne(contacts[i], scheduledTs)
+          await sendOne(contacts[i], scheduledTs, attachmentUrl)
           setProgress(i + 1)
         }
       } else if (sendMode === 'drip') {
-        // Queue as drip feed
         const batch = parseInt(dripBatchSize) || 10
-        const interval = parseInt(dripInterval) || 60
+        const intervalMinutes = getDripIntervalMinutes()
         const res = await fetch('/api/messages/drip', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             locationId,
             contactIds: contacts.map((c) => c.id),
-            type: messageType,
+            type: 'SMS',
             message: message.trim(),
-            imageUrl: imageUrl.trim() || null,
+            imageUrl: attachmentUrl,
             batchSize: batch,
-            intervalMinutes: interval,
+            intervalMinutes,
           }),
         })
         if (res.ok) {
@@ -82,16 +131,16 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
     setSending(false)
   }
 
-  async function sendOne(contact: Contact, scheduledTimestamp?: string) {
+  async function sendOne(contact: Contact, scheduledTimestamp?: string, attachmentUrl?: string | null) {
     await fetch('/api/messages/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         locationId,
         contactId: contact.id,
-        type: messageType,
+        type: 'SMS',
         message: message.trim(),
-        ...(imageUrl.trim() ? { attachments: [imageUrl.trim()] } : {}),
+        ...(attachmentUrl ? { attachments: [attachmentUrl] } : {}),
         ...(scheduledTimestamp ? { scheduledTimestamp } : {}),
       }),
     })
@@ -122,7 +171,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <div>
-            <h2 className="text-sm font-bold text-gray-900">Send Message</h2>
+            <h2 className="text-sm font-bold text-gray-900">Send SMS</h2>
             <p className="text-xs text-gray-500">{contacts.length} recipients selected</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -131,10 +180,29 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Message type */}
-          <div className="flex gap-2">
-            <button onClick={() => setMessageType('SMS')} className={`flex-1 rounded-xl border py-2 text-sm font-semibold transition ${messageType === 'SMS' ? 'border-brand bg-brand/10 text-brand' : 'border-gray-200 text-gray-500'}`}>SMS</button>
-            <button onClick={() => setMessageType('WhatsApp')} className={`flex-1 rounded-xl border py-2 text-sm font-semibold transition ${messageType === 'WhatsApp' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-500'}`}>WhatsApp</button>
+          {/* Template picker */}
+          <div className="relative">
+            <button
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+              Use Template
+            </button>
+            {showTemplates && (
+              <div className="absolute left-0 top-full z-10 mt-1 w-72 rounded-xl border border-gray-200 bg-white shadow-lg">
+                {SMS_TEMPLATES.map((t) => (
+                  <button
+                    key={t.name}
+                    onClick={() => { setMessage(t.text); setShowTemplates(false) }}
+                    className="block w-full px-4 py-2.5 text-left text-xs transition hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                  >
+                    <span className="font-semibold text-gray-900">{t.name}</span>
+                    <p className="mt-0.5 text-gray-500 line-clamp-1">{t.text}</p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Message */}
@@ -146,14 +214,33 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
             className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/10 resize-none"
           />
 
-          {/* Image URL */}
-          <input
-            type="text"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="Image URL (optional)"
-            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-brand/40"
-          />
+          {/* File upload */}
+          <div>
+            {file ? (
+              <div className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-2.5">
+                {filePreview && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={filePreview} alt="Preview" className="h-10 w-10 rounded-lg object-cover" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-xs font-medium text-gray-900">{file.name}</p>
+                  <p className="text-[10px] text-gray-400">{(file.size / 1024).toFixed(0)} KB</p>
+                </div>
+                <button onClick={removeFile} className="text-gray-400 hover:text-red-500">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-3 text-xs text-gray-400 transition hover:border-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" /></svg>
+                Attach file (image, PDF...)
+              </button>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx" onChange={handleFileChange} className="hidden" />
+          </div>
 
           {/* Send mode */}
           <div className="space-y-2">
@@ -178,9 +265,13 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>Send</span>
               <input type="number" value={dripBatchSize} onChange={(e) => setDripBatchSize(e.target.value)} className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-center text-sm outline-none" min="1" />
-              <span>messages every</span>
+              <span>every</span>
               <input type="number" value={dripInterval} onChange={(e) => setDripInterval(e.target.value)} className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-center text-sm outline-none" min="1" />
-              <span>minutes</span>
+              <select value={dripUnit} onChange={(e) => setDripUnit(e.target.value as 'minutes' | 'hours' | 'days')} className="rounded-lg border border-gray-200 px-2 py-1 text-sm outline-none">
+                <option value="minutes">minutes</option>
+                <option value="hours">hours</option>
+                <option value="days">days</option>
+              </select>
             </div>
           )}
 

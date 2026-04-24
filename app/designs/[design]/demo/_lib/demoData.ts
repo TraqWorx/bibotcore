@@ -479,11 +479,11 @@ export const demoWorkflows = [
 // ─── Apulia Tourism Demo Data ─────────────────────────────────────────────
 
 export const apuliaTourismDemoTheme: DesignTheme = {
-  primaryColor: '#0f2b46',
+  primaryColor: '#2d6a1e',
   secondaryColor: '#e6853e',
-  companyName: 'Apulia Tourism',
+  companyName: 'Apulian Tourism',
   logoText: 'AT',
-  logoUrl: '',
+  logoUrl: '/brands/apulia-tourism-logo.png',
 }
 
 export const apuliaTourismDemoDashboard = {
