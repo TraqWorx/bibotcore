@@ -8,14 +8,24 @@ import {
   type ContactDetail,
 } from '../_actions'
 
+interface DemoContact {
+  id: string
+  contactName: string
+  email: string | null
+  phone: string | null
+  city: string | null
+  tags: string[]
+}
+
 interface Props {
   contactId: string | null
   locationId: string
   onClose: () => void
   onContactUpdated?: () => void
+  demoContact?: DemoContact | null
 }
 
-export default function ContactDrawer({ contactId, locationId, onClose, onContactUpdated }: Props) {
+export default function ContactDrawer({ contactId, locationId, onClose, onContactUpdated, demoContact }: Props) {
   const [contact, setContact] = useState<ContactDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState<'info' | 'edit' | 'messages'>('info')
@@ -32,6 +42,33 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
 
   useEffect(() => {
     if (!contactId) return
+
+    // Demo mode: build contact from local data
+    if (demoContact) {
+      const parts = demoContact.contactName.split(' ')
+      const c: ContactDetail = {
+        id: demoContact.id,
+        firstName: parts[0],
+        lastName: parts.slice(1).join(' '),
+        email: demoContact.email ?? undefined,
+        phone: demoContact.phone ?? undefined,
+        city: demoContact.city ?? undefined,
+        tags: demoContact.tags,
+      }
+      setContact(c)
+      setEditData({
+        firstName: c.firstName ?? '',
+        lastName: c.lastName ?? '',
+        email: c.email ?? '',
+        phone: c.phone ?? '',
+        companyName: '',
+        address1: '',
+        city: c.city ?? '',
+      })
+      setTab('info')
+      return
+    }
+
     setLoading(true)
     setContact(null)
     setTab('info')
@@ -50,7 +87,7 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
       }
       setLoading(false)
     })
-  }, [contactId, locationId])
+  }, [contactId, locationId, demoContact])
 
   function handleSave() {
     if (!contactId || !contact) return

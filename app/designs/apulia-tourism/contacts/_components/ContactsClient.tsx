@@ -287,7 +287,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
                 key={c.id}
                 className="cursor-pointer transition-colors hover:brightness-95"
                 style={{ borderBottom: '1px solid var(--shell-line)' }}
-                onClick={() => !demoMode && setSelectedContactId(c.id)}
+                onClick={() => setSelectedContactId(c.id)}
               >
                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                   <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleOne(c.id)} className="rounded" />
@@ -328,6 +328,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
           contactId={selectedContactId}
           locationId={locationId}
           onClose={() => setSelectedContactId(null)}
+          demoContact={demoMode ? contacts.find((c) => c.id === selectedContactId) ?? null : undefined}
         />
       )}
     </div>
