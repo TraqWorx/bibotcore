@@ -1,11 +1,18 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 interface Contact {
   id: string
   contactName: string
   phone: string | null
+}
+
+interface Template {
+  id: string
+  name: string
+  body: string
+  status: string
 }
 
 interface Props {
@@ -14,16 +21,10 @@ interface Props {
   onClose: () => void
 }
 
-const SMS_TEMPLATES = [
-  { name: 'Welcome', text: 'Benvenuto! Siamo felici di averti con noi. Per qualsiasi informazione non esitare a contattarci.' },
-  { name: 'Follow-up', text: 'Ciao, volevamo sapere se hai avuto modo di valutare la nostra proposta. Restiamo a disposizione per qualsiasi domanda.' },
-  { name: 'Appointment reminder', text: 'Ti ricordiamo il tuo appuntamento previsto per domani. Per confermare o spostare rispondi a questo messaggio.' },
-  { name: 'Thank you', text: 'Grazie per aver scelto i nostri servizi! Speriamo di rivederti presto.' },
-  { name: 'Promo', text: 'Offerta speciale per te! Contattaci per scoprire le nostre promozioni attive.' },
-]
-
 export default function SendMessageModal({ locationId, contacts, onClose }: Props) {
   const [message, setMessage] = useState('')
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(true)
   const [file, setFile] = useState<File | null>(null)
   const [filePreview, setFilePreview] = useState<string | null>(null)
   const [sendMode, setSendMode] = useState<'now' | 'schedule' | 'drip'>('now')
@@ -38,6 +39,22 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
   const [error, setError] = useState<string | null>(null)
   const [showTemplates, setShowTemplates] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Fetch WhatsApp templates (Meta-approved)
+  useEffect(() => {
+    fetch(`/api/ghl/templates?locationId=${locationId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const all = (data.templates ?? []) as { id: string; name: string; body?: string; templateBody?: string; status?: string }[]
+        setTemplates(
+          all
+            .filter((t) => t.status === 'APPROVED' || t.status === 'approved')
+            .map((t) => ({ id: t.id, name: t.name, body: t.body ?? t.templateBody ?? '', status: t.status ?? '' }))
+        )
+      })
+      .catch(() => {})
+      .finally(() => setTemplatesLoading(false))
+  }, [locationId])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -184,21 +201,22 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
           <div className="relative">
             <button
               onClick={() => setShowTemplates(!showTemplates)}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
+              disabled={templatesLoading || templates.length === 0}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-40"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-              Use Template
+              {templatesLoading ? 'Loading templates…' : templates.length === 0 ? 'No approved templates' : `Use Template (${templates.length})`}
             </button>
-            {showTemplates && (
-              <div className="absolute left-0 top-full z-10 mt-1 w-72 rounded-xl border border-gray-200 bg-white shadow-lg">
-                {SMS_TEMPLATES.map((t) => (
+            {showTemplates && templates.length > 0 && (
+              <div className="absolute left-0 top-full z-10 mt-1 max-h-60 w-80 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+                {templates.map((t) => (
                   <button
-                    key={t.name}
-                    onClick={() => { setMessage(t.text); setShowTemplates(false) }}
+                    key={t.id}
+                    onClick={() => { setMessage(t.body); setShowTemplates(false) }}
                     className="block w-full px-4 py-2.5 text-left text-xs transition hover:bg-gray-50 border-b border-gray-100 last:border-0"
                   >
                     <span className="font-semibold text-gray-900">{t.name}</span>
-                    <p className="mt-0.5 text-gray-500 line-clamp-1">{t.text}</p>
+                    <p className="mt-0.5 text-gray-500 line-clamp-2">{t.body}</p>
                   </button>
                 ))}
               </div>

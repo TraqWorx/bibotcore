@@ -287,5 +287,8 @@ export async function getGhlClient(locationId: string) {
           '2021-04-15'
         ),
     },
+    templates: {
+      list: () => request(`/locations/${locationId}/templates?type=whatsapp`, {}, '2021-07-28'),
+    },
   }
 }
