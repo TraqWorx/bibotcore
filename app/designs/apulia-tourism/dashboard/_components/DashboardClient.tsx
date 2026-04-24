@@ -106,6 +106,7 @@ export default function DashboardClient({
     )
   }
 
+  const base = demoMode ? '/designs/apulia-tourism/demo' : '/designs/apulia-tourism'
   const qs = demoMode ? '' : `?locationId=${locationId}`
 
   return (
@@ -118,14 +119,14 @@ export default function DashboardClient({
           label="Total Contacts"
           value={data.totalContacts}
           icon={<IconContacts />}
-          href={`/designs/apulia-tourism/contacts${qs}`}
+          href={`${base}/contacts${qs}`}
         />
         <KpiCard
           label="Unreplied"
           value={data.unrepliedCount}
           icon={<IconUnreplied />}
           accent={data.unrepliedCount > 0 ? 'warning' : undefined}
-          href={`/designs/apulia-tourism/conversations${qs}`}
+          href={`${base}/conversations${qs}`}
         />
         <KpiCard
           label="Messages Sent"
@@ -241,7 +242,7 @@ export default function DashboardClient({
             )}
             {data.unrepliedCount > 3 && (
               <div className="border-t px-5 py-2.5" style={{ borderColor: 'var(--shell-line)' }}>
-                <Link href={`/designs/apulia-tourism/conversations${qs}`} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
+                <Link href={`${base}/conversations${qs}`} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
                   View all →
                 </Link>
               </div>
@@ -251,7 +252,7 @@ export default function DashboardClient({
           {/* Recent campaigns link */}
           {data.recentCampaigns.length > 0 && (
             <div className="rounded-2xl border p-4 text-center" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
-              <Link href={`/designs/apulia-tourism/campaigns${qs}`} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
+              <Link href={`${base}/campaigns${qs}`} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
                 View all campaigns →
               </Link>
             </div>
