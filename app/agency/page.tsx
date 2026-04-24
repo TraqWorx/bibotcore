@@ -175,7 +175,8 @@ export default async function AgencyPage({
   function monthsSince(iso: string): number {
     const start = new Date(iso)
     const now = new Date()
-    return Math.max(0, (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()))
+    const months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth())
+    return Math.max(1, months) // at least 1 if plan is active
   }
 
   let monthlyRevenue: number | null = null
