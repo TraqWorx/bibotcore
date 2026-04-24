@@ -89,7 +89,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
   }
 
   async function handleSend() {
-    if (!message.trim()) { setError('Write a message'); return }
+    if (!message.trim()) { setError('Scrivi un messaggio'); return }
     setSending(true)
     setError(null)
     setProgress(0)
@@ -115,7 +115,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
           setProgress(i + 1)
         }
       } else if (sendMode === 'schedule') {
-        if (!scheduleDate || !scheduleTime) { setError('Select date and time'); setSending(false); return }
+        if (!scheduleDate || !scheduleTime) { setError('Seleziona data e ora'); setSending(false); return }
         const scheduledTs = new Date(`${scheduleDate}T${scheduleTime}`).toISOString()
         for (let i = 0; i < contacts.length; i++) {
           await sendOne(contacts[i], scheduledTs, attachmentUrl)
@@ -148,7 +148,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
       }
       setSent(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Send failed')
+      setError(err instanceof Error ? err.message : 'Invio fallito')
     }
     setSending(false)
   }
@@ -178,10 +178,10 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
             </svg>
           </div>
           <p className="font-bold text-gray-900">
-            {sendMode === 'drip' ? 'Drip feed created!' : sendMode === 'schedule' ? 'Messages scheduled!' : 'Messages sent!'}
+            {sendMode === 'drip' ? 'Invio graduale creato!' : sendMode === 'schedule' ? 'Messaggi programmati!' : 'Messaggi inviati!'}
           </p>
-          <p className="mt-1 text-sm text-gray-500">{contacts.length} contacts via {messageType}</p>
-          <button onClick={onClose} className="mt-4 rounded-xl bg-gray-900 px-6 py-2 text-sm font-semibold text-white">Done</button>
+          <p className="mt-1 text-sm text-gray-500">{contacts.length} contatti tramite {messageType}</p>
+          <button onClick={onClose} className="mt-4 rounded-xl bg-gray-900 px-6 py-2 text-sm font-semibold text-white">Fatto</button>
         </div>
       </div>
     )
@@ -193,8 +193,8 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <div>
-            <h2 className="text-sm font-bold text-gray-900">Send Message</h2>
-            <p className="text-xs text-gray-500">{contacts.length} recipients selected</p>
+            <h2 className="text-sm font-bold text-gray-900">Invia Messaggio</h2>
+            <p className="text-xs text-gray-500">{contacts.length} destinatari selezionati</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -228,12 +228,12 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
               {templatesLoading
-                ? 'Loading…'
+                ? 'Caricamento…'
                 : templates.length === 0
-                  ? messageType === 'WhatsApp' ? 'No approved templates' : 'No snippets'
+                  ? messageType === 'WhatsApp' ? 'Nessun template approvato' : 'Nessun snippet'
                   : messageType === 'WhatsApp'
-                    ? `WhatsApp Templates (${templates.length})`
-                    : `SMS Snippets (${templates.length})`
+                    ? `Template WhatsApp (${templates.length})`
+                    : `Snippet SMS (${templates.length})`
               }
             </button>
             {showTemplates && templates.length > 0 && (
@@ -256,7 +256,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder={messageType === 'WhatsApp' ? 'Select a template or type message…' : 'Type your message...'}
+            placeholder={messageType === 'WhatsApp' ? 'Seleziona un template o scrivi il messaggio…' : 'Scrivi il tuo messaggio...'}
             rows={4}
             className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/10 resize-none"
           />
@@ -283,7 +283,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-3 text-xs text-gray-400 transition hover:border-gray-400 hover:text-gray-600"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" /></svg>
-                Attach file (image, PDF...)
+                Allega file (immagine, PDF...)
               </button>
             )}
             <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx" onChange={handleFileChange} className="hidden" />
@@ -291,11 +291,11 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
 
           {/* Send mode */}
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Delivery</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Consegna</p>
             <div className="flex gap-2">
-              <button onClick={() => setSendMode('now')} className={`flex-1 rounded-xl border py-2 text-xs font-semibold transition ${sendMode === 'now' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Send Now</button>
-              <button onClick={() => setSendMode('schedule')} className={`flex-1 rounded-xl border py-2 text-xs font-semibold transition ${sendMode === 'schedule' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Schedule</button>
-              <button onClick={() => setSendMode('drip')} className={`flex-1 rounded-xl border py-2 text-xs font-semibold transition ${sendMode === 'drip' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Drip Feed</button>
+              <button onClick={() => setSendMode('now')} className={`flex-1 rounded-xl border py-2 text-xs font-semibold transition ${sendMode === 'now' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Invia Ora</button>
+              <button onClick={() => setSendMode('schedule')} className={`flex-1 rounded-xl border py-2 text-xs font-semibold transition ${sendMode === 'schedule' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Programma</button>
+              <button onClick={() => setSendMode('drip')} className={`flex-1 rounded-xl border py-2 text-xs font-semibold transition ${sendMode === 'drip' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Invio Graduale</button>
             </div>
           </div>
 
@@ -310,14 +310,14 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
           {/* Drip feed options */}
           {sendMode === 'drip' && (
             <div className="flex items-center gap-2 text-sm text-gray-600">
-              <span>Send</span>
+              <span>Invia</span>
               <input type="number" value={dripBatchSize} onChange={(e) => setDripBatchSize(e.target.value)} className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-center text-sm outline-none" min="1" />
-              <span>every</span>
+              <span>ogni</span>
               <input type="number" value={dripInterval} onChange={(e) => setDripInterval(e.target.value)} className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-center text-sm outline-none" min="1" />
               <select value={dripUnit} onChange={(e) => setDripUnit(e.target.value as 'minutes' | 'hours' | 'days')} className="rounded-lg border border-gray-200 px-2 py-1 text-sm outline-none">
-                <option value="minutes">minutes</option>
-                <option value="hours">hours</option>
-                <option value="days">days</option>
+                <option value="minutes">minuti</option>
+                <option value="hours">ore</option>
+                <option value="days">giorni</option>
               </select>
             </div>
           )}
@@ -336,13 +336,13 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
 
         {/* Footer */}
         <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-4">
-          <button onClick={onClose} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button onClick={onClose} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">Annulla</button>
           <button
             onClick={handleSend}
             disabled={sending || !message.trim()}
             className="rounded-xl bg-gray-900 px-6 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
           >
-            {sending ? 'Sending...' : sendMode === 'drip' ? 'Start Drip' : sendMode === 'schedule' ? 'Schedule' : 'Send Now'}
+            {sending ? 'Invio...' : sendMode === 'drip' ? 'Avvia Invio' : sendMode === 'schedule' ? 'Programma' : 'Invia Ora'}
           </button>
         </div>
       </div>

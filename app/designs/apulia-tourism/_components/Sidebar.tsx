@@ -64,10 +64,10 @@ function NavGlyph({ name }: { name: string }) {
 
 const MODULE_NAV = [
   { key: 'dashboard', label: 'Dashboard', path: '/designs/apulia-tourism/dashboard' },
-  { key: 'contacts', label: 'Contacts', path: '/designs/apulia-tourism/contacts' },
-  { key: 'conversations', label: 'Conversations', path: '/designs/apulia-tourism/conversations' },
-  { key: 'campaigns', label: 'Campaigns', path: '/designs/apulia-tourism/campaigns' },
-  { key: 'settings', label: 'Settings', path: '/designs/apulia-tourism/settings' },
+  { key: 'contacts', label: 'Contatti', path: '/designs/apulia-tourism/contacts' },
+  { key: 'conversations', label: 'Conversazioni', path: '/designs/apulia-tourism/conversations' },
+  { key: 'campaigns', label: 'Campagne', path: '/designs/apulia-tourism/campaigns' },
+  { key: 'settings', label: 'Impostazioni', path: '/designs/apulia-tourism/settings' },
 ] as const
 
 function hexToRgb(hex: string): string {
@@ -182,7 +182,7 @@ export default function Sidebar({
       <div className="sf-sidebar-divider mx-3 mb-2 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
       <div className="flex flex-1 flex-col overflow-y-auto px-2.5 pb-3">
-        <p className="sf-sidebar-label mb-2 px-2.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Menu</p>
+        <p className="sf-sidebar-label mb-2 px-2.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Menù</p>
         <nav className="space-y-0.5">
           {navItems.map((item) => {
             const basePath =

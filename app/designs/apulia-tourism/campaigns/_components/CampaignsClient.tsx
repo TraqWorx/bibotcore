@@ -30,20 +30,20 @@ const DEMO_CAMPAIGNS: Campaign[] = [
 ]
 
 function formatInterval(minutes: number): string {
-  if (minutes === 0) return 'Sent all at once'
-  if (minutes < 60) return `Every ${minutes} min`
-  if (minutes < 1440) return `Every ${Math.round(minutes / 60)} hr${minutes >= 120 ? 's' : ''}`
+  if (minutes === 0) return 'Invio immediato'
+  if (minutes < 60) return `Ogni ${minutes} min`
+  if (minutes < 1440) return `Ogni ${Math.round(minutes / 60)} ore`
   const days = Math.round(minutes / 1440)
-  return `Every ${days} day${days > 1 ? 's' : ''}`
+  return `Ogni ${days} giorni`
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return new Date(dateStr).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function timeUntil(dateStr: string): string {
   const diff = new Date(dateStr).getTime() - Date.now()
-  if (diff <= 0) return 'Due now'
+  if (diff <= 0) return 'In corso'
   const mins = Math.floor(diff / 60000)
   if (mins < 60) return `in ${mins}m`
   const hrs = Math.floor(mins / 60)
@@ -76,7 +76,7 @@ export default function CampaignsClient({ locationId, demoMode = false }: { loca
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <SimfoniaPageHeader eyebrow="Messaging" title="Campaigns" description="Loading…" />
+        <SimfoniaPageHeader eyebrow="Messaggistica" title="Campagne" description="Caricamento…" />
         <div className="h-64 animate-pulse rounded-2xl" style={{ backgroundColor: 'var(--shell-soft)' }} />
       </div>
     )
@@ -84,15 +84,15 @@ export default function CampaignsClient({ locationId, demoMode = false }: { loca
 
   return (
     <div className="space-y-6">
-      <SimfoniaPageHeader eyebrow="Messaging" title="Campaigns" description="Track all your bulk messaging campaigns." />
+      <SimfoniaPageHeader eyebrow="Messaggistica" title="Campagne" description="Monitora tutte le campagne di messaggistica." />
 
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatCard label="Total Campaigns" value={stats.total} />
-        <StatCard label="Active" value={stats.active} color="var(--brand)" />
-        <StatCard label="Completed" value={stats.completed} color="#16a34a" />
-        <StatCard label="Messages Sent" value={stats.totalSent} />
-        <StatCard label="Total Recipients" value={stats.totalRecipients} />
+        <StatCard label="Campagne Totali" value={stats.total} />
+        <StatCard label="Attive" value={stats.active} color="var(--brand)" />
+        <StatCard label="Completate" value={stats.completed} color="#16a34a" />
+        <StatCard label="Messaggi Inviati" value={stats.totalSent} />
+        <StatCard label="Destinatari Totali" value={stats.totalRecipients} />
       </div>
 
       {/* Filter tabs */}
@@ -109,7 +109,7 @@ export default function CampaignsClient({ locationId, demoMode = false }: { loca
                 : { borderColor: 'var(--shell-line)', color: 'var(--shell-muted)' }
               }
             >
-              {f} ({count})
+              {f === 'all' ? 'tutte' : f === 'active' ? 'attive' : f === 'completed' ? 'completate' : 'fallite'} ({count})
             </button>
           )
         })}
@@ -118,8 +118,8 @@ export default function CampaignsClient({ locationId, demoMode = false }: { loca
       {/* Campaign list */}
       {filtered.length === 0 ? (
         <div className="rounded-2xl border p-10 text-center" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
-          <p className="text-sm" style={{ color: 'var(--shell-muted)' }}>No campaigns found.</p>
-          <p className="mt-1 text-xs" style={{ color: 'var(--shell-muted)' }}>Go to Contacts, select recipients, and click Send Message to create a campaign.</p>
+          <p className="text-sm" style={{ color: 'var(--shell-muted)' }}>Nessuna campagna trovata.</p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--shell-muted)' }}>Vai ai Contatti, seleziona i destinatari e clicca Invia Messaggio per creare una campagna.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -157,6 +157,7 @@ export default function CampaignsClient({ locationId, demoMode = false }: { loca
                       <span>{formatDate(c.created_at)}</span>
                       {isDrip && <span>· {formatInterval(c.interval_minutes)}</span>}
                       <span>· Batch: {c.batch_size}</span>
+
                     </div>
                   </div>
 
@@ -183,33 +184,33 @@ export default function CampaignsClient({ locationId, demoMode = false }: { loca
                   <div className="border-t px-5 py-4 space-y-3" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'color-mix(in srgb, var(--shell-canvas) 50%, var(--shell-surface))' }}>
                     {/* Full message */}
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Message</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Messaggio</p>
                       <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--foreground)' }}>{c.message}</p>
                     </div>
 
                     {/* Stats grid */}
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      <DetailStat label="Total Recipients" value={total} />
-                      <DetailStat label="Sent" value={sent} color="#16a34a" />
-                      <DetailStat label="Remaining" value={remaining} color={remaining > 0 ? 'var(--brand)' : undefined} />
-                      <DetailStat label="Batch Size" value={c.batch_size} />
+                      <DetailStat label="Destinatari Totali" value={total} />
+                      <DetailStat label="Inviati" value={sent} color="#16a34a" />
+                      <DetailStat label="Rimanenti" value={remaining} color={remaining > 0 ? 'var(--brand)' : undefined} />
+                      <DetailStat label="Dimensione Batch" value={c.batch_size} />
                     </div>
 
                     {/* Delivery info */}
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Delivery</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Consegna</p>
                         <p className="mt-0.5 text-xs font-medium" style={{ color: 'var(--foreground)' }}>
-                          {isDrip ? `Drip — ${formatInterval(c.interval_minutes)}` : 'Sent all at once'}
+                          {isDrip ? `Invio Graduale — ${formatInterval(c.interval_minutes)}` : 'Invio immediato'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Created</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Creato</p>
                         <p className="mt-0.5 text-xs font-medium" style={{ color: 'var(--foreground)' }}>{formatDate(c.created_at)}</p>
                       </div>
                       {c.last_batch_at && (
                         <div>
-                          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Last Batch</p>
+                          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Ultimo Invio</p>
                           <p className="mt-0.5 text-xs font-medium" style={{ color: 'var(--foreground)' }}>{formatDate(c.last_batch_at)}</p>
                         </div>
                       )}
@@ -220,7 +221,7 @@ export default function CampaignsClient({ locationId, demoMode = false }: { loca
                       <div className="flex items-center gap-2 rounded-xl border px-3 py-2.5" style={{ borderColor: 'var(--brand)', backgroundColor: 'color-mix(in srgb, var(--brand) 5%, transparent)' }}>
                         <svg className="h-4 w-4 shrink-0" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                         <p className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
-                          Next batch: {Math.min(c.batch_size, remaining)} messages {timeUntil(nextBatchAt)} — {formatDate(nextBatchAt)}
+                          Prossimo invio: {Math.min(c.batch_size, remaining)} messaggi {timeUntil(nextBatchAt)} — {formatDate(nextBatchAt)}
                         </p>
                       </div>
                     )}
@@ -228,7 +229,7 @@ export default function CampaignsClient({ locationId, demoMode = false }: { loca
                     {/* Progress bar (mobile) */}
                     <div className="sm:hidden">
                       <div className="flex items-center justify-between text-[10px] font-semibold" style={{ color: 'var(--shell-muted)' }}>
-                        <span>{sent}/{total} sent</span>
+                        <span>{sent}/{total} inviati</span>
                         <span>{Math.round(progress)}%</span>
                       </div>
                       <div className="mt-1 h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--shell-soft)' }}>
@@ -272,5 +273,6 @@ function StatusBadge({ status }: { status: string }) {
       : status === 'failed'
         ? 'bg-red-50 text-red-700 border-red-200'
         : 'bg-gray-50 text-gray-500 border-gray-200'
-  return <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-bold capitalize ${styles}`}>{status}</span>
+  const label = status === 'active' ? 'attiva' : status === 'completed' ? 'completata' : status === 'failed' ? 'fallita' : status
+  return <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-bold capitalize ${styles}`}>{label}</span>
 }

@@ -183,8 +183,8 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>Contacts</h1>
-          <p className="text-xs" style={{ color: 'var(--shell-muted)' }}>{contacts.length} total</p>
+          <h1 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>Contatti</h1>
+          <p className="text-xs" style={{ color: 'var(--shell-muted)' }}>{contacts.length} totale</p>
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
@@ -193,7 +193,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
               className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm"
               style={{ backgroundColor: 'var(--brand)' }}
             >
-              Send Message ({selectedIds.size})
+              Invia Messaggio ({selectedIds.size})
             </button>
           )}
           {!demoMode && (
@@ -202,7 +202,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
               className="rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:bg-black/5"
               style={{ borderColor: 'var(--shell-line)', color: 'var(--foreground)' }}
             >
-              + Add Contact
+              + Aggiungi Contatto
             </Link>
           )}
         </div>
@@ -215,7 +215,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
           className="rounded-full border px-3 py-1 text-xs font-semibold transition"
           style={!activeList ? { borderColor: 'var(--brand)', backgroundColor: 'color-mix(in srgb, var(--brand) 10%, transparent)', color: 'var(--brand)' } : { borderColor: '#e5e7eb', color: '#6b7280' }}
         >
-          All Contacts
+          Tutti i Contatti
         </button>
         {smartLists.map((list) => (
           <div key={list.id} className="group flex items-center gap-0.5">
@@ -226,32 +226,32 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
             >
               {list.name}
             </button>
-            <button onClick={() => openEditList(list)} className="rounded-full p-0.5 text-gray-300 opacity-0 transition hover:text-blue-500 group-hover:opacity-100" title="Edit list">
+            <button onClick={() => openEditList(list)} className="rounded-full p-0.5 text-gray-300 opacity-0 transition hover:text-blue-500 group-hover:opacity-100" title="Modifica lista">
               <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg>
             </button>
-            <button onClick={() => handleDeleteList(list.id)} className="rounded-full p-0.5 text-gray-300 opacity-0 transition hover:text-red-500 group-hover:opacity-100" title="Delete list">
+            <button onClick={() => handleDeleteList(list.id)} className="rounded-full p-0.5 text-gray-300 opacity-0 transition hover:text-red-500 group-hover:opacity-100" title="Elimina lista">
               <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
         ))}
         {listFormMode === 'none' ? (
           <button onClick={openCreateList} className="rounded-full border border-dashed border-gray-300 px-3 py-1 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600">
-            + New List
+            + Nuova Lista
           </button>
         ) : (
           <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
-            <input type="text" value={listName} onChange={(e) => setListName(e.target.value)} placeholder="List name" className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none w-24" />
+            <input type="text" value={listName} onChange={(e) => setListName(e.target.value)} placeholder="Nome lista" className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none w-24" />
             <select value={listField} onChange={(e) => setListField(e.target.value)} className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none">
-              <option value="">Field...</option>
-              <option value="city">City</option>
+              <option value="">Campo...</option>
+              <option value="city">Città</option>
               <option value="tags">Tag</option>
               {customFields.map((f) => <option key={f.key} value={f.key}>{f.name}</option>)}
             </select>
-            <input type="text" value={listValue} onChange={(e) => setListValue(e.target.value)} placeholder="Value" className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none w-24" />
+            <input type="text" value={listValue} onChange={(e) => setListValue(e.target.value)} placeholder="Valore" className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none w-24" />
             <button onClick={handleSaveList} className="rounded-lg bg-gray-900 px-2 py-1 text-xs font-semibold text-white">
-              {listFormMode === 'edit' ? 'Update' : 'Save'}
+              {listFormMode === 'edit' ? 'Aggiorna' : 'Salva'}
             </button>
-            <button onClick={resetListForm} className="text-xs text-gray-400">Cancel</button>
+            <button onClick={resetListForm} className="text-xs text-gray-400">Annulla</button>
           </div>
         )}
       </div>
@@ -261,7 +261,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
         type="text"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search contacts..."
+        placeholder="Cerca contatti..."
         className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none"
         style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)', color: 'var(--foreground)' }}
       />
@@ -274,11 +274,11 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
               <th className="px-4 py-3 text-left">
                 <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Name</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Phone</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Nome</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Telefono</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Email</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>City</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Tags</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Città</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Tag</th>
             </tr>
           </thead>
           <tbody>
@@ -304,12 +304,12 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--shell-muted)' }}>No contacts found</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--shell-muted)' }}>Nessun contatto trovato</td></tr>
             )}
           </tbody>
         </table>
         {filtered.length > 100 && (
-          <p className="px-4 py-2 text-xs" style={{ color: 'var(--shell-muted)' }}>Showing 100 of {filtered.length}</p>
+          <p className="px-4 py-2 text-xs" style={{ color: 'var(--shell-muted)' }}>Mostrati 100 di {filtered.length}</p>
         )}
       </div>
 

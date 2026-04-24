@@ -165,7 +165,7 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
       if (res?.error) {
         setSendResult(res.error)
       } else {
-        setSendResult('Sent!')
+        setSendResult('Inviato!')
         setMessage('')
         setTimeout(() => setSendResult(null), 2000)
       }
@@ -191,7 +191,7 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
             </div>
             <div>
               <h3 className="text-sm font-bold" style={{ color: 'var(--foreground)' }}>
-                {loading ? 'Loading…' : contact ? `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim() || 'No name' : 'Not found'}
+                {loading ? 'Caricamento…' : contact ? `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim() || 'Senza nome' : 'Non trovato'}
               </h3>
               {contact?.companyName && <p className="text-xs" style={{ color: 'var(--shell-muted)' }}>{contact.companyName}</p>}
             </div>
@@ -211,7 +211,7 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
                 className={`px-4 py-2.5 text-xs font-semibold capitalize transition ${tab === t ? 'border-b-2 text-brand' : ''}`}
                 style={tab === t ? { borderColor: 'var(--brand)', color: 'var(--brand)' } : { color: 'var(--shell-muted)' }}
               >
-                {t === 'info' ? 'Info' : t === 'edit' ? 'Edit' : 'SMS'}
+                {t === 'info' ? 'Info' : t === 'edit' ? 'Modifica' : 'SMS'}
               </button>
             ))}
           </div>
@@ -226,21 +226,21 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
           )}
 
           {!loading && !contact && (
-            <p className="text-sm" style={{ color: 'var(--shell-muted)' }}>Contact not found.</p>
+            <p className="text-sm" style={{ color: 'var(--shell-muted)' }}>Contatto non trovato.</p>
           )}
 
           {/* Info Tab */}
           {!loading && contact && tab === 'info' && (
             <div className="space-y-4">
               <InfoRow label="Email" value={contact.email} />
-              <InfoRow label="Phone" value={contact.phone} />
-              <InfoRow label="Company" value={contact.companyName} />
-              <InfoRow label="Address" value={contact.address1} />
-              <InfoRow label="City" value={contact.city} />
+              <InfoRow label="Telefono" value={contact.phone} />
+              <InfoRow label="Azienda" value={contact.companyName} />
+              <InfoRow label="Indirizzo" value={contact.address1} />
+              <InfoRow label="Città" value={contact.city} />
 
               {contact.tags && contact.tags.length > 0 && (
                 <div>
-                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Tags</p>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Tag</p>
                   <div className="flex flex-wrap gap-1.5">
                     {contact.tags.map((t) => (
                       <span key={t} className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: 'var(--shell-soft)', color: 'var(--brand)' }}>{t}</span>
@@ -251,7 +251,7 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
 
               {contact.customFields && contact.customFields.length > 0 && (
                 <div>
-                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Custom Fields</p>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Campi Personalizzati</p>
                   <div className="space-y-2">
                     {contact.customFields.filter((f) => f.value || f.field_value || f.fieldValue).map((f) => (
                       <div key={f.id} className="flex justify-between text-xs">
@@ -265,7 +265,7 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
 
               {contact.opportunities && contact.opportunities.length > 0 && (
                 <div>
-                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Opportunities</p>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Opportunità</p>
                   <div className="space-y-2">
                     {contact.opportunities.map((o) => (
                       <div key={o.id} className="rounded-xl border p-3" style={{ borderColor: 'var(--shell-line)' }}>
@@ -285,17 +285,17 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
           {/* Edit Tab */}
           {!loading && contact && tab === 'edit' && (
             <div className="space-y-3">
-              <EditField label="First Name" value={editData.firstName} onChange={(v) => setEditData({ ...editData, firstName: v })} />
-              <EditField label="Last Name" value={editData.lastName} onChange={(v) => setEditData({ ...editData, lastName: v })} />
+              <EditField label="Nome" value={editData.firstName} onChange={(v) => setEditData({ ...editData, firstName: v })} />
+              <EditField label="Cognome" value={editData.lastName} onChange={(v) => setEditData({ ...editData, lastName: v })} />
               <EditField label="Email" value={editData.email} onChange={(v) => setEditData({ ...editData, email: v })} />
-              <EditField label="Phone" value={editData.phone} onChange={(v) => setEditData({ ...editData, phone: v })} />
-              <EditField label="Company" value={editData.companyName} onChange={(v) => setEditData({ ...editData, companyName: v })} />
-              <EditField label="Address" value={editData.address1} onChange={(v) => setEditData({ ...editData, address1: v })} />
-              <EditField label="City" value={editData.city} onChange={(v) => setEditData({ ...editData, city: v })} />
+              <EditField label="Telefono" value={editData.phone} onChange={(v) => setEditData({ ...editData, phone: v })} />
+              <EditField label="Azienda" value={editData.companyName} onChange={(v) => setEditData({ ...editData, companyName: v })} />
+              <EditField label="Indirizzo" value={editData.address1} onChange={(v) => setEditData({ ...editData, address1: v })} />
+              <EditField label="Città" value={editData.city} onChange={(v) => setEditData({ ...editData, city: v })} />
 
               {/* Tags */}
               <div>
-                <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Tags</label>
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Tag</label>
 
                 {/* Current tags */}
                 {editTags.length > 0 && (
@@ -325,7 +325,7 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
                         addTag(tagInput)
                       }
                     }}
-                    placeholder="Type to add tag…"
+                    placeholder="Digita per aggiungere tag…"
                     className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
                     style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-canvas)', color: 'var(--foreground)' }}
                   />
@@ -372,7 +372,7 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
                 className="w-full rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                 style={{ backgroundColor: 'var(--brand)' }}
               >
-                {saving ? 'Saving…' : 'Save'}
+                {saving ? 'Salvataggio…' : 'Salva'}
               </button>
             </div>
           )}
@@ -383,13 +383,13 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type SMS message…"
+                placeholder="Scrivi messaggio SMS…"
                 rows={3}
                 className="w-full rounded-xl border px-4 py-3 text-sm outline-none resize-none"
                 style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-canvas)', color: 'var(--foreground)' }}
               />
               {sendResult && (
-                <p className={`text-xs font-medium ${sendResult === 'Sent!' ? 'text-emerald-600' : 'text-red-600'}`}>{sendResult}</p>
+                <p className={`text-xs font-medium ${sendResult === 'Inviato!' ? 'text-emerald-600' : 'text-red-600'}`}>{sendResult}</p>
               )}
               <button
                 onClick={handleSendMessage}
@@ -397,7 +397,7 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
                 className="w-full rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                 style={{ backgroundColor: 'var(--brand)' }}
               >
-                {sending ? 'Sending…' : 'Send SMS'}
+                {sending ? 'Invio…' : 'Invia SMS'}
               </button>
             </div>
           )}

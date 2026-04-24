@@ -70,16 +70,16 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
   }
 
   const sections = [
-    { id: 'general', label: 'General' },
-    { id: 'messaging', label: 'Messaging' },
-    { id: 'drip', label: 'Drip Feed' },
-    { id: 'automation', label: 'Automation' },
-    { id: 'notifications', label: 'Notifications' },
+    { id: 'general', label: 'Generale' },
+    { id: 'messaging', label: 'Messaggistica' },
+    { id: 'drip', label: 'Invio Graduale' },
+    { id: 'automation', label: 'Automazione' },
+    { id: 'notifications', label: 'Notifiche' },
   ]
 
   return (
     <div className="space-y-6">
-      <SimfoniaPageHeader eyebrow="Configuration" title="Settings" description="Configure your messaging preferences and automations." />
+      <SimfoniaPageHeader eyebrow="Configurazione" title="Impostazioni" description="Configura le preferenze di messaggistica e automazioni." />
 
       <div className="flex gap-6">
         {/* Sidebar nav */}
@@ -122,18 +122,18 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
 
           {/* General */}
           {activeSection === 'general' && (
-            <Section title="General">
-              <Field label="Company Name">
+            <Section title="Generale">
+              <Field label="Nome Azienda">
                 <input
                   type="text"
                   value={settings.companyName}
                   onChange={(e) => update('companyName', e.target.value)}
-                  placeholder="Your company name"
+                  placeholder="Nome della tua azienda"
                   className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
                   style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-canvas)', color: 'var(--foreground)' }}
                 />
               </Field>
-              <Field label="Default Message Type">
+              <Field label="Tipo Messaggio Predefinito">
                 <div className="flex gap-2">
                   {(['SMS', 'WhatsApp'] as const).map((t) => (
                     <button
@@ -155,18 +155,18 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
 
           {/* Messaging */}
           {activeSection === 'messaging' && (
-            <Section title="Welcome Message">
+            <Section title="Messaggio di Benvenuto">
               <Toggle
-                label="Send welcome message to new contacts"
+                label="Invia messaggio di benvenuto ai nuovi contatti"
                 checked={settings.welcomeMessageEnabled}
                 onChange={(v) => update('welcomeMessageEnabled', v)}
               />
               {settings.welcomeMessageEnabled && (
-                <Field label="Welcome Message">
+                <Field label="Messaggio di Benvenuto">
                   <textarea
                     value={settings.welcomeMessage}
                     onChange={(e) => update('welcomeMessage', e.target.value)}
-                    placeholder="Write your welcome message…"
+                    placeholder="Scrivi il tuo messaggio di benvenuto…"
                     rows={3}
                     className="w-full rounded-xl border px-3 py-2 text-sm outline-none resize-none"
                     style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-canvas)', color: 'var(--foreground)' }}
@@ -178,9 +178,9 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
 
           {/* Drip Feed */}
           {activeSection === 'drip' && (
-            <Section title="Drip Feed Defaults">
-              <p className="text-xs" style={{ color: 'var(--shell-muted)' }}>Set default values for new drip campaigns. These can be overridden per campaign.</p>
-              <Field label="Default Batch Size">
+            <Section title="Impostazioni Invio Graduale">
+              <p className="text-xs" style={{ color: 'var(--shell-muted)' }}>Imposta i valori predefiniti per le nuove campagne. Possono essere modificati per ogni campagna.</p>
+              <Field label="Dimensione Batch Predefinita">
                 <input
                   type="number"
                   value={settings.dripDefaultBatchSize}
@@ -191,7 +191,7 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
                 />
               </Field>
               <div className="flex items-end gap-2">
-                <Field label="Default Interval">
+                <Field label="Intervallo Predefinito">
                   <input
                     type="number"
                     value={settings.dripDefaultInterval}
@@ -207,9 +207,9 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
                   className="rounded-xl border px-3 py-2 text-sm outline-none"
                   style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-canvas)', color: 'var(--foreground)' }}
                 >
-                  <option value="minutes">minutes</option>
-                  <option value="hours">hours</option>
-                  <option value="days">days</option>
+                  <option value="minutes">minuti</option>
+                  <option value="hours">ore</option>
+                  <option value="days">giorni</option>
                 </select>
               </div>
             </Section>
@@ -217,18 +217,18 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
 
           {/* Automation */}
           {activeSection === 'automation' && (
-            <Section title="Auto-Reply">
+            <Section title="Risposta Automatica">
               <Toggle
-                label="Enable auto-reply for incoming messages"
+                label="Attiva risposta automatica per messaggi in arrivo"
                 checked={settings.autoReplyEnabled}
                 onChange={(v) => update('autoReplyEnabled', v)}
               />
               {settings.autoReplyEnabled && (
-                <Field label="Auto-Reply Message">
+                <Field label="Messaggio di Risposta Automatica">
                   <textarea
                     value={settings.autoReplyMessage}
                     onChange={(e) => update('autoReplyMessage', e.target.value)}
-                    placeholder="Automatic reply message…"
+                    placeholder="Messaggio di risposta automatica…"
                     rows={3}
                     className="w-full rounded-xl border px-3 py-2 text-sm outline-none resize-none"
                     style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-canvas)', color: 'var(--foreground)' }}
@@ -240,14 +240,14 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
 
           {/* Notifications */}
           {activeSection === 'notifications' && (
-            <Section title="Notifications">
+            <Section title="Notifiche">
               <Toggle
-                label="Notify when conversations go unreplied"
+                label="Notifica conversazioni senza risposta"
                 checked={settings.notifyUnreplied}
                 onChange={(v) => update('notifyUnreplied', v)}
               />
               {settings.notifyUnreplied && (
-                <Field label="Alert after (minutes)">
+                <Field label="Avvisa dopo (minuti)">
                   <input
                     type="number"
                     value={settings.notifyUnrepliedMinutes}
@@ -259,7 +259,7 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
                 </Field>
               )}
               <Toggle
-                label="Notify when campaign completes"
+                label="Notifica al completamento campagna"
                 checked={settings.notifyCampaignComplete}
                 onChange={(v) => update('notifyCampaignComplete', v)}
               />
@@ -274,9 +274,9 @@ export default function SettingsClient({ locationId, demoMode = false }: { locat
               className="rounded-xl px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               style={{ backgroundColor: 'var(--brand)' }}
             >
-              {saving ? 'Saving…' : 'Save Settings'}
+              {saving ? 'Salvataggio…' : 'Salva Impostazioni'}
             </button>
-            {saved && <span className="text-xs font-medium text-emerald-600">Saved!</span>}
+            {saved && <span className="text-xs font-medium text-emerald-600">Salvato!</span>}
           </div>
         </div>
       </div>

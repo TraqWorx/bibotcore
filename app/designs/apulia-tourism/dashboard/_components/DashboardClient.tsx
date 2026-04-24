@@ -65,16 +65,16 @@ const DEMO_DATA: DashboardData = {
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 1) return 'adesso'
+  if (mins < 60) return `${mins}m fa`
   const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
+  if (hrs < 24) return `${hrs}h fa`
   const days = Math.floor(hrs / 24)
-  return `${days}d ago`
+  return `${days}g fa`
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return new Date(dateStr).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 export default function DashboardClient({
@@ -96,7 +96,7 @@ export default function DashboardClient({
   if (isLoading || !data) {
     return (
       <div className="space-y-6">
-        <SimfoniaPageHeader eyebrow="Overview" title="Dashboard" description="Loading…" />
+        <SimfoniaPageHeader eyebrow="Panoramica" title="Dashboard" description="Caricamento…" />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-28 animate-pulse rounded-2xl" style={{ backgroundColor: 'var(--shell-soft)' }} />
@@ -111,30 +111,30 @@ export default function DashboardClient({
 
   return (
     <div className="space-y-6">
-      <SimfoniaPageHeader eyebrow="Overview" title="Dashboard" description="Contacts & messaging campaigns at a glance." />
+      <SimfoniaPageHeader eyebrow="Panoramica" title="Dashboard" description="Contatti e campagne di messaggistica a colpo d'occhio." />
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard
-          label="Total Contacts"
+          label="Contatti Totali"
           value={data.totalContacts}
           icon={<IconContacts />}
           href={`${base}/contacts${qs}`}
         />
         <KpiCard
-          label="Unreplied"
+          label="Senza Risposta"
           value={data.unrepliedCount}
           icon={<IconUnreplied />}
           accent={data.unrepliedCount > 0 ? 'warning' : undefined}
           href={`${base}/conversations${qs}`}
         />
         <KpiCard
-          label="Messages Sent"
+          label="Messaggi Inviati"
           value={data.campaigns.totalSent}
           icon={<IconSent />}
         />
         <KpiCard
-          label="Pending"
+          label="In Attesa"
           value={data.campaigns.totalPending}
           icon={<IconPending />}
           accent={data.campaigns.totalPending > 0 ? 'info' : undefined}
@@ -147,18 +147,18 @@ export default function DashboardClient({
         <div className="space-y-4">
           {/* Campaign Stats */}
           <div className="rounded-2xl border p-5" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
-            <h3 className="mb-3 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Campaigns</h3>
+            <h3 className="mb-3 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Campagne</h3>
             <div className="grid grid-cols-3 gap-3">
-              <MiniStat label="Total" value={data.campaigns.total} />
-              <MiniStat label="Active" value={data.campaigns.active} color="var(--brand)" />
-              <MiniStat label="Completed" value={data.campaigns.completed} color="#16a34a" />
+              <MiniStat label="Totali" value={data.campaigns.total} />
+              <MiniStat label="Attive" value={data.campaigns.active} color="var(--brand)" />
+              <MiniStat label="Completate" value={data.campaigns.completed} color="#16a34a" />
             </div>
           </div>
 
           {/* Next Batch */}
           {data.nextBatch && (
             <div className="rounded-2xl border p-5" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Next Scheduled Batch</h3>
+              <h3 className="mb-2 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Prossimo Invio Programmato</h3>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: 'var(--shell-soft)' }}>
                   <svg className="h-5 w-5" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
@@ -166,7 +166,7 @@ export default function DashboardClient({
                 <div className="flex-1">
                   <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>{formatDate(data.nextBatch.scheduledAt)}</p>
                   <p className="text-xs" style={{ color: 'var(--shell-muted)' }}>
-                    {data.nextBatch.batchSize} messages · {data.nextBatch.remaining} remaining
+                    {data.nextBatch.batchSize} messaggi · {data.nextBatch.remaining} rimanenti
                   </p>
                 </div>
               </div>
@@ -176,10 +176,10 @@ export default function DashboardClient({
           {/* Recent Campaigns */}
           <div className="rounded-2xl border" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
             <div className="border-b px-5 py-3" style={{ borderColor: 'var(--shell-line)' }}>
-              <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Recent Campaigns</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Campagne Recenti</h3>
             </div>
             {data.recentCampaigns.length === 0 ? (
-              <p className="px-5 py-6 text-center text-xs" style={{ color: 'var(--shell-muted)' }}>No campaigns yet. Select contacts and send your first message.</p>
+              <p className="px-5 py-6 text-center text-xs" style={{ color: 'var(--shell-muted)' }}>Nessuna campagna. Seleziona i contatti e invia il tuo primo messaggio.</p>
             ) : (
               <div className="divide-y" style={{ borderColor: 'var(--shell-line)' }}>
                 {data.recentCampaigns.map((c) => (
@@ -192,7 +192,7 @@ export default function DashboardClient({
                       <div className="mt-0.5 flex items-center gap-2 text-[10px]" style={{ color: 'var(--shell-muted)' }}>
                         <span>{timeAgo(c.createdAt)}</span>
                         <span>·</span>
-                        <span>{c.sent}/{c.total} sent</span>
+                        <span>{c.sent}/{c.total} inviati</span>
                       </div>
                     </div>
                     <StatusBadge status={c.status} />
@@ -217,15 +217,15 @@ export default function DashboardClient({
           {/* Unreplied Conversations */}
           <div className="rounded-2xl border" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
             <div className="flex items-center justify-between border-b px-5 py-3" style={{ borderColor: 'var(--shell-line)' }}>
-              <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Unreplied Conversations</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--shell-muted)' }}>Conversazioni Senza Risposta</h3>
               {data.unrepliedCount > 0 && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">{data.unrepliedCount}</span>
               )}
             </div>
             {data.unrepliedConversations.length === 0 ? (
               <div className="px-5 py-6 text-center">
-                <p className="text-xs font-medium" style={{ color: 'var(--brand)' }}>All caught up!</p>
-                <p className="mt-0.5 text-[10px]" style={{ color: 'var(--shell-muted)' }}>No pending replies</p>
+                <p className="text-xs font-medium" style={{ color: 'var(--brand)' }}>Tutto aggiornato!</p>
+                <p className="mt-0.5 text-[10px]" style={{ color: 'var(--shell-muted)' }}>Nessuna risposta in sospeso</p>
               </div>
             ) : (
               <div className="divide-y" style={{ borderColor: 'var(--shell-line)' }}>
@@ -243,7 +243,7 @@ export default function DashboardClient({
             {data.unrepliedCount > 3 && (
               <div className="border-t px-5 py-2.5" style={{ borderColor: 'var(--shell-line)' }}>
                 <Link href={`${base}/conversations${qs}`} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
-                  View all →
+                  Vedi tutte →
                 </Link>
               </div>
             )}
@@ -253,7 +253,7 @@ export default function DashboardClient({
           {data.recentCampaigns.length > 0 && (
             <div className="rounded-2xl border p-4 text-center" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
               <Link href={`${base}/campaigns${qs}`} className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
-                View all campaigns →
+                Vedi tutte le campagne →
               </Link>
             </div>
           )}
@@ -298,7 +298,8 @@ function StatusBadge({ status }: { status: string }) {
     : status === 'completed'
       ? 'bg-emerald-50 text-emerald-700'
       : 'bg-gray-100 text-gray-500'
-  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${styles}`}>{status}</span>
+  const label = status === 'active' ? 'attiva' : status === 'completed' ? 'completata' : status
+  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${styles}`}>{label}</span>
 }
 
 function IconContacts() {
