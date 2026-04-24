@@ -32,8 +32,13 @@ const DEMO_CONTACTS: Contact[] = [
   { id: 'dc-6', contactName: 'Marco De Santis', email: 'marco@example.it', phone: '+39 338 666 7788', city: 'Bari', tags: ['tour-operator', 'premium'], dateAdded: '2026-03-25', customFields: {} },
 ]
 
+const PAGE_SIZE = 50
+
 export default function ContactsClient({ locationId, demoMode = false }: { locationId: string; demoMode?: boolean }) {
   const [contacts, setContacts] = useState<Contact[]>(demoMode ? DEMO_CONTACTS : [])
+  const [totalContacts, setTotalContacts] = useState(demoMode ? DEMO_CONTACTS.length : 0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(!demoMode)
   const [search, setSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -50,26 +55,27 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
   const [listField, setListField] = useState('')
   const [listValue, setListValue] = useState('')
 
-  // Load ALL contacts via pagination
+  // Load contacts (server-side paginated with filters)
   useEffect(() => {
     if (demoMode) return
-    let cancelled = false
-    async function loadAll() {
-      let page = 1
-      let all: Contact[] = []
-      const fieldMap = new Map<string, string>()
-      while (true) {
-        const res = await fetch(`/api/contacts?locationId=${locationId}&pageSize=500&page=${page}`)
-        const data = await res.json()
+    setLoading(true)
+    let filterParams = ''
+    if (search) filterParams += `&search=${encodeURIComponent(search)}`
+    if (activeList) {
+      const list = smartLists.find((l) => l.id === activeList)
+      if (list) {
+        if (list.field === 'city') filterParams += `&city=${encodeURIComponent(list.value)}`
+        else if (list.field === 'tags') filterParams += `&tag=${encodeURIComponent(list.value)}`
+      }
+    }
+    fetch(`/api/contacts?locationId=${locationId}&pageSize=${PAGE_SIZE}&page=${page}${filterParams}`)
+      .then((r) => r.json())
+      .then((data) => {
         const raw = data.contacts ?? []
-        if (raw.length === 0) break
         const mapped = raw.map((c: Record<string, unknown>) => {
           const cf: Record<string, string> = {}
           for (const f of (c.customFields ?? []) as { id: string; value: unknown }[]) {
             if (f.value) cf[f.id] = String(f.value)
-          }
-          for (const [k] of Object.entries(cf)) {
-            if (!fieldMap.has(k)) fieldMap.set(k, k)
           }
           return {
             id: c.id as string,
@@ -82,49 +88,37 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
             customFields: cf,
           }
         })
-        all = all.concat(mapped)
-        if (cancelled) return
-        setContacts([...all])
-        if (page >= (data.totalPages ?? 1)) break
-        page++
-      }
-      if (!cancelled) {
-        setCustomFields([...fieldMap.entries()].map(([key, name]) => ({ key, name })))
-        setLoading(false)
-      }
-    }
-    loadAll().catch(() => setLoading(false))
-    return () => { cancelled = true }
+        setContacts(mapped)
+        setTotalContacts(data.total ?? mapped.length)
+        setTotalPages(data.totalPages ?? 1)
 
+        const fieldMap = new Map<string, string>()
+        for (const c of mapped) {
+          for (const [k] of Object.entries(c.customFields)) {
+            if (!fieldMap.has(k)) fieldMap.set(k, k)
+          }
+        }
+        if (fieldMap.size > 0) setCustomFields([...fieldMap.entries()].map(([key, name]) => ({ key, name })))
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [locationId, demoMode, page, search, activeList, smartLists])
+
+  // Load smart lists from localStorage
+  useEffect(() => {
     const savedLists = localStorage.getItem(`smartLists-${locationId}`)
     if (savedLists) {
       try { setSmartLists(JSON.parse(savedLists as string)) } catch { /* ignore */ }
     }
-  }, [locationId, demoMode])
+  }, [locationId])
 
   function saveSmartLists(lists: SmartList[]) {
     setSmartLists(lists)
     localStorage.setItem(`smartLists-${locationId}`, JSON.stringify(lists))
   }
 
-  const filtered = useMemo(() => {
-    let result = contacts
-    if (search) {
-      const q = search.toLowerCase()
-      result = result.filter((c) => c.contactName.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.phone?.includes(q) || c.city?.toLowerCase().includes(q))
-    }
-    if (activeList) {
-      const list = smartLists.find((l) => l.id === activeList)
-      if (list) {
-        result = result.filter((c) => {
-          if (list.field === 'city') return c.city?.toLowerCase() === list.value.toLowerCase()
-          if (list.field === 'tags') return c.tags.some((t) => t.toLowerCase() === list.value.toLowerCase())
-          return c.customFields[list.field]?.toLowerCase() === list.value.toLowerCase()
-        })
-      }
-    }
-    return result
-  }, [contacts, search, activeList, smartLists])
+  // Contacts are already filtered server-side when a smart list is active
+  const filtered = contacts
 
   const allSelected = filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id))
 
@@ -148,10 +142,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
     setListValue('')
   }
 
-  function openCreateList() {
-    resetListForm()
-    setListFormMode('create')
-  }
+  function openCreateList() { resetListForm(); setListFormMode('create') }
 
   function openEditList(list: SmartList) {
     setListFormMode('edit')
@@ -166,8 +157,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
     if (listFormMode === 'edit' && editingListId) {
       saveSmartLists(smartLists.map((l) => l.id === editingListId ? { ...l, name: listName.trim(), field: listField, value: listValue.trim() } : l))
     } else {
-      const newList: SmartList = { id: Date.now().toString(), name: listName.trim(), field: listField, value: listValue.trim() }
-      saveSmartLists([...smartLists, newList])
+      saveSmartLists([...smartLists, { id: Date.now().toString(), name: listName.trim(), field: listField, value: listValue.trim() }])
     }
     resetListForm()
   }
@@ -177,16 +167,15 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
     if (activeList === id) setActiveList(null)
   }
 
+  // Debounced search
+  const [searchInput, setSearchInput] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [searchInput])
+
   const selectedContacts = contacts.filter((c) => selectedIds.has(c.id))
   const qs = locationId ? `?locationId=${locationId}` : ''
-
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-brand" />
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-4">
@@ -194,7 +183,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>Contatti</h1>
-          <p className="text-xs" style={{ color: 'var(--shell-muted)' }}>{contacts.length} totale</p>
+          <p className="text-xs" style={{ color: 'var(--shell-muted)' }}>{totalContacts.toLocaleString()} totale</p>
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
@@ -221,7 +210,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
       {/* Smart Lists */}
       <div className="flex flex-wrap items-center gap-2">
         <button
-          onClick={() => setActiveList(null)}
+          onClick={() => { setActiveList(null); setPage(1) }}
           className="rounded-full border px-3 py-1 text-xs font-semibold transition"
           style={!activeList ? { borderColor: 'var(--brand)', backgroundColor: 'color-mix(in srgb, var(--brand) 10%, transparent)', color: 'var(--brand)' } : { borderColor: '#e5e7eb', color: '#6b7280' }}
         >
@@ -230,7 +219,7 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
         {smartLists.map((list) => (
           <div key={list.id} className="group flex items-center gap-0.5">
             <button
-              onClick={() => setActiveList(activeList === list.id ? null : list.id)}
+              onClick={() => { setActiveList(activeList === list.id ? null : list.id); setPage(1) }}
               className="rounded-full border px-3 py-1 text-xs font-semibold transition"
               style={activeList === list.id ? { borderColor: 'var(--brand)', backgroundColor: 'color-mix(in srgb, var(--brand) 10%, transparent)', color: 'var(--brand)' } : { borderColor: '#e5e7eb', color: '#6b7280' }}
             >
@@ -269,8 +258,8 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
       {/* Search */}
       <input
         type="text"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        value={searchInput}
+        onChange={(e) => setSearchInput(e.target.value)}
         placeholder="Cerca contatti..."
         className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none"
         style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)', color: 'var(--foreground)' }}
@@ -278,48 +267,78 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
 
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border shadow-sm" style={{ borderColor: 'var(--shell-line)', backgroundColor: 'var(--shell-surface)' }}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--shell-line)' }}>
-              <th className="px-4 py-3 text-left">
-                <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Nome</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Telefono</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Email</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Città</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Tag</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.slice(0, 100).map((c) => (
-              <tr
-                key={c.id}
-                className="cursor-pointer transition-colors hover:brightness-95"
-                style={{ borderBottom: '1px solid var(--shell-line)' }}
-                onClick={() => setSelectedContactId(c.id)}
-              >
-                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                  <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleOne(c.id)} className="rounded" />
-                </td>
-                <td className="px-4 py-3 font-medium" style={{ color: 'var(--foreground)' }}>{c.contactName || '—'}</td>
-                <td className="px-4 py-3 text-xs" style={{ color: 'var(--shell-muted)' }}>{c.phone || '—'}</td>
-                <td className="px-4 py-3 text-xs" style={{ color: 'var(--shell-muted)' }}>{c.email || '—'}</td>
-                <td className="px-4 py-3 text-xs" style={{ color: 'var(--shell-muted)' }}>{c.city || '—'}</td>
-                <td className="px-4 py-3">
-                  {c.tags.slice(0, 3).map((t) => (
-                    <span key={t} className="mr-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: 'var(--shell-soft)', color: 'var(--brand)' }}>{t}</span>
-                  ))}
-                </td>
+        {loading ? (
+          <div className="flex h-40 items-center justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-brand" />
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--shell-line)' }}>
+                <th className="px-4 py-3 text-left">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Nome</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Telefono</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Email</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Città</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--shell-muted)' }}>Tag</th>
               </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--shell-muted)' }}>Nessun contatto trovato</td></tr>
-            )}
-          </tbody>
-        </table>
-        {filtered.length > 100 && (
-          <p className="px-4 py-2 text-xs" style={{ color: 'var(--shell-muted)' }}>Mostrati 100 di {filtered.length}</p>
+            </thead>
+            <tbody>
+              {filtered.map((c) => (
+                <tr
+                  key={c.id}
+                  className="cursor-pointer transition-colors hover:brightness-95"
+                  style={{ borderBottom: '1px solid var(--shell-line)' }}
+                  onClick={() => setSelectedContactId(c.id)}
+                >
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleOne(c.id)} className="rounded" />
+                  </td>
+                  <td className="px-4 py-3 font-medium" style={{ color: 'var(--foreground)' }}>{c.contactName || '—'}</td>
+                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--shell-muted)' }}>{c.phone || '—'}</td>
+                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--shell-muted)' }}>{c.email || '—'}</td>
+                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--shell-muted)' }}>{c.city || '—'}</td>
+                  <td className="px-4 py-3">
+                    {c.tags.slice(0, 3).map((t) => (
+                      <span key={t} className="mr-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: 'var(--shell-soft)', color: 'var(--brand)' }}>{t}</span>
+                    ))}
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && !loading && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--shell-muted)' }}>Nessun contatto trovato</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t px-4 py-3" style={{ borderColor: 'var(--shell-line)' }}>
+            <p className="text-xs" style={{ color: 'var(--shell-muted)' }}>
+              Pagina {page} di {totalPages} · {totalContacts.toLocaleString()} contatti
+            </p>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="rounded-lg border px-3 py-1 text-xs font-medium disabled:opacity-30"
+                style={{ borderColor: 'var(--shell-line)', color: 'var(--foreground)' }}
+              >
+                ← Prec
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="rounded-lg border px-3 py-1 text-xs font-medium disabled:opacity-30"
+                style={{ borderColor: 'var(--shell-line)', color: 'var(--foreground)' }}
+              >
+                Succ →
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

@@ -51,15 +51,18 @@ export async function GET(req: NextRequest) {
     .order('date_added', { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1)
 
+  const city = sp.get('city') ?? null
+
   if (search) {
     const s = `%${search}%`
-    query = query.or(`first_name.ilike.${s},last_name.ilike.${s},email.ilike.${s},phone.ilike.${s}`)
+    query = query.or(`first_name.ilike.${s},last_name.ilike.${s},email.ilike.${s},phone.ilike.${s},city.ilike.${s}`)
   }
   if (tag) {
     for (const t of tag.split(',').map((t) => t.trim()).filter(Boolean)) {
       query = query.contains('tags', [t])
     }
   }
+  if (city) query = query.ilike('city', city)
   if (dateFrom) query = query.gte('date_added', new Date(dateFrom + 'T00:00:00.000Z').toISOString())
   if (dateTo) query = query.lte('date_added', new Date(dateTo + 'T23:59:59.999Z').toISOString())
 

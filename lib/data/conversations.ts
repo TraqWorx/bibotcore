@@ -27,6 +27,26 @@ export async function listConversations(
 ): Promise<{ conversations: CachedConversation[]; fromCache: boolean }> {
   const sb = createAdminClient()
 
+  // Always fetch fresh from GHL first, fall back to cache
+  const fresh = await fetchFromGhl(locationId)
+
+  if (fresh.length > 0) {
+    // Merge assigned_to from metadata
+    const { data: metadata } = await sb
+      .from('conversation_metadata')
+      .select('conversation_id, assigned_to')
+      .eq('location_id', locationId)
+    if (metadata && metadata.length > 0) {
+      const metaMap = new Map(metadata.map((m) => [m.conversation_id, m.assigned_to]))
+      for (const c of fresh) {
+        const override = metaMap.get(c.ghl_id)
+        if (override) (c as Record<string, unknown>).assigned_to = override
+      }
+    }
+    return { conversations: fresh, fromCache: false }
+  }
+
+  // GHL failed — fall back to cache
   const [{ data: convos }, { data: metadata }] = await Promise.all([
     sb.from('cached_conversations')
       .select(CONVO_COLUMNS)
@@ -38,7 +58,6 @@ export async function listConversations(
   ])
 
   if (convos && convos.length > 0) {
-    // Merge assigned_to from metadata
     if (metadata && metadata.length > 0) {
       const metaMap = new Map(metadata.map((m) => [m.conversation_id, m.assigned_to]))
       for (const c of convos) {
@@ -49,8 +68,7 @@ export async function listConversations(
     return { conversations: convos as CachedConversation[], fromCache: true }
   }
 
-  // Fallback to GHL
-  return { conversations: await fetchFromGhl(locationId), fromCache: false }
+  return { conversations: [], fromCache: false }
 }
 
 async function fetchFromGhl(locationId: string): Promise<CachedConversation[]> {
