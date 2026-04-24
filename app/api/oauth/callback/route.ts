@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { runDesignInstaller } from '@/lib/designInstaller/runDesignInstaller'
 import { verifyOAuthState } from '@/lib/ghl/oauthState'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAdminClient } from '@/lib/supabase-server'
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code')
   const rawState = req.nextUrl.searchParams.get('state') ?? ''
   const state = verifyOAuthState(rawState)
+  const supabase = createAdminClient()
 
   if (!code) {
     return NextResponse.json(
