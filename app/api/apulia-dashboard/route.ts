@@ -9,12 +9,11 @@ export async function GET(req: NextRequest) {
   const sb = createAdminClient()
 
   // Parallel fetch: contacts count, conversations, drip jobs
+  const ghl = await getGhlClient(locationId)
   const [contactsData, conversationsData, dripJobsResult] = await Promise.all([
-    getGhlClient(locationId)
-      .then((ghl) => ghl.contacts.list())
+    ghl.contacts.list()
       .catch(() => null),
-    getGhlClient(locationId)
-      .then((ghl) => ghl.conversations.search())
+    ghl.conversations.search()
       .catch(() => null),
     sb.from('drip_jobs')
       .select('*')

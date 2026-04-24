@@ -87,11 +87,11 @@ export default async function ContactProfilePage({
   const q = `?locationId=${locationId}`
 
   const tagColors: Record<string, string> = {
-    energia:      'bg-amber-50 text-amber-700',
-    telefonia:    'bg-blue-50 text-blue-700',
-    wind:         'bg-purple-50 text-purple-700',
-    fastweb:      'bg-orange-50 text-orange-700',
-    connettivita: 'bg-teal-50 text-teal-700',
+    hotel:             'bg-blue-50 text-blue-700',
+    'b&b':             'bg-amber-50 text-amber-700',
+    'tour-operator':   'bg-emerald-50 text-emerald-700',
+    restaurant:        'bg-orange-50 text-orange-700',
+    premium:           'bg-purple-50 text-purple-700',
   }
 
   return (

@@ -199,6 +199,7 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
     if (lastName.trim()) payload.lastName = lastName.trim()
     if (email.trim()) payload.email = email.trim()
     if (phone.trim()) payload.phone = phone.trim()
+    if (companyName.trim()) payload.companyName = companyName.trim()
     if (customFieldValues.length > 0) payload.customFields = customFieldValues
 
     const result = await createContact(payload as Parameters<typeof createContact>[0], locationId)
@@ -214,10 +215,11 @@ export default function NewContactForm({ locationId, tags: ghlTags = [], customF
   const inputClass = `w-full px-4 py-2.5 text-sm ${sf.input}`
 
   const CATEGORY_ACCENT: Record<string, { bg: string; border: string; text: string; dot: string }> = {
-    telefonia:       { bg: 'bg-blue-50',    border: 'border-blue-200',    text: 'text-blue-700',    dot: 'bg-blue-400' },
-    energia:         { bg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-700',   dot: 'bg-amber-400' },
-    connettivita:    { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-400' },
-    intrattenimento: { bg: 'bg-purple-50',  border: 'border-purple-200',  text: 'text-purple-700',  dot: 'bg-purple-400' },
+    hotel:            { bg: 'bg-blue-50',    border: 'border-blue-200',    text: 'text-blue-700',    dot: 'bg-blue-400' },
+    'b&b':            { bg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-700',   dot: 'bg-amber-400' },
+    'tour-operator':  { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-400' },
+    restaurant:       { bg: 'bg-orange-50',  border: 'border-orange-200',  text: 'text-orange-700',  dot: 'bg-orange-400' },
+    premium:          { bg: 'bg-purple-50',  border: 'border-purple-200',  text: 'text-purple-700',  dot: 'bg-purple-400' },
   }
   const DEFAULT_ACCENT = { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700', dot: 'bg-gray-400' }
 

@@ -54,8 +54,6 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
       setAllLocationTags(['hotel', 'premium', 'tour-operator', 'b&b', 'new', 'restaurant', 'partner'])
       return
     }
-    fetch(`/api/ghl/contacts?locationId=${locationId}&limit=1`)
-      .catch(() => {})
     // Fetch tags from GHL
     fetch(`/api/ghl/tags?locationId=${locationId}`)
       .then((r) => r.json())
@@ -319,6 +317,7 @@ export default function ContactDrawer({ contactId, locationId, onClose, onContac
                     value={tagInput}
                     onChange={(e) => { setTagInput(e.target.value); setShowTagDropdown(true) }}
                     onFocus={() => setShowTagDropdown(true)}
+                    onBlur={() => { setTimeout(() => setShowTagDropdown(false), 200) }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && tagInput.trim()) {
                         e.preventDefault()

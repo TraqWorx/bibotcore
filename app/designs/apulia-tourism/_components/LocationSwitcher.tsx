@@ -40,7 +40,7 @@ export default function LocationSwitcher({ locations, currentLocationId }: Props
   function handleChange(locationId: string) {
     setValue(locationId)
     localStorage.setItem(LS_KEY, locationId)
-    const designSlug = locations.find((l) => l.location_id === locationId)?.design_slug ?? 'simfonia'
+    const designSlug = locations.find((l) => l.location_id === locationId)?.design_slug ?? 'apulia-tourism'
     const params = new URLSearchParams(searchParams.toString())
     params.set('locationId', locationId)
     router.push(`/designs/${designSlug}/dashboard?${params.toString()}`)
