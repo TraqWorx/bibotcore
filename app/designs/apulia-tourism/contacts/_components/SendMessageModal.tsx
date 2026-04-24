@@ -50,26 +50,37 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch templates when message type changes
-  // SMS → snippets (type=sms), WhatsApp → Meta-approved templates (type=whatsapp)
+  // SMS → snippets from GHL API
+  // WhatsApp → approved templates from Settings (localStorage)
   useEffect(() => {
     setTemplates([])
     setTemplatesLoading(true)
     setShowTemplates(false)
-    const type = messageType === 'WhatsApp' ? 'whatsapp' : 'sms'
-    fetch(`/api/ghl/templates?locationId=${locationId}&type=${type}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const all = (data.templates ?? []) as { id: string; name: string; body?: string; status?: string; attachments?: string[] }[]
-        const filtered = messageType === 'WhatsApp'
-          ? all.filter((t) => (t.status ?? '').toUpperCase() === 'APPROVED')
-          : all
-        setTemplates(
-          filtered.map((t) => ({ id: t.id, name: t.name, body: t.body ?? '', attachments: t.attachments ?? [] }))
-        )
-      })
-      .catch(() => {})
-      .finally(() => setTemplatesLoading(false))
-  }, [locationId, messageType])
+    setMessage('')
+    setTemplateAttachments([])
+
+    if (messageType === 'WhatsApp') {
+      // Load from settings (Meta-approved templates registered by admin)
+      const waTemplates: { id: string; name: string; body: string }[] = savedSettings.waTemplates ?? []
+      setTemplates(waTemplates.map((t) => ({ ...t, attachments: [] })))
+      setTemplatesLoading(false)
+    } else {
+      // Load GHL snippets + local custom snippets from settings
+      const localSnippets: { id: string; name: string; body: string }[] = savedSettings.smsSnippets ?? []
+      fetch(`/api/ghl/templates?locationId=${locationId}&type=sms`)
+        .then((r) => r.json())
+        .then((data) => {
+          const ghl = (data.templates ?? []) as { id: string; name: string; body?: string; attachments?: string[] }[]
+          const ghlMapped = ghl.map((t) => ({ id: t.id, name: t.name, body: t.body ?? '', attachments: t.attachments ?? [] }))
+          const localMapped = localSnippets.map((t) => ({ ...t, attachments: [] }))
+          setTemplates([...ghlMapped, ...localMapped])
+        })
+        .catch(() => {
+          setTemplates(localSnippets.map((t) => ({ ...t, attachments: [] })))
+        })
+        .finally(() => setTemplatesLoading(false))
+    }
+  }, [locationId, messageType, savedSettings.waTemplates])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -264,12 +275,18 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
           </div>
 
           {/* Message */}
+          {messageType === 'WhatsApp' && !message && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
+              Seleziona un template approvato da Meta. I messaggi WhatsApp possono essere inviati solo tramite template approvati.
+            </div>
+          )}
           <textarea
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder={messageType === 'WhatsApp' ? 'Seleziona un template o scrivi il messaggio…' : 'Scrivi il tuo messaggio...'}
+            onChange={(e) => messageType !== 'WhatsApp' ? setMessage(e.target.value) : undefined}
+            readOnly={messageType === 'WhatsApp'}
+            placeholder={messageType === 'WhatsApp' ? '← Seleziona un template approvato' : 'Scrivi il tuo messaggio...'}
             rows={4}
-            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/10 resize-none"
+            className={`w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none resize-none ${messageType === 'WhatsApp' ? 'bg-gray-50 cursor-not-allowed' : 'focus:border-brand/40 focus:ring-2 focus:ring-brand/10'}`}
           />
 
           {/* File upload */}
