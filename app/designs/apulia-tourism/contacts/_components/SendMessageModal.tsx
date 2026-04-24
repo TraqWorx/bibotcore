@@ -12,6 +12,7 @@ interface Template {
   id: string
   name: string
   body: string
+  attachments: string[]
 }
 
 interface Props {
@@ -21,18 +22,24 @@ interface Props {
 }
 
 export default function SendMessageModal({ locationId, contacts, onClose }: Props) {
-  const [messageType, setMessageType] = useState<'SMS' | 'WhatsApp'>('SMS')
+  // Load settings defaults
+  const savedSettings = typeof window !== 'undefined' ? (() => {
+    try { return JSON.parse(localStorage.getItem(`at-settings-${locationId}`) ?? '{}') } catch { return {} }
+  })() : {}
+
+  const [messageType, setMessageType] = useState<'SMS' | 'WhatsApp'>(savedSettings.defaultMessageType ?? 'SMS')
   const [message, setMessage] = useState('')
   const [templates, setTemplates] = useState<Template[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [filePreview, setFilePreview] = useState<string | null>(null)
+  const [templateAttachments, setTemplateAttachments] = useState<string[]>([])
   const [sendMode, setSendMode] = useState<'now' | 'schedule' | 'drip'>('now')
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduleTime, setScheduleTime] = useState('')
-  const [dripBatchSize, setDripBatchSize] = useState('10')
-  const [dripInterval, setDripInterval] = useState('1')
-  const [dripUnit, setDripUnit] = useState<'minutes' | 'hours' | 'days'>('hours')
+  const [dripBatchSize, setDripBatchSize] = useState(String(savedSettings.dripDefaultBatchSize ?? 10))
+  const [dripInterval, setDripInterval] = useState(String(savedSettings.dripDefaultInterval ?? 1))
+  const [dripUnit, setDripUnit] = useState<'minutes' | 'hours' | 'days'>(savedSettings.dripDefaultUnit ?? 'hours')
   const [dripStartDate, setDripStartDate] = useState('')
   const [dripStartTime, setDripStartTime] = useState('')
   const [sending, setSending] = useState(false)
@@ -52,12 +59,12 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
     fetch(`/api/ghl/templates?locationId=${locationId}&type=${type}`)
       .then((r) => r.json())
       .then((data) => {
-        const all = (data.templates ?? []) as { id: string; name: string; body?: string; templateBody?: string; status?: string }[]
+        const all = (data.templates ?? []) as { id: string; name: string; body?: string; status?: string; attachments?: string[] }[]
         const filtered = messageType === 'WhatsApp'
           ? all.filter((t) => (t.status ?? '').toUpperCase() === 'APPROVED')
           : all
         setTemplates(
-          filtered.map((t) => ({ id: t.id, name: t.name, body: t.body ?? t.templateBody ?? '' }))
+          filtered.map((t) => ({ id: t.id, name: t.name, body: t.body ?? '', attachments: t.attachments ?? [] }))
         )
       })
       .catch(() => {})
@@ -157,6 +164,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
   }
 
   async function sendOne(contact: Contact, scheduledTimestamp?: string, attachmentUrl?: string | null) {
+    const allAttachments = [...templateAttachments, ...(attachmentUrl ? [attachmentUrl] : [])]
     await fetch('/api/messages/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -165,7 +173,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
         contactId: contact.id,
         type: messageType,
         message: message.trim(),
-        ...(attachmentUrl ? { attachments: [attachmentUrl] } : {}),
+        ...(allAttachments.length > 0 ? { attachments: allAttachments } : {}),
         ...(scheduledTimestamp ? { scheduledTimestamp } : {}),
       }),
     })
@@ -244,7 +252,7 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
                 {templates.map((t) => (
                   <button
                     key={t.id}
-                    onClick={() => { setMessage(t.body); setShowTemplates(false) }}
+                    onClick={() => { setMessage(t.body); setTemplateAttachments(t.attachments); setShowTemplates(false) }}
                     className="block w-full px-4 py-2.5 text-left text-xs transition hover:bg-gray-50 border-b border-gray-100 last:border-0"
                   >
                     <span className="font-semibold text-gray-900">{t.name}</span>
@@ -291,6 +299,27 @@ export default function SendMessageModal({ locationId, contacts, onClose }: Prop
             )}
             <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx" onChange={handleFileChange} className="hidden" />
           </div>
+
+          {/* Template attachments preview */}
+          {templateAttachments.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Allegati template</p>
+              <div className="flex flex-wrap gap-2">
+                {templateAttachments.map((url, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5">
+                    {url.match(/\.(jpg|jpeg|png|gif|webp)/i) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={url} alt="" className="h-8 w-8 rounded object-cover" />
+                    ) : (
+                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32" /></svg>
+                    )}
+                    <span className="text-[10px] text-gray-500">Allegato {i + 1}</span>
+                  </div>
+                ))}
+                <button onClick={() => setTemplateAttachments([])} className="text-[10px] text-gray-400 hover:text-red-500">Rimuovi</button>
+              </div>
+            </div>
+          )}
 
           {/* Send mode */}
           <div className="space-y-2">

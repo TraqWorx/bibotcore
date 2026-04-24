@@ -9,17 +9,29 @@ export async function GET(req: NextRequest) {
   try {
     const ghl = await getGhlClient(locationId)
     const data = await ghl.templates.list()
-    const all = (data?.templates ?? []) as { id: string; name: string; body?: string; templateBody?: string; type?: string; status?: string }[]
+    const raw = (data?.templates ?? []) as {
+      id: string; name: string; type?: string; status?: string
+      body?: string; templateBody?: string
+      template?: { body?: string; attachments?: string[] }
+      urlAttachments?: string[]
+    }[]
+
+    // Normalize: body can be at root or nested in template.body
+    const normalized = raw.map((t) => ({
+      id: t.id,
+      name: t.name,
+      type: t.type ?? '',
+      status: t.status ?? '',
+      body: t.template?.body ?? t.body ?? t.templateBody ?? '',
+      attachments: t.template?.attachments ?? t.urlAttachments ?? [],
+    }))
 
     // Filter by type
-    let filtered = all
+    let filtered = normalized
     if (type === 'whatsapp') {
-      filtered = all.filter((t) => (t.type ?? '').toLowerCase().includes('whatsapp'))
+      filtered = normalized.filter((t) => t.type.toLowerCase().includes('whatsapp'))
     } else if (type === 'sms') {
-      filtered = all.filter((t) => {
-        const tType = (t.type ?? '').toLowerCase()
-        return tType === 'sms' || tType === '' || tType === 'snippet' || !tType.includes('whatsapp')
-      })
+      filtered = normalized.filter((t) => !t.type.toLowerCase().includes('whatsapp'))
     }
 
     return NextResponse.json({ templates: filtered })

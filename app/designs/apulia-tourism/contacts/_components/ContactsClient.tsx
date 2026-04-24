@@ -48,6 +48,8 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
   const [customFields, setCustomFields] = useState<{ key: string; name: string }[]>([])
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
 
+  const [cities, setCities] = useState<string[]>([])
+
   // Smart list form
   const [listFormMode, setListFormMode] = useState<'none' | 'create' | 'edit'>('none')
   const [editingListId, setEditingListId] = useState<string | null>(null)
@@ -104,13 +106,19 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
       .finally(() => setLoading(false))
   }, [locationId, demoMode, page, search, activeList, smartLists])
 
-  // Load smart lists from localStorage
+  // Load smart lists + cities
   useEffect(() => {
     const savedLists = localStorage.getItem(`smartLists-${locationId}`)
     if (savedLists) {
       try { setSmartLists(JSON.parse(savedLists as string)) } catch { /* ignore */ }
     }
-  }, [locationId])
+    if (!demoMode) {
+      fetch(`/api/contacts/cities?locationId=${locationId}`)
+        .then((r) => r.json())
+        .then((data) => setCities(data.cities ?? []))
+        .catch(() => {})
+    }
+  }, [locationId, demoMode])
 
   function saveSmartLists(lists: SmartList[]) {
     setSmartLists(lists)
@@ -263,13 +271,20 @@ export default function ContactsClient({ locationId, demoMode = false }: { locat
         ) : (
           <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
             <input type="text" value={listName} onChange={(e) => setListName(e.target.value)} placeholder="Nome lista" className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none w-24" />
-            <select value={listField} onChange={(e) => setListField(e.target.value)} className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none">
+            <select value={listField} onChange={(e) => { setListField(e.target.value); setListValue('') }} className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none">
               <option value="">Campo...</option>
               <option value="city">Città</option>
               <option value="tags">Tag</option>
               {customFields.map((f) => <option key={f.key} value={f.key}>{f.name}</option>)}
             </select>
-            <input type="text" value={listValue} onChange={(e) => setListValue(e.target.value)} placeholder="Valore" className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none w-24" />
+            {listField === 'city' ? (
+              <select value={listValue} onChange={(e) => setListValue(e.target.value)} className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none w-40">
+                <option value="">Seleziona città...</option>
+                {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            ) : (
+              <input type="text" value={listValue} onChange={(e) => setListValue(e.target.value)} placeholder="Valore" className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none w-24" />
+            )}
             <button onClick={handleSaveList} className="rounded-lg bg-gray-900 px-2 py-1 text-xs font-semibold text-white">
               {listFormMode === 'edit' ? 'Aggiorna' : 'Salva'}
             </button>
