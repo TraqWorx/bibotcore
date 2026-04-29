@@ -45,6 +45,19 @@ interface DiagRow {
   hasAffiliateScope: boolean
   affiliateCheck: HealthCheck | null
   affiliateRelevant: boolean
+  lastWebhookAt: string | null
+}
+
+interface IntegrationCheck {
+  name: string
+  ok: boolean
+  detail: string
+}
+
+interface ConfigCheck {
+  key: string
+  state: 'set' | 'empty' | 'missing'
+  required: boolean
 }
 
 function decodeJwt(token: string): JwtInfo {
@@ -62,6 +75,53 @@ function decodeJwt(token: string): JwtInfo {
   } catch (err) {
     return { scopes: [], decodeError: err instanceof Error ? err.message : 'decode failed' }
   }
+}
+
+async function pingStripe(label: string, key: string | undefined): Promise<IntegrationCheck> {
+  if (!key) return { name: label, ok: false, detail: 'env var missing' }
+  if (key.length < 20) return { name: label, ok: false, detail: 'env var empty' }
+  try {
+    const r = await fetch('https://api.stripe.com/v1/balance', {
+      headers: { Authorization: `Bearer ${key}` },
+    })
+    if (!r.ok) return { name: label, ok: false, detail: `HTTP ${r.status}` }
+    return { name: label, ok: true, detail: 'OK' }
+  } catch (err) {
+    return { name: label, ok: false, detail: err instanceof Error ? err.message : 'fetch error' }
+  }
+}
+
+async function pingAgencyToken(): Promise<IntegrationCheck> {
+  const t = process.env.GHL_AGENCY_TOKEN
+  const cid = process.env.GHL_COMPANY_ID
+  if (!t) return { name: 'GHL agency token', ok: false, detail: 'env var missing' }
+  if (!cid) return { name: 'GHL agency token', ok: false, detail: 'GHL_COMPANY_ID missing' }
+  try {
+    const r = await fetch(`${GHL_BASE}/locations/search?limit=1&companyId=${cid}`, {
+      headers: { Authorization: `Bearer ${t}`, Version: '2021-07-28' },
+    })
+    if (!r.ok) return { name: 'GHL agency token', ok: false, detail: `HTTP ${r.status}` }
+    return { name: 'GHL agency token', ok: true, detail: 'OK' }
+  } catch (err) {
+    return { name: 'GHL agency token', ok: false, detail: err instanceof Error ? err.message : 'fetch error' }
+  }
+}
+
+function checkConfig(): ConfigCheck[] {
+  const required = [
+    'NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY',
+    'GHL_AGENCY_TOKEN', 'GHL_COMPANY_ID', 'GHL_CLIENT_ID', 'GHL_CLIENT_SECRET',
+    'GHL_REDIRECT_URI', 'GHL_APP_VERSION_ID',
+    'STRIPE_SECRET_KEY', 'STRIPE_PRO_PRICE_ID', 'STRIPE_WEBHOOK_SECRET',
+    'NEXT_PUBLIC_APP_URL', 'WEBHOOK_SECRET', 'CRON_SECRET', 'ANTHROPIC_API_KEY',
+  ]
+  const optional = ['STRIPE_GHL_SECRET_KEY', 'STRIPE_GHL_WEBHOOK_SECRET']
+  return [...required.map((k) => ({ key: k, required: true })), ...optional.map((k) => ({ key: k, required: false }))]
+    .map(({ key, required: req }) => {
+      const val = process.env[key]
+      const state: ConfigCheck['state'] = val == null ? 'missing' : val.length === 0 ? 'empty' : 'set'
+      return { key, state, required: req }
+    })
 }
 
 async function ping(url: string, token: string): Promise<HealthCheck> {
@@ -115,6 +175,15 @@ export default async function DiagnosticsPage() {
 
   const { data: cronJobs } = await sb.rpc('get_cron_health') as { data: CronHealthRow[] | null }
 
+  // Run external integration pings in parallel — they all hit network.
+  const [stripeSaas, stripeGhl, agencyTokenCheck] = await Promise.all([
+    pingStripe('Stripe (SaaS)', process.env.STRIPE_SECRET_KEY),
+    pingStripe('Stripe (Bibot customers)', process.env.STRIPE_GHL_SECRET_KEY),
+    pingAgencyToken(),
+  ])
+  const integrations = [stripeSaas, stripeGhl, agencyTokenCheck]
+  const configChecks = checkConfig()
+
   const { data: locations } = await sb
     .from('locations')
     .select('location_id, name')
@@ -129,6 +198,22 @@ export default async function DiagnosticsPage() {
         .in('location_id', locationIds)
     : { data: [] }
   const connByLoc = new Map((connections ?? []).map((c) => [c.location_id, c]))
+
+  // Latest webhook received per location — drift detection. If a
+  // location is connected but we haven't received a webhook in days,
+  // GHL likely dropped the registration.
+  const { data: webhookSamples } = locationIds.length
+    ? await sb
+        .from('ghl_webhook_events')
+        .select('location_id, received_at')
+        .in('location_id', locationIds)
+        .order('received_at', { ascending: false })
+        .limit(2000)
+    : { data: [] as { location_id: string; received_at: string }[] }
+  const lastWebhookByLoc = new Map<string, string>()
+  for (const ev of webhookSamples ?? []) {
+    if (!lastWebhookByLoc.has(ev.location_id)) lastWebhookByLoc.set(ev.location_id, ev.received_at)
+  }
 
   const rows: DiagRow[] = await Promise.all((locations ?? []).map(async (loc): Promise<DiagRow> => {
     const conn = connByLoc.get(loc.location_id)
@@ -152,6 +237,7 @@ export default async function DiagnosticsPage() {
         hasAffiliateScope: false,
         affiliateCheck: null,
         affiliateRelevant: isBibotLocation,
+        lastWebhookAt: lastWebhookByLoc.get(loc.location_id) ?? null,
       }
     }
 
@@ -177,6 +263,7 @@ export default async function DiagnosticsPage() {
       hasAffiliateScope,
       affiliateCheck: checks[1],
       affiliateRelevant: isBibotLocation,
+      lastWebhookAt: lastWebhookByLoc.get(loc.location_id) ?? null,
     }
   }))
 
@@ -217,6 +304,46 @@ export default async function DiagnosticsPage() {
 
       <div className={`${ad.panel} space-y-3`}>
         <div className="flex items-baseline justify-between">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-500">External integrations</p>
+          <p className="text-[10px] text-gray-400">Live ping</p>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {integrations.map((c) => (
+            <div key={c.name} className="rounded-2xl border border-gray-200 bg-white p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-gray-900">{c.name}</span>
+                {badge(c.ok ? 'green' : 'red', c.ok ? 'OK' : 'FAIL')}
+              </div>
+              <p className="mt-1 text-[10px] text-gray-500">{c.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={`${ad.panel} space-y-3`}>
+        <div className="flex items-baseline justify-between">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Configuration</p>
+          <p className="text-[10px] text-gray-400">Env var presence (values redacted)</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {configChecks.map((c) => {
+            const color = c.state === 'set'
+              ? 'green'
+              : c.required
+                ? 'red'
+                : 'gray'
+            return (
+              <div key={c.key} className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 bg-white px-3 py-2">
+                <span className="font-mono text-[11px] text-gray-700">{c.key}</span>
+                {badge(color, c.state)}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className={`${ad.panel} space-y-3`}>
+        <div className="flex items-baseline justify-between">
           <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Background jobs</p>
           <p className="text-[10px] text-gray-400">Last successful run per cron</p>
         </div>
@@ -250,12 +377,13 @@ export default async function DiagnosticsPage() {
       <div className={ad.tableShell}>
         <table className="w-full table-fixed text-left text-sm">
           <colgroup>
-            <col className="w-[26%]" />
-            <col className="w-[10%]" />
-            <col className="w-[10%]" />
-            <col className="w-[14%]" />
-            <col className="w-[14%]" />
-            <col className="w-[14%]" />
+            <col className="w-[22%]" />
+            <col className="w-[9%]" />
+            <col className="w-[9%]" />
+            <col className="w-[12%]" />
+            <col className="w-[12%]" />
+            <col className="w-[12%]" />
+            <col className="w-[12%]" />
             <col className="w-[12%]" />
           </colgroup>
           <thead className={ad.tableHeadRow}>
@@ -266,6 +394,7 @@ export default async function DiagnosticsPage() {
               <th className="px-4 py-3">Affiliate</th>
               <th className="px-4 py-3">Expires</th>
               <th className="px-4 py-3">Last refreshed</th>
+              <th className="px-4 py-3">Last webhook</th>
               <th className="px-4 py-3 text-right">Health</th>
             </tr>
           </thead>
@@ -289,7 +418,7 @@ export default async function DiagnosticsPage() {
                       </div>
                       <div className="mt-0.5 font-mono text-[10px] text-gray-400">{r.locationId}</div>
                     </td>
-                    <td colSpan={5} className="px-4 py-2.5 text-xs text-gray-400">Not connected</td>
+                    <td colSpan={6} className="px-4 py-2.5 text-xs text-gray-400">Not connected</td>
                     <td className="px-4 py-2.5 text-right">
                       <Link href="/admin/locations" className="text-[10px] font-bold uppercase tracking-wide text-brand hover:underline">
                         Connect →
@@ -298,6 +427,9 @@ export default async function DiagnosticsPage() {
                   </tr>
                 )
               }
+
+              const webhookAgeMs = r.lastWebhookAt ? Date.now() - new Date(r.lastWebhookAt).getTime() : null
+              const webhookStale = webhookAgeMs == null || webhookAgeMs > 7 * 24 * 60 * 60 * 1000
 
               return (
                 <tr key={r.locationId} className="align-top">
@@ -351,6 +483,16 @@ export default async function DiagnosticsPage() {
                     )}
                   </td>
                   <td className="px-4 py-4">
+                    {r.lastWebhookAt ? (
+                      <>
+                        <div className={`text-xs font-semibold ${webhookStale ? 'text-amber-700' : 'text-gray-900'}`}>{relTime(r.lastWebhookAt)}</div>
+                        <div className="text-[10px] text-gray-400">{new Date(r.lastWebhookAt).toLocaleString()}</div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-amber-700">never</div>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
                     <div className="flex flex-col items-end gap-1.5">
                       {r.health?.ok
                         ? badge('green', 'OK')
@@ -383,7 +525,10 @@ export default async function DiagnosticsPage() {
           <li><strong>Scopes</strong>: how many scopes the token grants. The OAuth app&apos;s <code>versionId</code> determines this — to add scopes, edit the marketplace app version then re-authorize.</li>
           <li><strong>Affiliate</strong>: <em>In token</em> = `affiliate-manager.readonly` scope is on the JWT; <em>Missing</em> = needs re-authorization after the marketplace app version is updated. The API ping below the badge runs only for the Bibot subaccount (the only one with affiliate data).</li>
           <li><strong>Health</strong>: live <code>GET /locations/&#123;id&#125;</code>. <em>OK</em> = token works; <em>Reconnect</em> = JWT rejected; <em>Not connected</em> = no OAuth install on this location yet.</li>
-          <li><strong>Last refreshed</strong>: <em>never (since instrumented)</em> until the cron rotates the token. After that, never older than ~6h.</li>
+          <li><strong>Last refreshed</strong>: never older than ~2h once the cron has run after instrumentation.</li>
+          <li><strong>Last webhook</strong>: timestamp of the most recent GHL event we received for this location. <em>never</em> or older than ~7 days suggests GHL dropped the webhook registration; reconnect to re-register.</li>
+          <li><strong>External integrations</strong>: live ping of Stripe (both accounts) and the agency PIT — if one shows FAIL, anything depending on it is broken until fixed.</li>
+          <li><strong>Configuration</strong>: env-var presence only (values redacted). Required keys missing/empty show red; optional ones show gray. Catches the &quot;empty string&quot; failure mode where <code>process.env.X = &apos;&apos;</code> bypasses null fallbacks.</li>
         </ul>
       </div>
     </div>
