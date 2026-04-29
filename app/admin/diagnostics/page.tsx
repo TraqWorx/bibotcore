@@ -24,6 +24,15 @@ interface HealthCheck {
   detail?: string
 }
 
+interface CronHealthRow {
+  jobname: string
+  schedule: string
+  active: boolean
+  last_run_at: string | null
+  last_status: string | null
+  last_message: string | null
+}
+
 interface DiagRow {
   locationId: string
   locationName: string
@@ -103,6 +112,8 @@ export default async function DiagnosticsPage() {
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
   if (!profile?.agency_id || !isBibotAgency(profile.agency_id)) redirect('/admin')
+
+  const { data: cronJobs } = await sb.rpc('get_cron_health') as { data: CronHealthRow[] | null }
 
   const { data: locations } = await sb
     .from('locations')
@@ -201,6 +212,38 @@ export default async function DiagnosticsPage() {
         <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Bibot affiliate scope</p>
           <p className={`mt-2 text-3xl font-black ${affiliateScopeOk ? 'text-emerald-600' : 'text-amber-600'}`}>{affiliateScopeOk ? 'OK' : bibotRow ? 'Missing' : '—'}</p>
+        </div>
+      </div>
+
+      <div className={`${ad.panel} space-y-3`}>
+        <div className="flex items-baseline justify-between">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Background jobs</p>
+          <p className="text-[10px] text-gray-400">Last successful run per cron</p>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {(cronJobs ?? []).map((job) => {
+            const stale = !job.last_run_at || (Date.now() - new Date(job.last_run_at).getTime() > 8 * 60 * 60 * 1000)
+            const failed = job.last_status && job.last_status !== 'succeeded'
+            const color = !job.active ? 'gray' : failed ? 'red' : stale ? 'amber' : 'green'
+            return (
+              <div key={job.jobname} className="rounded-2xl border border-gray-200 bg-white p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-[11px] font-bold text-gray-900">{job.jobname}</span>
+                  {badge(color, job.last_status ?? (job.active ? 'pending' : 'paused'))}
+                </div>
+                <div className="mt-1 font-mono text-[10px] text-gray-400">{job.schedule}</div>
+                <div className="mt-2 text-xs font-semibold text-gray-700">
+                  {job.last_run_at ? relTime(job.last_run_at) : 'never'}
+                </div>
+                {job.last_run_at && (
+                  <div className="text-[10px] text-gray-400">{new Date(job.last_run_at).toLocaleString()}</div>
+                )}
+              </div>
+            )
+          })}
+          {(cronJobs ?? []).length === 0 && (
+            <div className="col-span-3 text-xs text-gray-500">No cron jobs scheduled.</div>
+          )}
         </div>
       </div>
 
