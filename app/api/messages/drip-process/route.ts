@@ -119,3 +119,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ processed: totalSent })
 }
+
+export async function POST(req: NextRequest) {
+  return GET(req)
+}
