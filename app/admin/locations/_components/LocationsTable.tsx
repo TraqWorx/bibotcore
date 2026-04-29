@@ -260,7 +260,13 @@ export default function LocationsTable({ rows, designs, unconnectedLocations, pl
                 {pageRows.map((row, i) => (
                   <tr
                     key={row.id}
-                    className={`transition-colors hover:bg-gray-50/70 ${row.churned ? 'bg-red-50/25' : ''}`}
+                    className={`transition-colors hover:bg-gray-50/70 ${
+                      row.churned
+                        ? 'bg-red-50/25'
+                        : row.manualPlan && row.planId
+                          ? 'bg-amber-50/30'
+                          : ''
+                    }`}
                   >
                     <td className="px-3 py-3 text-xs text-gray-300 tabular-nums">{startIdx + i + 1}</td>
                     <td className="px-3 py-3 max-w-[260px]">
@@ -336,9 +342,28 @@ export default function LocationsTable({ rows, designs, unconnectedLocations, pl
                       )}
                     </td>
                     <td className="px-3 py-3 text-xs text-gray-600">
-                      {row.churned
-                        ? <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">Churned</span>
-                        : row.planName ?? <span className="text-gray-300">—</span>}
+                      {row.churned ? (
+                        <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">Churned</span>
+                      ) : row.planName ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="font-semibold text-gray-900">{row.planName}</span>
+                          {row.manualPlan ? (
+                            <span
+                              className="inline-flex w-fit items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-800"
+                              title="Plan was set manually (e.g. PayPal customer). Stripe sync will not change it."
+                            >
+                              <span className="h-1 w-1 rounded-full bg-amber-500" /> Manual
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-flex w-fit items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gray-500"
+                              title="Plan synced automatically from Stripe via GHL SaaS subscription."
+                            >
+                              <span className="h-1 w-1 rounded-full bg-gray-400" /> Stripe
+                            </span>
+                          )}
+                        </div>
+                      ) : <span className="text-gray-300">—</span>}
                     </td>
                     <td className={`px-3 py-3 text-right text-xs font-bold tabular-nums whitespace-nowrap ${row.planPrice != null ? 'text-emerald-700' : 'text-gray-400'}`}>
                       {row.planPrice != null

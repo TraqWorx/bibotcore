@@ -50,8 +50,14 @@ export default function ActivateButton({ locationId, currentPlanId, plans }: {
   }
 
   if (!open) {
+    const styled = currentPlanId
+      ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+      : 'border-brand/30 bg-brand/5 text-brand hover:bg-brand/10'
     return (
-      <button onClick={() => setOpen(true)} className="rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50 whitespace-nowrap">
+      <button
+        onClick={() => setOpen(true)}
+        className={`rounded-lg border px-2.5 py-1 text-[11px] font-bold whitespace-nowrap transition-colors ${styled}`}
+      >
         {currentPlanId ? 'Change Plan' : 'Set Plan'}
       </button>
     )
