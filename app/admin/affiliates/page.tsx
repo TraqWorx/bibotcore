@@ -208,7 +208,12 @@ export default async function AffiliatesPage() {
   }
   const planLookup = (email: string) => emailToPlan.get(email.toLowerCase()) ?? null
 
-  for (const conn of connections ?? []) {
+  // Affiliates live only on the Bibot subaccount itself (name contains "bibot").
+  // Other connected sub-accounts may have their own affiliate-manager configurations,
+  // but those aren't ours to show on this page.
+  const bibotConnections = (connections ?? []).filter((c) => /bibot/i.test(nameMap.get(c.location_id) ?? ''))
+
+  for (const conn of bibotConnections) {
     const token = await refreshIfNeeded(conn.location_id, conn)
     const cid = conn.company_id ?? companyId
     const { affiliates, issue } = await fetchAffiliates(conn.location_id, token, cid)
@@ -221,13 +226,11 @@ export default async function AffiliatesPage() {
         detail: issue.detail,
       })
     }
-    // Get location token for detail fetches (use raw company token, not refreshed)
-    const locToken = await getLocationToken(conn.access_token, conn.location_id, cid)
+    // Detail fetches reuse the same Location-scoped token that succeeded for /affiliates.
+    // Old code called getLocationToken() which only works on Company tokens — it returns
+    // null for Location tokens, leaving commission % and customers empty.
     for (const a of affiliates) {
-      let details = { commissionPercent: null as number | null, customers: [] as AffiliateCustomer[] }
-      if (locToken) {
-        details = await fetchAffiliateDetails(conn.location_id, locToken, a, planLookup)
-      }
+      const details = await fetchAffiliateDetails(conn.location_id, token, a, planLookup)
       allAffiliates.push({
         ...a,
         locationId: conn.location_id,
