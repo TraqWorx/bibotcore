@@ -11,6 +11,8 @@ interface AffiliateCustomer {
   planName?: string
   planPrice?: number
   locationName?: string
+  revenue?: number
+  commissionAmount?: number
 }
 
 interface AffiliateRow {
@@ -41,6 +43,16 @@ function monthsSince(iso: string): number {
   const start = new Date(iso)
   const now = new Date()
   return Math.max(1, Math.round((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)))
+}
+
+// Derive months billed from GHL's revenue total ÷ plan price. Falls back to
+// elapsed time since the affiliate link was created when revenue or planPrice
+// is missing (typical for leads / not-yet-provisioned customers).
+function monthsFromRevenue(c: AffiliateCustomer): number {
+  if (typeof c.revenue === 'number' && typeof c.planPrice === 'number' && c.planPrice > 0) {
+    return Math.max(1, Math.round(c.revenue / c.planPrice))
+  }
+  return c.createdAt ? monthsSince(c.createdAt) : 0
 }
 
 function formatDate(iso: string): string {
@@ -117,10 +129,11 @@ export default function AffiliatesTable({ affiliates }: { affiliates: AffiliateR
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                               {a.customers.map((c, i) => {
-                                const months = c.createdAt ? monthsSince(c.createdAt) : 0
+                                const months = monthsFromRevenue(c)
                                 const commRate = (a.commissionPercent ?? 0) / 100
                                 const monthlyCommission = (c.planPrice ?? 0) * commRate
-                                const totalCommission = monthlyCommission * months
+                                // Prefer GHL's authoritative commissionAmount; fall back to local math.
+                                const totalCommission = c.commissionAmount ?? (monthlyCommission * months)
                                 return (
                                   <tr key={i}>
                                     <td className="py-2 font-medium text-gray-900">

@@ -39,6 +39,9 @@ interface AffiliateCustomer {
   planName?: string
   planPrice?: number
   locationName?: string
+  // From GHL — authoritative totals so we don't reverse-engineer them.
+  revenue?: number
+  commissionAmount?: number
 }
 
 interface AffiliateDisplay extends Affiliate {
@@ -114,9 +117,13 @@ async function fetchAffiliateDetails(locationId: string, locToken: string, affil
           email,
           createdAt: c.createdAt as string | undefined,
           type: c.type as string | undefined,
-          planName: plan?.planName,
+          // Prefer GHL's planName when our DB lookup misses (e.g. customer email
+          // not yet provisioned as a profile).
+          planName: plan?.planName ?? (c.planName as string | undefined),
           planPrice: plan?.planPrice,
           locationName: plan?.locationName,
+          revenue: typeof c.revenue === 'number' ? c.revenue : undefined,
+          commissionAmount: typeof c.commissionAmount === 'number' ? c.commissionAmount : undefined,
         }
       })
     }
