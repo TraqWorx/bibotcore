@@ -17,20 +17,20 @@ export default function RefreshButton({ locationId }: { locationId: string }) {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <span className="inline-flex items-center gap-1.5">
       <button
         type="button"
         onClick={onClick}
         disabled={pending}
-        className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-800 shadow-sm transition hover:bg-gray-50 disabled:opacity-50"
+        className="text-[10px] font-bold uppercase tracking-wide text-gray-500 hover:text-gray-900 disabled:opacity-50"
       >
-        {pending ? 'Refreshing…' : 'Refresh now'}
+        {pending ? 'Refreshing…' : 'Refresh'}
       </button>
       {msg && (
-        <span className={`text-[10px] font-semibold ${msg === 'Refreshed' ? 'text-emerald-700' : 'text-rose-700'}`}>
-          {msg}
+        <span className={`text-[10px] font-semibold ${msg === 'Refreshed' ? 'text-emerald-600' : 'text-rose-600'}`}>
+          · {msg}
         </span>
       )}
-    </div>
+    </span>
   )
 }

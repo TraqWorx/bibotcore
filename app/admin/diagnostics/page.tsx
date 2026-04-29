@@ -200,13 +200,13 @@ export default async function DiagnosticsPage() {
       <div className={ad.tableShell}>
         <table className="w-full table-fixed text-left text-sm">
           <colgroup>
-            <col className="w-[22%]" />
-            <col className="w-[12%]" />
-            <col className="w-[12%]" />
-            <col className="w-[12%]" />
+            <col className="w-[26%]" />
+            <col className="w-[10%]" />
+            <col className="w-[10%]" />
             <col className="w-[14%]" />
             <col className="w-[14%]" />
             <col className="w-[14%]" />
+            <col className="w-[12%]" />
           </colgroup>
           <thead className={ad.tableHeadRow}>
             <tr className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
@@ -228,8 +228,29 @@ export default async function DiagnosticsPage() {
             {rows.map((r) => {
               const expired = r.expiresAt && new Date(r.expiresAt).getTime() < Date.now()
               const expiringSoon = r.expiresAt && new Date(r.expiresAt).getTime() - Date.now() < 12 * 60 * 60 * 1000
+
+              if (!r.connected) {
+                return (
+                  <tr key={r.locationId} className="align-middle bg-gray-50/40">
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-700">{r.locationName}</span>
+                        {r.affiliateRelevant && badge('gray', 'Bibot')}
+                      </div>
+                      <div className="mt-0.5 font-mono text-[10px] text-gray-400">{r.locationId}</div>
+                    </td>
+                    <td colSpan={5} className="px-4 py-2.5 text-xs text-gray-400">Not connected</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <Link href="/admin/locations" className="text-[10px] font-bold uppercase tracking-wide text-brand hover:underline">
+                        Connect →
+                      </Link>
+                    </td>
+                  </tr>
+                )
+              }
+
               return (
-                <tr key={r.locationId} className={`align-top ${!r.connected ? 'bg-gray-50/50' : ''}`}>
+                <tr key={r.locationId} className="align-top">
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-gray-900">{r.locationName}</span>
@@ -237,35 +258,25 @@ export default async function DiagnosticsPage() {
                     </div>
                     <div className="mt-1 font-mono text-[10px] text-gray-400">{r.locationId}</div>
                     {r.jwt.versionId && (
-                      <div className="mt-1 font-mono text-[10px] text-gray-400">v: {r.jwt.versionId}</div>
+                      <div className="mt-0.5 font-mono text-[10px] text-gray-400">v: {r.jwt.versionId}</div>
                     )}
                   </td>
                   <td className="px-4 py-4">
-                    {!r.connected
-                      ? badge('gray', '—')
-                      : r.jwt.decodeError
-                        ? badge('gray', 'PIT')
-                        : r.jwt.authClass === 'Company'
-                          ? badge('amber', 'Company')
-                          : r.jwt.authClass === 'Location'
-                            ? badge('green', 'Location')
-                            : badge('gray', r.jwt.authClass ?? '—')}
+                    {r.jwt.decodeError
+                      ? badge('gray', 'PIT')
+                      : r.jwt.authClass === 'Company'
+                        ? badge('amber', 'Company')
+                        : r.jwt.authClass === 'Location'
+                          ? badge('green', 'Location')
+                          : badge('gray', r.jwt.authClass ?? '—')}
                   </td>
                   <td className="px-4 py-4">
-                    {r.connected ? (
-                      <>
-                        <span className="text-xs font-bold text-gray-900">{r.jwt.scopes.length}</span>
-                        <span className="ml-1 text-[10px] text-gray-500">scopes</span>
-                      </>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
+                    <span className="text-xs font-bold text-gray-900">{r.jwt.scopes.length}</span>
+                    <span className="ml-1 text-[10px] text-gray-500">scopes</span>
                   </td>
                   <td className="px-4 py-4">
                     {!r.affiliateRelevant ? (
-                      <span className="text-xs text-gray-400">N/A</span>
-                    ) : !r.connected ? (
-                      <span className="text-xs text-gray-400">—</span>
+                      <span className="text-xs text-gray-300">N/A</span>
                     ) : (
                       <>
                         {r.hasAffiliateScope ? badge('green', 'In token') : badge('amber', 'Missing')}
@@ -278,45 +289,38 @@ export default async function DiagnosticsPage() {
                     )}
                   </td>
                   <td className="px-4 py-4">
-                    {r.connected ? (
-                      <>
-                        <div className={`text-xs font-semibold ${expired ? 'text-rose-700' : expiringSoon ? 'text-amber-700' : 'text-gray-900'}`}>
-                          {relTime(r.expiresAt)}
-                        </div>
-                        <div className="text-[10px] text-gray-400">{r.expiresAt ? new Date(r.expiresAt).toLocaleString() : '—'}</div>
-                      </>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
+                    <div className={`text-xs font-semibold ${expired ? 'text-rose-700' : expiringSoon ? 'text-amber-700' : 'text-gray-900'}`}>
+                      {relTime(r.expiresAt)}
+                    </div>
+                    {r.expiresAt && (
+                      <div className="text-[10px] text-gray-400">{new Date(r.expiresAt).toLocaleString()}</div>
                     )}
                   </td>
                   <td className="px-4 py-4">
-                    {r.connected ? (
+                    {r.refreshedAt ? (
                       <>
                         <div className="text-xs font-semibold text-gray-900">{relTime(r.refreshedAt)}</div>
-                        <div className="text-[10px] text-gray-400">{r.refreshedAt ? new Date(r.refreshedAt).toLocaleString() : 'never (since instrumented)'}</div>
+                        <div className="text-[10px] text-gray-400">{new Date(r.refreshedAt).toLocaleString()}</div>
                       </>
                     ) : (
-                      <span className="text-xs text-gray-400">—</span>
+                      <div className="text-xs text-gray-400">—</div>
                     )}
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex flex-col items-end gap-2">
-                      {!r.connected ? (
-                        badge('gray', 'Not connected')
-                      ) : r.health?.ok ? (
-                        badge('green', 'OK')
-                      ) : r.health?.detail?.toLowerCase().includes('jwt') ? (
-                        badge('red', 'Reconnect')
-                      ) : (
-                        badge('amber', `HTTP ${r.health?.status ?? '?'}`)
-                      )}
-                      {r.connected && r.health && !r.health.ok && r.health.detail && (
+                    <div className="flex flex-col items-end gap-1.5">
+                      {r.health?.ok
+                        ? badge('green', 'OK')
+                        : r.health?.detail?.toLowerCase().includes('jwt')
+                          ? badge('red', 'Reconnect')
+                          : badge('amber', `HTTP ${r.health?.status ?? '?'}`)}
+                      {r.health && !r.health.ok && r.health.detail && (
                         <code className="text-right font-mono text-[10px] text-gray-500 line-clamp-2">{r.health.detail}</code>
                       )}
-                      <div className="flex items-center gap-2">
-                        {r.connected && <RefreshButton locationId={r.locationId} />}
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <RefreshButton locationId={r.locationId} />
+                        <span className="text-[10px] text-gray-300">·</span>
                         <Link href="/admin/locations" className="text-[10px] font-bold uppercase tracking-wide text-gray-500 hover:text-gray-900">
-                          {r.connected ? 'Reconnect →' : 'Connect →'}
+                          Reconnect
                         </Link>
                       </div>
                     </div>
