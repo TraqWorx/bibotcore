@@ -349,18 +349,20 @@ export default async function DiagnosticsPage() {
         </div>
         <div className="grid grid-cols-3 gap-3">
           {(cronJobs ?? []).map((job) => {
-            const stale = !job.last_run_at || (Date.now() - new Date(job.last_run_at).getTime() > 8 * 60 * 60 * 1000)
+            const neverRan = !job.last_run_at
+            const stale = !neverRan && (Date.now() - new Date(job.last_run_at!).getTime() > 8 * 60 * 60 * 1000)
             const failed = job.last_status && job.last_status !== 'succeeded'
-            const color = !job.active ? 'gray' : failed ? 'red' : stale ? 'amber' : 'green'
+            const color = !job.active ? 'gray' : failed ? 'red' : neverRan ? 'gray' : stale ? 'amber' : 'green'
+            const label = !job.active ? 'paused' : failed ? job.last_status! : neverRan ? 'scheduled' : 'succeeded'
             return (
               <div key={job.jobname} className="rounded-2xl border border-gray-200 bg-white p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-[11px] font-bold text-gray-900">{job.jobname}</span>
-                  {badge(color, job.last_status ?? (job.active ? 'pending' : 'paused'))}
+                  {badge(color, label)}
                 </div>
                 <div className="mt-1 font-mono text-[10px] text-gray-400">{job.schedule}</div>
                 <div className="mt-2 text-xs font-semibold text-gray-700">
-                  {job.last_run_at ? relTime(job.last_run_at) : 'never'}
+                  {job.last_run_at ? relTime(job.last_run_at) : 'awaiting first tick'}
                 </div>
                 {job.last_run_at && (
                   <div className="text-[10px] text-gray-400">{new Date(job.last_run_at).toLocaleString()}</div>
