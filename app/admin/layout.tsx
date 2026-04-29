@@ -39,7 +39,6 @@ const getAdminData = cache(async () => {
     navLinks.push(
       { href: '/admin/finances', label: 'Finances' },
       { href: '/admin/affiliates', label: 'Affiliates' },
-      { href: '/admin/diagnostics', label: 'Diagnostics' },
     )
   }
 
@@ -56,10 +55,13 @@ const getAdminData = cache(async () => {
     }
   }
 
-  const bottomLinks = [
+  const bottomLinks: { href: string; label: string; count?: number }[] = [
     { href: '/admin/users', label: 'Users', count: userCount ?? 0 },
     { href: '/admin/account', label: 'Account & Billing' },
   ]
+  if (isBibotAgency(agencyId)) {
+    bottomLinks.push({ href: '/admin/diagnostics', label: 'Diagnostics' })
+  }
 
   return { navLinks, bottomLinks, agencyName, agencyId, initials: agencyName.slice(0, 2).toUpperCase(), email: user.email ?? '' }
 })

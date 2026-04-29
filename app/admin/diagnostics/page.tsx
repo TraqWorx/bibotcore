@@ -121,7 +121,12 @@ export default async function DiagnosticsPage() {
 
   const rows: DiagRow[] = await Promise.all((locations ?? []).map(async (loc): Promise<DiagRow> => {
     const conn = connByLoc.get(loc.location_id)
-    const affiliateRelevant = /bibot/i.test(loc.name ?? '')
+    // We surface affiliate scope info for every connected location now —
+    // the scope is granted by the marketplace app version, so any re-authorized
+    // location should have it. The Bibot subaccount is the only one that
+    // actually exposes affiliate data, but visibility into scope state for
+    // all locations helps spot drift.
+    const isBibotLocation = /bibot/i.test(loc.name ?? '')
 
     if (!conn?.access_token) {
       return {
@@ -135,7 +140,7 @@ export default async function DiagnosticsPage() {
         health: null,
         hasAffiliateScope: false,
         affiliateCheck: null,
-        affiliateRelevant,
+        affiliateRelevant: isBibotLocation,
       }
     }
 
@@ -143,7 +148,9 @@ export default async function DiagnosticsPage() {
     const hasAffiliateScope = jwt.scopes.some((s) => s.toLowerCase().includes('affiliate'))
     const checks = await Promise.all([
       ping(`${GHL_BASE}/locations/${loc.location_id}`, conn.access_token),
-      affiliateRelevant
+      // Only ping the affiliate-manager API for the Bibot subaccount; other
+      // locations may not have an affiliate manager configured at all.
+      isBibotLocation
         ? ping(`${GHL_BASE}/affiliate-manager/${loc.location_id}/affiliates`, conn.access_token)
         : Promise.resolve(null),
     ])
@@ -158,7 +165,7 @@ export default async function DiagnosticsPage() {
       health: checks[0],
       hasAffiliateScope,
       affiliateCheck: checks[1],
-      affiliateRelevant,
+      affiliateRelevant: isBibotLocation,
     }
   }))
 
@@ -275,17 +282,11 @@ export default async function DiagnosticsPage() {
                     <span className="ml-1 text-[10px] text-gray-500">scopes</span>
                   </td>
                   <td className="px-4 py-4">
-                    {!r.affiliateRelevant ? (
-                      <span className="text-xs text-gray-300">N/A</span>
-                    ) : (
-                      <>
-                        {r.hasAffiliateScope ? badge('green', 'In token') : badge('amber', 'Missing')}
-                        {r.affiliateCheck && (
-                          <div className="mt-1 text-[10px] text-gray-500">
-                            {r.affiliateCheck.ok ? 'API ✓' : `API ${r.affiliateCheck.status}`}
-                          </div>
-                        )}
-                      </>
+                    {r.hasAffiliateScope ? badge('green', 'In token') : badge('amber', 'Missing')}
+                    {r.affiliateCheck && (
+                      <div className="mt-1 text-[10px] text-gray-500">
+                        {r.affiliateCheck.ok ? 'API ✓' : `API ${r.affiliateCheck.status}`}
+                      </div>
                     )}
                   </td>
                   <td className="px-4 py-4">
@@ -337,7 +338,7 @@ export default async function DiagnosticsPage() {
         <ul className="space-y-1 text-xs text-gray-700">
           <li><strong>Auth class</strong>: <code>Location</code> = OAuth location-scoped, <code>Company</code> = needs locationToken exchange, <code>PIT</code> = Private Integration Token (40-char, no JWT).</li>
           <li><strong>Scopes</strong>: how many scopes the token grants. The OAuth app&apos;s <code>versionId</code> determines this — to add scopes, edit the marketplace app version then re-authorize.</li>
-          <li><strong>Affiliate</strong>: only relevant for the Bibot subaccount (the only one with an affiliate manager). <em>In token</em> = scope present; <em>Missing</em> = needs re-authorization after the marketplace app version is updated. Other locations show <em>N/A</em>.</li>
+          <li><strong>Affiliate</strong>: <em>In token</em> = `affiliate-manager.readonly` scope is on the JWT; <em>Missing</em> = needs re-authorization after the marketplace app version is updated. The API ping below the badge runs only for the Bibot subaccount (the only one with affiliate data).</li>
           <li><strong>Health</strong>: live <code>GET /locations/&#123;id&#125;</code>. <em>OK</em> = token works; <em>Reconnect</em> = JWT rejected; <em>Not connected</em> = no OAuth install on this location yet.</li>
           <li><strong>Last refreshed</strong>: <em>never (since instrumented)</em> until the cron rotates the token. After that, never older than ~6h.</li>
         </ul>
