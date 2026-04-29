@@ -39,6 +39,7 @@ const getAdminData = cache(async () => {
     navLinks.push(
       { href: '/admin/finances', label: 'Finances' },
       { href: '/admin/affiliates', label: 'Affiliates' },
+      { href: '/admin/diagnostics', label: 'Diagnostics' },
     )
   }
 

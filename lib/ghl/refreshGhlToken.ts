@@ -30,6 +30,7 @@ export async function refreshGhlToken(
       access_token: data.access_token,
       refresh_token: data.refresh_token,
       expires_at: expiresAt,
+      refreshed_at: new Date().toISOString(),
     })
     .eq('location_id', locationId)
 

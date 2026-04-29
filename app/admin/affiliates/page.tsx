@@ -1,5 +1,6 @@
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import AffiliatesTable from './_components/AffiliatesTable'
@@ -45,6 +46,24 @@ interface AffiliateDisplay extends Affiliate {
   locationName: string
   commissionPercent: number | null
   customers: AffiliateCustomer[]
+}
+
+type IssueKind = 'scope_missing' | 'auth_failed' | 'other'
+
+interface ConnectionIssue {
+  locationId: string
+  locationName: string
+  kind: IssueKind
+  status: number
+  detail: string
+}
+
+function classify(status: number, body: string): IssueKind {
+  if (status === 401) {
+    if (/scope/i.test(body)) return 'scope_missing'
+    return 'auth_failed'
+  }
+  return 'other'
 }
 
 async function getLocationToken(companyToken: string, locationId: string, companyId: string): Promise<string | null> {
@@ -105,15 +124,17 @@ async function fetchAffiliateDetails(locationId: string, locToken: string, affil
   return { commissionPercent, customers }
 }
 
-async function fetchAffiliates(locationId: string, token: string, companyId: string): Promise<Affiliate[]> {
+async function fetchAffiliates(
+  locationId: string,
+  token: string,
+  companyId: string
+): Promise<{ affiliates: Affiliate[]; issue?: { kind: IssueKind; status: number; detail: string } }> {
   try {
-    // First try with the token directly
     let res = await fetch(`${GHL_BASE}/affiliate-manager/${locationId}/affiliates`, {
       headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
       cache: 'no-store',
     })
 
-    // If 401, try exchanging for a location token
     if (res.status === 401) {
       const locToken = await getLocationToken(token, locationId, companyId)
       if (locToken) {
@@ -124,12 +145,17 @@ async function fetchAffiliates(locationId: string, token: string, companyId: str
       }
     }
 
-    if (!res.ok) return []
+    if (!res.ok) {
+      const body = await res.text()
+      console.error(`[affiliates] ${locationId} -> ${res.status} ${body.slice(0, 200)}`)
+      return { affiliates: [], issue: { kind: classify(res.status, body), status: res.status, detail: body.slice(0, 200) } }
+    }
     const data = await res.json()
-    return (data?.affiliates ?? data?.data ?? []) as Affiliate[]
+    return { affiliates: (data?.affiliates ?? data?.data ?? []) as Affiliate[] }
   } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
     console.error('[affiliates] fetch error:', err)
-    return []
+    return { affiliates: [], issue: { kind: 'other', status: 0, detail } }
   }
 }
 
@@ -156,6 +182,7 @@ export default async function AffiliatesPage() {
     .not('refresh_token', 'is', null)
 
   const allAffiliates: AffiliateDisplay[] = []
+  const issues: ConnectionIssue[] = []
   const { data: locations } = await sb.from('locations').select('location_id, name, ghl_plan_id').eq('agency_id', profile.agency_id)
   const nameMap = new Map((locations ?? []).map((l) => [l.location_id, l.name]))
 
@@ -184,7 +211,16 @@ export default async function AffiliatesPage() {
   for (const conn of connections ?? []) {
     const token = await refreshIfNeeded(conn.location_id, conn)
     const cid = conn.company_id ?? companyId
-    const affiliates = await fetchAffiliates(conn.location_id, token, cid)
+    const { affiliates, issue } = await fetchAffiliates(conn.location_id, token, cid)
+    if (issue) {
+      issues.push({
+        locationId: conn.location_id,
+        locationName: nameMap.get(conn.location_id) ?? conn.location_id,
+        kind: issue.kind,
+        status: issue.status,
+        detail: issue.detail,
+      })
+    }
     // Get location token for detail fetches (use raw company token, not refreshed)
     const locToken = await getLocationToken(conn.access_token, conn.location_id, cid)
     for (const a of affiliates) {
@@ -209,18 +245,56 @@ export default async function AffiliatesPage() {
   const totalLeads = allAffiliates.reduce((s, a) => s + (a.lead ?? 0), 0)
   const defaultCurrency = allAffiliates[0]?.currency
 
+  const totalConnections = (connections ?? []).length
+  const okConnections = totalConnections - issues.length
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className={ad.pageTitle}>Affiliates</h1>
-        <p className={ad.pageSubtitle}>{allAffiliates.length} affiliates across {new Set(allAffiliates.map(a => a.locationId)).size} locations</p>
+        <p className={ad.pageSubtitle}>
+          {allAffiliates.length} affiliates across {new Set(allAffiliates.map(a => a.locationId)).size} locations
+          {totalConnections > 0 && (
+            <> · {okConnections}/{totalConnections} connections OK{issues.length > 0 && <> · <span className="font-semibold text-amber-700">{issues.length} need attention</span></>}</>
+          )}
+        </p>
       </div>
+
+      {issues.length > 0 && (
+        <div className="rounded-3xl border border-amber-300/70 bg-amber-50/80 p-5 shadow-sm sm:p-6">
+          <p className="text-sm font-bold text-amber-900">Some locations couldn&apos;t load affiliates</p>
+          <ul className="mt-3 space-y-2 text-sm text-amber-900">
+            {issues.map((iss) => {
+              const action =
+                iss.kind === 'scope_missing'
+                  ? 'Affiliate scope is not on this token. Re-authorize this location after the GHL app version includes the affiliate scopes.'
+                  : iss.kind === 'auth_failed'
+                  ? 'Connection has expired. Reconnect this location.'
+                  : `Unexpected response (HTTP ${iss.status}).`
+              return (
+                <li key={iss.locationId} className="flex flex-col gap-1 rounded-xl bg-white/60 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold">{iss.locationName}</span>
+                    <Link href="/admin/locations" className="text-xs font-bold uppercase tracking-wide text-amber-800 hover:underline">
+                      Manage →
+                    </Link>
+                  </div>
+                  <span className="text-xs text-amber-800">{action}</span>
+                  <span className="font-mono text-[10px] text-amber-700/80">{iss.locationId} · {iss.detail}</span>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
 
       {allAffiliates.length === 0 ? (
         <div className={`${ad.panel} py-12 text-center`}>
           <p className="text-sm font-medium text-gray-500">No affiliates found</p>
           <p className="mt-1 text-xs text-gray-400">
-            Make sure the affiliate scope is enabled in your GHL app and locations are re-authorized.
+            {issues.length > 0
+              ? 'Resolve the connection issues above to load affiliate data.'
+              : 'No affiliates have signed up under any connected location yet.'}
           </p>
         </div>
       ) : (
