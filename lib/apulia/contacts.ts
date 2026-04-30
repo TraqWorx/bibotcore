@@ -66,7 +66,13 @@ export interface UpsertContactInput {
 
 /** Create or update a contact. Returns the resulting contact id. */
 export async function upsertContact(input: UpsertContactInput): Promise<string> {
-  const customField = input.customField ? Object.fromEntries(Object.entries(input.customField).map(([k, v]) => [k, v])) : undefined
+  // GHL contact endpoints expect customFields as an array of { id, value }
+  // for both POST and PUT. The "customField: { id: value }" object form is
+  // ONLY accepted by POST; PUT silently rejects it with 422 — caused every
+  // update to drop its custom fields without surfacing an error.
+  const customFieldsArray = input.customField
+    ? Object.entries(input.customField).map(([id, value]) => ({ id, value }))
+    : undefined
   if (input.id) {
     const body: Record<string, unknown> = {}
     if (input.email != null) body.email = input.email
@@ -74,7 +80,7 @@ export async function upsertContact(input: UpsertContactInput): Promise<string> 
     if (input.firstName != null) body.firstName = input.firstName
     if (input.lastName != null) body.lastName = input.lastName
     if (input.tags) body.tags = input.tags
-    if (customField) body.customField = customField
+    if (customFieldsArray) body.customFields = customFieldsArray
     const r = await ghlFetch(`/contacts/${input.id}`, { method: 'PUT', body: JSON.stringify(body) })
     if (!r.ok) throw new Error(`PUT /contacts/${input.id} -> ${r.status} ${await r.text()}`)
     return input.id
@@ -85,7 +91,7 @@ export async function upsertContact(input: UpsertContactInput): Promise<string> 
   if (input.firstName) body.firstName = input.firstName
   if (input.lastName) body.lastName = input.lastName
   if (input.tags) body.tags = input.tags
-  if (customField) body.customField = customField
+  if (customFieldsArray) body.customFields = customFieldsArray
   const r = await ghlFetch('/contacts/', { method: 'POST', body: JSON.stringify(body) })
   if (!r.ok) throw new Error(`POST /contacts -> ${r.status} ${await r.text()}`)
   const j = (await r.json()) as { contact?: { id: string }; id?: string }

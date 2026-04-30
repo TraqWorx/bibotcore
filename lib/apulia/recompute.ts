@@ -55,7 +55,7 @@ export async function recomputeCommissions(): Promise<RecomputeResult> {
       if (Math.round(current * 100) === Math.round(entry.total * 100)) return
       const r = await ghlFetch(`/contacts/${admin.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ customField: { [APULIA_FIELD.COMMISSIONE_TOTALE]: entry.total } }),
+        body: JSON.stringify({ customFields: [{ id: APULIA_FIELD.COMMISSIONE_TOTALE, value: entry.total }] }),
       })
       if (!r.ok) console.error(`[recompute] update ${admin.id}: ${r.status} ${await r.text()}`)
     },

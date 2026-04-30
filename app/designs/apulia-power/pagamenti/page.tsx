@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { listAdminsWithStats } from '@/lib/apulia/queries'
@@ -60,7 +61,11 @@ export default async function Page() {
                   const a = adminById.get(p.contact_id)
                   return (
                     <tr key={p.contact_id + p.period}>
-                      <td>{a?.name ?? p.contact_id}</td>
+                      <td>
+                        <Link href={`/designs/apulia-power/amministratori/${p.contact_id}`} style={{ color: 'var(--ap-text)', textDecoration: 'none', fontWeight: 600 }}>
+                          {a?.name ?? p.contact_id}
+                        </Link>
+                      </td>
                       <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtEur(p.amount_cents / 100)}</td>
                       <td>{new Date(p.paid_at).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}</td>
                       <td style={{ color: 'var(--ap-text-muted)', fontSize: 12 }}>{p.paid_by ?? '—'}</td>
@@ -70,7 +75,11 @@ export default async function Page() {
                 })}
                 {isCurrent && due.map((a) => (
                   <tr key={a.contactId}>
-                    <td>{a.name}</td>
+                    <td>
+                      <Link href={`/designs/apulia-power/amministratori/${a.contactId}`} style={{ color: 'var(--ap-text)', textDecoration: 'none', fontWeight: 600 }}>
+                        {a.name}
+                      </Link>
+                    </td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtEur(a.total)}</td>
                     <td>—</td>
                     <td>—</td>

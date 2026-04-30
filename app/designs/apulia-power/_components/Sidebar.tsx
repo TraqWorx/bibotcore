@@ -37,7 +37,10 @@ export default function Sidebar({ role, email }: { role: 'owner' | 'amministrato
   return (
     <aside className="ap-sidebar">
       <div className="ap-brand">
-        <div className="ap-brand-mark">AP</div>
+        <div className="ap-brand-mark" style={{ background: 'white', padding: 0, overflow: 'hidden' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/apulia-power-logo.webp" alt="Apulia Power" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        </div>
         <div className="ap-brand-text">Apulia Power<small>Rete commerciale</small></div>
       </div>
 

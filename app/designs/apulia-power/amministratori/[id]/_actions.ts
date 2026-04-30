@@ -26,7 +26,7 @@ export async function setPodOverride(podContactId: string, amount: number, admin
   const value = amount > 0 ? amount : ''
   const r = await ghlFetch(`/contacts/${podContactId}`, {
     method: 'PUT',
-    body: JSON.stringify({ customField: { [APULIA_FIELD.POD_OVERRIDE]: value } }),
+    body: JSON.stringify({ customFields: [{ id: APULIA_FIELD.POD_OVERRIDE, value }] }),
   })
   if (!r.ok) return { error: `GHL ${r.status}: ${(await r.text()).slice(0, 200)}` }
 
