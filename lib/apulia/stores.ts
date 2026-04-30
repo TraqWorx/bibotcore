@@ -28,7 +28,8 @@ export async function getStoreBySlug(slug: string): Promise<Store | null> {
 /** Public booking widget URL hosted by the underlying CRM. */
 export function bookingUrlFor(widgetSlug: string | null | undefined): string | null {
   if (!widgetSlug) return null
-  return `https://api.leadconnectorhq.com/widget/booking/${widgetSlug}`
+  // Note: 'bookings' (plural) — singular returns 404.
+  return `https://api.leadconnectorhq.com/widget/bookings/${widgetSlug}`
 }
 
 /** Public lead form URL on this app. */

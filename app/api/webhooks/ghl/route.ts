@@ -216,6 +216,28 @@ export async function POST(req: Request) {
     })
   }
 
+  // ── Apulia Power: keep apulia_contacts cache in sync in realtime ─────────
+  if (locationId === 'VtNhBfleEQDg0KX4eZqY') {
+    const cb = body as ContactWebhookPayload & { tags?: string[]; email?: string; phone?: string; companyName?: string; dateUpdated?: string }
+    if (eventType === 'ContactDelete' || eventType === 'ContactDeleted') {
+      if (cb.id) {
+        const { deleteCached } = await import('@/lib/apulia/cache')
+        await deleteCached(cb.id).catch((e) => console.error('[apulia cache] delete:', e))
+      }
+    } else if (CONTACT_EVENTS.includes(eventType) && cb.id) {
+      const { upsertCachedFromGhl } = await import('@/lib/apulia/cache')
+      await upsertCachedFromGhl({
+        id: cb.id,
+        firstName: cb.firstName,
+        lastName: cb.lastName,
+        email: cb.email,
+        phone: cb.phone,
+        tags: cb.tags ?? [],
+        customFields: cb.customFields ?? [],
+      }).catch((e) => console.error('[apulia cache] upsert:', e))
+    }
+  }
+
   // ── Persist the raw event ────────────────────────────────────────────────
   const { error } = await supabase
     .from('ghl_webhook_events')
