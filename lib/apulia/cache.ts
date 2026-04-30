@@ -32,6 +32,21 @@ function num(v: string | undefined | null): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+/**
+ * Some PODs / PDRs come out of Excel as scientific notation (e.g. "1.042E+13"
+ * for a 13-digit number). Detect and expand to the integer form.
+ */
+export function normalizePod(v: string | null | undefined): string | null {
+  if (v == null) return null
+  const s = String(v).trim()
+  if (!s) return null
+  if (/^[+-]?\d+(\.\d+)?[Ee][+-]?\d+$/.test(s)) {
+    const n = Number(s)
+    if (Number.isFinite(n)) return n.toFixed(0)
+  }
+  return s
+}
+
 export function toCacheRow(c: ApuliaContact): CachedContactRow {
   const cf: Record<string, string> = {}
   for (const f of c.customFields ?? []) {
@@ -46,7 +61,7 @@ export function toCacheRow(c: ApuliaContact): CachedContactRow {
     last_name: c.lastName ?? null,
     tags: c.tags ?? [],
     custom_fields: cf,
-    pod_pdr: cf[APULIA_FIELD.POD_PDR] ?? null,
+    pod_pdr: normalizePod(cf[APULIA_FIELD.POD_PDR]),
     codice_amministratore: cf[APULIA_FIELD.CODICE_AMMINISTRATORE] ?? null,
     amministratore_name: cf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO] ?? null,
     cliente: cf[APULIA_FIELD.CLIENTE] ?? c.firstName ?? null,

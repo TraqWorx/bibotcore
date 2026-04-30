@@ -1,6 +1,9 @@
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
+import { cookies } from 'next/headers'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+
+export const APULIA_IMPERSONATE_COOKIE = 'ap_impersonate'
 
 export const APULIA_LOCATION_ID = 'VtNhBfleEQDg0KX4eZqY'
 export const APULIA_AGENCY_ID = 'e7b3d0d8-5682-44d5-87c1-c449e6814f15'
@@ -15,6 +18,8 @@ export interface ApuliaSession {
   codiceAmministratore?: string
   /** GHL contact ID of the admin's contact record (for /amministratori drill-down link). */
   contactId?: string
+  /** True when the owner is impersonating an amministratore via the "View as" feature. */
+  impersonating?: boolean
 }
 
 /**
@@ -46,6 +51,30 @@ export const getApuliaSession = cache(async (): Promise<ApuliaSession> => {
     profile?.agency_id === APULIA_AGENCY_ID
 
   if (isOwner) {
+    // If owner has set the impersonation cookie, render the design as that
+    // amministratore so they can preview the personal view exactly as that
+    // admin would see it. Owner can clear via /designs/apulia-power/exit-impersonation.
+    const cookieStore = await cookies()
+    const impersonateContactId = cookieStore.get(APULIA_IMPERSONATE_COOKIE)?.value
+    if (impersonateContactId) {
+      const sb2 = createAdminClient()
+      const { data: target } = await sb2
+        .from('apulia_contacts')
+        .select('id, codice_amministratore, email')
+        .eq('id', impersonateContactId)
+        .eq('is_amministratore', true)
+        .maybeSingle()
+      if (target) {
+        return {
+          email: target.email ?? user.email,
+          userId: user.id,
+          role: 'amministratore',
+          codiceAmministratore: target.codice_amministratore ?? undefined,
+          contactId: target.id,
+          impersonating: true,
+        }
+      }
+    }
     return { email: user.email, userId: user.id, role: 'owner' }
   }
 

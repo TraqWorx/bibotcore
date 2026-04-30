@@ -35,14 +35,14 @@ export default function Page() {
         <Section n="1" title="Premessa">
           <p>
             Apulia Power gestisce una rete commerciale articolata in <strong>7 store fisici</strong>,
-            oltre <strong>150 amministratori di condominio</strong> e migliaia di POD attivi. La
-            piattaforma CRM standard (GoHighLevel) supporta i flussi base — contatti, pipeline,
-            calendari — ma non risponde alle esigenze di calcolo automatico delle commissioni,
-            visualizzazione aggregata per amministratore e gestione dei pagamenti semestrali.
+            oltre <strong>150 amministratori di condominio</strong> e migliaia di POD attivi. Le
+            piattaforme CRM standard supportano i flussi base — contatti, pipeline, calendari — ma
+            non rispondono alle esigenze di calcolo automatico delle commissioni, visualizzazione
+            aggregata per amministratore e gestione dei pagamenti semestrali.
           </p>
           <p>
-            Bibot propone un&apos;applicazione esterna integrata che lavora sopra il CRM e fornisce
-            un&apos;interfaccia operativa dedicata, rapida e completamente automatizzata.
+            Bibot propone un&apos;applicazione dedicata che fornisce un&apos;interfaccia operativa
+            su misura, rapida e completamente automatizzata.
           </p>
         </Section>
 
@@ -87,14 +87,14 @@ export default function Page() {
           <p>
             Una <strong>web app dedicata</strong>, ospitata su dominio Bibot, con accesso protetto
             magic-link per il titolare e per ogni amministratore di condominio. La dashboard riflette
-            in tempo reale i dati del CRM e arricchisce la gestione con automazioni cross-contatto.
+            in tempo reale i dati e arricchisce la gestione con automazioni cross-contatto.
           </p>
           <p>
             <strong>Architettura.</strong> I contatti e i custom field vengono mantenuti in una cache
             locale Postgres per garantire prestazioni istantanee, filtri ricchi e continuità di
-            servizio anche in caso di indisponibilità del CRM. Ogni modifica nel CRM viene propagata
-            in tempo reale via webhook, con un job di riconciliazione completa ogni 6 ore come rete
-            di sicurezza.
+            servizio anche in caso di indisponibilità della piattaforma sottostante. Ogni modifica
+            viene propagata in tempo reale via webhook, con un job di riconciliazione completa ogni
+            6 ore come rete di sicurezza.
           </p>
         </Section>
 
@@ -151,7 +151,7 @@ export default function Page() {
               <li>Sezione Store Fisici con i 7 punti vendita (Bisceglie, Barletta, Casagiove, Caserta, Napoli Secondigliano, Torino, Messina).</li>
               <li>Per ogni store: <strong>QR code generato automaticamente</strong> da stampare su flyer e materiali POP.</li>
               <li>Form pubblico mobile-friendly su dominio Bibot, brandizzato Apulia Power, una pagina per store.</li>
-              <li>Submit del form crea automaticamente il contatto nel CRM con tag <code>lead</code> e <code>store-{'{slug}'}</code>, abilitando i flussi di benvenuto già configurati lato CRM.</li>
+              <li>Submit del form crea automaticamente il contatto in Bibot con tag <code>lead</code> e <code>store-{'{slug}'}</code>, abilitando i flussi di benvenuto già configurati.</li>
               <li>Anti-bot honeypot integrato.</li>
               <li>Link diretti ai calendari di prenotazione per ogni store (booking widget Bibot esistente).</li>
               <li>Conteggio lead per store: ultimi 40 giorni e totale storico.</li>
@@ -181,7 +181,7 @@ export default function Page() {
             <ul>
               <li>Date di pagamento configurabili (default 01/01 e 01/07).</li>
               <li>Compenso per POD modificabile per amministratore.</li>
-              <li>Sincronizzazione manuale dalla CRM in caso di edit diretto sul CRM.</li>
+              <li>Sincronizzazione manuale dalla piattaforma in caso di edit diretto.</li>
               <li>Riferimenti tecnici (custom field, location ID).</li>
             </ul>
           </SubSection>
@@ -189,30 +189,26 @@ export default function Page() {
 
         <Section n="5" title="Affidabilità e prestazioni">
           <ul>
-            <li><strong>Cache locale</strong> di tutti i contatti: lettura istantanea, indipendente dal CRM.</li>
+            <li><strong>Cache locale</strong> di tutti i contatti: lettura istantanea, indipendente dalla piattaforma sottostante.</li>
             <li><strong>Sincronizzazione bidirezionale</strong>: webhook real-time + cron full-sync ogni 6 ore.</li>
             <li><strong>Filtri DB-side</strong>: ricerche su migliaia di contatti in &lt;100ms.</li>
             <li><strong>Sicurezza</strong>: auth Supabase, ruoli distinti (titolare vs amministratore), RLS abilitata su tutte le tabelle interne.</li>
-            <li><strong>Token CRM auto-rinnovati</strong> ogni 2 ore per garantire continuità.</li>
+            <li><strong>Token auto-rinnovati</strong> ogni 2 ore per garantire continuità.</li>
             <li><strong>Pannello di diagnostica</strong> con stato connessioni, cron job e cache.</li>
           </ul>
         </Section>
 
         <Section n="6" title="Stack tecnico">
           <ul>
-            <li>Frontend: <strong>Next.js 16</strong> (App Router, Turbopack), TypeScript, Tailwind / CSS scoped.</li>
+            <li>Frontend: <strong>Next.js 16</strong> (App Router, Turbopack), TypeScript.</li>
             <li>Backend: API serverless su <strong>Vercel</strong>, runtime Node.js.</li>
             <li>Database: <strong>Supabase</strong> (Postgres + auth + cron pg_cron + pg_net).</li>
             <li>Hosting: <strong>core.bibotcrm.it</strong>, dominio dedicato, SSL automatico.</li>
-            <li>Integrazione CRM: API REST + webhook + token OAuth.</li>
           </ul>
         </Section>
 
         <Section n="7" title="Tempistiche">
-          <p>
-            Implementazione completa: <strong>già consegnata</strong> (in produzione su core.bibotcrm.it).
-            Eventuali iterazioni o adattamenti richiesti dal cliente verranno valutati separatamente.
-          </p>
+          <p>Consegna in <strong>7 giorni lavorativi</strong> dall&apos;accettazione del preventivo.</p>
         </Section>
 
         <Section n="8" title="Investimento">
@@ -229,9 +225,6 @@ export default function Page() {
 
         <Section n="9" title="Esclusioni">
           <ul>
-            <li>Costo della piattaforma CRM (a carico del cliente).</li>
-            <li>Costi infrastrutturali Vercel / Supabase oltre il piano Hobby (se necessari).</li>
-            <li>Workflow lato CRM (campagne welcome lead, reminder appuntamenti, follow-up switch-out): vanno configurati nel CRM dal cliente o quotati separatamente.</li>
             <li>Sviluppi di nuove funzionalità non incluse in questo documento.</li>
           </ul>
         </Section>

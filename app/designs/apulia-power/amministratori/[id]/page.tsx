@@ -6,6 +6,7 @@ import { currentPeriod, APULIA_FIELD } from '@/lib/apulia/fields'
 import { createAdminClient } from '@/lib/supabase-server'
 import PodTable from './_components/PodTable'
 import MarkPaidButton from './_components/MarkPaidButton'
+import ImpersonateButton from './_components/ImpersonateButton'
 
 interface ProfileField {
   label: string
@@ -53,7 +54,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const sb = createAdminClient()
   const [{ data: payments }, { data: contactRow }] = await Promise.all([
     sb.from('apulia_payments').select('period, amount_cents, paid_at, paid_by, note').eq('contact_id', id).order('paid_at', { ascending: false }),
-    sb.from('apulia_contacts').select('custom_fields, address1, city').eq('id', id).maybeSingle(),
+    sb.from('apulia_contacts').select('custom_fields').eq('id', id).maybeSingle(),
   ])
   const customFields = (contactRow?.custom_fields ?? {}) as Record<string, string>
   const profileBlocks = PROFILE_BLOCKS.map((b) => ({
@@ -79,7 +80,10 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             Compenso per POD: <strong>{fmtEur(admin.compensoPerPod)}</strong>
           </p>
         </div>
-        <MarkPaidButton adminContactId={id} amount={admin.total} alreadyPaid={admin.paidThisPeriod} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+          <MarkPaidButton adminContactId={id} amount={admin.total} alreadyPaid={admin.paidThisPeriod} />
+          <ImpersonateButton adminContactId={id} />
+        </div>
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>

@@ -48,7 +48,11 @@ export async function* importPdp(rows: Record<string, string>[], headers: string
   let done = 0
 
   await pmap(rows, async (row) => {
-    const pod = (row[COL.PodPdr] || '').toUpperCase().trim()
+    const podRaw = (row[COL.PodPdr] || '').toUpperCase().trim()
+    // Excel often serialises numeric PODs in scientific notation; expand.
+    const pod = /^[+-]?\d+(\.\d+)?[Ee][+-]?\d+$/.test(podRaw)
+      ? Number(podRaw).toFixed(0)
+      : podRaw
     if (!pod) {
       skipped++; done++; return
     }

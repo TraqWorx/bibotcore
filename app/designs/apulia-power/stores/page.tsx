@@ -12,12 +12,12 @@ export default async function Page() {
 
   const stores = await listStores()
 
-  // Lead counts per store: last 40 days + all time
+  // Lead counts per store: current month + all time
   const sb = createAdminClient()
-  const since40 = new Date()
-  since40.setDate(since40.getDate() - 40)
-  since40.setHours(0, 0, 0, 0)
-  const { data: leadCountsRaw } = await sb.rpc('apulia_lead_counts_per_store', { since_iso: since40.toISOString() })
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  startOfMonth.setHours(0, 0, 0, 0)
+  const { data: leadCountsRaw } = await sb.rpc('apulia_lead_counts_per_store', { since_iso: startOfMonth.toISOString() })
   const counts = new Map((leadCountsRaw ?? []).map((r: { slug: string; month_count: number; total_count: number }) => [r.slug, r]))
 
   return (
@@ -46,7 +46,7 @@ export default async function Page() {
 
               <div style={{ display: 'flex', gap: 12 }}>
                 <div className="ap-stat" data-tone="accent" style={{ flex: 1 }}>
-                  <div className="ap-stat-label">Lead ultimi 40 gg</div>
+                  <div className="ap-stat-label">Lead mese corrente</div>
                   <div className="ap-stat-value">{c?.month_count ?? 0}</div>
                 </div>
                 <div className="ap-stat" data-tone="neutral" style={{ flex: 1 }}>

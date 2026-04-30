@@ -1,11 +1,13 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import { ghlFetch } from '@/lib/apulia/ghl'
 import { APULIA_FIELD, currentPeriod } from '@/lib/apulia/fields'
 import { patchCached } from '@/lib/apulia/cache'
+import { APULIA_IMPERSONATE_COOKIE } from '@/lib/apulia/auth'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -105,4 +107,37 @@ export async function unmarkPaid(adminContactId: string): Promise<{ error: strin
   revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
   revalidatePath('/designs/apulia-power/amministratori')
   revalidatePath('/designs/apulia-power/pagamenti')
+}
+
+/**
+ * Owner-only: temporarily render the design as if logged in as a specific
+ * amministratore. Sets a cookie consumed by getApuliaSession; the owner can
+ * exit via the banner shown in the layout.
+ */
+export async function startImpersonation(adminContactId: string): Promise<{ error: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+
+  const sb = createAdminClient()
+  const { data: target } = await sb
+    .from('apulia_contacts')
+    .select('id')
+    .eq('id', adminContactId)
+    .eq('is_amministratore', true)
+    .maybeSingle()
+  if (!target) return { error: 'Amministratore non trovato' }
+
+  const cookieStore = await cookies()
+  cookieStore.set(APULIA_IMPERSONATE_COOKIE, adminContactId, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 60 * 60, // 1 hour
+  })
+}
+
+export async function exitImpersonation(): Promise<void> {
+  const cookieStore = await cookies()
+  cookieStore.delete(APULIA_IMPERSONATE_COOKIE)
 }

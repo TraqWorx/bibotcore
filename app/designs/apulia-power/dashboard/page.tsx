@@ -21,16 +21,16 @@ export default async function Page() {
   const totalPaid = admins.filter((a) => a.paidThisPeriod).reduce((s, a) => s + a.total, 0)
   const period = currentPeriod()
 
-  // Recent imports + leads-per-store (last 40 days)
+  // Recent imports + leads-per-store (current month)
   const sb = createAdminClient()
-  const since40 = new Date(); since40.setDate(since40.getDate() - 40); since40.setHours(0, 0, 0, 0)
+  const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0)
   const [{ data: recent }, { data: leadsByStore }] = await Promise.all([
     sb.from('apulia_imports').select('id, kind, filename, rows_total, created_at').order('created_at', { ascending: false }).limit(5),
-    sb.rpc('apulia_lead_counts_per_store', { since_iso: since40.toISOString() }) as unknown as Promise<{ data: { slug: string; month_count: number; total_count: number }[] | null }>,
+    sb.rpc('apulia_lead_counts_per_store', { since_iso: startOfMonth.toISOString() }) as unknown as Promise<{ data: { slug: string; month_count: number; total_count: number }[] | null }>,
   ])
   const stores = await import('@/lib/apulia/stores').then((m) => m.listStores())
   const leadsMap = new Map((leadsByStore ?? []).map((r) => [r.slug, r]))
-  const totalLeads40 = (leadsByStore ?? []).reduce((s, r) => s + (r.month_count || 0), 0)
+  const totalLeadsMonth = (leadsByStore ?? []).reduce((s, r) => s + (r.month_count || 0), 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -56,8 +56,8 @@ export default async function Page() {
           <div className="ap-stat-foot">esclusi dal calcolo commissione</div>
         </div>
         <div className="ap-stat" data-tone="accent">
-          <div className="ap-stat-label">Lead ultimi 40 gg</div>
-          <div className="ap-stat-value">{totalLeads40.toLocaleString('it-IT')}</div>
+          <div className="ap-stat-label">Lead mese corrente</div>
+          <div className="ap-stat-value">{totalLeadsMonth.toLocaleString('it-IT')}</div>
           <div className="ap-stat-foot">da QR / form pubblici</div>
         </div>
         <div className="ap-stat">
@@ -78,7 +78,7 @@ export default async function Page() {
           <Link href="/designs/apulia-power/stores" style={{ fontSize: 12, fontWeight: 700, color: 'var(--ap-blue)', textDecoration: 'none' }}>Gestisci →</Link>
         </header>
         <table className="ap-table">
-          <thead><tr><th>Store</th><th style={{ textAlign: 'right' }}>Ultimi 40 gg</th><th style={{ textAlign: 'right' }}>Totale</th></tr></thead>
+          <thead><tr><th>Store</th><th style={{ textAlign: 'right' }}>Mese corrente</th><th style={{ textAlign: 'right' }}>Totale</th></tr></thead>
           <tbody>
             {stores.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessuno store configurato.</td></tr>}
             {stores.map((s) => {
