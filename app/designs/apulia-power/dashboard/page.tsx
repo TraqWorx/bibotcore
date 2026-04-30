@@ -36,7 +36,7 @@ export default async function Page() {
         <div className="ap-stat" data-tone="accent">
           <div className="ap-stat-label">Condomini attivi</div>
           <div className="ap-stat-value">{snap.totalPodsActive.toLocaleString('it-IT')}</div>
-          <div className="ap-stat-foot">{snap.totalContacts.toLocaleString('it-IT')} totali · escl. amministratori</div>
+          <div className="ap-stat-foot">{(snap.totalPodsActive + snap.totalPodsSwitchedOut).toLocaleString('it-IT')} totali · escl. switch-out</div>
         </div>
         <div className="ap-stat" data-tone="neutral">
           <div className="ap-stat-label">Amministratori</div>
@@ -68,7 +68,7 @@ export default async function Page() {
           </header>
           <table className="ap-table">
             <thead>
-              <tr><th>Nome</th><th style={{ textAlign: 'right' }}>POD</th><th style={{ textAlign: 'right' }}>Da pagare</th><th>Stato</th></tr>
+              <tr><th>Nome</th><th style={{ textAlign: 'right' }}>POD</th><th style={{ textAlign: 'right' }}>Da pagare</th><th>Pagamento</th></tr>
             </thead>
             <tbody>
               {admins.slice(0, 8).map((a) => (
@@ -78,7 +78,7 @@ export default async function Page() {
                   </td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{a.podsActive}{a.podsSwitchedOut > 0 && <span style={{ color: 'var(--ap-warning)', fontSize: 11, marginLeft: 4 }}>+{a.podsSwitchedOut} so</span>}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{fmtEur(a.total)}</td>
-                  <td>{a.paidThisPeriod ? <span className="ap-pill" data-tone="green">✓</span> : <span className="ap-pill" data-tone="amber">·</span>}</td>
+                  <td>{a.paidThisPeriod ? <span className="ap-pill" data-tone="green">Pagato</span> : <span className="ap-pill" data-tone="amber">Da pagare</span>}</td>
                 </tr>
               ))}
             </tbody>

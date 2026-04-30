@@ -1,12 +1,17 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
-import { loadSnapshot } from '@/lib/apulia/queries'
-import { APULIA_FIELD, APULIA_TAG, getField } from '@/lib/apulia/fields'
+import { listCondomini } from '@/lib/apulia/queries'
 
 export const dynamic = 'force-dynamic'
 
-interface SearchParams { q?: string; tag?: string; admin?: string; page?: string }
+interface SearchParams {
+  q?: string
+  stato?: 'active' | 'switch_out'
+  comune?: string
+  amministratore?: string
+  page?: string
+}
 
 const PAGE_SIZE = 50
 
@@ -14,56 +19,72 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   const session = await getApuliaSession()
   if (session.role !== 'owner') redirect('/designs/apulia-power/dashboard')
   const sp = await searchParams
-  const q = (sp.q ?? '').toLowerCase().trim()
-  const tagFilter = sp.tag ?? ''
   const page = Math.max(1, Number(sp.page ?? 1))
 
-  const snap = await loadSnapshot()
-  let pods = snap.pods
+  const { rows, total, comuni, amministratori } = await listCondomini({
+    q: sp.q,
+    stato: sp.stato,
+    comune: sp.comune,
+    amministratore: sp.amministratore,
+    page,
+    pageSize: PAGE_SIZE,
+  })
 
-  if (tagFilter === 'active') pods = pods.filter((p) => !p.tags?.includes(APULIA_TAG.SWITCH_OUT))
-  else if (tagFilter === 'switch_out') pods = pods.filter((p) => p.tags?.includes(APULIA_TAG.SWITCH_OUT))
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  if (q) {
-    pods = pods.filter((p) => {
-      const pod = (getField(p.customFields, APULIA_FIELD.POD_PDR) ?? '').toLowerCase()
-      const name = ((p.firstName ?? '') + ' ' + (p.lastName ?? '')).toLowerCase()
-      const adminName = (getField(p.customFields, APULIA_FIELD.AMMINISTRATORE_CONDOMINIO) ?? '').toLowerCase()
-      return pod.includes(q) || name.includes(q) || adminName.includes(q)
-    })
-  }
-
-  const totalCount = pods.length
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
-  const slice = pods.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-
-  function buildHref(o: Partial<SearchParams>): string {
-    const next = { ...sp, ...o }
+  function buildHref(patch: Partial<SearchParams>): string {
+    const next: Record<string, string | undefined> = { ...sp, ...patch }
     const u = new URLSearchParams()
     if (next.q) u.set('q', next.q)
-    if (next.tag) u.set('tag', next.tag)
+    if (next.stato) u.set('stato', next.stato)
+    if (next.comune) u.set('comune', next.comune)
+    if (next.amministratore) u.set('amministratore', next.amministratore)
     if (next.page && Number(next.page) > 1) u.set('page', String(next.page))
-    return '/designs/apulia-power/condomini' + (u.toString() ? '?' + u.toString() : '')
+    const qs = u.toString()
+    return '/designs/apulia-power/condomini' + (qs ? '?' + qs : '')
   }
+
+  const filtersActive = Boolean(sp.q || sp.stato || sp.comune || sp.amministratore)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <header>
         <h1 className="ap-page-title">Condomini</h1>
-        <p className="ap-page-subtitle">{totalCount.toLocaleString('it-IT')} POD trovati. Cerca per nome cliente, POD/PDR, amministratore.</p>
+        <p className="ap-page-subtitle">{total.toLocaleString('it-IT')} POD trovati. Filtra per cliente, amministratore, comune, stato.</p>
       </header>
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <form style={{ flex: '1 1 280px' }}>
-          <input className="ap-input" name="q" defaultValue={q} placeholder="Cerca…" />
-          {tagFilter && <input type="hidden" name="tag" value={tagFilter} />}
-        </form>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <Link href={buildHref({ tag: undefined, page: undefined })} className="ap-pill" data-tone={!tagFilter ? 'blue' : 'gray'} style={{ textDecoration: 'none' }}>Tutti</Link>
-          <Link href={buildHref({ tag: 'active', page: undefined })} className="ap-pill" data-tone={tagFilter === 'active' ? 'green' : 'gray'} style={{ textDecoration: 'none' }}>Attivi</Link>
-          <Link href={buildHref({ tag: 'switch_out', page: undefined })} className="ap-pill" data-tone={tagFilter === 'switch_out' ? 'amber' : 'gray'} style={{ textDecoration: 'none' }}>Switch-out</Link>
+      <form className="ap-card ap-card-pad" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'flex-end' }}>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Cerca</label>
+          <input className="ap-input" name="q" defaultValue={sp.q ?? ''} placeholder="POD, cliente, amministratore…" style={{ marginTop: 4 }} />
         </div>
-      </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Amministratore</label>
+          <select className="ap-input" name="amministratore" defaultValue={sp.amministratore ?? ''} style={{ marginTop: 4 }}>
+            <option value="">Tutti</option>
+            {amministratori.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Comune</label>
+          <select className="ap-input" name="comune" defaultValue={sp.comune ?? ''} style={{ marginTop: 4 }}>
+            <option value="">Tutti</option>
+            {comuni.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Stato</label>
+          <select className="ap-input" name="stato" defaultValue={sp.stato ?? ''} style={{ marginTop: 4 }}>
+            <option value="">Tutti</option>
+            <option value="active">Attivi</option>
+            <option value="switch_out">Switch-out</option>
+          </select>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button type="submit" className="ap-btn ap-btn-primary" style={{ flex: 1 }}>Filtra</button>
+          {filtersActive && <Link href="/designs/apulia-power/condomini" className="ap-btn ap-btn-ghost">Reset</Link>}
+        </div>
+      </form>
 
       <section className="ap-card">
         <table className="ap-table">
@@ -77,23 +98,16 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
             </tr>
           </thead>
           <tbody>
-            {slice.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td></tr>}
-            {slice.map((p) => {
-              const pod = getField(p.customFields, APULIA_FIELD.POD_PDR) ?? '—'
-              const adminName = getField(p.customFields, APULIA_FIELD.AMMINISTRATORE_CONDOMINIO) ?? '—'
-              const comune = getField(p.customFields, 'EXO9WD4aLV2aPiMYxXUU') ?? '—' // Indirizzo (Città)
-              const cliente = ((p.firstName ?? '') + ' ' + (p.lastName ?? '')).trim() || (getField(p.customFields, APULIA_FIELD.CLIENTE) ?? '—')
-              const switchedOut = p.tags?.includes(APULIA_TAG.SWITCH_OUT)
-              return (
-                <tr key={p.id}>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{pod}</td>
-                  <td>{cliente}</td>
-                  <td>{adminName}</td>
-                  <td>{comune}</td>
-                  <td>{switchedOut ? <span className="ap-pill" data-tone="amber">Switch-out</span> : <span className="ap-pill" data-tone="green">Attivo</span>}</td>
-                </tr>
-              )
-            })}
+            {rows.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td></tr>}
+            {rows.map((p) => (
+              <tr key={p.contactId}>
+                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.pod}</td>
+                <td>{p.cliente ?? '—'}</td>
+                <td>{p.amministratore ?? '—'}</td>
+                <td>{p.comune ?? '—'}</td>
+                <td>{p.switchedOut ? <span className="ap-pill" data-tone="amber">Switch-out</span> : <span className="ap-pill" data-tone="green">Attivo</span>}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </section>

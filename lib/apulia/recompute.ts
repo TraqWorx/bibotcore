@@ -1,6 +1,7 @@
 import { ghlFetch, pmap } from './ghl'
 import { fetchAllContacts, indexByCodiceAmministratore } from './contacts'
 import { APULIA_FIELD, APULIA_TAG, getField } from './fields'
+import { fullSyncCache } from './cache'
 
 export interface RecomputeResult {
   admins: number
@@ -61,6 +62,11 @@ export async function recomputeCommissions(): Promise<RecomputeResult> {
     },
     8,
   )
+
+  // After GHL is updated, refresh the local cache so reads reflect the new
+  // commission totals immediately (otherwise the page would show stale values
+  // until the next full-sync).
+  await fullSyncCache().catch((err) => console.error('[recompute] cache sync:', err))
 
   return {
     admins: admins.length,
