@@ -8,7 +8,7 @@ import { APULIA_LOCATION_ID } from '@/lib/apulia/fields'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 800 // 13 min — large CSVs are slow
+export const maxDuration = 300 // Hobby plan ceiling
 
 export async function POST(req: NextRequest) {
   const auth = await createAuthClient()
