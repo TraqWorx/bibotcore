@@ -48,7 +48,7 @@ export function ResyncButton() {
   const [msg, setMsg] = useState<string | null>(null)
 
   function go() {
-    setMsg('Sincronizzo da GHL…')
+    setMsg('Sincronizzo da Bibot…')
     startTransition(async () => {
       const r = await resyncCache()
       if (r?.error) setMsg(`Errore: ${r.error}`)

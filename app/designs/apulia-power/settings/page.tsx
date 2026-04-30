@@ -38,13 +38,13 @@ export default async function Page() {
         </p>
         <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: 0 }}>
           La cache si aggiorna automaticamente dopo ogni import e ogni modifica di override. Usa il pulsante per
-          forzare una risincronizzazione completa da GHL (utile se qualcuno modifica un contatto direttamente in GHL).
+          forzare una risincronizzazione completa da Bibot (utile se qualcuno modifica un contatto direttamente in Bibot).
         </p>
         <ResyncButton />
       </section>
 
       <section className="ap-card ap-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <h2 style={{ fontSize: 14, fontWeight: 800 }}>Riferimenti GHL</h2>
+        <h2 style={{ fontSize: 14, fontWeight: 800 }}>Riferimenti tecnici</h2>
         <KV k="Location ID" v={APULIA_LOCATION_ID} />
         <KV k="Commissione Totale" v={APULIA_FIELD.COMMISSIONE_TOTALE} />
         <KV k="POD Override" v={APULIA_FIELD.POD_OVERRIDE} />

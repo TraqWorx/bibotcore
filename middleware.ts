@@ -11,6 +11,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/portal/login') ||
     pathname.startsWith('/onboarding') ||
     /^\/designs\/[^/]+\/demo(?:\/.*)?$/.test(pathname) ||
+    pathname.startsWith('/apulia/lead/') ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname === '/'

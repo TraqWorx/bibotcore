@@ -28,7 +28,7 @@ export async function setPodOverride(podContactId: string, amount: number, admin
     method: 'PUT',
     body: JSON.stringify({ customFields: [{ id: APULIA_FIELD.POD_OVERRIDE, value }] }),
   })
-  if (!r.ok) return { error: `GHL ${r.status}: ${(await r.text()).slice(0, 200)}` }
+  if (!r.ok) return { error: `Bibot ${r.status}: ${(await r.text()).slice(0, 200)}` }
 
   // 2. Patch the local cache for this POD.
   await patchCached(podContactId, { pod_override: amount > 0 ? amount : null })
