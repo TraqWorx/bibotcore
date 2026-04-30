@@ -39,6 +39,23 @@ export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
 
   const connMap = new Map((connections ?? []).map((c) => [c.location_id, c]))
 
+  // Pre-load all auth users ONCE (paginated). Used to resolve "already
+  // exists" without doing a list-all-users call inside the per-user loop.
+  const authByEmail = new Map<string, string>()
+  {
+    let page = 1
+    while (true) {
+      const { data } = await sb.auth.admin.listUsers({ perPage: 1000, page })
+      const users = data?.users ?? []
+      for (const u of users) {
+        if (u.email) authByEmail.set(u.email.toLowerCase(), u.id)
+      }
+      if (users.length < 1000) break
+      page++
+      if (page > 30) break
+    }
+  }
+
   for (const loc of allLocations) {
     const conn = connMap.get(loc.location_id)
     try {
@@ -92,15 +109,16 @@ export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
 
           if (createErr) {
             if (createErr.message.toLowerCase().includes('already')) {
-              const { data: page } = await sb.auth.admin.listUsers({ perPage: 1000 })
-              const found = page?.users?.find((u) => u.email?.toLowerCase() === email)
-              if (found) profileId = found.id
+              // Use the pre-loaded map instead of paging all users again.
+              const id = authByEmail.get(email)
+              if (id) profileId = id
             } else {
               errors.push(`${loc.location_id}: createUser ${email}: ${createErr.message}`)
               continue
             }
           } else if (created?.user) {
             profileId = created.user.id
+            authByEmail.set(email, created.user.id)
             usersCreated++
           }
 

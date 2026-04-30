@@ -90,8 +90,14 @@ export async function POST(req: Request) {
     }
   }
 
-  // ── Handle user added to location ──────────────────────────────────────
-  const USER_CREATED_EVENTS = ['UserCreate', 'user.created', 'UserAdded', 'user.added']
+  // ── Handle user added to / updated on location ─────────────────────────
+  // GHL fires UserUpdate when an existing company user is assigned to a
+  // location, gets a role change, etc. — treat it the same as a create:
+  // ensure the Supabase profile exists and is linked to this locationId.
+  const USER_CREATED_EVENTS = [
+    'UserCreate', 'user.created', 'UserAdded', 'user.added',
+    'UserUpdate', 'user.updated',
+  ]
   if (USER_CREATED_EVENTS.includes(eventType)) {
     const email = (
       (body.email as string | undefined) ??
