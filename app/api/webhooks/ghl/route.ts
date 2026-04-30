@@ -3,6 +3,16 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { runDesignInstaller } from '@/lib/designInstaller/runDesignInstaller'
 import { provisionLocation } from '@/lib/ghl/provisionLocation'
 import { processWebhookEvent } from '@/lib/sync/webhookProcessor'
+import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
+
+// Per-location custom-field-to-contact-name auto-sync. When a CSV import
+// (or any other source) creates a contact with the configured custom field
+// populated but no contact name, we copy the field value into firstName.
+// Add new locations here as the same convention is applied elsewhere.
+const NAME_FROM_CUSTOM_FIELD: Record<string, string> = {
+  // Apulia Power → "Cliente" custom field
+  'VtNhBfleEQDg0KX4eZqY': 'kgGrpZOgfUZoeTfhs7Ef',
+}
 
 /**
  * POST /api/webhooks/ghl
@@ -192,6 +202,14 @@ export async function POST(req: Request) {
       } catch { /* ignore notification errors */ }
     })
 
+  // ── Cliente → contact Name sync (CSV import auto-mapping) ────────────────
+  const CONTACT_EVENTS = ['ContactCreate', 'ContactUpdate']
+  if (CONTACT_EVENTS.includes(eventType) && NAME_FROM_CUSTOM_FIELD[locationId]) {
+    syncCustomFieldToName(body as ContactWebhookPayload, locationId).catch((err) => {
+      console.error('[ghl-webhook] Cliente→Name sync failed:', err)
+    })
+  }
+
   // ── Persist the raw event ────────────────────────────────────────────────
   const { error } = await supabase
     .from('ghl_webhook_events')
@@ -205,4 +223,48 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ ok: true })
+}
+
+interface ContactWebhookPayload {
+  id?: string
+  firstName?: string
+  lastName?: string
+  companyName?: string
+  customFields?: { id: string; value?: string }[]
+}
+
+/**
+ * If the configured custom field on this location has a value AND the
+ * contact has no name yet, write the field's value into firstName via
+ * GHL's contact PUT endpoint. Lets a CSV column like "Cliente" populate
+ * the contact's display name without manual mapping at import time.
+ */
+async function syncCustomFieldToName(payload: ContactWebhookPayload, locationId: string): Promise<void> {
+  const fieldId = NAME_FROM_CUSTOM_FIELD[locationId]
+  const contactId = payload.id
+  if (!contactId || !fieldId) return
+
+  const cf = (payload.customFields ?? []).find((f) => f.id === fieldId)
+  const value = cf?.value?.toString().trim()
+  if (!value) return
+
+  // Don't overwrite a contact that already has a name set.
+  const hasName = Boolean(
+    payload.firstName?.trim() || payload.lastName?.trim() || payload.companyName?.trim()
+  )
+  if (hasName) return
+
+  const token = await getGhlTokenForLocation(locationId)
+  const r = await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Version: '2021-07-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ firstName: value, locationId }),
+  })
+  if (!r.ok) {
+    console.error(`[Cliente→Name] PUT /contacts/${contactId} -> ${r.status}: ${(await r.text()).slice(0, 200)}`)
+  }
 }
