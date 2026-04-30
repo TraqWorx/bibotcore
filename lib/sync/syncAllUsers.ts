@@ -101,32 +101,45 @@ export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
         let profileId = profile?.id
 
         if (!profileId) {
-          // Create auth user (no invite email — silent creation)
-          const { data: created, error: createErr } = await sb.auth.admin.createUser({
-            email,
-            email_confirm: true,
-          })
+          // Try the pre-built auth map first — covers users that exist in
+          // auth.users but never got a profiles row (a common drift state).
+          const knownAuthId = authByEmail.get(email)
+          if (knownAuthId) {
+            profileId = knownAuthId
+          } else {
+            // No auth user yet: create one (no invite email).
+            const { data: created, error: createErr } = await sb.auth.admin.createUser({
+              email,
+              email_confirm: true,
+            })
 
-          if (createErr) {
-            if (createErr.message.toLowerCase().includes('already')) {
-              // Use the pre-loaded map instead of paging all users again.
-              const id = authByEmail.get(email)
-              if (id) profileId = id
-            } else {
-              errors.push(`${loc.location_id}: createUser ${email}: ${createErr.message}`)
-              continue
+            if (createErr) {
+              if (createErr.message.toLowerCase().includes('already')) {
+                // Race or stale map — re-resolve.
+                const id = authByEmail.get(email)
+                if (id) profileId = id
+              } else {
+                errors.push(`${loc.location_id}: createUser ${email}: ${createErr.message}`)
+                continue
+              }
+            } else if (created?.user) {
+              profileId = created.user.id
+              authByEmail.set(email, created.user.id)
+              usersCreated++
             }
-          } else if (created?.user) {
-            profileId = created.user.id
-            authByEmail.set(email, created.user.id)
-            usersCreated++
           }
+        }
 
-          if (profileId) {
-            const { data: existingProf } = await sb.from('profiles').select('id').eq('id', profileId).maybeSingle()
-            if (!existingProf) {
-              await sb.from('profiles').insert({ id: profileId, email, role: 'agency' })
-            }
+        // Always reconcile the profiles row regardless of which branch
+        // resolved profileId. Without this, auth-only users (no profile)
+        // got linked in profile_locations but stayed invisible to the UI,
+        // which counts profiles. That's why Apulia showed 84/101.
+        if (profileId) {
+          const { data: existingProf } = await sb.from('profiles').select('id, email').eq('id', profileId).maybeSingle()
+          if (!existingProf) {
+            await sb.from('profiles').upsert({ id: profileId, email, role: 'agency' }, { onConflict: 'id' })
+          } else if (!existingProf.email) {
+            await sb.from('profiles').update({ email }).eq('id', profileId)
           }
         }
 

@@ -29,17 +29,31 @@ export const getApuliaSession = cache(async (): Promise<ApuliaSession> => {
   if (!user?.email) redirect('/login?next=/designs/apulia-power/dashboard')
 
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('role, agency_id').eq('id', user.id).single()
+  const { data: profile } = await sb
+    .from('profiles')
+    .select('role, agency_id, location_id')
+    .eq('id', user.id)
+    .single()
 
-  // Owners: any agency-admin or super-admin on Apulia's agency.
-  const isOwner = (profile?.role === 'admin' || profile?.role === 'super_admin') && profile?.agency_id === APULIA_AGENCY_ID
+  // Owner detection — broad: anyone with platform-level access OR an
+  // explicit admin-like role on Apulia. Prevents false 403s for users
+  // whose agency_id is null (super_admin) or whose Bibot record stored
+  // them under a different agency.
+  const isOwner =
+    profile?.role === 'super_admin' ||
+    profile?.role === 'admin' ||
+    (profile?.location_id === APULIA_LOCATION_ID && profile?.role === 'agency') ||
+    profile?.agency_id === APULIA_AGENCY_ID
+
   if (isOwner) {
     return { email: user.email, userId: user.id, role: 'owner' }
   }
 
   // Amministratore: search Apulia contacts where email matches.
   const { data: conn } = await sb.from('ghl_connections').select('access_token').eq('location_id', APULIA_LOCATION_ID).single()
-  if (!conn) redirect('/login?error=apulia_not_connected')
+  if (!conn) {
+    return { email: user.email, userId: user.id, role: 'amministratore' }
+  }
 
   const r = await fetch('https://services.leadconnectorhq.com/contacts/search', {
     method: 'POST',
@@ -51,13 +65,16 @@ export const getApuliaSession = cache(async (): Promise<ApuliaSession> => {
     }),
     cache: 'no-store',
   })
-  if (!r.ok) redirect('/login?error=lookup_failed')
-  const j = (await r.json()) as { contacts?: { id: string; tags?: string[]; customFields?: { id: string; value?: string }[] }[] }
-  const contact = j.contacts?.[0]
+  let contact: { id: string; tags?: string[]; customFields?: { id: string; value?: string }[] } | undefined
+  if (r.ok) {
+    const j = (await r.json()) as { contacts?: typeof contact[] }
+    contact = j.contacts?.[0]
+  }
   const isAmministratore = contact?.tags?.includes('amministratore')
-  if (!isAmministratore) redirect('/login?error=not_authorized')
+  if (!isAmministratore) {
+    redirect('/login?error=not_authorized&email=' + encodeURIComponent(user.email))
+  }
 
-  // Resolve their Codice amministratore from custom field 3VwwjdaKH8oQgUO1Vwih
   const codice = contact?.customFields?.find((f) => f.id === '3VwwjdaKH8oQgUO1Vwih')?.value
   return {
     email: user.email,
