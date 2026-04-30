@@ -5,7 +5,7 @@ import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import { ghlFetch } from '@/lib/apulia/ghl'
 import { APULIA_FIELD, currentPeriod } from '@/lib/apulia/fields'
-import { recomputeCommissions } from '@/lib/apulia/recompute'
+import { patchCached } from '@/lib/apulia/cache'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -22,7 +22,7 @@ export async function setPodOverride(podContactId: string, amount: number, admin
   const guard = await ensureOwner()
   if ('error' in guard) return guard
 
-  // Send empty string to clear, otherwise the number.
+  // 1. Update GHL with the new override value.
   const value = amount > 0 ? amount : ''
   const r = await ghlFetch(`/contacts/${podContactId}`, {
     method: 'PUT',
@@ -30,8 +30,38 @@ export async function setPodOverride(podContactId: string, amount: number, admin
   })
   if (!r.ok) return { error: `GHL ${r.status}: ${(await r.text()).slice(0, 200)}` }
 
-  // Recompute the affected admin's total. Cheap relative to a full pass.
-  await recomputeCommissions().catch((err) => console.error('[setPodOverride] recompute:', err))
+  // 2. Patch the local cache for this POD.
+  await patchCached(podContactId, { pod_override: amount > 0 ? amount : null })
+
+  // 3. Recompute just the affected admin's total from cache (fast — no
+  //    full GHL refetch). Then push the new total to GHL + cache.
+  const sb = createAdminClient()
+  const { data: admin } = await sb
+    .from('apulia_contacts')
+    .select('codice_amministratore, compenso_per_pod')
+    .eq('id', adminContactId)
+    .single()
+  if (admin?.codice_amministratore) {
+    const { data: pods } = await sb
+      .from('apulia_contacts')
+      .select('pod_override')
+      .eq('codice_amministratore', admin.codice_amministratore)
+      .eq('is_amministratore', false)
+      .eq('is_switch_out', false)
+    const compenso = Number(admin.compenso_per_pod) || 0
+    const newTotal = (pods ?? []).reduce(
+      (s, p) => s + (Number(p.pod_override) || compenso),
+      0,
+    )
+    // Push to GHL + cache
+    const tr = await ghlFetch(`/contacts/${adminContactId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ customFields: [{ id: APULIA_FIELD.COMMISSIONE_TOTALE, value: newTotal }] }),
+    })
+    if (tr.ok) {
+      await patchCached(adminContactId, { commissione_totale: newTotal })
+    }
+  }
 
   revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
   revalidatePath('/designs/apulia-power/amministratori')
