@@ -87,6 +87,13 @@ export default async function Page() {
         <p style={{ fontSize: 13, color: 'var(--ap-text-muted)', margin: 0 }}>
           <strong>Switch-out</strong> richiede almeno: <code>Pod Pdr</code> (o <code>POD/PDR</code>) per il match.
         </p>
+        <p style={{ fontSize: 13, color: 'var(--ap-text-muted)', margin: 0 }}>
+          <strong>Amministratori</strong> richiede almeno: <code>Fornitura : Cliente : Amministratore condominio</code> (nome) e{' '}
+          <code>Fornitura : Cliente : Codice amministratore</code>. Opzionali:{' '}
+          <code>Codice fiscale Amministratore</code>, <code>Partita IVA</code>, <code>Numero Telefono Amministratore</code>,{' '}
+          <code>Email</code> (Dati di fatturazione), <code>Indirizzo</code>, <code>Indirizzo (Città)</code>,{' '}
+          <code>Indirizzo (Stato/Provincia)</code>, <code>compenso per ciascun pod</code>. Gli esistenti vengono aggiornati per codice; i nuovi vengono creati con il tag <code>amministratore</code> e data 1° pagamento = oggi.
+        </p>
         <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: 0 }}>
           Salva sempre il CSV con la colonna POD formattata come <em>Testo</em>: i numeri lunghi salvati come Numero diventano notazione scientifica (es. <code>8.82601E+11</code>) e perdono cifre.
         </p>

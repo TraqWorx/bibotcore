@@ -3,6 +3,7 @@ import { getApuliaSession } from '@/lib/apulia/auth'
 import { listAdminsWithStats } from '@/lib/apulia/queries'
 import { currentPeriod } from '@/lib/apulia/fields'
 import AdminsTable from './_components/AdminsTable'
+import AddAdminPanel from './_components/AddAdminPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,7 @@ export default async function Page() {
           <p className="ap-page-subtitle">
             {admins.length} amministratori · {dueNowCount > 0 ? <strong style={{ color: 'var(--ap-danger)' }}>{dueNowCount} da pagare oggi</strong> : 'Nessun pagamento dovuto oggi'}. Ogni amministratore ha un proprio ciclo di 6 mesi.
           </p>
+          <div style={{ marginTop: 12 }}><AddAdminPanel /></div>
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <div className="ap-stat" data-tone="warn" style={{ minWidth: 180 }}>
