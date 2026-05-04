@@ -5,7 +5,8 @@ import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import { APULIA_FIELD, currentPeriod } from '@/lib/apulia/fields'
 import { upsertContact } from '@/lib/apulia/contacts'
-import { upsertCachedFromGhl } from '@/lib/apulia/cache'
+import { upsertCachedFromGhl, patchCached } from '@/lib/apulia/cache'
+import { ghlFetch } from '@/lib/apulia/ghl'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -137,4 +138,55 @@ export async function createAdmin(input: CreateAdminInput): Promise<{ id?: strin
   revalidatePath('/designs/apulia-power/dashboard')
   revalidatePath('/designs/apulia-power/settings')
   return { id: newId }
+}
+
+/**
+ * Update the per-POD compenso for one amministratore. Pushes to Bibot custom
+ * field, patches the cache, then recomputes commissione_totale (since POD
+ * rows without a per-POD override fall back to this value).
+ */
+export async function setCompensoPerPod(adminContactId: string, amount: number): Promise<{ total?: number; error?: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { error: guard.error }
+  if (!Number.isFinite(amount) || amount < 0) return { error: 'Importo non valido' }
+
+  const sb = createAdminClient()
+  const { data: admin } = await sb
+    .from('apulia_contacts')
+    .select('codice_amministratore')
+    .eq('id', adminContactId)
+    .eq('is_amministratore', true)
+    .maybeSingle()
+  if (!admin) return { error: 'Amministratore non trovato' }
+
+  const r = await ghlFetch(`/contacts/${adminContactId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ customFields: [{ id: APULIA_FIELD.COMPENSO_PER_POD, value: amount > 0 ? amount : '' }] }),
+  })
+  if (!r.ok) return { error: `Bibot ${r.status}: ${(await r.text()).slice(0, 200)}` }
+
+  await patchCached(adminContactId, { compenso_per_pod: amount > 0 ? amount : null })
+
+  // Recompute total from cache (override wins, else compenso).
+  let newTotal = 0
+  if (admin.codice_amministratore) {
+    const { data: pods } = await sb
+      .from('apulia_contacts')
+      .select('pod_override')
+      .eq('codice_amministratore', admin.codice_amministratore)
+      .eq('is_amministratore', false)
+      .eq('is_switch_out', false)
+    newTotal = (pods ?? []).reduce((s, p) => s + (Number(p.pod_override) || amount), 0)
+    const tr = await ghlFetch(`/contacts/${adminContactId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ customFields: [{ id: APULIA_FIELD.COMMISSIONE_TOTALE, value: newTotal }] }),
+    })
+    if (tr.ok) await patchCached(adminContactId, { commissione_totale: newTotal })
+  }
+
+  revalidatePath('/designs/apulia-power/amministratori')
+  revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
+  revalidatePath('/designs/apulia-power/settings')
+  revalidatePath('/designs/apulia-power/dashboard')
+  return { total: newTotal }
 }
