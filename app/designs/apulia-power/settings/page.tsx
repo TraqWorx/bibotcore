@@ -114,26 +114,110 @@ export default async function Page() {
             id: 'import',
             label: 'Formato file di import',
             content: (
-              <section className="ap-card ap-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <h2 style={{ fontSize: 14, fontWeight: 800 }}>Formato file di import</h2>
-                <p style={{ fontSize: 13, color: 'var(--ap-text-muted)', margin: 0 }}>
-                  <strong>PDP ATTIVI</strong> richiede almeno: <code>POD/PDR</code>, <code>Cliente</code> (o <code>Full Name</code>), <code>Fornitura : Cliente : Codice amministratore</code>.
-                  Le altre colonne in italiano si auto-mappano sui custom field corrispondenti.
-                </p>
-                <p style={{ fontSize: 13, color: 'var(--ap-text-muted)', margin: 0 }}>
-                  <strong>Switch-out</strong> richiede almeno: <code>Pod Pdr</code> (o <code>POD/PDR</code>) per il match.
-                </p>
-                <p style={{ fontSize: 13, color: 'var(--ap-text-muted)', margin: 0 }}>
-                  <strong>Amministratori</strong> richiede almeno: <code>Fornitura : Cliente : Amministratore condominio</code> (nome) e{' '}
-                  <code>Fornitura : Cliente : Codice amministratore</code>. Opzionali:{' '}
-                  <code>Codice fiscale Amministratore</code>, <code>Partita IVA</code>, <code>Numero Telefono Amministratore</code>,{' '}
-                  <code>Email</code> (Dati di fatturazione), <code>Indirizzo</code>, <code>Indirizzo (Città)</code>,{' '}
-                  <code>Indirizzo (Stato/Provincia)</code>, <code>compenso per ciascun pod</code>. Gli esistenti vengono aggiornati per codice; i nuovi vengono creati con il tag <code>amministratore</code> e data 1° pagamento = oggi.
-                </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: 0 }}>
-                  Salva sempre il CSV con la colonna POD formattata come <em>Testo</em>: i numeri lunghi salvati come Numero diventano notazione scientifica (es. <code>8.82601E+11</code>) e perdono cifre.
+                  Salva sempre il CSV con la colonna POD/PDR formattata come <em>Testo</em>: i numeri lunghi salvati come Numero diventano notazione scientifica (es. <code>8.82601E+11</code>) e perdono cifre.
                 </p>
-              </section>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, alignItems: 'start' }}>
+                  <ImportColumnsCard
+                    title="Amministratori"
+                    requiredCols={[
+                      'Fornitura : Cliente : Amministratore condominio',
+                      'Fornitura : Cliente : Codice amministratore',
+                    ]}
+                    optionalCols={[
+                      'compenso per ciascun pod',
+                      'Fornitura : Cliente : Amministratore condominio : Codice fiscale Amministratore',
+                      'Fornitura : Cliente : Amministratore condominio : Partita IVA',
+                      'Fornitura : Dati di fatturazione : Indirizzo',
+                      'Fornitura : Dati di fatturazione : Indirizzo (Città)',
+                      'Fornitura : Dati di fatturazione : Indirizzo (Stato/Provincia)',
+                      'Fornitura : Cliente : Numero Telefono Amministratore',
+                      'Fornitura : Dati di fatturazione : Email',
+                    ]}
+                    note="Match per Codice amministratore. I nuovi vengono creati con tag amministratore e 1° pagamento = oggi."
+                  />
+                  <ImportColumnsCard
+                    title="PDP ATTIVI"
+                    requiredCols={[
+                      'POD/PDR',
+                      'Cliente',
+                      'Fornitura : Cliente : Codice amministratore',
+                    ]}
+                    optionalCols={[
+                      'Commodity',
+                      'Fornitura : Cliente : Record Type Testuale',
+                      'Fornitura : Opportunità : Data firma contratto',
+                      'Inizio fornitura',
+                      'Data inizio validità nuova offerta',
+                      'Fornitura : Cliente : Codice Identificativo Univoco',
+                      'Fornitura : Cliente : Codice fiscale',
+                      'Referente commerciale',
+                      'Fornitura : Cliente : Amministratore condominio',
+                      'Fornitura : Cliente : Amministratore condominio : Codice fiscale Amministratore',
+                      'Fornitura : Cliente : Amministratore condominio : Partita IVA',
+                      'Fornitura : Dati di fatturazione : Indirizzo',
+                      'Fornitura : Dati di fatturazione : Indirizzo (Città)',
+                      'Fornitura : Dati di fatturazione : Indirizzo (Stato/Provincia)',
+                      'DDF modalità invio fatt',
+                      'Fornitura : Cliente : Numero Telefono Amministratore',
+                      'Fornitura : Dati di fatturazione : Email',
+                      'Fornitura : Dati di fatturazione : Codice sdi',
+                      'Modalità di pagamento',
+                      'Fornitura : Modalita di pagamento : Codice fiscale titolare Conto Corrente',
+                      'Fornitura : Modalita di pagamento : IBAN',
+                      'Contratto commerciale',
+                      'Periodicità di Fatturazione',
+                      'Consumo annuo (smc)',
+                      'Consumo annuo (kWh)',
+                      'Codice sconto',
+                      'Consorzio',
+                      'Fornitura : Consorzio : Codice consorzio',
+                      'Fornitura : Consorzio : ID Consorzio',
+                      'Analisi acque',
+                      'Data inizio validità offerta',
+                      'Data fine validità offerta',
+                      'Stato',
+                      'Fornitura : Opportunità : Tipo di record Opportunità',
+                      'Fornitura : Opportunità : ID opportunità',
+                      'Fornitura : Cliente : ID clienti',
+                      'ID forniture',
+                      'Fornitura : Dati di fatturazione : Indirizzo (CAP)',
+                      'Matricola contatore',
+                      'Potenza impegnata',
+                      'IVA',
+                      'Tensione',
+                      'Valore tensione',
+                      'Tipo tensione',
+                      'Fornitura : Cliente : Numero di cellulare',
+                      'Fornitura : Cliente : Numero di telefono',
+                      'Fornitura : Opportunità : Promo Privacy',
+                      'Opportunità',
+                    ]}
+                    note="Match per POD/PDR. I nuovi POD vengono creati e collegati all'amministratore tramite Codice amministratore."
+                  />
+                  <ImportColumnsCard
+                    title="Switch-out"
+                    requiredCols={['Pod Pdr']}
+                    optionalCols={[
+                      'Fornitura: Commodity',
+                      'Target cliente',
+                      'Fornitura: Indirizzo e comune',
+                      'Numero ordine',
+                      'Servizio',
+                      'Descrizione',
+                      'Data esecuzione attività',
+                      'Data creazione',
+                      'Cognome / Ragione sociale: Cognome / Ragione sociale',
+                      'Fornitura: Amministratore',
+                      'Fornitura: Consumo annuo (kWh)',
+                      'Fornitura: Consumo annuo (smc)',
+                      'Fornitura: Stato',
+                    ]}
+                    note="Match per Pod Pdr. I POD trovati vengono marcati come switch-out e usciti dal calcolo commissione."
+                  />
+                </div>
+              </div>
             ),
           },
           {
@@ -180,5 +264,59 @@ function KV({ k, v }: { k: string; v: string }) {
       <span style={{ color: 'var(--ap-text-muted)' }}>{k}</span>
       <code style={{ fontSize: 12, color: 'var(--ap-text)' }}>{v}</code>
     </div>
+  )
+}
+
+function ImportColumnsCard({
+  title,
+  requiredCols,
+  optionalCols,
+  note,
+}: {
+  title: string
+  requiredCols: string[]
+  optionalCols: string[]
+  note?: string
+}) {
+  return (
+    <section className="ap-card" style={{ display: 'flex', flexDirection: 'column' }}>
+      <header style={{ padding: '12px 16px', borderBottom: '1px solid var(--ap-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 800, margin: 0 }}>{title}</h3>
+        <span style={{ fontSize: 11, color: 'var(--ap-text-faint)', fontVariantNumeric: 'tabular-nums' }}>
+          {requiredCols.length + optionalCols.length} colonne
+        </span>
+      </header>
+      <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
+            Obbligatorie
+          </div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {requiredCols.map((c) => (
+              <li key={c} style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--ap-text)', wordBreak: 'break-word', padding: '3px 8px', background: 'var(--ap-bg-muted, #fff7ed)', border: '1px solid var(--ap-warning, #fbbf24)', borderRadius: 6 }}>
+                {c}
+              </li>
+            ))}
+          </ul>
+        </div>
+        {optionalCols.length > 0 && (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
+              Opzionali
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {optionalCols.map((c) => (
+                <li key={c} style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--ap-text-muted)', wordBreak: 'break-word', padding: '2px 0' }}>
+                  {c}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {note && (
+          <p style={{ fontSize: 11, color: 'var(--ap-text-faint)', margin: 0, lineHeight: 1.5 }}>{note}</p>
+        )}
+      </div>
+    </section>
   )
 }
