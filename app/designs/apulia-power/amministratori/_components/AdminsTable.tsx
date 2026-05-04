@@ -16,6 +16,10 @@ interface AdminRow {
   total: number
   paidThisPeriod: boolean
   paidAt?: string
+  firstPaymentAt?: string
+  nextDueDate?: string
+  isDueNow?: boolean
+  overdueCount?: number
 }
 
 function fmtEur(n: number): string {
@@ -28,8 +32,9 @@ export default function AdminsTable({ admins, period }: { admins: AdminRow[]; pe
   const [flash, setFlash] = useState<string | null>(null)
   const router = useRouter()
 
+  // Owner can only bulk-pay admins whose next period is due now (and have a positive amount).
   const selectableIds = useMemo(
-    () => admins.filter((a) => !a.paidThisPeriod && a.total > 0).map((a) => a.contactId),
+    () => admins.filter((a) => a.isDueNow && a.total > 0).map((a) => a.contactId),
     [admins],
   )
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id))
@@ -91,17 +96,16 @@ export default function AdminsTable({ admins, period }: { admins: AdminRow[]; pe
             </th>
             <th>Amministratore</th>
             <th>Cod. Amm.</th>
-            <th style={{ textAlign: 'right' }}>Compenso/POD</th>
             <th style={{ textAlign: 'right' }}>POD attivi</th>
-            <th style={{ textAlign: 'right' }}>Switch-out</th>
             <th style={{ textAlign: 'right' }}>Da pagare</th>
-            <th>Stato {period}</th>
+            <th>Prossima scadenza</th>
+            <th>Stato</th>
           </tr>
         </thead>
         <tbody>
-          {admins.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: 32, color: 'var(--ap-text-faint)' }}>Nessun amministratore.</td></tr>}
+          {admins.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32, color: 'var(--ap-text-faint)' }}>Nessun amministratore.</td></tr>}
           {admins.map((a) => {
-            const canSelect = !a.paidThisPeriod && a.total > 0
+            const canSelect = a.isDueNow && a.total > 0
             return (
               <tr key={a.contactId} style={{ background: selected.has(a.contactId) ? 'color-mix(in srgb, var(--ap-blue-soft) 30%, transparent)' : undefined }}>
                 <td>
@@ -116,14 +120,17 @@ export default function AdminsTable({ admins, period }: { admins: AdminRow[]; pe
                   {a.email && <div style={{ fontSize: 11, color: 'var(--ap-text-faint)', marginTop: 2 }}>{a.email}</div>}
                 </td>
                 <td style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--ap-text-muted)' }}>{a.codiceAmministratore ?? '—'}</td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtEur(a.compensoPerPod)}</td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{a.podsActive}</td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: a.podsSwitchedOut ? 'var(--ap-warning)' : 'var(--ap-text-faint)' }}>{a.podsSwitchedOut}</td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{fmtEur(a.paidThisPeriod ? 0 : a.total)}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{a.podsActive}{a.podsSwitchedOut > 0 && <span style={{ color: 'var(--ap-warning)', fontSize: 11, marginLeft: 4 }}>+{a.podsSwitchedOut} so</span>}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{fmtEur(a.total)}</td>
+                <td style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12, color: a.isDueNow ? 'var(--ap-danger)' : a.firstPaymentAt ? 'var(--ap-text)' : 'var(--ap-text-faint)' }}>
+                  {a.nextDueDate ? new Date(a.nextDueDate).toLocaleDateString('it-IT') : 'Da configurare'}
+                </td>
                 <td>
-                  {a.paidThisPeriod
-                    ? <span className="ap-pill" data-tone="green">✓ Pagato {a.paidAt ? new Date(a.paidAt).toLocaleDateString('it-IT') : ''}</span>
-                    : <span className="ap-pill" data-tone="amber">Da pagare</span>}
+                  {a.isDueNow
+                    ? <span className="ap-pill" data-tone="red">Da pagare ora{a.overdueCount && a.overdueCount > 1 ? ` (+${a.overdueCount - 1})` : ''}</span>
+                    : a.firstPaymentAt
+                      ? <span className="ap-pill" data-tone="green">Programmato</span>
+                      : <span className="ap-pill" data-tone="gray">Senza data</span>}
                 </td>
               </tr>
             )

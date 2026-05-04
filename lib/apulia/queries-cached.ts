@@ -14,6 +14,16 @@ export interface AdminRow {
   total: number
   paidThisPeriod: boolean
   paidAt?: string
+  /** Anchor date — set on first PDP import where this admin matched. */
+  firstPaymentAt?: string
+  /** Next due date = anchor + paid_count * 6 months. */
+  nextDueDate?: string
+  /** Index of the next period to be paid (1, 2, 3 …). */
+  nextPeriodIdx?: number
+  /** True when the next due date is today or earlier. */
+  isDueNow?: boolean
+  /** How many periods are overdue (0 if none). */
+  overdueCount?: number
 }
 
 export interface PodRow {
@@ -52,25 +62,40 @@ export async function loadSnapshot(): Promise<ApuliaSnapshot> {
   }
 }
 
+interface ScheduleRow {
+  contact_id: string
+  first_payment_at: string | null
+  paid_count: number
+  next_period_idx: number
+  next_due_date: string | null
+  is_due_now: boolean
+  overdue_count: number
+}
+
 export async function listAdminsWithStats(): Promise<AdminRow[]> {
   const sb = createAdminClient()
-  const period = currentPeriod()
 
-  const [{ data: admins }, { data: podCounts }, { data: payments }] = await Promise.all([
+  const [{ data: admins }, { data: podCounts }, { data: schedule }, { data: latestPayments }] = await Promise.all([
     sb.from('apulia_contacts').select('id, first_name, last_name, email, phone, codice_amministratore, compenso_per_pod, commissione_totale').eq('is_amministratore', true),
     sb.rpc('apulia_admin_pod_counts'),
-    sb.from('apulia_payments').select('contact_id, paid_at').eq('period', period),
+    sb.rpc('apulia_admin_schedule') as unknown as Promise<{ data: ScheduleRow[] | null }>,
+    sb.from('apulia_payments').select('contact_id, paid_at').not('period_idx', 'is', null).order('paid_at', { ascending: false }),
   ])
 
-  const paidMap = new Map((payments ?? []).map((p) => [p.contact_id, p.paid_at as string]))
   const countMap = new Map<string, { active: number; switched: number }>()
   for (const r of (podCounts ?? []) as Array<{ codice_amministratore: string; active: number; switched: number }>) {
     if (r.codice_amministratore) countMap.set(r.codice_amministratore, { active: Number(r.active), switched: Number(r.switched) })
+  }
+  const scheduleMap = new Map((schedule ?? []).map((s) => [s.contact_id, s]))
+  const latestPaidMap = new Map<string, string>()
+  for (const p of latestPayments ?? []) {
+    if (!latestPaidMap.has(p.contact_id)) latestPaidMap.set(p.contact_id, p.paid_at as string)
   }
 
   const rows: AdminRow[] = (admins ?? []).map((a) => {
     const code = a.codice_amministratore ?? undefined
     const counts = (code && countMap.get(code)) || { active: 0, switched: 0 }
+    const sched = scheduleMap.get(a.id)
     return {
       contactId: a.id,
       name: [a.first_name, a.last_name].filter(Boolean).join(' ') || a.email || '—',
@@ -81,8 +106,14 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
       podsActive: counts.active,
       podsSwitchedOut: counts.switched,
       total: Number(a.commissione_totale) || 0,
-      paidThisPeriod: paidMap.has(a.id),
-      paidAt: paidMap.get(a.id),
+      // "Paid this period" now means: the most recent due period has been paid.
+      paidThisPeriod: sched ? sched.paid_count >= sched.next_period_idx - 1 && !sched.is_due_now : false,
+      paidAt: latestPaidMap.get(a.id),
+      firstPaymentAt: sched?.first_payment_at ?? undefined,
+      nextDueDate: sched?.next_due_date ?? undefined,
+      nextPeriodIdx: sched?.next_period_idx,
+      isDueNow: sched?.is_due_now ?? false,
+      overdueCount: sched?.overdue_count ?? 0,
     }
   })
   rows.sort((a, b) => b.total - a.total)
@@ -122,9 +153,17 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
     }
   }
 
-  // Period-paid status from apulia_payments
-  const period = currentPeriod()
-  const { data: pay } = await sb.from('apulia_payments').select('paid_at').eq('contact_id', adminContactId).eq('period', period).maybeSingle()
+  // Per-admin schedule (anchor + next due) from RPC.
+  const { data: scheduleRows } = await sb.rpc('apulia_admin_schedule') as unknown as { data: ScheduleRow[] | null }
+  const sched = (scheduleRows ?? []).find((s) => s.contact_id === adminContactId)
+  const { data: latestPay } = await sb
+    .from('apulia_payments')
+    .select('paid_at')
+    .eq('contact_id', adminContactId)
+    .not('period_idx', 'is', null)
+    .order('paid_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   const adminRow: AdminRow = {
     contactId: a.id,
@@ -136,8 +175,13 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
     podsActive: activePods.length,
     podsSwitchedOut: switchedPods.length,
     total: Number(a.commissione_totale) || 0,
-    paidThisPeriod: Boolean(pay),
-    paidAt: pay?.paid_at as string | undefined,
+    paidThisPeriod: sched ? sched.paid_count >= sched.next_period_idx - 1 && !sched.is_due_now : false,
+    paidAt: latestPay?.paid_at as string | undefined,
+    firstPaymentAt: sched?.first_payment_at ?? undefined,
+    nextDueDate: sched?.next_due_date ?? undefined,
+    nextPeriodIdx: sched?.next_period_idx,
+    isDueNow: sched?.is_due_now ?? false,
+    overdueCount: sched?.overdue_count ?? 0,
   }
 
   return { admin: adminRow, activePods: activePods.map(asPodRow), switchedPods: switchedPods.map(asPodRow) }

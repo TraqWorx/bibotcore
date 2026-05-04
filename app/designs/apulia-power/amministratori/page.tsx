@@ -15,8 +15,9 @@ export default async function Page() {
   if (session.role !== 'owner') redirect('/designs/apulia-power/dashboard')
 
   const admins = await listAdminsWithStats()
-  const totalDue = admins.filter((a) => !a.paidThisPeriod).reduce((s, a) => s + a.total, 0)
+  const totalDue = admins.filter((a) => a.isDueNow).reduce((s, a) => s + a.total, 0)
   const totalPaid = admins.filter((a) => a.paidThisPeriod).reduce((s, a) => s + a.total, 0)
+  const dueNowCount = admins.filter((a) => a.isDueNow).length
   const period = currentPeriod()
 
   return (
@@ -25,7 +26,7 @@ export default async function Page() {
         <div>
           <h1 className="ap-page-title">Amministratori</h1>
           <p className="ap-page-subtitle">
-            {admins.length} amministratori. Periodo corrente: <strong>{period}</strong>. Seleziona uno o più per pagamento di gruppo.
+            {admins.length} amministratori · {dueNowCount > 0 ? <strong style={{ color: 'var(--ap-danger)' }}>{dueNowCount} da pagare oggi</strong> : 'Nessun pagamento dovuto oggi'}. Ogni amministratore ha un proprio ciclo di 6 mesi.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 12 }}>

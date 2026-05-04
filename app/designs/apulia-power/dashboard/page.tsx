@@ -17,8 +17,9 @@ export default async function Page() {
 
   // Owner view
   const [snap, admins] = await Promise.all([loadSnapshot(), listAdminsWithStats()])
-  const totalDue = admins.filter((a) => !a.paidThisPeriod).reduce((s, a) => s + a.total, 0)
+  const totalDue = admins.filter((a) => a.isDueNow).reduce((s, a) => s + a.total, 0)
   const totalPaid = admins.filter((a) => a.paidThisPeriod).reduce((s, a) => s + a.total, 0)
+  const dueNowCount = admins.filter((a) => a.isDueNow).length
   const period = currentPeriod()
 
   // Recent imports + leads-per-store (current month)
@@ -60,15 +61,15 @@ export default async function Page() {
           <div className="ap-stat-value">{totalLeadsMonth.toLocaleString('it-IT')}</div>
           <div className="ap-stat-foot">da QR / form pubblici</div>
         </div>
-        <div className="ap-stat">
-          <div className="ap-stat-label">Da pagare {period}</div>
+        <div className="ap-stat" data-tone={dueNowCount > 0 ? 'warn' : undefined}>
+          <div className="ap-stat-label">Da pagare oggi</div>
           <div className="ap-stat-value">{fmtEur(totalDue)}</div>
-          <div className="ap-stat-foot">{admins.filter((a) => !a.paidThisPeriod).length} amministratori in sospeso</div>
+          <div className="ap-stat-foot">{dueNowCount} amministratori con scadenza oggi o in arretrato</div>
         </div>
         <div className="ap-stat" data-tone="good">
-          <div className="ap-stat-label">Già pagato {period}</div>
+          <div className="ap-stat-label">Già pagato (totale)</div>
           <div className="ap-stat-value">{fmtEur(totalPaid)}</div>
-          <div className="ap-stat-foot">{admins.filter((a) => a.paidThisPeriod).length} amministratori liquidati</div>
+          <div className="ap-stat-foot">{admins.filter((a) => a.paidThisPeriod).length} amministratori in corso</div>
         </div>
       </div>
 
