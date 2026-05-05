@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { listCondomini } from '@/lib/apulia/queries'
+import AddCondominoPanel from './_components/AddCondominoPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,9 +49,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <header>
-        <h1 className="ap-page-title">Condomini</h1>
-        <p className="ap-page-subtitle">{total.toLocaleString('it-IT')} POD trovati. Filtra per cliente, amministratore, comune, stato.</p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1 className="ap-page-title">Condomini</h1>
+          <p className="ap-page-subtitle">{total.toLocaleString('it-IT')} POD trovati. Filtra per cliente, amministratore, comune, stato.</p>
+        </div>
+        <AddCondominoPanel />
       </header>
 
       <form className="ap-card ap-card-pad" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'flex-end' }}>
@@ -100,11 +104,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           <tbody>
             {rows.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td></tr>}
             {rows.map((p) => (
-              <tr key={p.contactId}>
-                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.pod}</td>
-                <td>{p.cliente ?? '—'}</td>
-                <td>{p.amministratore ?? '—'}</td>
-                <td>{p.comune ?? '—'}</td>
+              <tr key={p.contactId} style={{ cursor: 'pointer' }}>
+                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                  <Link href={`/designs/apulia-power/condomini/${p.contactId}`} style={{ color: 'var(--ap-text)', textDecoration: 'none', display: 'block' }}>{p.pod}</Link>
+                </td>
+                <td><Link href={`/designs/apulia-power/condomini/${p.contactId}`} style={{ color: 'var(--ap-text)', textDecoration: 'none', display: 'block' }}>{p.cliente ?? '—'}</Link></td>
+                <td><Link href={`/designs/apulia-power/condomini/${p.contactId}`} style={{ color: 'var(--ap-text)', textDecoration: 'none', display: 'block' }}>{p.amministratore ?? '—'}</Link></td>
+                <td><Link href={`/designs/apulia-power/condomini/${p.contactId}`} style={{ color: 'var(--ap-text)', textDecoration: 'none', display: 'block' }}>{p.comune ?? '—'}</Link></td>
                 <td>{p.switchedOut ? <span className="ap-pill" data-tone="amber">Switch-out</span> : <span className="ap-pill" data-tone="green">Attivo</span>}</td>
               </tr>
             ))}

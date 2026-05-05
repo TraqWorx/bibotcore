@@ -2,39 +2,15 @@ import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { adminWithPods } from '@/lib/apulia/queries'
-import { currentPeriod, APULIA_FIELD } from '@/lib/apulia/fields'
+import { currentPeriod } from '@/lib/apulia/fields'
 import { createAdminClient } from '@/lib/supabase-server'
+import { fetchApuliaFieldGroups } from '@/lib/apulia/field-meta'
 import PodTable from './_components/PodTable'
 import MarkPaidButton from './_components/MarkPaidButton'
 import ImpersonateButton from './_components/ImpersonateButton'
-
-interface ProfileField {
-  label: string
-  value: string | null | undefined
-  mono?: boolean
-}
-
-const PROFILE_BLOCKS: { title: string; fields: { id: string; label: string; mono?: boolean }[] }[] = [
-  {
-    title: 'Anagrafica',
-    fields: [
-      { id: APULIA_FIELD.AMMINISTRATORE_CONDOMINIO, label: 'Ragione sociale' },
-      { id: APULIA_FIELD.CODICE_AMMINISTRATORE, label: 'Codice amministratore', mono: true },
-      { id: APULIA_FIELD.CODICE_FISCALE_AMMINISTRATORE, label: 'Codice fiscale', mono: true },
-      { id: APULIA_FIELD.PARTITA_IVA_AMMINISTRATORE, label: 'Partita IVA', mono: true },
-      { id: APULIA_FIELD.TELEFONO_AMMINISTRATORE, label: 'Telefono' },
-      { id: APULIA_FIELD.EMAIL_BILLING, label: 'Email fatturazione' },
-    ],
-  },
-  {
-    title: 'Indirizzo di fatturazione',
-    fields: [
-      { id: 'oCvfwCelHDn6gWEljqUJ', label: 'Indirizzo' },
-      { id: 'EXO9WD4aLV2aPiMYxXUU', label: 'Città' },
-      { id: 'opaPQWrWwDiaAeyoMbN5', label: 'Stato/Provincia' },
-    ],
-  },
-]
+import AdminFullEditor from './_components/AdminFullEditor'
+import DeleteContactButton from '../../_components/DeleteContactButton'
+import { deleteAdmin } from './_actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,15 +28,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   // Payment history + raw custom fields for invoicing details
   const sb = createAdminClient()
-  const [{ data: payments }, { data: contactRow }] = await Promise.all([
+  const [{ data: payments }, { data: contactRow }, fieldGroups] = await Promise.all([
     sb.from('apulia_payments').select('period, amount_cents, paid_at, paid_by, note').eq('contact_id', id).order('paid_at', { ascending: false }),
-    sb.from('apulia_contacts').select('custom_fields').eq('id', id).maybeSingle(),
+    sb.from('apulia_contacts').select('first_name, last_name, email, phone, tags, custom_fields').eq('id', id).maybeSingle(),
+    fetchApuliaFieldGroups(),
   ])
   const customFields = (contactRow?.custom_fields ?? {}) as Record<string, string>
-  const profileBlocks = PROFILE_BLOCKS.map((b) => ({
-    title: b.title,
-    fields: b.fields.map((f) => ({ label: f.label, value: customFields[f.id] ?? null, mono: f.mono })) as ProfileField[],
-  })).filter((b) => b.fields.some((f) => f.value))
+  const tags: string[] = (contactRow?.tags ?? []) as string[]
 
   const period = currentPeriod()
   const paidThisPeriod = (payments ?? []).find((p) => p.period === period)
@@ -83,6 +57,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
           <MarkPaidButton adminContactId={id} amount={admin.total} alreadyPaid={admin.paidThisPeriod} />
           <ImpersonateButton adminContactId={id} />
+          <DeleteContactButton
+            contactId={id}
+            action={deleteAdmin}
+            label="Elimina amministratore"
+            confirmText={`Eliminare l'amministratore ${admin.name}?\nQuesta azione non si può annullare.`}
+          />
         </div>
       </header>
 
@@ -102,23 +82,18 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </div>
       </div>
 
-      {profileBlocks.length > 0 && (
-        <section className="ap-card ap-card-pad" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
-          {profileBlocks.map((b) => (
-            <div key={b.title}>
-              <h3 style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>{b.title}</h3>
-              <dl style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
-                {b.fields.map((f) => f.value ? (
-                  <div key={f.label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <dt style={{ fontSize: 11, color: 'var(--ap-text-muted)' }}>{f.label}</dt>
-                    <dd style={{ fontSize: 13, fontWeight: 600, fontFamily: f.mono ? 'monospace' : undefined, margin: 0 }}>{f.value}</dd>
-                  </div>
-                ) : null)}
-              </dl>
-            </div>
-          ))}
-        </section>
-      )}
+      <AdminFullEditor
+        contactId={id}
+        core={{
+          firstName: contactRow?.first_name ?? '',
+          lastName: contactRow?.last_name ?? '',
+          email: contactRow?.email ?? '',
+          phone: contactRow?.phone ?? '',
+        }}
+        customFields={customFields}
+        tags={tags}
+        groups={fieldGroups}
+      />
 
       <section className="ap-card">
         <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

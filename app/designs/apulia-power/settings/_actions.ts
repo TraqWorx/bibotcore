@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import { fullSyncCache } from '@/lib/apulia/cache'
+import { removeTag } from '@/lib/apulia/contacts'
+import { pmap } from '@/lib/apulia/ghl'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -43,4 +45,37 @@ export async function resyncCache(): Promise<{ total: number; deleted: number; e
   } catch (err) {
     return { total: 0, deleted: 0, error: err instanceof Error ? err.message : 'failed' }
   }
+}
+
+/**
+ * Remove a tag from every contact in the Apulia location. Used by the
+ * Settings → Tag manager to permanently get rid of a tag. Concurrent
+ * (8 in flight) and best-effort: failures are counted, not thrown.
+ */
+export async function deleteTagGlobally(tag: string): Promise<{ removed: number; failed: number; error?: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { removed: 0, failed: 0, error: guard.error }
+  const t = tag.trim()
+  if (!t) return { removed: 0, failed: 0, error: 'Tag vuoto' }
+
+  const sb = createAdminClient()
+  const { data: rows } = await sb.from('apulia_contacts').select('id, tags').contains('tags', [t])
+  if (!rows || rows.length === 0) return { removed: 0, failed: 0 }
+
+  let removed = 0, failed = 0
+  await pmap(rows, async (r) => {
+    try {
+      await removeTag(r.id, t)
+      const remaining = (r.tags ?? []).filter((x: string) => x !== t)
+      await sb.from('apulia_contacts').update({ tags: remaining }).eq('id', r.id)
+      removed++
+    } catch {
+      failed++
+    }
+  }, 8)
+
+  revalidatePath('/designs/apulia-power/settings')
+  revalidatePath('/designs/apulia-power/condomini')
+  revalidatePath('/designs/apulia-power/amministratori')
+  return { removed, failed }
 }

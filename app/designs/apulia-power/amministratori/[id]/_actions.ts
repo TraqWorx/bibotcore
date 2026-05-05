@@ -6,8 +6,9 @@ import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import { ghlFetch } from '@/lib/apulia/ghl'
 import { APULIA_FIELD, currentPeriod } from '@/lib/apulia/fields'
-import { patchCached } from '@/lib/apulia/cache'
+import { patchCached, deleteCached } from '@/lib/apulia/cache'
 import { APULIA_IMPERSONATE_COOKIE } from '@/lib/apulia/auth'
+import { upsertContact, addTag as ghlAddTag, removeTag as ghlRemoveTag, deleteContact } from '@/lib/apulia/contacts'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -168,4 +169,126 @@ export async function startImpersonation(adminContactId: string): Promise<{ erro
 export async function exitImpersonation(): Promise<void> {
   const cookieStore = await cookies()
   cookieStore.delete(APULIA_IMPERSONATE_COOKIE)
+}
+
+function pathsToRevalidateAdmin(id: string) {
+  revalidatePath(`/designs/apulia-power/amministratori/${id}`)
+  revalidatePath('/designs/apulia-power/amministratori')
+  revalidatePath('/designs/apulia-power/dashboard')
+  revalidatePath('/designs/apulia-power/settings')
+}
+
+/** Update one custom field on an admin contact. */
+export async function updateAdminField(contactId: string, fieldId: string, value: string): Promise<{ error?: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+  const r = await ghlFetch(`/contacts/${contactId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ customFields: [{ id: fieldId, value }] }),
+  })
+  if (!r.ok) return { error: `Bibot ${r.status}: ${(await r.text()).slice(0, 200)}` }
+
+  const sb = createAdminClient()
+  const { data: row } = await sb.from('apulia_contacts').select('custom_fields').eq('id', contactId).single()
+  const cf = { ...((row?.custom_fields ?? {}) as Record<string, string>) }
+  if (value) cf[fieldId] = value
+  else delete cf[fieldId]
+  const patch: Record<string, unknown> = { custom_fields: cf }
+  if (fieldId === APULIA_FIELD.CODICE_AMMINISTRATORE) patch.codice_amministratore = value || null
+  if (fieldId === APULIA_FIELD.AMMINISTRATORE_CONDOMINIO) patch.amministratore_name = value || null
+  if (fieldId === APULIA_FIELD.COMPENSO_PER_POD) patch.compenso_per_pod = value ? Number(String(value).replace(',', '.')) : null
+  await sb.from('apulia_contacts').update(patch).eq('id', contactId)
+
+  pathsToRevalidateAdmin(contactId)
+}
+
+/** Update core contact fields on an admin (firstName/lastName/email/phone). */
+export async function updateAdminCore(contactId: string, field: 'firstName' | 'lastName' | 'email' | 'phone', value: string): Promise<{ error?: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+  try {
+    await upsertContact({ id: contactId, [field]: value })
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Aggiornamento fallito' }
+  }
+  const dbField = field === 'firstName' ? 'first_name' : field === 'lastName' ? 'last_name' : field
+  const sb = createAdminClient()
+  await sb.from('apulia_contacts').update({ [dbField]: value || null }).eq('id', contactId)
+  pathsToRevalidateAdmin(contactId)
+}
+
+export async function addAdminTag(contactId: string, tag: string): Promise<{ error?: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+  if (!tag.trim()) return { error: 'Tag vuoto' }
+  try {
+    await ghlAddTag(contactId, tag.trim())
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Add tag fallito' }
+  }
+  const sb = createAdminClient()
+  const { data: row } = await sb.from('apulia_contacts').select('tags').eq('id', contactId).single()
+  const tags = Array.from(new Set([...(row?.tags ?? []), tag.trim()]))
+  await sb.from('apulia_contacts').update({ tags }).eq('id', contactId)
+  pathsToRevalidateAdmin(contactId)
+}
+
+export async function removeAdminTag(contactId: string, tag: string): Promise<{ error?: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+  try {
+    await ghlRemoveTag(contactId, tag)
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Remove tag fallito' }
+  }
+  const sb = createAdminClient()
+  const { data: row } = await sb.from('apulia_contacts').select('tags').eq('id', contactId).single()
+  const tags = (row?.tags ?? []).filter((t: string) => t !== tag)
+  await sb.from('apulia_contacts').update({ tags }).eq('id', contactId)
+  pathsToRevalidateAdmin(contactId)
+}
+
+/**
+ * Delete an admin. If POD condomini are linked to its codice_amministratore,
+ * returns a `warn` asking for force=true. With force, detaches the POD (sets
+ * codice_amministratore to null in cache only — POD records remain in Bibot
+ * but become orphaned from any admin).
+ */
+export async function deleteAdmin(contactId: string, force?: boolean): Promise<{ error?: string; warn?: string; redirect?: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+  const sb = createAdminClient()
+
+  const { data: admin } = await sb.from('apulia_contacts').select('codice_amministratore').eq('id', contactId).maybeSingle()
+  if (!admin) return { error: 'Amministratore non trovato' }
+
+  if (admin.codice_amministratore && !force) {
+    const { count } = await sb
+      .from('apulia_contacts')
+      .select('id', { count: 'exact', head: true })
+      .eq('codice_amministratore', admin.codice_amministratore)
+      .eq('is_amministratore', false)
+    if (count && count > 0) {
+      return { warn: `Ci sono ${count} POD collegati a questo amministratore. Eliminandolo verranno lasciati orfani (POD intatti, ma senza amministratore associato). Procedere?` }
+    }
+  }
+
+  try {
+    await deleteContact(contactId)
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Eliminazione fallita' }
+  }
+  await deleteCached(contactId)
+
+  // Detach orphaned POD if force.
+  if (admin.codice_amministratore && force) {
+    await sb
+      .from('apulia_contacts')
+      .update({ codice_amministratore: null, amministratore_name: null })
+      .eq('codice_amministratore', admin.codice_amministratore)
+      .eq('is_amministratore', false)
+  }
+
+  pathsToRevalidateAdmin(contactId)
+  return { redirect: '/designs/apulia-power/amministratori' }
 }

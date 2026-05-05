@@ -108,4 +108,10 @@ export async function removeTag(contactId: string, tag: string): Promise<void> {
   await ghlFetch(`/contacts/${contactId}/tags`, { method: 'DELETE', body: JSON.stringify({ tags: [tag] }) })
 }
 
+/** Delete a contact from Bibot. */
+export async function deleteContact(contactId: string): Promise<void> {
+  const r = await ghlFetch(`/contacts/${contactId}`, { method: 'DELETE' })
+  if (!r.ok && r.status !== 404) throw new Error(`DELETE /contacts/${contactId} -> ${r.status} ${await r.text()}`)
+}
+
 export { pmap }

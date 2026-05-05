@@ -6,6 +6,7 @@ import { ResyncButton } from './_components/SettingsForms'
 import AdminPaymentSchedule, { type AdminScheduleEntry } from './_components/AdminPaymentSchedule'
 import CompensiTable, { type CompensoEntry } from './_components/CompensiTable'
 import SettingsTabs from './_components/SettingsTabs'
+import TagManager from './_components/TagManager'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,6 +64,16 @@ export default async function Page() {
   const dueNowCount = adminScheduleEntries.filter((a) => a.isDueNow).length
   const noCompensoCount = compensiEntries.filter((a) => a.compensoPerPod === 0).length
 
+  // Tag usage across the cache.
+  const { data: tagRows } = await sb.from('apulia_contacts').select('tags')
+  const tagCountMap = new Map<string, number>()
+  for (const r of (tagRows ?? []) as { tags: string[] | null }[]) {
+    for (const t of r.tags ?? []) tagCountMap.set(t, (tagCountMap.get(t) ?? 0) + 1)
+  }
+  const tagUsage = Array.from(tagCountMap.entries())
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1080 }}>
       <header>
@@ -106,6 +117,24 @@ export default async function Page() {
                 </header>
                 <div style={{ padding: '16px 20px' }}>
                   <CompensiTable admins={compensiEntries} />
+                </div>
+              </section>
+            ),
+          },
+          {
+            id: 'tags',
+            label: 'Tag',
+            badge: tagUsage.length,
+            content: (
+              <section className="ap-card">
+                <header style={{ padding: '16px 20px', borderBottom: '1px solid var(--ap-line)' }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 800 }}>Gestione tag</h2>
+                  <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
+                    Tutti i tag usati nei contatti Apulia (condomini + amministratori). Eliminandoli vengono rimossi anche da Bibot.
+                  </p>
+                </header>
+                <div style={{ padding: '16px 20px' }}>
+                  <TagManager tags={tagUsage} />
                 </div>
               </section>
             ),
