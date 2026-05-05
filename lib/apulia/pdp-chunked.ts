@@ -137,7 +137,7 @@ export async function processPdpChunk(
       counters.unmatched++
       processedCount++
     }
-  }, 4)
+  }, 2)
 
   return { counters, newCreated, rateLimited, processedCount }
 }
