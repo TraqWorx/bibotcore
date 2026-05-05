@@ -1,5 +1,6 @@
 import { fetchAllContacts, indexByPodPdr, upsertContact, removeTag, type ApuliaContact, pmap } from './contacts'
 import { APULIA_TAG } from './fields'
+import { GhlRateLimitError } from './ghl'
 
 const COL = {
   PodPdr: 'POD/PDR',
@@ -59,6 +60,10 @@ export interface ChunkOutput {
   counters: ChunkCounters
   /** New entries to merge into the persisted createdInRun map. */
   newCreated: Record<string, CompactContact>
+  /** True when GHL is rate-limit-blocking us; caller should pause. */
+  rateLimited?: boolean
+  /** Number of rows actually processed before aborting (rateLimited only). */
+  processedCount?: number
 }
 
 /**
@@ -74,13 +79,16 @@ export async function processPdpChunk(
 ): Promise<ChunkOutput> {
   const counters = { ...prev }
   const newCreated: Record<string, CompactContact> = {}
+  let rateLimited = false
+  let processedCount = 0
 
   await pmap(rowsSlice, async (row) => {
+    if (rateLimited) return // short-circuit remaining rows once we detect block
     const podRaw = (row[COL.PodPdr] || '').toUpperCase().trim()
     const pod = /^[+-]?\d+(\.\d+)?[Ee][+-]?\d+$/.test(podRaw)
       ? Number(podRaw).toFixed(0)
       : podRaw
-    if (!pod) { counters.skipped++; return }
+    if (!pod) { counters.skipped++; processedCount++; return }
 
     const cliente = (row[COL.Cliente] || '').trim()
     const cf: Record<string, string | number> = {}
@@ -117,13 +125,21 @@ export async function processPdpChunk(
           counters.created++
         }
       }
+      processedCount++
     } catch (err) {
+      if (err instanceof GhlRateLimitError) {
+        // Don't count this row as unmatched — it's retryable. Set the
+        // flag so other workers stop and the caller pauses the import.
+        rateLimited = true
+        return
+      }
       console.error(`[pdp-chunk] row failed (POD ${pod}):`, err)
       counters.unmatched++
+      processedCount++
     }
   }, 4)
 
-  return { counters, newCreated }
+  return { counters, newCreated, rateLimited, processedCount }
 }
 
 /** Finalize: auto-create missing admins + recompute commissions. */

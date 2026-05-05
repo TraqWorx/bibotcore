@@ -26,7 +26,13 @@ export async function POST(req: NextRequest) {
 
   let triggered = 0, skipped = 0
   for (const r of rows ?? []) {
-    // Skip if a /continue already ran in the last 30 seconds — likely still in flight.
+    // /continue may set last_continue_at to a future timestamp when
+    // pausing for rate-limit cooldown. Respect that.
+    if (r.last_continue_at && new Date(r.last_continue_at).getTime() > Date.now()) {
+      skipped++
+      continue
+    }
+    // Skip if a /continue already ran in the last 30s — likely in flight.
     const lastTouch = r.last_continue_at ?? r.last_progress_at
     if (lastTouch && Date.now() - new Date(lastTouch).getTime() < 30_000) {
       skipped++

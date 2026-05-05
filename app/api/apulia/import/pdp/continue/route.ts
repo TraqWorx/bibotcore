@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
   await sb.from('apulia_imports').update({ last_continue_at: new Date().toISOString() }).eq('id', id)
 
   // Process as many chunks as fit in our time budget.
+  let rateLimited = false
   while (done < total && Date.now() - startedAt < TIME_BUDGET_MS) {
     const end = Math.min(done + CHUNK_SIZE, total)
     const slice = payload.rows.slice(done, end)
@@ -75,6 +76,24 @@ export async function POST(req: NextRequest) {
     const out = await processPdpChunk(slice, meta.colFieldMap, byPodView, counters)
     counters = out.counters
     createdInRun = { ...createdInRun, ...out.newCreated }
+    if (out.rateLimited) {
+      // Save partial progress for whatever did succeed before the block.
+      done += out.processedCount ?? 0
+      rateLimited = true
+      await sb.from('apulia_imports').update({
+        progress_done: done,
+        created: counters.created,
+        updated: counters.updated,
+        untagged: counters.untagged,
+        unmatched: counters.unmatched,
+        skipped: counters.skipped,
+        payload_meta: { ...meta, createdInRun },
+        last_progress_at: new Date().toISOString(),
+        // Push last_continue_at into the future so dispatcher waits ~90s.
+        last_continue_at: new Date(Date.now() + 90_000).toISOString(),
+      }).eq('id', id)
+      break
+    }
     done = end
     await sb.from('apulia_imports').update({
       progress_done: done,
@@ -88,9 +107,11 @@ export async function POST(req: NextRequest) {
     }).eq('id', id)
   }
 
+  if (rateLimited) {
+    return NextResponse.json({ done, total, paused: 'rate-limited' })
+  }
+
   if (done < total) {
-    // Hit the budget before finishing — schedule the next pass and let
-    // the pg_cron dispatcher pick it up if our self-trigger doesn't.
     await triggerPdpContinue(id)
     return NextResponse.json({ done, total, more: true })
   }

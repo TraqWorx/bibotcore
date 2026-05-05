@@ -32,10 +32,24 @@ export async function ghlHeaders(): Promise<Record<string, string>> {
 }
 
 /**
+ * Thrown when a GHL request is rate-limited and our backoff retries
+ * couldn't clear it. Distinct from a normal 429 response so callers
+ * can distinguish "row failed, move on" from "GHL is down for us
+ * right now, pause the import".
+ */
+export class GhlRateLimitError extends Error {
+  constructor(public readonly path: string) {
+    super(`GHL rate-limited after retries: ${path}`)
+    this.name = 'GhlRateLimitError'
+  }
+}
+
+/**
  * Fetch with retry on 401 (token rotated mid-run) and 429 (rate limit).
  * 429 retries up to 5 times with exponential backoff (capped at 8s),
  * since GHL's 100 req/10s limit is easy to brush against during bulk
- * imports even with bounded concurrency. Throws on terminal failure.
+ * imports even with bounded concurrency. Throws GhlRateLimitError on
+ * terminal 429 so callers can pause instead of marking work failed.
  */
 export async function ghlFetch(path: string, init?: RequestInit): Promise<Response> {
   const url = path.startsWith('http') ? path : GHL_BASE + path
@@ -58,6 +72,7 @@ export async function ghlFetch(path: string, init?: RequestInit): Promise<Respon
     r = await fetch(url, opts)
     attempt++
   }
+  if (r.status === 429) throw new GhlRateLimitError(path)
   return r
 }
 
