@@ -36,38 +36,67 @@ export async function POST(req: NextRequest) {
   const allFields = (await fieldsRes.json()).customFields as { id: string; name: string }[]
 
   const filename = file.name
+
+  // Insert a 'running' row so the Imports page can show progress even
+  // if the operator refreshes mid-import.
+  const sbInit = createAdminClient()
+  const { data: imp } = await sbInit.from('apulia_imports').insert({
+    kind: 'pdp',
+    filename,
+    rows_total: rows.length,
+    progress_done: 0,
+    progress_total: rows.length,
+    last_progress_at: new Date().toISOString(),
+    status: 'running',
+    triggered_by: user.email ?? null,
+  }).select('id').single()
+  const importId = imp?.id as string | undefined
+
   const stream = new ReadableStream({
     async start(controller) {
       const enc = new TextEncoder()
-      const send = (obj: unknown) => controller.enqueue(enc.encode(JSON.stringify(obj) + '\n'))
+      const send = (obj: unknown) => {
+        try { controller.enqueue(enc.encode(JSON.stringify(obj) + '\n')) } catch { /* client gone */ }
+      }
+      const sb2 = createAdminClient()
 
       let summary: Record<string, unknown> = { kind: 'pdp' }
+      let failed = false
       try {
         for await (const evt of importPdp(rows, headers, allFields)) {
           send(evt)
+          if (evt.type === 'progress' && importId) {
+            await sb2.from('apulia_imports').update({
+              progress_done: evt.done,
+              created: evt.created,
+              updated: evt.updated,
+              untagged: evt.untagged,
+              unmatched: evt.unmatched,
+              skipped: evt.skipped,
+              last_progress_at: new Date().toISOString(),
+            }).eq('id', importId)
+          }
           if (evt.type === 'done') summary = { ...evt }
         }
       } catch (err) {
+        failed = true
         send({ type: 'error', message: err instanceof Error ? err.message : 'failed' })
       } finally {
-        // Persist a row in apulia_imports
-        try {
-          const sb2 = createAdminClient()
-          await sb2.from('apulia_imports').insert({
-            kind: 'pdp',
-            filename,
-            rows_total: rows.length,
+        if (importId) {
+          await sb2.from('apulia_imports').update({
+            status: failed ? 'failed' : 'completed',
+            progress_done: (summary.created as number ?? 0) + (summary.updated as number ?? 0) + (summary.skipped as number ?? 0) + (summary.unmatched as number ?? 0),
             created: (summary.created as number) ?? 0,
             updated: (summary.updated as number) ?? 0,
             untagged: (summary.untagged as number) ?? 0,
             unmatched: (summary.unmatched as number) ?? 0,
+            skipped: (summary.skipped as number) ?? 0,
             duration_ms: (summary.durationMs as number) ?? null,
-            status: 'completed',
-            triggered_by: user.email ?? null,
             finished_at: new Date().toISOString(),
-          })
-        } catch { /* swallow */ }
-        controller.close()
+            last_progress_at: new Date().toISOString(),
+          }).eq('id', importId).then(() => undefined, () => undefined)
+        }
+        try { controller.close() } catch { /* already closed */ }
       }
     },
   })
