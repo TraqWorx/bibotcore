@@ -4,9 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import { APULIA_FIELD, currentPeriod } from '@/lib/apulia/fields'
-import { upsertContact } from '@/lib/apulia/contacts'
+import { upsertContact, deleteContact } from '@/lib/apulia/contacts'
 import { upsertCachedFromGhl, patchCached } from '@/lib/apulia/cache'
-import { ghlFetch } from '@/lib/apulia/ghl'
+import { ghlFetch, pmap } from '@/lib/apulia/ghl'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -189,4 +189,43 @@ export async function setCompensoPerPod(adminContactId: string, amount: number):
   revalidatePath('/designs/apulia-power/settings')
   revalidatePath('/designs/apulia-power/dashboard')
   return { total: newTotal }
+}
+
+/**
+ * Bulk delete admins. POD linked to any of them are detached (their
+ * codice_amministratore is cleared) so they remain in Bibot but unassigned.
+ */
+export async function bulkDeleteAdmins(ids: string[]): Promise<{ deleted: number; failed: number; error?: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { deleted: 0, failed: 0, error: guard.error }
+  if (ids.length === 0) return { deleted: 0, failed: 0 }
+
+  const sb = createAdminClient()
+  const { data: rows } = await sb.from('apulia_contacts').select('id, codice_amministratore').in('id', ids).eq('is_amministratore', true)
+  const codes = (rows ?? []).map((r) => r.codice_amministratore).filter((c): c is string => Boolean(c))
+
+  let deleted = 0, failed = 0
+  await pmap(rows ?? [], async (r) => {
+    try {
+      await deleteContact(r.id)
+      await sb.from('apulia_contacts').delete().eq('id', r.id)
+      deleted++
+    } catch {
+      failed++
+    }
+  }, 6)
+
+  if (codes.length > 0) {
+    await sb
+      .from('apulia_contacts')
+      .update({ codice_amministratore: null, amministratore_name: null })
+      .in('codice_amministratore', codes)
+      .eq('is_amministratore', false)
+  }
+
+  revalidatePath('/designs/apulia-power/amministratori')
+  revalidatePath('/designs/apulia-power/condomini')
+  revalidatePath('/designs/apulia-power/dashboard')
+  revalidatePath('/designs/apulia-power/settings')
+  return { deleted, failed }
 }

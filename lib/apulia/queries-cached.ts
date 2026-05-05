@@ -45,6 +45,24 @@ export interface ApuliaSnapshot {
   totalCommissionThisPeriod: number
 }
 
+/** Lightweight list for picker dropdowns: name + code only. */
+export async function listAdminPickerOptions(): Promise<{ contactId: string; name: string; code: string }[]> {
+  const sb = createAdminClient()
+  const { data } = await sb
+    .from('apulia_contacts')
+    .select('id, first_name, last_name, codice_amministratore')
+    .eq('is_amministratore', true)
+    .not('codice_amministratore', 'is', null)
+    .order('first_name')
+  return ((data ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null; codice_amministratore: string | null }>)
+    .filter((a) => a.codice_amministratore)
+    .map((a) => ({
+      contactId: a.id,
+      name: [a.first_name, a.last_name].filter(Boolean).join(' ') || 'Senza nome',
+      code: a.codice_amministratore as string,
+    }))
+}
+
 export async function loadSnapshot(): Promise<ApuliaSnapshot> {
   const sb = createAdminClient()
   const [{ count: totalAdmins }, { count: totalPodsActive }, { count: totalPodsSwitchedOut }, { data: admins }] = await Promise.all([

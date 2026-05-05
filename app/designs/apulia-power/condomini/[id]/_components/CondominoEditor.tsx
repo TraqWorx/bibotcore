@@ -3,12 +3,20 @@
 import { useState } from 'react'
 import FieldRow from '../../../_components/FieldRow'
 import TagEditor from '../../../_components/TagEditor'
+import AdminPicker, { type AdminOption } from '../../../_components/AdminPicker'
 import {
   updateCondominoField,
   updateCondominoCore,
   addCondominoTag,
   removeCondominoTag,
+  setCondominoAdminByCode,
 } from '../_actions'
+import { APULIA_FIELD } from '@/lib/apulia/fields'
+
+const ADMIN_LINK_FIELD_IDS = new Set<string>([
+  APULIA_FIELD.CODICE_AMMINISTRATORE,
+  APULIA_FIELD.AMMINISTRATORE_CONDOMINIO,
+])
 
 export interface FieldDef {
   id: string
@@ -28,9 +36,12 @@ interface Props {
   customFields: Record<string, string>
   tags: string[]
   groups: GroupDef[]
+  adminOptions: AdminOption[]
+  currentAdminCode: string
+  currentAdminName: string
 }
 
-export default function CondominoEditor({ contactId, core, customFields, tags, groups }: Props) {
+export default function CondominoEditor({ contactId, core, customFields, tags, groups, adminOptions, currentAdminCode, currentAdminName }: Props) {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {}
     groups.forEach((g, i) => { init[g.title] = i < 2 })
@@ -51,6 +62,20 @@ export default function CondominoEditor({ contactId, core, customFields, tags, g
           <FieldRow contactId={contactId} fieldId="email" label="Email" type="email" initial={core.email} save={saveCore} />
           <FieldRow contactId={contactId} fieldId="phone" label="Telefono" type="tel" initial={core.phone} save={saveCore} />
         </div>
+      </section>
+
+      <section className="ap-card ap-card-pad">
+        <h3 style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 12 }}>Amministratore</h3>
+        <AdminPicker
+          options={adminOptions}
+          initialCode={currentAdminCode}
+          initialName={currentAdminName}
+          onSelect={(code) => setCondominoAdminByCode(contactId, code)}
+          label="Codice · Amministratore"
+        />
+        <p style={{ fontSize: 11, color: 'var(--ap-text-faint)', margin: '6px 0 0' }}>
+          Cerca per codice o nome. Il codice e il nome vengono aggiornati insieme su Bibot.
+        </p>
       </section>
 
       <section className="ap-card ap-card-pad">
@@ -85,7 +110,7 @@ export default function CondominoEditor({ contactId, core, customFields, tags, g
             </button>
             {isOpen && (
               <div style={{ padding: '4px 18px 18px', borderTop: '1px solid var(--ap-line)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
-                {g.fields.map((f) => (
+                {g.fields.filter((f) => !ADMIN_LINK_FIELD_IDS.has(f.id)).map((f) => (
                   <FieldRow
                     key={f.id}
                     contactId={contactId}

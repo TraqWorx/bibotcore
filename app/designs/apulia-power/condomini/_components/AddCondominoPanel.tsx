@@ -3,22 +3,25 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createCondomino } from '../_actions'
+import AdminPicker, { type AdminOption } from '../../_components/AdminPicker'
 
-export default function AddCondominoPanel() {
+export default function AddCondominoPanel({ adminOptions }: { adminOptions: AdminOption[] }) {
   const [open, setOpen] = useState(false)
 
   return (
     <>
       <button onClick={() => setOpen(true)} className="ap-btn ap-btn-primary">＋ Nuovo condominio</button>
-      {open && <Modal onClose={() => setOpen(false)} />}
+      {open && <Modal onClose={() => setOpen(false)} adminOptions={adminOptions} />}
     </>
   )
 }
 
-function Modal({ onClose }: { onClose: () => void }) {
+function Modal({ onClose, adminOptions }: { onClose: () => void; adminOptions: AdminOption[] }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [adminCode, setAdminCode] = useState('')
+  const [adminName, setAdminName] = useState('')
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -28,7 +31,7 @@ function Modal({ onClose }: { onClose: () => void }) {
       const res = await createCondomino({
         podPdr: (fd.get('podPdr') as string) ?? '',
         cliente: (fd.get('cliente') as string) ?? '',
-        codiceAmministratore: (fd.get('codiceAmministratore') as string) || undefined,
+        codiceAmministratore: adminCode || undefined,
         email: (fd.get('email') as string) || undefined,
         phone: (fd.get('phone') as string) || undefined,
         comune: (fd.get('comune') as string) || undefined,
@@ -58,7 +61,17 @@ function Modal({ onClose }: { onClose: () => void }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field name="podPdr" label="POD/PDR *" required mono />
           <Field name="cliente" label="Cliente *" required />
-          <Field name="codiceAmministratore" label="Codice amministratore" mono />
+          <div style={{ gridColumn: '1 / -1' }}>
+            <AdminPicker
+              options={adminOptions}
+              initialCode=""
+              onSelect={async () => undefined}
+              controlled
+              onChange={(c, n) => { setAdminCode(c); setAdminName(n) }}
+              label="Amministratore (opzionale, cerca per codice o nome)"
+            />
+            {adminName && <div style={{ fontSize: 11, color: 'var(--ap-text-faint)', marginTop: 4 }}>Selezionato: <strong>{adminCode}</strong> · {adminName}</div>}
+          </div>
           <Field name="codiceFiscale" label="Codice fiscale" mono />
           <Field name="email" label="Email" type="email" />
           <Field name="phone" label="Telefono" type="tel" />

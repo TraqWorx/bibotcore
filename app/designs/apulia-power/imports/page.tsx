@@ -40,6 +40,13 @@ export default async function ImportsPage() {
           endpoint="/api/apulia/import/switch-out"
           emoji="📤"
         />
+        <DropZone
+          kind="admins"
+          title="Amministratori"
+          subtitle="Lista amministratori con compenso, CF, P.IVA e contatti. Match per Codice amministratore; i nuovi vengono creati con tag amministratore."
+          endpoint="/api/apulia/import/admins"
+          emoji="👤"
+        />
       </div>
 
       <section className="ap-card">

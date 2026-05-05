@@ -2,7 +2,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { listCondomini } from '@/lib/apulia/queries'
+import { listAdminPickerOptions } from '@/lib/apulia/queries-cached'
 import AddCondominoPanel from './_components/AddCondominoPanel'
+import CondominiBulkSelect from './_components/CondominiBulkSelect'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,14 +24,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   const sp = await searchParams
   const page = Math.max(1, Number(sp.page ?? 1))
 
-  const { rows, total, comuni, amministratori } = await listCondomini({
-    q: sp.q,
-    stato: sp.stato,
-    comune: sp.comune,
-    amministratore: sp.amministratore,
-    page,
-    pageSize: PAGE_SIZE,
-  })
+  const [{ rows, total, comuni, amministratori }, adminOptions] = await Promise.all([
+    listCondomini({
+      q: sp.q,
+      stato: sp.stato,
+      comune: sp.comune,
+      amministratore: sp.amministratore,
+      page,
+      pageSize: PAGE_SIZE,
+    }),
+    listAdminPickerOptions(),
+  ])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -54,7 +59,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           <h1 className="ap-page-title">Condomini</h1>
           <p className="ap-page-subtitle">{total.toLocaleString('it-IT')} POD trovati. Filtra per cliente, amministratore, comune, stato.</p>
         </div>
-        <AddCondominoPanel />
+        <AddCondominoPanel adminOptions={adminOptions} />
       </header>
 
       <form className="ap-card ap-card-pad" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'flex-end' }}>
@@ -91,31 +96,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
       </form>
 
       <section className="ap-card">
-        <table className="ap-table">
-          <thead>
-            <tr>
-              <th>POD/PDR</th>
-              <th>Cliente</th>
-              <th>Amministratore</th>
-              <th>Comune</th>
-              <th>Stato</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td></tr>}
-            {rows.map((p) => (
-              <tr key={p.contactId} style={{ cursor: 'pointer' }}>
-                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
-                  <Link href={`/designs/apulia-power/condomini/${p.contactId}`} style={{ color: 'var(--ap-text)', textDecoration: 'none', display: 'block' }}>{p.pod}</Link>
-                </td>
-                <td><Link href={`/designs/apulia-power/condomini/${p.contactId}`} style={{ color: 'var(--ap-text)', textDecoration: 'none', display: 'block' }}>{p.cliente ?? '—'}</Link></td>
-                <td><Link href={`/designs/apulia-power/condomini/${p.contactId}`} style={{ color: 'var(--ap-text)', textDecoration: 'none', display: 'block' }}>{p.amministratore ?? '—'}</Link></td>
-                <td><Link href={`/designs/apulia-power/condomini/${p.contactId}`} style={{ color: 'var(--ap-text)', textDecoration: 'none', display: 'block' }}>{p.comune ?? '—'}</Link></td>
-                <td>{p.switchedOut ? <span className="ap-pill" data-tone="amber">Switch-out</span> : <span className="ap-pill" data-tone="green">Attivo</span>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <CondominiBulkSelect rows={rows} />
       </section>
 
       {totalPages > 1 && (

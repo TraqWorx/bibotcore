@@ -17,7 +17,7 @@ interface SummaryShape {
 }
 
 interface Props {
-  kind: 'pdp' | 'switch_out'
+  kind: 'pdp' | 'switch_out' | 'admins'
   title: string
   subtitle: string
   endpoint: string
@@ -144,6 +144,13 @@ export default function DropZone({ kind, title, subtitle, endpoint, emoji }: Pro
                 <Stat label="Tag aggiunti" value={summary.tagged ?? 0} tone="green" />
                 <Stat label="Già taggati" value={summary.alreadyTagged ?? 0} tone="gray" />
                 <Stat label="Non trovati" value={summary.unmatched ?? 0} tone={summary.unmatched ? 'amber' : 'gray'} />
+                <Stat label="Saltati" value={summary.skipped ?? 0} tone="gray" />
+              </>
+            )}
+            {kind === 'admins' && (
+              <>
+                <Stat label="Creati" value={summary.created ?? 0} tone="green" />
+                <Stat label="Aggiornati" value={summary.updated ?? 0} tone="blue" />
                 <Stat label="Saltati" value={summary.skipped ?? 0} tone="gray" />
               </>
             )}

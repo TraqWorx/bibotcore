@@ -105,6 +105,55 @@ export async function removeCondominoTag(contactId: string, tag: string): Promis
   pathsToRevalidate(contactId)
 }
 
+/**
+ * Atomically link this condominio to an existing amministratore by code.
+ * Writes BOTH `Codice amministratore` AND `Amministratore condominio` (name)
+ * to Bibot in one PUT, and patches both cache columns. Pass empty string to
+ * detach.
+ */
+export async function setCondominoAdminByCode(contactId: string, code: string): Promise<{ error?: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+  const sb = createAdminClient()
+  const trimmed = (code ?? '').trim()
+  let name = ''
+  if (trimmed) {
+    const { data: admin } = await sb
+      .from('apulia_contacts')
+      .select('first_name, last_name')
+      .eq('is_amministratore', true)
+      .eq('codice_amministratore', trimmed)
+      .maybeSingle()
+    if (!admin) return { error: `Nessun amministratore con codice ${trimmed}` }
+    name = [admin.first_name, admin.last_name].filter(Boolean).join(' ')
+  }
+
+  const r = await ghlFetch(`/contacts/${contactId}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      customFields: [
+        { id: APULIA_FIELD.CODICE_AMMINISTRATORE, value: trimmed },
+        { id: APULIA_FIELD.AMMINISTRATORE_CONDOMINIO, value: name },
+      ],
+    }),
+  })
+  if (!r.ok) return { error: `Bibot ${r.status}: ${(await r.text()).slice(0, 200)}` }
+
+  const { data: row } = await sb.from('apulia_contacts').select('custom_fields').eq('id', contactId).single()
+  const cf = { ...((row?.custom_fields ?? {}) as Record<string, string>) }
+  if (trimmed) cf[APULIA_FIELD.CODICE_AMMINISTRATORE] = trimmed
+  else delete cf[APULIA_FIELD.CODICE_AMMINISTRATORE]
+  if (name) cf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO] = name
+  else delete cf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO]
+  await sb.from('apulia_contacts').update({
+    custom_fields: cf,
+    codice_amministratore: trimmed || null,
+    amministratore_name: name || null,
+  }).eq('id', contactId)
+
+  pathsToRevalidate(contactId)
+}
+
 export async function deleteCondomino(contactId: string): Promise<{ error?: string; redirect?: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return guard

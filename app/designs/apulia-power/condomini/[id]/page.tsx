@@ -4,6 +4,8 @@ import { getApuliaSession } from '@/lib/apulia/auth'
 import { createAdminClient } from '@/lib/supabase-server'
 import { fetchApuliaFieldGroups } from '@/lib/apulia/field-meta'
 import { APULIA_FIELD } from '@/lib/apulia/fields'
+import { normalizePod } from '@/lib/apulia/cache'
+import { listAdminPickerOptions } from '@/lib/apulia/queries-cached'
 import CondominoEditor from './_components/CondominoEditor'
 import DeleteContactButton from '../../_components/DeleteContactButton'
 import { deleteCondomino } from './_actions'
@@ -16,18 +18,21 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const { id } = await params
 
   const sb = createAdminClient()
-  const [{ data: contact }, fieldGroups] = await Promise.all([
+  const [{ data: contact }, fieldGroups, adminOptions] = await Promise.all([
     sb.from('apulia_contacts').select('*').eq('id', id).maybeSingle(),
     fetchApuliaFieldGroups(),
+    listAdminPickerOptions(),
   ])
   if (!contact || contact.is_amministratore) notFound()
 
   const cf = (contact.custom_fields ?? {}) as Record<string, string>
   const tags: string[] = contact.tags ?? []
-  const podPdr = (cf[APULIA_FIELD.POD_PDR] as string | undefined) ?? contact.pod_pdr ?? '—'
+  // POD/PDR can come in scientific notation from older imports — normalize for display.
+  const rawPod = (cf[APULIA_FIELD.POD_PDR] as string | undefined) ?? contact.pod_pdr ?? ''
+  const podPdr = normalizePod(rawPod) ?? '—'
   const cliente = (cf[APULIA_FIELD.CLIENTE] as string | undefined) ?? contact.cliente ?? contact.first_name ?? '—'
-  const codiceAmm = cf[APULIA_FIELD.CODICE_AMMINISTRATORE]
-  const adminName = (cf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO] as string | undefined) ?? contact.amministratore_name
+  const codiceAmm = (cf[APULIA_FIELD.CODICE_AMMINISTRATORE] as string | undefined) ?? contact.codice_amministratore ?? ''
+  const adminName = (cf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO] as string | undefined) ?? contact.amministratore_name ?? ''
 
   // Find admin contact id by code (if any) so we can link to it.
   let adminContactId: string | null = null
@@ -75,6 +80,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         customFields={cf}
         tags={tags}
         groups={fieldGroups}
+        adminOptions={adminOptions}
+        currentAdminCode={codiceAmm}
+        currentAdminName={adminName}
       />
     </div>
   )

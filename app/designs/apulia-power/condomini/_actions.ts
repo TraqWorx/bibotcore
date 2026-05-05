@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
-import { upsertContact } from '@/lib/apulia/contacts'
+import { upsertContact, deleteContact } from '@/lib/apulia/contacts'
 import { upsertCachedFromGhl } from '@/lib/apulia/cache'
+import { pmap } from '@/lib/apulia/ghl'
 import { APULIA_FIELD } from '@/lib/apulia/fields'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
@@ -78,4 +79,27 @@ export async function createCondomino(input: CreateCondominoInput): Promise<{ id
   revalidatePath('/designs/apulia-power/condomini')
   revalidatePath('/designs/apulia-power/dashboard')
   return { id: newId }
+}
+
+/** Delete many condomini in one shot. Best-effort: counts errors, never throws. */
+export async function bulkDeleteCondomini(ids: string[]): Promise<{ deleted: number; failed: number; error?: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { deleted: 0, failed: 0, error: guard.error }
+  if (ids.length === 0) return { deleted: 0, failed: 0 }
+
+  const sb = createAdminClient()
+  let deleted = 0, failed = 0
+  await pmap(ids, async (id) => {
+    try {
+      await deleteContact(id)
+      await sb.from('apulia_contacts').delete().eq('id', id)
+      deleted++
+    } catch {
+      failed++
+    }
+  }, 6)
+
+  revalidatePath('/designs/apulia-power/condomini')
+  revalidatePath('/designs/apulia-power/dashboard')
+  return { deleted, failed }
 }
