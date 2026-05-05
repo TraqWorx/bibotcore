@@ -14,6 +14,8 @@ interface SummaryShape {
   alreadyTagged?: number
   durationMs?: number
   recompute?: { admins: number; pods: number; podsActive: number; totalCommissionCents: number }
+  enqueued?: boolean
+  importId?: string
 }
 
 interface Props {
@@ -38,10 +40,20 @@ export default function DropZone({ kind, title, subtitle, endpoint, emoji }: Pro
     const fd = new FormData(); fd.append('file', file)
     try {
       const r = await fetch(endpoint, { method: 'POST', body: fd })
-      if (!r.ok || !r.body) {
+      if (!r.ok) {
         setError(`HTTP ${r.status}: ${await r.text()}`)
         setBusy(false); return
       }
+      const ctype = r.headers.get('Content-Type') ?? ''
+      if (ctype.includes('application/json')) {
+        // Resumable import: server returned an id, watch progress in Storico.
+        const j = await r.json()
+        setProgress({ done: 0, total: Number(j.total) || 0, phase: 'In coda · vedi Storico per il progresso' })
+        setSummary({ type: 'done', enqueued: true, importId: j.importId } as unknown as SummaryShape)
+        router.refresh()
+        return
+      }
+      if (!r.body) { setError('Risposta vuota'); setBusy(false); return }
       const reader = r.body.getReader()
       const dec = new TextDecoder()
       let buf = ''
@@ -121,7 +133,18 @@ export default function DropZone({ kind, title, subtitle, endpoint, emoji }: Pro
         </div>
       )}
 
-      {summary && (
+      {summary && summary.enqueued && (
+        <div className="ap-card ap-card-pad" style={{ marginTop: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <span className="ap-pill" data-tone="blue">⏳ In coda</span>
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', margin: 0 }}>
+            Il file viene elaborato in background — segui il progresso nello Storico qui sotto. Puoi anche aggiornare la pagina o navigare via, l&apos;import continua.
+          </p>
+        </div>
+      )}
+
+      {summary && !summary.enqueued && (
         <div className="ap-card ap-card-pad" style={{ marginTop: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <span className="ap-pill" data-tone="green">✓ Completato</span>
