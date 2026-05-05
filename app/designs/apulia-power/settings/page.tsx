@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { APULIA_LOCATION_ID, APULIA_FIELD, currentPeriod } from '@/lib/apulia/fields'
 import { createAdminClient } from '@/lib/supabase-server'
-import { ResyncButton } from './_components/SettingsForms'
 import AdminPaymentSchedule, { type AdminScheduleEntry } from './_components/AdminPaymentSchedule'
 import CompensiTable, { type CompensoEntry } from './_components/CompensiTable'
 import SettingsTabs from './_components/SettingsTabs'
@@ -17,14 +16,10 @@ export default async function Page() {
   const sb = createAdminClient()
 
   const [
-    { count: cacheCount },
-    { data: lastSync },
     { data: admins },
     { data: schedule },
     { data: podCounts },
   ] = await Promise.all([
-    sb.from('apulia_contacts').select('id', { count: 'exact', head: true }),
-    sb.from('apulia_contacts').select('cached_at').order('cached_at', { ascending: false }).limit(1).maybeSingle(),
     sb.from('apulia_contacts')
       .select('id, first_name, last_name, codice_amministratore, first_payment_at, compenso_per_pod, commissione_totale')
       .eq('is_amministratore', true)
@@ -247,24 +242,6 @@ export default async function Page() {
                   />
                 </div>
               </div>
-            ),
-          },
-          {
-            id: 'cache',
-            label: 'Cache contatti',
-            content: (
-              <section className="ap-card ap-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <h2 style={{ fontSize: 14, fontWeight: 800 }}>Cache contatti</h2>
-                <p style={{ fontSize: 13, color: 'var(--ap-text-muted)', margin: 0 }}>
-                  {(cacheCount ?? 0).toLocaleString('it-IT')} contatti in cache. Ultimo aggiornamento:{' '}
-                  <strong>{lastSync?.cached_at ? new Date(lastSync.cached_at).toLocaleString('it-IT') : 'mai'}</strong>.
-                </p>
-                <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: 0 }}>
-                  La cache si aggiorna automaticamente dopo ogni import e ogni modifica. Usa il pulsante per
-                  forzare una risincronizzazione completa da Bibot.
-                </p>
-                <ResyncButton />
-              </section>
             ),
           },
           {

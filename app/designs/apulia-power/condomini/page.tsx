@@ -5,6 +5,7 @@ import { listCondomini } from '@/lib/apulia/queries'
 import { listAdminPickerOptions } from '@/lib/apulia/queries-cached'
 import AddCondominoPanel from './_components/AddCondominoPanel'
 import CondominiBulkSelect from './_components/CondominiBulkSelect'
+import { ResyncButton } from '../settings/_components/SettingsForms'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,7 +60,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           <h1 className="ap-page-title">Condomini</h1>
           <p className="ap-page-subtitle">{total.toLocaleString('it-IT')} POD trovati. Filtra per cliente, amministratore, comune, stato.</p>
         </div>
-        <AddCondominoPanel adminOptions={adminOptions} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <ResyncButton />
+          <AddCondominoPanel adminOptions={adminOptions} />
+        </div>
       </header>
 
       <form className="ap-card ap-card-pad" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, alignItems: 'flex-end' }}>
