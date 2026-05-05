@@ -6,6 +6,8 @@ import { listAdminPickerOptions } from '@/lib/apulia/queries-cached'
 import AddCondominoPanel from './_components/AddCondominoPanel'
 import CondominiBulkSelect from './_components/CondominiBulkSelect'
 import { ResyncButton } from '../settings/_components/SettingsForms'
+import StaleSyncTrigger from '../_components/StaleSyncTrigger'
+import { createAdminClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +27,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   const sp = await searchParams
   const page = Math.max(1, Number(sp.page ?? 1))
 
-  const [{ rows, total, comuni, amministratori }, adminOptions] = await Promise.all([
+  const sb = createAdminClient()
+  const [{ rows, total, comuni, amministratori }, adminOptions, { data: latestCache }] = await Promise.all([
     listCondomini({
       q: sp.q,
       stato: sp.stato,
@@ -35,7 +38,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
       pageSize: PAGE_SIZE,
     }),
     listAdminPickerOptions(),
+    sb.from('apulia_contacts').select('cached_at').order('cached_at', { ascending: false }).limit(1).maybeSingle(),
   ])
+  const cacheAgeMinutes = latestCache?.cached_at
+    ? (Date.now() - new Date(latestCache.cached_at).getTime()) / 60000
+    : Number.POSITIVE_INFINITY
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -61,6 +68,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           <p className="ap-page-subtitle">{total.toLocaleString('it-IT')} POD trovati. Filtra per cliente, amministratore, comune, stato.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <StaleSyncTrigger ageMinutes={cacheAgeMinutes} />
           <ResyncButton />
           <AddCondominoPanel adminOptions={adminOptions} />
         </div>

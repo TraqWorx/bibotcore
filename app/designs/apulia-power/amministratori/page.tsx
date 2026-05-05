@@ -5,6 +5,8 @@ import { currentPeriod } from '@/lib/apulia/fields'
 import AdminsTable from './_components/AdminsTable'
 import AddAdminPanel from './_components/AddAdminPanel'
 import { ResyncButton } from '../settings/_components/SettingsForms'
+import StaleSyncTrigger from '../_components/StaleSyncTrigger'
+import { createAdminClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +18,14 @@ export default async function Page() {
   const session = await getApuliaSession()
   if (session.role !== 'owner') redirect('/designs/apulia-power/dashboard')
 
-  const admins = await listAdminsWithStats()
+  const sb = createAdminClient()
+  const [admins, { data: latestCache }] = await Promise.all([
+    listAdminsWithStats(),
+    sb.from('apulia_contacts').select('cached_at').order('cached_at', { ascending: false }).limit(1).maybeSingle(),
+  ])
+  const cacheAgeMinutes = latestCache?.cached_at
+    ? (Date.now() - new Date(latestCache.cached_at).getTime()) / 60000
+    : Number.POSITIVE_INFINITY
   const totalDue = admins.filter((a) => a.isDueNow).reduce((s, a) => s + a.total, 0)
   const totalPaid = admins.filter((a) => a.paidThisPeriod).reduce((s, a) => s + a.total, 0)
   const dueNowCount = admins.filter((a) => a.isDueNow).length
@@ -33,6 +42,7 @@ export default async function Page() {
           <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <AddAdminPanel />
             <ResyncButton />
+            <StaleSyncTrigger ageMinutes={cacheAgeMinutes} />
           </div>
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
