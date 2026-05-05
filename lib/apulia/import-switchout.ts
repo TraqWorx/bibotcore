@@ -24,24 +24,27 @@ export async function* importSwitchOut(rows: Record<string, string>[]): AsyncGen
 
   let tagged = 0, alreadyTagged = 0, unmatched = 0, skipped = 0, done = 0
 
-  await pmap(rows, async (row) => {
-    const pod = podColumn ? (row[podColumn] || '').toUpperCase().trim() : ''
-    if (!pod) { skipped++; done++; return }
-    const c = byPod.get(pod)
-    if (!c) { unmatched++; done++; return }
-    if (c.tags?.includes(APULIA_TAG.SWITCH_OUT)) { alreadyTagged++; done++; return }
-    try {
-      await addTag(c.id, APULIA_TAG.SWITCH_OUT)
-      tagged++
-    } catch (err) {
-      console.error(`[importSwitchOut] tag failed (POD ${pod}):`, err)
-      unmatched++
-    } finally {
-      done++
-    }
-  }, 8)
-
-  yield { type: 'progress', done, total: rows.length, tagged, alreadyTagged, unmatched, skipped }
+  const CHUNK = 40
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK)
+    await pmap(chunk, async (row) => {
+      const pod = podColumn ? (row[podColumn] || '').toUpperCase().trim() : ''
+      if (!pod) { skipped++; done++; return }
+      const c = byPod.get(pod)
+      if (!c) { unmatched++; done++; return }
+      if (c.tags?.includes(APULIA_TAG.SWITCH_OUT)) { alreadyTagged++; done++; return }
+      try {
+        await addTag(c.id, APULIA_TAG.SWITCH_OUT)
+        tagged++
+      } catch (err) {
+        console.error(`[importSwitchOut] tag failed (POD ${pod}):`, err)
+        unmatched++
+      } finally {
+        done++
+      }
+    }, 8)
+    yield { type: 'progress', done, total: rows.length, tagged, alreadyTagged, unmatched, skipped }
+  }
 
   yield { type: 'recompute' }
   const recompute = await recomputeCommissions()

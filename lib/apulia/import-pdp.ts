@@ -56,59 +56,63 @@ export async function* importPdp(rows: Record<string, string>[], headers: string
   let created = 0, updated = 0, untagged = 0, unmatched = 0, skipped = 0
   let done = 0
 
-  await pmap(rows, async (row) => {
-    const podRaw = (row[COL.PodPdr] || '').toUpperCase().trim()
-    // Excel often serialises numeric PODs in scientific notation; expand.
-    const pod = /^[+-]?\d+(\.\d+)?[Ee][+-]?\d+$/.test(podRaw)
-      ? Number(podRaw).toFixed(0)
-      : podRaw
-    if (!pod) {
-      skipped++; done++; return
-    }
-    const cliente = (row[COL.Cliente] || '').trim()
-
-    // Build customField payload from every CSV column that maps to a known field.
-    const cf: Record<string, string | number> = {}
-    for (const [colName, fieldId] of colFieldMap) {
-      const v = row[colName]
-      if (v == null || v === '') continue
-      cf[fieldId] = v
-    }
-
-    const existingContact = byPod.get(pod)
-    const wasSwitchedOut = existingContact?.tags?.includes(APULIA_TAG.SWITCH_OUT)
-
-    try {
-      if (existingContact) {
-        await upsertContact({
-          id: existingContact.id,
-          firstName: cliente || existingContact.firstName,
-          customField: cf,
-        })
-        if (wasSwitchedOut) {
-          await removeTag(existingContact.id, APULIA_TAG.SWITCH_OUT)
-          untagged++
-        }
-        updated++
-      } else {
-        await upsertContact({
-          email: (row[COL.Email] || '').trim() || undefined,
-          phone: sanitizePhone(row[COL.Mobile] || row[COL.Phone]),
-          firstName: cliente || pod,
-          customField: cf,
-        })
-        created++
+  // Process in chunks so we can yield progress between them. Each chunk
+  // still uses pmap internally for concurrency.
+  const CHUNK = 40
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK)
+    await pmap(chunk, async (row) => {
+      const podRaw = (row[COL.PodPdr] || '').toUpperCase().trim()
+      // Excel often serialises numeric PODs in scientific notation; expand.
+      const pod = /^[+-]?\d+(\.\d+)?[Ee][+-]?\d+$/.test(podRaw)
+        ? Number(podRaw).toFixed(0)
+        : podRaw
+      if (!pod) {
+        skipped++; done++; return
       }
-    } catch (err) {
-      console.error(`[importPdp] row failed (POD ${pod}):`, err)
-      unmatched++
-    } finally {
-      done++
-    }
-  }, 8)
+      const cliente = (row[COL.Cliente] || '').trim()
 
-  // Periodically yield progress isn't simple inside pmap; emit aggregate then.
-  yield { type: 'progress', done, total: rows.length, created, updated, untagged, unmatched, skipped }
+      const cf: Record<string, string | number> = {}
+      for (const [colName, fieldId] of colFieldMap) {
+        const v = row[colName]
+        if (v == null || v === '') continue
+        cf[fieldId] = v
+      }
+
+      const existingContact = byPod.get(pod)
+      const wasSwitchedOut = existingContact?.tags?.includes(APULIA_TAG.SWITCH_OUT)
+
+      try {
+        if (existingContact) {
+          await upsertContact({
+            id: existingContact.id,
+            firstName: cliente || existingContact.firstName,
+            customField: cf,
+          })
+          if (wasSwitchedOut) {
+            await removeTag(existingContact.id, APULIA_TAG.SWITCH_OUT)
+            untagged++
+          }
+          updated++
+        } else {
+          await upsertContact({
+            email: (row[COL.Email] || '').trim() || undefined,
+            phone: sanitizePhone(row[COL.Mobile] || row[COL.Phone]),
+            firstName: cliente || pod,
+            customField: cf,
+          })
+          created++
+        }
+      } catch (err) {
+        console.error(`[importPdp] row failed (POD ${pod}):`, err)
+        unmatched++
+      } finally {
+        done++
+      }
+    }, 8)
+
+    yield { type: 'progress', done, total: rows.length, created, updated, untagged, unmatched, skipped }
+  }
 
   // Auto-create admin contacts for any new Codice amministratore in this
   // CSV that doesn't yet have an `amministratore`-tagged contact. Stamp

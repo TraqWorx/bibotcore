@@ -112,6 +112,9 @@ export async function* importAdmins(rows: Record<string, string>[]): AsyncGenera
       skipped++
     }
     done++
+    if (done % 5 === 0) {
+      yield { type: 'progress', done, total: rows.length, created, updated, skipped }
+    }
   }
 
   yield { type: 'progress', done, total: rows.length, created, updated, skipped }
