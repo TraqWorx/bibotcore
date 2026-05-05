@@ -108,7 +108,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
       </form>
 
       <section className="ap-card">
-        <CondominiBulkSelect rows={rows} />
+        <CondominiBulkSelect
+          rows={rows}
+          total={total}
+          filters={{ q: sp.q, stato: sp.stato, comune: sp.comune, amministratore: sp.amministratore }}
+        />
       </section>
 
       {totalPages > 1 && (

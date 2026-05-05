@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { bulkDeleteCondomini } from '../_actions'
+import { bulkDeleteCondomini, type BulkDeleteFilters } from '../_actions'
 
 export interface CondominoRow {
   contactId: string
@@ -14,8 +14,15 @@ export interface CondominoRow {
   switchedOut: boolean
 }
 
-export default function CondominiBulkSelect({ rows }: { rows: CondominoRow[] }) {
+interface Props {
+  rows: CondominoRow[]
+  total: number
+  filters: BulkDeleteFilters
+}
+
+export default function CondominiBulkSelect({ rows, total, filters }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [allMatching, setAllMatching] = useState(false)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
@@ -23,9 +30,12 @@ export default function CondominiBulkSelect({ rows }: { rows: CondominoRow[] }) 
 
   const allChecked = rows.length > 0 && rows.every((r) => selected.has(r.contactId))
   const someChecked = !allChecked && rows.some((r) => selected.has(r.contactId))
-  const selectedCount = useMemo(() => rows.filter((r) => selected.has(r.contactId)).length, [rows, selected])
+  const pageSelectedCount = useMemo(() => rows.filter((r) => selected.has(r.contactId)).length, [rows, selected])
+  const selectedCount = allMatching ? total : pageSelectedCount
+  const showAcrossPagesPrompt = allChecked && !allMatching && total > rows.length
 
   function toggle(id: string) {
+    if (allMatching) setAllMatching(false)
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -35,21 +45,31 @@ export default function CondominiBulkSelect({ rows }: { rows: CondominoRow[] }) 
   }
 
   function toggleAll() {
+    setAllMatching(false)
     if (allChecked) setSelected(new Set())
     else setSelected(new Set(rows.map((r) => r.contactId)))
   }
 
+  function clearAll() {
+    setAllMatching(false)
+    setSelected(new Set())
+  }
+
   function bulkDelete() {
     const ids = rows.filter((r) => selected.has(r.contactId)).map((r) => r.contactId)
-    if (ids.length === 0) return
-    if (!window.confirm(`Eliminare ${ids.length} condomini?\nQuesta azione non si può annullare.`)) return
+    const count = allMatching ? total : ids.length
+    if (count === 0) return
+    const msg = allMatching
+      ? `Eliminare TUTTI i ${total.toLocaleString('it-IT')} condomini che corrispondono al filtro corrente?\nQuesta azione non si può annullare.`
+      : `Eliminare ${ids.length} condomini?\nQuesta azione non si può annullare.`
+    if (!window.confirm(msg)) return
     setError(null); setFlash(null)
     startTransition(async () => {
-      const res = await bulkDeleteCondomini(ids)
+      const res = await bulkDeleteCondomini(allMatching ? { filters } : { ids })
       if (res.error) setError(res.error)
       else {
         setFlash(`Eliminati ${res.deleted} condomini${res.failed ? ` (${res.failed} errori)` : ''}.`)
-        setSelected(new Set())
+        clearAll()
         router.refresh()
       }
     })
@@ -68,14 +88,39 @@ export default function CondominiBulkSelect({ rows }: { rows: CondominoRow[] }) 
           gap: 12,
           flexWrap: 'wrap',
         }}>
-          <div style={{ fontSize: 13, color: 'var(--ap-text)' }}>
-            {selectedCount > 0 && <><strong>{selectedCount}</strong> selezionati</>}
+          <div style={{ fontSize: 13, color: 'var(--ap-text)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {selectedCount > 0 && (
+              <>
+                <strong>{selectedCount.toLocaleString('it-IT')}</strong> selezionati
+                {allMatching && <span className="ap-pill" data-tone="blue" style={{ fontSize: 10 }}>tutti i risultati</span>}
+              </>
+            )}
+            {showAcrossPagesPrompt && (
+              <button
+                type="button"
+                onClick={() => setAllMatching(true)}
+                className="ap-btn ap-btn-ghost"
+                style={{ height: 26, fontSize: 12, padding: '0 10px' }}
+              >
+                Seleziona tutti i {total.toLocaleString('it-IT')} →
+              </button>
+            )}
+            {allMatching && (
+              <button
+                type="button"
+                onClick={toggleAll}
+                className="ap-btn ap-btn-ghost"
+                style={{ height: 26, fontSize: 12, padding: '0 10px' }}
+              >
+                Solo questa pagina ({rows.length})
+              </button>
+            )}
             {flash && <span className="ap-pill" data-tone="green" style={{ marginLeft: 8 }}>✓ {flash}</span>}
             {error && <span style={{ color: 'var(--ap-danger)', marginLeft: 8 }}>{error}</span>}
           </div>
           {selectedCount > 0 && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" onClick={() => setSelected(new Set())} className="ap-btn ap-btn-ghost" style={{ height: 32 }} disabled={pending}>
+              <button type="button" onClick={clearAll} className="ap-btn ap-btn-ghost" style={{ height: 32 }} disabled={pending}>
                 Deseleziona
               </button>
               <button
@@ -85,7 +130,7 @@ export default function CondominiBulkSelect({ rows }: { rows: CondominoRow[] }) 
                 className="ap-btn"
                 style={{ background: 'var(--ap-danger, #dc2626)', color: '#fff', height: 32 }}
               >
-                {pending ? 'Elimino…' : `🗑 Elimina ${selectedCount}`}
+                {pending ? 'Elimino…' : `🗑 Elimina ${selectedCount.toLocaleString('it-IT')}`}
               </button>
             </div>
           )}
