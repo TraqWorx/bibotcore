@@ -102,7 +102,10 @@ export async function* importAdmins(rows: Record<string, string>[]): AsyncGenera
             tags: ['amministratore'],
             customFields: Object.entries(cf).map(([cid, v]) => ({ id: cid, value: String(v) })),
           })
-          await sb.from('apulia_contacts').update({ first_payment_at: new Date().toISOString() }).eq('id', newId)
+          // Note: first_payment_at is intentionally NOT set here. The
+          // payment cycle anchors to the day the admin's first POD
+          // imports via PDP — that's where the PDP importer (or the
+          // operator via Settings) stamps the anchor.
           idByCode.set(code, newId)
           created++
         }
