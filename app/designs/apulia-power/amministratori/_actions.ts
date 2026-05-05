@@ -5,7 +5,7 @@ import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import { APULIA_FIELD, currentPeriod } from '@/lib/apulia/fields'
 import { upsertContact, deleteContact } from '@/lib/apulia/contacts'
-import { upsertCachedFromGhl, patchCached } from '@/lib/apulia/cache'
+import { upsertCachedFromGhl, patchCached, fullSyncCache } from '@/lib/apulia/cache'
 import { ghlFetch, pmap } from '@/lib/apulia/ghl'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
@@ -222,6 +222,9 @@ export async function bulkDeleteAdmins(ids: string[]): Promise<{ deleted: number
       .in('codice_amministratore', codes)
       .eq('is_amministratore', false)
   }
+
+  // Reconcile against GHL — bulk semantics can miss webhooks.
+  try { await fullSyncCache() } catch { /* ignore */ }
 
   revalidatePath('/designs/apulia-power/amministratori')
   revalidatePath('/designs/apulia-power/condomini')

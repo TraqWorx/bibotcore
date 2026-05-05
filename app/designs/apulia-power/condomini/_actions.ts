@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import { upsertContact, deleteContact } from '@/lib/apulia/contacts'
-import { upsertCachedFromGhl } from '@/lib/apulia/cache'
+import { upsertCachedFromGhl, fullSyncCache } from '@/lib/apulia/cache'
 import { pmap } from '@/lib/apulia/ghl'
 import { APULIA_FIELD } from '@/lib/apulia/fields'
 
@@ -127,6 +127,10 @@ export async function bulkDeleteCondomini(input: { ids?: string[]; filters?: Bul
       failed++
     }
   }, 6)
+
+  // Belt-and-suspenders: GHL bulk semantics can miss webhooks, so
+  // reconcile the cache against GHL after any large delete.
+  try { await fullSyncCache() } catch { /* ignore */ }
 
   revalidatePath('/designs/apulia-power/condomini')
   revalidatePath('/designs/apulia-power/dashboard')

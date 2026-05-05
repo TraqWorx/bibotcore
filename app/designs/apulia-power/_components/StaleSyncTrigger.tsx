@@ -4,43 +4,58 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface Props {
-  /** Server-rendered cache age in minutes (Infinity if cache is empty). */
+  /**
+   * Server-rendered cache age in minutes (Infinity if cache is empty).
+   * The server endpoint also decides whether to actually sync — this
+   * is just a hint to skip the round-trip when the cache is clearly
+   * fresh.
+   */
   ageMinutes: number
-  /** Trigger a sync if age >= this. Default 10. */
+  /** Trigger a sync if age >= this OR drift is detected. Default 2. */
   staleMinutes?: number
 }
 
 /**
- * Mounts on a list page; if the cache snapshot is older than the threshold
- * it POSTs to `/api/apulia/maybe-resync` and refreshes the route once the
- * sync finishes. Operator never sees a delay — page renders from cache, the
- * trigger runs in the background, and on completion the data refreshes.
+ * Mounts on a list page and POSTs to /api/apulia/maybe-resync. The
+ * server endpoint runs a fullSyncCache when EITHER the cache is older
+ * than `staleMinutes` OR the cache row count diverges from the live
+ * GHL count. The page auto-refreshes once the sync completes.
+ *
+ * The drift check catches GHL bulk operations (which don't fire
+ * per-contact webhooks) within one page visit instead of waiting
+ * for the next hourly cron.
  */
-export default function StaleSyncTrigger({ ageMinutes, staleMinutes = 10 }: Props) {
+export default function StaleSyncTrigger({ ageMinutes, staleMinutes = 2 }: Props) {
   const router = useRouter()
   const fired = useRef(false)
-  const [state, setState] = useState<'idle' | 'syncing' | 'done' | 'error'>(ageMinutes >= staleMinutes ? 'syncing' : 'idle')
+  const [state, setState] = useState<'idle' | 'checking' | 'syncing' | 'done' | 'error'>('checking')
 
   useEffect(() => {
     if (fired.current) return
-    if (ageMinutes < staleMinutes) return
     fired.current = true
     ;(async () => {
       try {
         const r = await fetch(`/api/apulia/maybe-resync?staleMinutes=${staleMinutes}`, { method: 'POST' })
         if (!r.ok) { setState('error'); return }
-        setState('done')
-        router.refresh()
+        const j = await r.json() as { skipped?: boolean; synced?: boolean }
+        if (j.skipped) { setState('idle'); return }
+        if (j.synced) {
+          setState('done')
+          router.refresh()
+          return
+        }
+        setState('idle')
       } catch {
         setState('error')
       }
     })()
-  }, [ageMinutes, staleMinutes, router])
+  }, [staleMinutes, router, ageMinutes])
 
   if (state === 'idle' || state === 'done') return null
 
   return (
     <span style={{ fontSize: 11, color: 'var(--ap-text-faint)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      {state === 'checking' && <>↻ Verifico…</>}
       {state === 'syncing' && <>↻ Aggiorno…</>}
       {state === 'error' && <span style={{ color: 'var(--ap-danger)' }}>⚠ Sync fallito</span>}
     </span>
