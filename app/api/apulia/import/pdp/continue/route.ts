@@ -8,6 +8,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 300
 
 const CHUNK_SIZE = 400
+const TIME_BUDGET_MS = 240_000 // 4 min — leave ~60s headroom under Vercel's 300s
 
 interface PayloadMeta {
   colFieldMap: Record<string, string>
@@ -49,45 +50,52 @@ export async function POST(req: NextRequest) {
   }
 
   const total = payload.rows.length
-  const start = row.progress_done ?? 0
-  const end = Math.min(start + CHUNK_SIZE, total)
-  if (start >= total) {
+  if ((row.progress_done ?? 0) >= total) {
     return await runFinalize(sb, id, payload.rows, meta.colFieldMap, row)
   }
 
-  const slice = payload.rows.slice(start, end)
-  const byPodView = { ...meta.byPodInit, ...meta.createdInRun }
-  const prev: ChunkCounters = {
+  const startedAt = Date.now()
+  let done = row.progress_done ?? 0
+  let counters: ChunkCounters = {
     created: row.created ?? 0,
     updated: row.updated ?? 0,
     untagged: row.untagged ?? 0,
     unmatched: row.unmatched ?? 0,
     skipped: row.skipped ?? 0,
   }
+  let createdInRun = { ...meta.createdInRun }
 
   await sb.from('apulia_imports').update({ last_continue_at: new Date().toISOString() }).eq('id', id)
 
-  const out = await processPdpChunk(slice, meta.colFieldMap, byPodView, prev)
-  const newCreatedInRun = { ...meta.createdInRun, ...out.newCreated }
-
-  const newDone = end
-  await sb.from('apulia_imports').update({
-    progress_done: newDone,
-    created: out.counters.created,
-    updated: out.counters.updated,
-    untagged: out.counters.untagged,
-    unmatched: out.counters.unmatched,
-    skipped: out.counters.skipped,
-    payload_meta: { ...meta, createdInRun: newCreatedInRun },
-    last_progress_at: new Date().toISOString(),
-  }).eq('id', id)
-
-  if (newDone < total) {
-    await triggerPdpContinue(id)
-    return NextResponse.json({ done: newDone, total, more: true })
+  // Process as many chunks as fit in our time budget.
+  while (done < total && Date.now() - startedAt < TIME_BUDGET_MS) {
+    const end = Math.min(done + CHUNK_SIZE, total)
+    const slice = payload.rows.slice(done, end)
+    const byPodView = { ...meta.byPodInit, ...createdInRun }
+    const out = await processPdpChunk(slice, meta.colFieldMap, byPodView, counters)
+    counters = out.counters
+    createdInRun = { ...createdInRun, ...out.newCreated }
+    done = end
+    await sb.from('apulia_imports').update({
+      progress_done: done,
+      created: counters.created,
+      updated: counters.updated,
+      untagged: counters.untagged,
+      unmatched: counters.unmatched,
+      skipped: counters.skipped,
+      payload_meta: { ...meta, createdInRun },
+      last_progress_at: new Date().toISOString(),
+    }).eq('id', id)
   }
 
-  return await runFinalize(sb, id, payload.rows, meta.colFieldMap, { ...row, ...out.counters, progress_done: newDone })
+  if (done < total) {
+    // Hit the budget before finishing — schedule the next pass and let
+    // the pg_cron dispatcher pick it up if our self-trigger doesn't.
+    await triggerPdpContinue(id)
+    return NextResponse.json({ done, total, more: true })
+  }
+
+  return await runFinalize(sb, id, payload.rows, meta.colFieldMap, { ...row, ...counters, progress_done: done })
 }
 
 async function runFinalize(
