@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
-import { parseCsv } from '@/lib/apulia/csv'
+import { parseSpreadsheet } from '@/lib/apulia/spreadsheet'
 import { importPdp } from '@/lib/apulia/import-pdp'
 import { ghlFetch } from '@/lib/apulia/ghl'
 import { APULIA_LOCATION_ID } from '@/lib/apulia/fields'
@@ -28,9 +28,8 @@ export async function POST(req: NextRequest) {
   const file = form.get('file')
   if (!(file instanceof File)) return new Response('Missing file', { status: 400 })
 
-  const text = await file.text()
-  const { headers, rows } = parseCsv(text)
-  if (rows.length === 0) return new Response('Empty CSV', { status: 400 })
+  const { headers, rows } = await parseSpreadsheet(file)
+  if (rows.length === 0) return new Response('Empty file', { status: 400 })
 
   // Pre-fetch field-name → id map so importPdp can match columns to fields.
   const fieldsRes = await ghlFetch(`/locations/${APULIA_LOCATION_ID}/customFields`)

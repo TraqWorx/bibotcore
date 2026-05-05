@@ -116,7 +116,7 @@ export default async function Page() {
             content: (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: 0 }}>
-                  Salva sempre il CSV con la colonna POD/PDR formattata come <em>Testo</em>: i numeri lunghi salvati come Numero diventano notazione scientifica (es. <code>8.82601E+11</code>) e perdono cifre.
+                  Puoi caricare direttamente il file <strong>.xlsx</strong> esportato da Excel, oppure un CSV. Per i CSV, salva la colonna POD/PDR come <em>Testo</em> per evitare la conversione in notazione scientifica (es. <code>8.82601E+11</code>); l&apos;import xlsx preserva sempre la stringa originale.
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, alignItems: 'start' }}>
                   <ImportColumnsCard

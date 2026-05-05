@@ -97,11 +97,11 @@ export default function DropZone({ kind, title, subtitle, endpoint, emoji }: Pro
         onDrop={onDrop}
         onClick={() => fileInput.current?.click()}
       >
-        <input ref={fileInput} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+        <input ref={fileInput} type="file" accept=".csv,.xlsx,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
         <div style={{ fontSize: 32 }}>{emoji}</div>
         <div style={{ fontSize: 16, fontWeight: 700 }}>{title}</div>
         <div style={{ fontSize: 13, color: 'var(--ap-text-muted)', maxWidth: 320 }}>{subtitle}</div>
-        {!busy && !summary && <div style={{ fontSize: 12, color: 'var(--ap-text-faint)' }}>Trascina qui il file CSV o clicca</div>}
+        {!busy && !summary && <div style={{ fontSize: 12, color: 'var(--ap-text-faint)' }}>Trascina qui il file CSV o XLSX o clicca</div>}
 
         {busy && (
           <div style={{ width: '100%', maxWidth: 360, marginTop: 8 }}>

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
-import { parseCsv } from '@/lib/apulia/csv'
+import { parseSpreadsheet } from '@/lib/apulia/spreadsheet'
 import { importSwitchOut } from '@/lib/apulia/import-switchout'
 
 export const dynamic = 'force-dynamic'
@@ -22,9 +22,8 @@ export async function POST(req: NextRequest) {
   const file = form.get('file')
   if (!(file instanceof File)) return new Response('Missing file', { status: 400 })
 
-  const text = await file.text()
-  const { rows } = parseCsv(text)
-  if (rows.length === 0) return new Response('Empty CSV', { status: 400 })
+  const { rows } = await parseSpreadsheet(file)
+  if (rows.length === 0) return new Response('Empty file', { status: 400 })
 
   const filename = file.name
   const stream = new ReadableStream({

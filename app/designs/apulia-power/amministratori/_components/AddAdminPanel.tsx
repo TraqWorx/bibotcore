@@ -157,7 +157,7 @@ function UploadDrop({ onClose }: { onClose: () => void }) {
           <button type="button" onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: 20, cursor: 'pointer' }}>×</button>
         </div>
         <p style={{ fontSize: 13, color: 'var(--ap-text-muted)', marginBottom: 14 }}>
-          File CSV con colonne: <code>Fornitura : Cliente : Amministratore condominio</code> (nome, obbligatorio),{' '}
+          File CSV o XLSX con colonne: <code>Fornitura : Cliente : Amministratore condominio</code> (nome, obbligatorio),{' '}
           <code>Fornitura : Cliente : Codice amministratore</code> (obbligatorio), e opzionalmente CF, P.IVA, telefono, email,
           indirizzo, città, provincia, <code>compenso per ciascun pod</code>.
         </p>
@@ -168,9 +168,9 @@ function UploadDrop({ onClose }: { onClose: () => void }) {
           onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handle(f) }}
           onDragOver={(e) => e.preventDefault()}
         >
-          <input ref={fileInput} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) handle(f) }} />
+          <input ref={fileInput} type="file" accept=".csv,.xlsx,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) handle(f) }} />
           <div style={{ fontSize: 32 }}>📥</div>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>Trascina il CSV o clicca</div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>Trascina il file CSV o XLSX o clicca</div>
           {busy && (
             <div style={{ width: '100%', maxWidth: 360, marginTop: 8 }}>
               <div className="ap-progress"><div className="ap-progress-bar" style={{ width: `${pct}%` }} /></div>
