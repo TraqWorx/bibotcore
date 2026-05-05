@@ -33,7 +33,9 @@ export async function ghlHeaders(): Promise<Record<string, string>> {
 
 /**
  * Fetch with retry on 401 (token rotated mid-run) and 429 (rate limit).
- * Throws on terminal failure.
+ * 429 retries up to 5 times with exponential backoff (capped at 8s),
+ * since GHL's 100 req/10s limit is easy to brush against during bulk
+ * imports even with bounded concurrency. Throws on terminal failure.
  */
 export async function ghlFetch(path: string, init?: RequestInit): Promise<Response> {
   const url = path.startsWith('http') ? path : GHL_BASE + path
@@ -46,10 +48,15 @@ export async function ghlFetch(path: string, init?: RequestInit): Promise<Respon
     opts.headers = { ...(await ghlHeaders()), ...(init?.headers ?? {}) }
     r = await fetch(url, opts)
   }
-  if (r.status === 429) {
-    const retryAfter = Number(r.headers.get('retry-after') ?? 1)
-    await new Promise((res) => setTimeout(res, retryAfter * 1000))
+  let attempt = 0
+  while (r.status === 429 && attempt < 5) {
+    const retryAfter = Number(r.headers.get('retry-after') ?? 0)
+    const backoffMs = retryAfter > 0
+      ? retryAfter * 1000
+      : Math.min(8000, 500 * Math.pow(2, attempt)) + Math.floor(Math.random() * 200)
+    await new Promise((res) => setTimeout(res, backoffMs))
     r = await fetch(url, opts)
+    attempt++
   }
   return r
 }

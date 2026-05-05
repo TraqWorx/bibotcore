@@ -121,7 +121,7 @@ export async function processPdpChunk(
       console.error(`[pdp-chunk] row failed (POD ${pod}):`, err)
       counters.unmatched++
     }
-  }, 8)
+  }, 4)
 
   return { counters, newCreated }
 }
