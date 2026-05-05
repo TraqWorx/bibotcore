@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
-import { APULIA_LOCATION_ID, APULIA_FIELD, currentPeriod } from '@/lib/apulia/fields'
+import { currentPeriod } from '@/lib/apulia/fields'
 import { createAdminClient } from '@/lib/supabase-server'
 import AdminPaymentSchedule, { type AdminScheduleEntry } from './_components/AdminPaymentSchedule'
 import CompensiTable, { type CompensoEntry } from './_components/CompensiTable'
@@ -244,31 +244,8 @@ export default async function Page() {
               </div>
             ),
           },
-          {
-            id: 'tech',
-            label: 'Riferimenti tecnici',
-            content: (
-              <section className="ap-card ap-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <h2 style={{ fontSize: 14, fontWeight: 800 }}>Riferimenti tecnici</h2>
-                <KV k="Location ID" v={APULIA_LOCATION_ID} />
-                <KV k="Commissione Totale" v={APULIA_FIELD.COMMISSIONE_TOTALE} />
-                <KV k="POD Override" v={APULIA_FIELD.POD_OVERRIDE} />
-                <KV k="Compenso per POD" v={APULIA_FIELD.COMPENSO_PER_POD} />
-                <KV k="Codice Amministratore" v={APULIA_FIELD.CODICE_AMMINISTRATORE} />
-              </section>
-            ),
-          },
         ]}
       />
-    </div>
-  )
-}
-
-function KV({ k, v }: { k: string; v: string }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--ap-line)' }}>
-      <span style={{ color: 'var(--ap-text-muted)' }}>{k}</span>
-      <code style={{ fontSize: 12, color: 'var(--ap-text)' }}>{v}</code>
     </div>
   )
 }
