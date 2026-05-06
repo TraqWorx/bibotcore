@@ -30,11 +30,14 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const sb = createAdminClient()
   const [{ data: payments }, { data: contactRow }, fieldGroups] = await Promise.all([
     sb.from('apulia_payments').select('period, amount_cents, paid_at, paid_by, note').eq('contact_id', id).order('paid_at', { ascending: false }),
-    sb.from('apulia_contacts').select('first_name, last_name, email, phone, tags, custom_fields').eq('id', id).maybeSingle(),
+    sb.from('apulia_contacts').select('first_name, last_name, email, phone, tags, custom_fields, sync_status, sync_error, ghl_id').eq('id', id).maybeSingle(),
     fetchApuliaFieldGroups(),
   ])
   const customFields = (contactRow?.custom_fields ?? {}) as Record<string, string>
   const tags: string[] = (contactRow?.tags ?? []) as string[]
+  const syncStatus = (contactRow as { sync_status?: string } | null)?.sync_status
+  const syncError = (contactRow as { sync_error?: string | null } | null)?.sync_error
+  const ghlId = (contactRow as { ghl_id?: string | null } | null)?.ghl_id
 
   const period = currentPeriod()
   const paidThisPeriod = (payments ?? []).find((p) => p.period === period)
@@ -44,6 +47,20 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <Link href="/designs/apulia-power/amministratori" style={{ fontSize: 13, color: 'var(--ap-text-muted)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6, width: 'fit-content' }}>
         ← Tutti gli amministratori
       </Link>
+
+      {syncStatus === 'failed' && (
+        <div style={{ padding: '14px 18px', borderRadius: 8, background: 'color-mix(in srgb, var(--ap-danger, #dc2626) 12%, transparent)', border: '1px solid var(--ap-danger, #dc2626)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <strong style={{ color: 'var(--ap-danger, #dc2626)', fontSize: 13 }}>⚠ Non sincronizzato con GHL</strong>
+          <span style={{ fontSize: 12, color: 'var(--ap-text)', lineHeight: 1.5 }}>
+            {syncError ?? 'Sincronizzazione fallita. Modifica i dati in conflitto per riprovare.'}
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--ap-text-muted)' }}>
+            {ghlId
+              ? <>GHL id: <code style={{ fontFamily: 'monospace' }}>{ghlId}</code></>
+              : 'Questo contatto non è ancora presente in GHL. Modificalo per ritentare automaticamente.'}
+          </span>
+        </div>
+      )}
 
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div>

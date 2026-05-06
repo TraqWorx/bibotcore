@@ -24,6 +24,28 @@ function pathsToRevalidate(id: string) {
   revalidatePath('/designs/apulia-power/dashboard')
 }
 
+/**
+ * If the row never made it to GHL (ghl_id null — pending_create or
+ * previously failed), re-queue a fresh 'create' op so the worker tries
+ * to push the latest local snapshot. Otherwise queue the requested
+ * action as usual.
+ */
+async function enqueueOrRetryCreate(
+  contactId: string,
+  ghlId: string | null,
+  action: 'update' | 'set_field' | 'add_tag' | 'remove_tag',
+  payload?: unknown,
+): Promise<void> {
+  const sb = createAdminClient()
+  if (!ghlId) {
+    await sb.from('apulia_sync_queue').delete().eq('contact_id', contactId).eq('status', 'pending')
+    await sb.from('apulia_contacts').update({ sync_status: 'pending_create', sync_error: null }).eq('id', contactId)
+    await enqueueOp({ contact_id: contactId, ghl_id: null, action: 'create' })
+    return
+  }
+  await enqueueOp({ contact_id: contactId, ghl_id: ghlId, action, payload })
+}
+
 /** Bibot is now source of truth — UPDATE the row, enqueue the GHL push. */
 export async function updateCondominoField(contactId: string, fieldId: string, value: string): Promise<{ error?: string } | undefined> {
   const guard = await ensureOwner()
@@ -50,12 +72,7 @@ export async function updateCondominoField(contactId: string, fieldId: string, v
   const { error } = await sb.from('apulia_contacts').update(patch).eq('id', contactId)
   if (error) return { error: error.message }
 
-  await enqueueOp({
-    contact_id: contactId,
-    ghl_id: row.ghl_id ?? null,
-    action: 'set_field',
-    payload: { fieldId, value },
-  })
+  await enqueueOrRetryCreate(contactId, row.ghl_id ?? null, 'set_field', { fieldId, value })
 
   pathsToRevalidate(contactId)
 }
@@ -75,7 +92,7 @@ export async function updateCondominoCore(contactId: string, field: 'firstName' 
   }).eq('id', contactId)
   if (error) return { error: error.message }
 
-  await enqueueOp({ contact_id: contactId, ghl_id: row.ghl_id ?? null, action: 'update' })
+  await enqueueOrRetryCreate(contactId, row.ghl_id ?? null, 'update')
   pathsToRevalidate(contactId)
 }
 
@@ -90,7 +107,7 @@ export async function addCondominoTag(contactId: string, tag: string): Promise<{
   if (!row) return { error: 'Contatto non trovato' }
   const tags = Array.from(new Set([...((row.tags as string[] | null) ?? []), t]))
   await sb.from('apulia_contacts').update({ tags, sync_status: 'pending_update' }).eq('id', contactId)
-  await enqueueOp({ contact_id: contactId, ghl_id: row.ghl_id ?? null, action: 'add_tag', payload: { tag: t } })
+  await enqueueOrRetryCreate(contactId, row.ghl_id ?? null, 'add_tag', { tag: t })
   pathsToRevalidate(contactId)
 }
 
@@ -103,7 +120,7 @@ export async function removeCondominoTag(contactId: string, tag: string): Promis
   if (!row) return { error: 'Contatto non trovato' }
   const tags = ((row.tags as string[] | null) ?? []).filter((x) => x !== tag)
   await sb.from('apulia_contacts').update({ tags, sync_status: 'pending_update' }).eq('id', contactId)
-  await enqueueOp({ contact_id: contactId, ghl_id: row.ghl_id ?? null, action: 'remove_tag', payload: { tag } })
+  await enqueueOrRetryCreate(contactId, row.ghl_id ?? null, 'remove_tag', { tag })
   pathsToRevalidate(contactId)
 }
 
@@ -141,7 +158,7 @@ export async function setCondominoAdminByCode(contactId: string, code: string): 
     sync_status: 'pending_update',
   }).eq('id', contactId)
 
-  await enqueueOp({ contact_id: contactId, ghl_id: row.ghl_id ?? null, action: 'update' })
+  await enqueueOrRetryCreate(contactId, row.ghl_id ?? null, 'update')
   pathsToRevalidate(contactId)
 }
 

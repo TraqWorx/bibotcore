@@ -20,6 +20,8 @@ interface AdminRow {
   nextDueDate?: string
   isDueNow?: boolean
   overdueCount?: number
+  syncStatus?: string
+  syncError?: string | null
 }
 
 function fmtEur(n: number): string {
@@ -30,16 +32,23 @@ export default function AdminsTable({ admins, period }: { admins: AdminRow[]; pe
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [pending, startTransition] = useTransition()
   const [flash, setFlash] = useState<string | null>(null)
+  const [hideFailed, setHideFailed] = useState(false)
   const router = useRouter()
 
-  const allSelected = admins.length > 0 && admins.every((a) => selected.has(a.contactId))
+  const failedCount = admins.filter((a) => a.syncStatus === 'failed').length
+  const visibleAdmins = useMemo(
+    () => (hideFailed ? admins.filter((a) => a.syncStatus !== 'failed') : admins),
+    [admins, hideFailed],
+  )
+
+  const allSelected = visibleAdmins.length > 0 && visibleAdmins.every((a) => selected.has(a.contactId))
   const selectedTotal = useMemo(
-    () => admins.filter((a) => selected.has(a.contactId)).reduce((s, a) => s + a.total, 0),
-    [admins, selected],
+    () => visibleAdmins.filter((a) => selected.has(a.contactId)).reduce((s, a) => s + a.total, 0),
+    [visibleAdmins, selected],
   )
   const billableSelected = useMemo(
-    () => admins.filter((a) => selected.has(a.contactId) && a.isDueNow && a.total > 0),
-    [admins, selected],
+    () => visibleAdmins.filter((a) => selected.has(a.contactId) && a.isDueNow && a.total > 0),
+    [visibleAdmins, selected],
   )
   const canBulkPay = billableSelected.length === selected.size && selected.size > 0
 
@@ -85,6 +94,16 @@ export default function AdminsTable({ admins, period }: { admins: AdminRow[]; pe
 
   return (
     <>
+      {failedCount > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', borderBottom: '1px solid var(--ap-line)', background: 'color-mix(in srgb, var(--ap-danger, #dc2626) 8%, transparent)', fontSize: 12 }}>
+          <span style={{ color: 'var(--ap-danger, #dc2626)', fontWeight: 700 }}>⚠ {failedCount} non sincronizzati con GHL</span>
+          <span style={{ color: 'var(--ap-text-muted)' }}>— righe in rosso. Apri il dettaglio per il motivo.</span>
+          <label style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <input type="checkbox" checked={hideFailed} onChange={(e) => setHideFailed(e.target.checked)} />
+            <span>Nascondi falliti</span>
+          </label>
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--ap-line)', background: selected.size ? 'color-mix(in srgb, var(--ap-blue-soft) 50%, white)' : 'transparent' }}>
         {selected.size > 0 ? (
           <>
@@ -128,16 +147,23 @@ export default function AdminsTable({ admins, period }: { admins: AdminRow[]; pe
           </tr>
         </thead>
         <tbody>
-          {admins.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32, color: 'var(--ap-text-faint)' }}>Nessun amministratore.</td></tr>}
-          {admins.map((a) => {
+          {visibleAdmins.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32, color: 'var(--ap-text-faint)' }}>Nessun amministratore.</td></tr>}
+          {visibleAdmins.map((a) => {
+            const isFailed = a.syncStatus === 'failed'
+            const rowBg = isFailed
+              ? 'color-mix(in srgb, var(--ap-danger, #dc2626) 10%, transparent)'
+              : selected.has(a.contactId)
+                ? 'color-mix(in srgb, var(--ap-blue-soft) 30%, transparent)'
+                : undefined
             return (
-              <tr key={a.contactId} style={{ background: selected.has(a.contactId) ? 'color-mix(in srgb, var(--ap-blue-soft) 30%, transparent)' : undefined }}>
+              <tr key={a.contactId} style={{ background: rowBg, borderLeft: isFailed ? '3px solid var(--ap-danger, #dc2626)' : undefined }}>
                 <td>
                   <input type="checkbox" checked={selected.has(a.contactId)} onChange={() => toggle(a.contactId)} aria-label={`Seleziona ${a.name}`} />
                 </td>
                 <td>
-                  <Link href={`/designs/apulia-power/amministratori/${a.contactId}`} style={{ textDecoration: 'none', color: 'var(--ap-text)', fontWeight: 600 }}>
+                  <Link href={`/designs/apulia-power/amministratori/${a.contactId}`} style={{ textDecoration: 'none', color: isFailed ? 'var(--ap-danger, #dc2626)' : 'var(--ap-text)', fontWeight: 600 }}>
                     {a.name}
+                    {isFailed && <span style={{ marginLeft: 6, fontSize: 11 }} title={a.syncError ?? 'Sync fallito'}>⚠</span>}
                   </Link>
                   {a.email && <div style={{ fontSize: 11, color: 'var(--ap-text-faint)', marginTop: 2 }}>{a.email}</div>}
                 </td>

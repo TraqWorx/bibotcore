@@ -24,6 +24,10 @@ export interface AdminRow {
   isDueNow?: boolean
   /** How many periods are overdue (0 if none). */
   overdueCount?: number
+  /** Mirrors apulia_contacts.sync_status (synced | pending_create | …). */
+  syncStatus?: string
+  /** Worker's last error message when sync_status='failed'. */
+  syncError?: string | null
 }
 
 export interface PodRow {
@@ -95,7 +99,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
   const sb = createAdminClient()
 
   const [{ data: admins }, { data: podCounts }, { data: schedule }, { data: latestPayments }] = await Promise.all([
-    sb.from('apulia_contacts').select('id, first_name, last_name, email, phone, codice_amministratore, compenso_per_pod, commissione_totale').eq('is_amministratore', true).neq('sync_status', 'pending_delete'),
+    sb.from('apulia_contacts').select('id, first_name, last_name, email, phone, codice_amministratore, compenso_per_pod, commissione_totale, sync_status, sync_error').eq('is_amministratore', true).neq('sync_status', 'pending_delete'),
     sb.rpc('apulia_admin_pod_counts'),
     sb.rpc('apulia_admin_schedule') as unknown as Promise<{ data: ScheduleRow[] | null }>,
     sb.from('apulia_payments').select('contact_id, paid_at').not('period_idx', 'is', null).order('paid_at', { ascending: false }),
@@ -133,6 +137,8 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
       nextPeriodIdx: sched?.next_period_idx,
       isDueNow: sched?.is_due_now ?? false,
       overdueCount: sched?.overdue_count ?? 0,
+      syncStatus: (a as { sync_status?: string }).sync_status ?? undefined,
+      syncError: (a as { sync_error?: string | null }).sync_error ?? null,
     }
   })
   rows.sort((a, b) => b.total - a.total)
