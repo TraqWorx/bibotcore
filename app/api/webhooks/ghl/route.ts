@@ -221,8 +221,8 @@ export async function POST(req: Request) {
     const cb = body as ContactWebhookPayload & { tags?: string[]; email?: string; phone?: string; companyName?: string; dateUpdated?: string }
     if (eventType === 'ContactDelete' || eventType === 'ContactDeleted') {
       if (cb.id) {
-        const { deleteCached } = await import('@/lib/apulia/cache')
-        await deleteCached(cb.id).catch((e) => console.error('[apulia cache] delete:', e))
+        const { deleteCachedByGhlId } = await import('@/lib/apulia/cache')
+        await deleteCachedByGhlId(cb.id).catch((e) => console.error('[apulia cache] delete:', e))
       }
     } else if (CONTACT_EVENTS.includes(eventType) && cb.id) {
       const { upsertCachedFromGhl } = await import('@/lib/apulia/cache')
