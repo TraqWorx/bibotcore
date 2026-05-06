@@ -5,7 +5,9 @@ import { createAdminClient } from '@/lib/supabase-server'
 import AdminPaymentSchedule, { type AdminScheduleEntry } from './_components/AdminPaymentSchedule'
 import CompensiTable, { type CompensoEntry } from './_components/CompensiTable'
 import SettingsTabs from './_components/SettingsTabs'
+import SyncQueuePanel from './_components/SyncQueuePanel'
 import TagManager from './_components/TagManager'
+import { getSyncQueueStats } from './_actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,6 +60,12 @@ export default async function Page() {
 
   const dueNowCount = adminScheduleEntries.filter((a) => a.isDueNow).length
   const noCompensoCount = compensiEntries.filter((a) => a.compensoPerPod === 0).length
+
+  const queueStatsResult = await getSyncQueueStats()
+  const queueStats = 'error' in queueStatsResult
+    ? { pending: 0, inProgress: 0, failed: 0, completedLast24h: 0, oldestPendingMinutes: null }
+    : queueStatsResult
+  const queueBadge = queueStats.pending + queueStats.inProgress + queueStats.failed
 
   // Tag usage across the cache.
   const { data: tagRows } = await sb.from('apulia_contacts').select('tags')
@@ -112,6 +120,25 @@ export default async function Page() {
                 </header>
                 <div style={{ padding: '16px 20px' }}>
                   <CompensiTable admins={compensiEntries} />
+                </div>
+              </section>
+            ),
+          },
+          {
+            id: 'sync',
+            label: 'Coda sync',
+            badge: queueBadge > 0 ? queueBadge : undefined,
+            content: (
+              <section className="ap-card">
+                <header style={{ padding: '16px 20px', borderBottom: '1px solid var(--ap-line)' }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 800 }}>Coda di sincronizzazione GHL</h2>
+                  <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
+                    Operazioni in attesa di essere inviate a GHL. Bibot è la fonte di verità;
+                    le modifiche sono già applicate in locale e vengono propagate qui in background.
+                  </p>
+                </header>
+                <div style={{ padding: '16px 20px' }}>
+                  <SyncQueuePanel initial={queueStats} />
                 </div>
               </section>
             ),
