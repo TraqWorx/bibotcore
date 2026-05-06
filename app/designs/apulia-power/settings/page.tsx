@@ -5,9 +5,10 @@ import { createAdminClient } from '@/lib/supabase-server'
 import AdminPaymentSchedule, { type AdminScheduleEntry } from './_components/AdminPaymentSchedule'
 import CompensiTable, { type CompensoEntry } from './_components/CompensiTable'
 import SettingsTabs from './_components/SettingsTabs'
+import SyncImportHistory from './_components/SyncImportHistory'
 import SyncQueuePanel from './_components/SyncQueuePanel'
 import TagManager from './_components/TagManager'
-import { getSyncQueueStats } from './_actions'
+import { getSyncQueueStats, listSyncImports } from './_actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,10 +62,14 @@ export default async function Page() {
   const dueNowCount = adminScheduleEntries.filter((a) => a.isDueNow).length
   const noCompensoCount = compensiEntries.filter((a) => a.compensoPerPod === 0).length
 
-  const queueStatsResult = await getSyncQueueStats()
+  const [queueStatsResult, syncImportsResult] = await Promise.all([
+    getSyncQueueStats(),
+    listSyncImports(),
+  ])
   const queueStats = 'error' in queueStatsResult
     ? { pending: 0, inProgress: 0, failed: 0, completedLast24h: 0, oldestPendingMinutes: null }
     : queueStatsResult
+  const syncImports = Array.isArray(syncImportsResult) ? syncImportsResult : []
   const queueBadge = queueStats.pending + queueStats.inProgress + queueStats.failed
 
   // Tag usage across the cache.
@@ -137,8 +142,9 @@ export default async function Page() {
                     le modifiche sono già applicate in locale e vengono propagate qui in background.
                   </p>
                 </header>
-                <div style={{ padding: '16px 20px' }}>
+                <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <SyncQueuePanel initial={queueStats} />
+                  <SyncImportHistory imports={syncImports} />
                 </div>
               </section>
             ),

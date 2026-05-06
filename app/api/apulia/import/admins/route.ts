@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       let summary: Record<string, unknown> = { kind: 'admins' }
       let failed = false
       try {
-        for await (const evt of importAdmins(rows)) {
+        for await (const evt of importAdmins(rows, importId)) {
           send(evt)
           if (evt.type === 'progress' && importId) {
             await sb2.from('apulia_imports').update({

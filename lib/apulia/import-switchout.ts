@@ -29,7 +29,7 @@ interface ExistingPod {
  *
  * Final commission recompute runs synchronously (DB-only).
  */
-export async function* importSwitchOut(rows: Record<string, string>[]): AsyncGenerator<SwitchOutEvent> {
+export async function* importSwitchOut(rows: Record<string, string>[], importId?: string | null): AsyncGenerator<SwitchOutEvent> {
   const startedAt = Date.now()
   yield { type: 'preflight' }
 
@@ -93,7 +93,7 @@ export async function* importSwitchOut(rows: Record<string, string>[]): AsyncGen
       if (error) throw new Error(`switch-out update ${i}: ${error.message}`)
     }
   }
-  await enqueueOps(ops)
+  await enqueueOps(ops, importId ?? null)
 
   yield { type: 'progress', done, total: rows.length, tagged, alreadyTagged, unmatched, skipped }
   yield { type: 'recompute' }

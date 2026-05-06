@@ -82,6 +82,152 @@ export async function getSyncQueueStats(): Promise<SyncQueueStats | { error: str
   }
 }
 
+export interface SyncImportSummary {
+  importId: string | null
+  kind: string | null
+  filename: string | null
+  startedAt: string | null
+  totalOps: number
+  pending: number
+  inProgress: number
+  completed: number
+  failed: number
+}
+
+/**
+ * One row per bulk import (plus an "ad-hoc" bucket for manual server-action
+ * ops with import_id NULL). Each row shows op-status counts so the user
+ * can see "this import: 3949 ops, 3940 synced, 9 failed".
+ */
+export async function listSyncImports(): Promise<SyncImportSummary[] | { error: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { error: guard.error }
+  const sb = createAdminClient()
+
+  // Pull the imports themselves so we have file/kind/start time. Last 50.
+  const { data: imports } = await sb
+    .from('apulia_imports')
+    .select('id, kind, filename, created_at')
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  // Pull every op count grouped by import_id + status. Doing it client-side
+  // because supabase-js doesn't expose GROUP BY without an RPC.
+  const { data: opRows } = await sb
+    .from('apulia_sync_queue')
+    .select('import_id, status')
+    .limit(100_000)
+
+  const counts = new Map<string, { pending: number; inProgress: number; completed: number; failed: number; total: number }>()
+  for (const r of opRows ?? []) {
+    const key = (r.import_id as string | null) ?? '__manual__'
+    let c = counts.get(key)
+    if (!c) { c = { pending: 0, inProgress: 0, completed: 0, failed: 0, total: 0 }; counts.set(key, c) }
+    c.total++
+    if (r.status === 'pending') c.pending++
+    else if (r.status === 'in_progress') c.inProgress++
+    else if (r.status === 'completed') c.completed++
+    else if (r.status === 'failed') c.failed++
+  }
+
+  const summaries: SyncImportSummary[] = []
+  for (const imp of imports ?? []) {
+    const c = counts.get(imp.id) ?? { pending: 0, inProgress: 0, completed: 0, failed: 0, total: 0 }
+    if (c.total === 0) continue // skip imports that didn't enqueue ops
+    summaries.push({
+      importId: imp.id,
+      kind: imp.kind,
+      filename: imp.filename,
+      startedAt: imp.created_at,
+      totalOps: c.total,
+      pending: c.pending,
+      inProgress: c.inProgress,
+      completed: c.completed,
+      failed: c.failed,
+    })
+  }
+  // Manual bucket
+  const manual = counts.get('__manual__')
+  if (manual && manual.total > 0) {
+    summaries.unshift({
+      importId: null,
+      kind: 'manual',
+      filename: null,
+      startedAt: null,
+      totalOps: manual.total,
+      pending: manual.pending,
+      inProgress: manual.inProgress,
+      completed: manual.completed,
+      failed: manual.failed,
+    })
+  }
+  return summaries
+}
+
+export interface SyncOpDetail {
+  id: string
+  action: string
+  status: string
+  attempts: number
+  contactId: string | null
+  contactName: string | null
+  contactCode: string | null
+  contactPod: string | null
+  ghlId: string | null
+  lastError: string | null
+  lastAttemptAt: string | null
+  completedAt: string | null
+}
+
+/**
+ * Pull the queue ops for one import (or for the ad-hoc bucket when
+ * importId is null). Joins each op with its contact's display fields so
+ * the panel can show "DI FRATTA ADELE (code 14459571) — failed".
+ */
+export async function getSyncOpsForImport(importId: string | null): Promise<SyncOpDetail[] | { error: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { error: guard.error }
+  const sb = createAdminClient()
+
+  let q = sb
+    .from('apulia_sync_queue')
+    .select('id, action, status, attempts, contact_id, ghl_id, last_error, last_attempt_at, completed_at')
+    .order('created_at', { ascending: true })
+    .limit(5000)
+
+  if (importId == null) q = q.is('import_id', null)
+  else q = q.eq('import_id', importId)
+
+  const { data: ops } = await q
+  if (!ops?.length) return []
+
+  // Hydrate contact display fields in one round-trip.
+  const contactIds = [...new Set(ops.map((o) => o.contact_id).filter(Boolean) as string[])]
+  const { data: contacts } = contactIds.length
+    ? await sb.from('apulia_contacts').select('id, first_name, last_name, codice_amministratore, pod_pdr').in('id', contactIds)
+    : { data: [] as Array<{ id: string; first_name: string | null; last_name: string | null; codice_amministratore: string | null; pod_pdr: string | null }> }
+  const byId = new Map(((contacts ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null; codice_amministratore: string | null; pod_pdr: string | null }>).map((c) => [c.id, c]))
+
+  return ops.map((o) => {
+    const c = o.contact_id ? byId.get(o.contact_id as string) : null
+    const name = c ? ([c.first_name, c.last_name].filter(Boolean).join(' ') || null) : null
+    return {
+      id: o.id as string,
+      action: o.action as string,
+      status: o.status as string,
+      attempts: (o.attempts as number | null) ?? 0,
+      contactId: (o.contact_id as string | null) ?? null,
+      contactName: name,
+      contactCode: c?.codice_amministratore ?? null,
+      contactPod: c?.pod_pdr ?? null,
+      ghlId: (o.ghl_id as string | null) ?? null,
+      lastError: (o.last_error as string | null) ?? null,
+      lastAttemptAt: (o.last_attempt_at as string | null) ?? null,
+      completedAt: (o.completed_at as string | null) ?? null,
+    }
+  })
+}
+
 /** Reset all failed ops back to pending so the worker retries them. */
 export async function retryFailedOps(): Promise<{ retried: number; error?: string }> {
   const guard = await ensureOwner()

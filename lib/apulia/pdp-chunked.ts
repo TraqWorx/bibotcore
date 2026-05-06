@@ -87,6 +87,7 @@ export async function processPdpChunk(
   colFieldMap: Record<string, string>,
   byPodView: Record<string, CompactContact>,
   prev: ChunkCounters,
+  importId?: string | null,
 ): Promise<ChunkOutput> {
   const counters = { ...prev }
   const newCreated: Record<string, CompactContact> = {}
@@ -217,7 +218,7 @@ export async function processPdpChunk(
       if (error) throw new Error(`pdp update ${i}: ${error.message}`)
     }
   }
-  await enqueueOps(ops)
+  await enqueueOps(ops, importId ?? null)
 
   return { counters, newCreated, rateLimited: false, processedCount }
 }
@@ -233,6 +234,7 @@ export async function processPdpChunk(
 export async function finalizePdp(
   rows: Record<string, string>[],
   colFieldMap: Record<string, string>,
+  importId?: string | null,
 ): Promise<{ adminCreates: number; recomputed: import('./recompute').RecomputeResult }> {
   const { recomputeCommissions } = await import('./recompute')
   const sb = createAdminClient()
@@ -318,7 +320,7 @@ export async function finalizePdp(
       // isn't part of the bulk insert (column lives outside CachedContactRow).
       const ids = newAdmins.map((r) => r.id)
       await sb.from('apulia_contacts').update({ first_payment_at: now }).in('id', ids)
-      await enqueueOps(ops)
+      await enqueueOps(ops, importId ?? null)
     }
   }
 

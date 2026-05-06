@@ -16,14 +16,19 @@ export interface QueueOpInput {
   action: QueueAction
   /** Action-specific payload — see worker for shape per action. */
   payload?: unknown
+  /** Optional: if this op was created by a bulk import, the apulia_imports.id. */
+  import_id?: string | null
 }
 
 /**
  * Insert one or many sync ops onto the outbound queue. Caller is responsible
  * for setting the corresponding row's sync_status (pending_create / pending_update
  * / pending_delete) before enqueuing.
+ *
+ * The optional `defaultImportId` is convenient for bulk importers: every op
+ * in the array inherits it unless the op explicitly sets its own.
  */
-export async function enqueueOps(ops: QueueOpInput[]): Promise<void> {
+export async function enqueueOps(ops: QueueOpInput[], defaultImportId?: string | null): Promise<void> {
   if (ops.length === 0) return
   const sb = createAdminClient()
   const rows = ops.map((o) => ({
@@ -31,8 +36,8 @@ export async function enqueueOps(ops: QueueOpInput[]): Promise<void> {
     ghl_id: o.ghl_id ?? null,
     action: o.action,
     payload: o.payload ?? null,
+    import_id: o.import_id ?? defaultImportId ?? null,
   }))
-  // Chunk inserts so we never send a single multi-MB batch.
   const CHUNK = 500
   for (let i = 0; i < rows.length; i += CHUNK) {
     const { error } = await sb.from('apulia_sync_queue').insert(rows.slice(i, i + CHUNK))

@@ -49,7 +49,7 @@ interface ExistingAdmin {
  * Yields the same event shape as the old GHL-first version so the route
  * handler streaming UI stays identical.
  */
-export async function* importAdmins(rows: Record<string, string>[]): AsyncGenerator<AdminImportEvent> {
+export async function* importAdmins(rows: Record<string, string>[], importId?: string | null): AsyncGenerator<AdminImportEvent> {
   const startedAt = Date.now()
   yield { type: 'preflight' }
   const sb = createAdminClient()
@@ -166,7 +166,7 @@ export async function* importAdmins(rows: Record<string, string>[]): AsyncGenera
       if (error) throw new Error(`admins update ${i}: ${error.message}`)
     }
   }
-  await enqueueOps(ops)
+  await enqueueOps(ops, importId ?? null)
 
   yield { type: 'progress', done, total: rows.length, created, updated, skipped }
   yield { type: 'done', created, updated, skipped, durationMs: Date.now() - startedAt }

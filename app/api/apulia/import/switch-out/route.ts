@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       let summary: Record<string, unknown> = { kind: 'switch_out' }
       let failed = false
       try {
-        for await (const evt of importSwitchOut(rows)) {
+        for await (const evt of importSwitchOut(rows, importId)) {
           send(evt)
           if (evt.type === 'progress' && importId) {
             await sb2.from('apulia_imports').update({

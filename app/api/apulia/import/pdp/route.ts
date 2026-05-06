@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     for (let offset = 0; offset < rows.length; offset += CHUNK_SIZE) {
       const slice = rows.slice(offset, offset + CHUNK_SIZE)
       const view = { ...init.byPodInit, ...createdInRun }
-      const out = await processPdpChunk(slice, init.colFieldMap, view, counters)
+      const out = await processPdpChunk(slice, init.colFieldMap, view, counters, importId)
       counters = out.counters
       Object.assign(createdInRun, out.newCreated)
       if (importId) {
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { adminCreates, recomputed } = await finalizePdp(rows, init.colFieldMap)
+    const { adminCreates, recomputed } = await finalizePdp(rows, init.colFieldMap, importId)
 
     if (importId) {
       await sb.from('apulia_imports').update({
