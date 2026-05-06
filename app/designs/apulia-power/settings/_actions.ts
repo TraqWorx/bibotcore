@@ -256,28 +256,6 @@ export async function retryFailedOps(): Promise<{ retried: number; error?: strin
 }
 
 /**
- * Trigger an immediate drain (manual button on the Sync queue tab).
- * Calls /api/apulia/sync/drain with the internal secret.
- */
-export async function triggerDrainNow(): Promise<{ ok: boolean; error?: string }> {
-  const guard = await ensureOwner()
-  if ('error' in guard) return { ok: false, error: guard.error }
-  if (!process.env.CRON_SECRET) return { ok: false, error: 'CRON_SECRET non impostato' }
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://core.bibotcrm.it'
-  try {
-    const r = await fetch(`${baseUrl}/api/apulia/sync/drain`, {
-      method: 'POST',
-      headers: { 'x-internal-secret': process.env.CRON_SECRET, 'Content-Type': 'application/json' },
-    })
-    if (!r.ok) return { ok: false, error: `Drain returned ${r.status}` }
-    revalidatePath('/designs/apulia-power/settings')
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'drain failed' }
-  }
-}
-
-/**
  * Remove a tag from every Apulia contact. DB-first: strips the tag from
  * apulia_contacts.tags, marks rows pending_update, and enqueues one
  * remove_tag op per row for the worker.

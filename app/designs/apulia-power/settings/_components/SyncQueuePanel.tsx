@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { retryFailedOps, triggerDrainNow, type SyncQueueStats } from '../_actions'
+import { retryFailedOps, type SyncQueueStats } from '../_actions'
 
 interface Props {
   initial: SyncQueueStats
@@ -28,16 +28,6 @@ export default function SyncQueuePanel({ initial }: Props) {
     })
   }
 
-  function drainNow() {
-    setMessage(null)
-    startTransition(async () => {
-      const r = await triggerDrainNow()
-      if (!r.ok) setMessage(`Errore: ${r.error}`)
-      else setMessage('Drain avviato.')
-      router.refresh()
-    })
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
@@ -53,7 +43,6 @@ export default function SyncQueuePanel({ initial }: Props) {
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button className="ap-btn" onClick={refresh} disabled={pending}>Aggiorna</button>
-        <button className="ap-btn" onClick={drainNow} disabled={pending}>Drain ora</button>
         <button className="ap-btn ap-btn-danger" onClick={retry} disabled={pending || initial.failed === 0}>
           Riprova falliti ({initial.failed})
         </button>
@@ -65,8 +54,7 @@ export default function SyncQueuePanel({ initial }: Props) {
 
       <p style={{ fontSize: 11, color: 'var(--ap-text-faint)', margin: 0, lineHeight: 1.5 }}>
         Le modifiche in Bibot vengono applicate immediatamente al database e poi inviate
-        a GHL in background dal worker. La coda viene drenata ogni minuto da pg_cron.
-        Se vedi numeri che non scendono, prova un drain manuale o riavvia i falliti.
+        a GHL in background. La coda viene drenata automaticamente ogni minuto.
       </p>
     </div>
   )
