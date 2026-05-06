@@ -1,6 +1,8 @@
-import { fetchAllContacts, indexByPodPdr, upsertContact, removeTag, type ApuliaContact, pmap } from './contacts'
-import { APULIA_TAG } from './fields'
-import { GhlRateLimitError } from './ghl'
+import { randomUUID } from 'node:crypto'
+import { createAdminClient } from '@/lib/supabase-server'
+import { APULIA_FIELD, APULIA_TAG } from './fields'
+import { normalizePod } from './cache'
+import { enqueueOps, type QueueOpInput } from './sync-queue'
 
 const COL = {
   PodPdr: 'POD/PDR',
@@ -11,7 +13,9 @@ const COL = {
   Mobile: 'Fornitura : Cliente : Numero di cellulare',
 }
 
-/** Compact view of an existing contact stored across chunk invocations. */
+const COMUNE_FIELD_ID = 'EXO9WD4aLV2aPiMYxXUU'
+
+/** Compact existing-row view kept for backwards compat with any older callers. */
 export interface CompactContact {
   id: string
   firstName?: string
@@ -19,17 +23,16 @@ export interface CompactContact {
 }
 
 export interface PdpInitResult {
-  /** Compact byPod map from the initial GHL fetch. */
   byPodInit: Record<string, CompactContact>
-  /** Column → fieldId mapping used when building customFields. */
   colFieldMap: Record<string, string>
-  /** Headers from the parsed file. */
   headers: string[]
 }
 
-/** Build the initial state once at the start of a PDP import. */
+/**
+ * Initial state needed by the import. Pure-DB now — no GHL fetch.
+ */
 export async function initPdp(
-  rows: Record<string, string>[],
+  _rows: Record<string, string>[],
   headers: string[],
   allFields: { id: string; name: string }[],
 ): Promise<PdpInitResult> {
@@ -39,11 +42,19 @@ export async function initPdp(
     const id = fieldByName.get(h)
     if (id) colFieldMap[h] = id
   }
-  const existing = await fetchAllContacts()
-  const byPod = indexByPodPdr(existing)
+  const sb = createAdminClient()
+  const { data } = await sb
+    .from('apulia_contacts')
+    .select('id, first_name, tags, pod_pdr')
+    .eq('is_amministratore', false)
+    .not('pod_pdr', 'is', null)
   const byPodInit: Record<string, CompactContact> = {}
-  for (const [pod, c] of byPod) {
-    byPodInit[pod] = { id: c.id, firstName: c.firstName, tags: c.tags }
+  for (const r of data ?? []) {
+    if (r.pod_pdr) byPodInit[String(r.pod_pdr)] = {
+      id: String(r.id),
+      firstName: r.first_name ?? undefined,
+      tags: (r.tags as string[] | null) ?? [],
+    }
   }
   return { byPodInit, colFieldMap, headers }
 }
@@ -58,18 +69,18 @@ export interface ChunkCounters {
 
 export interface ChunkOutput {
   counters: ChunkCounters
-  /** New entries to merge into the persisted createdInRun map. */
   newCreated: Record<string, CompactContact>
-  /** True when GHL is rate-limit-blocking us; caller should pause. */
   rateLimited?: boolean
-  /** Number of rows actually processed before aborting (rateLimited only). */
   processedCount?: number
 }
 
 /**
- * Process one slice of PDP rows. Pure-ish: takes the current byPod view
- * (initial snapshot ∪ created-in-run), returns updated counters and the
- * new entries to merge before the next chunk.
+ * DB-first PDP chunk processor. Writes go straight to apulia_contacts and
+ * the corresponding queue ops are pushed onto apulia_sync_queue. There is
+ * no GHL traffic here — the worker drains the queue.
+ *
+ * `byPodView` is consulted first so cross-chunk creates within a single
+ * import don't double-mint rows for the same POD.
  */
 export async function processPdpChunk(
   rowsSlice: Record<string, string>[],
@@ -79,74 +90,150 @@ export async function processPdpChunk(
 ): Promise<ChunkOutput> {
   const counters = { ...prev }
   const newCreated: Record<string, CompactContact> = {}
-  let rateLimited = false
+
+  // Existing rows in this chunk that we need to UPDATE: pull their full
+  // current shape so we can merge custom_fields without losing prior keys.
+  const podsInSlice: string[] = []
+  for (const row of rowsSlice) {
+    const pod = normalizePod((row[COL.PodPdr] || '').toUpperCase().trim())
+    if (pod) podsInSlice.push(pod)
+  }
+  const sb = createAdminClient()
+  const existingMap = new Map<string, ExistingRow>()
+  if (podsInSlice.length) {
+    const { data } = await sb
+      .from('apulia_contacts')
+      .select('id, ghl_id, first_name, tags, custom_fields, is_switch_out, pod_pdr')
+      .in('pod_pdr', podsInSlice)
+    for (const r of (data ?? []) as ExistingRow[]) {
+      if (r.pod_pdr) existingMap.set(r.pod_pdr, r)
+    }
+  }
+
+  const inserts: NewRow[] = []
+  const updates: UpdatedRow[] = []
+  const ops: QueueOpInput[] = []
   let processedCount = 0
 
-  await pmap(rowsSlice, async (row) => {
-    if (rateLimited) return // short-circuit remaining rows once we detect block
-    const podRaw = (row[COL.PodPdr] || '').toUpperCase().trim()
-    const pod = /^[+-]?\d+(\.\d+)?[Ee][+-]?\d+$/.test(podRaw)
-      ? Number(podRaw).toFixed(0)
-      : podRaw
-    if (!pod) { counters.skipped++; processedCount++; return }
+  for (const row of rowsSlice) {
+    const pod = normalizePod((row[COL.PodPdr] || '').toUpperCase().trim())
+    if (!pod) { counters.skipped++; processedCount++; continue }
 
     const cliente = (row[COL.Cliente] || '').trim()
-    const cf: Record<string, string | number> = {}
+    const cf: Record<string, string> = {}
     for (const [colName, fieldId] of Object.entries(colFieldMap)) {
       const v = row[colName]
       if (v == null || v === '') continue
-      cf[fieldId] = v
+      cf[fieldId] = String(v)
     }
 
-    const existing = byPodView[pod]
-    const wasSwitchedOut = existing?.tags?.includes(APULIA_TAG.SWITCH_OUT)
+    // Cross-chunk dedupe: if a previous chunk already inserted this POD in
+    // the same run, treat as existing and update via the row id we minted.
+    const fromPrior = byPodView[pod]
+    const existing = existingMap.get(pod) ?? (fromPrior
+      ? { id: fromPrior.id, ghl_id: null, first_name: fromPrior.firstName ?? null, tags: fromPrior.tags ?? [], custom_fields: {}, is_switch_out: false }
+      : null)
 
-    try {
-      if (existing) {
-        await upsertContact({
-          id: existing.id,
-          firstName: cliente || existing.firstName,
-          customField: cf,
+    if (existing) {
+      const mergedCf: Record<string, string> = { ...(existing.custom_fields ?? {}), ...cf }
+      const tags = (existing.tags ?? []).filter((t) => t !== APULIA_TAG.SWITCH_OUT)
+      const wasSwitchedOut = existing.is_switch_out
+
+      updates.push({
+        id: existing.id,
+        first_name: cliente || existing.first_name,
+        tags,
+        custom_fields: mergedCf,
+        pod_pdr: pod,
+        codice_amministratore: mergedCf[APULIA_FIELD.CODICE_AMMINISTRATORE] ?? null,
+        amministratore_name: mergedCf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO] ?? null,
+        cliente: mergedCf[APULIA_FIELD.CLIENTE] ?? cliente ?? null,
+        comune: mergedCf[COMUNE_FIELD_ID] ?? null,
+        stato: mergedCf[APULIA_FIELD.STATO] ?? null,
+        is_switch_out: false,
+        sync_status: 'pending_update',
+      })
+      ops.push({
+        contact_id: existing.id,
+        ghl_id: existing.ghl_id ?? null,
+        action: 'update',
+      })
+      if (wasSwitchedOut) {
+        ops.push({
+          contact_id: existing.id,
+          ghl_id: existing.ghl_id ?? null,
+          action: 'remove_tag',
+          payload: { tag: APULIA_TAG.SWITCH_OUT },
         })
-        if (wasSwitchedOut) {
-          await removeTag(existing.id, APULIA_TAG.SWITCH_OUT)
-          counters.untagged++
-        }
-        counters.updated++
-      } else {
-        const newId = await upsertContact({
-          email: (row[COL.Email] || '').trim() || undefined,
-          phone: sanitizePhone(row[COL.Mobile] || row[COL.Phone]),
-          firstName: cliente || pod,
-          customField: cf,
-        })
-        if (newId) {
-          newCreated[pod] = { id: newId, firstName: cliente || pod, tags: [] }
-          counters.created++
-        }
+        counters.untagged++
       }
-      processedCount++
-    } catch (err) {
-      if (err instanceof GhlRateLimitError) {
-        // Don't count this row as unmatched — it's retryable. Set the
-        // flag so other workers stop and the caller pauses the import.
-        rateLimited = true
-        return
+      counters.updated++
+    } else {
+      const id = randomUUID()
+      const inserted: NewRow = {
+        id,
+        ghl_id: null,
+        sync_status: 'pending_create',
+        email: ((row[COL.Email] || '').trim()) || null,
+        phone: sanitizePhone(row[COL.Mobile] || row[COL.Phone]) ?? null,
+        first_name: cliente || pod,
+        last_name: null,
+        tags: [],
+        custom_fields: cf,
+        pod_pdr: pod,
+        codice_amministratore: cf[APULIA_FIELD.CODICE_AMMINISTRATORE] ?? null,
+        amministratore_name: cf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO] ?? null,
+        cliente: cliente || null,
+        comune: cf[COMUNE_FIELD_ID] ?? null,
+        stato: cf[APULIA_FIELD.STATO] ?? null,
+        compenso_per_pod: null,
+        pod_override: num(cf[APULIA_FIELD.POD_OVERRIDE]),
+        commissione_totale: null,
+        is_amministratore: false,
+        is_switch_out: false,
+        ghl_updated_at: null,
       }
-      console.error(`[pdp-chunk] row failed (POD ${pod}):`, err)
-      counters.unmatched++
-      processedCount++
+      inserts.push(inserted)
+      ops.push({ contact_id: id, ghl_id: null, action: 'create' })
+      newCreated[pod] = { id, firstName: cliente || pod, tags: [] }
+      counters.created++
     }
-  }, 2)
+    processedCount++
+  }
 
-  return { counters, newCreated, rateLimited, processedCount }
+  // Persist DB writes in chunks.
+  const CHUNK = 500
+  if (inserts.length) {
+    for (let i = 0; i < inserts.length; i += CHUNK) {
+      const slice = inserts.slice(i, i + CHUNK)
+      const { error } = await sb.from('apulia_contacts').insert(slice)
+      if (error) throw new Error(`pdp insert ${i}: ${error.message}`)
+    }
+  }
+  if (updates.length) {
+    for (let i = 0; i < updates.length; i += CHUNK) {
+      const slice = updates.slice(i, i + CHUNK)
+      const { error } = await sb.from('apulia_contacts').upsert(slice, { onConflict: 'id' })
+      if (error) throw new Error(`pdp update ${i}: ${error.message}`)
+    }
+  }
+  await enqueueOps(ops)
+
+  return { counters, newCreated, rateLimited: false, processedCount }
 }
 
-/** Finalize: auto-create missing admins + recompute commissions. */
-export async function finalizePdp(rows: Record<string, string>[], colFieldMap: Record<string, string>): Promise<{ adminCreates: number; recomputed: { admins: number; pods: number; podsActive: number; totalCommissionCents: number } }> {
-  const { createAdminClient } = await import('@/lib/supabase-server')
-  const { upsertContact } = await import('./contacts')
-  const { upsertCachedFromGhl } = await import('./cache')
+/**
+ * Auto-create any admins referenced in the PDP whose codice_amministratore
+ * isn't already in the DB. New admins are minted in apulia_contacts with
+ * sync_status='pending_create' and a 'create' op enqueued. Existing admins
+ * have their first_payment_at stamped if it isn't set.
+ *
+ * Recompute commissions runs at the end (DB-only).
+ */
+export async function finalizePdp(
+  rows: Record<string, string>[],
+  colFieldMap: Record<string, string>,
+): Promise<{ adminCreates: number; recomputed: import('./recompute').RecomputeResult }> {
   const { recomputeCommissions } = await import('./recompute')
   const sb = createAdminClient()
 
@@ -160,6 +247,7 @@ export async function finalizePdp(rows: Record<string, string>[], colFieldMap: R
     const code = (row[COL_CodiceAmm] || '').trim()
     if (code && !firstRowByCode.has(code)) firstRowByCode.set(code, row)
   }
+
   let adminCreates = 0
   if (firstRowByCode.size > 0) {
     const { data: existingAdmins } = await sb
@@ -167,8 +255,11 @@ export async function finalizePdp(rows: Record<string, string>[], colFieldMap: R
       .select('id, codice_amministratore, first_payment_at')
       .eq('is_amministratore', true)
       .in('codice_amministratore', [...firstRowByCode.keys()])
-    const existingByCode = new Map((existingAdmins ?? []).map((a) => [a.codice_amministratore, a]))
+    const existingByCode = new Map(((existingAdmins ?? []) as ExistingAdmin[]).map((a) => [a.codice_amministratore, a]))
     const now = new Date().toISOString()
+
+    const newAdmins: NewRow[] = []
+    const ops: QueueOpInput[] = []
 
     for (const [code, row] of firstRowByCode) {
       const existing = existingByCode.get(code)
@@ -179,33 +270,55 @@ export async function finalizePdp(rows: Record<string, string>[], colFieldMap: R
         continue
       }
       const adminName = (row[COL_AdminName] || '').trim() || `Amministratore ${code}`
-      const cf: Record<string, string | number> = {}
+      const cf: Record<string, string> = {}
       for (const [colName, fieldId] of Object.entries(colFieldMap)) {
         const v = row[colName]
         if (v == null || v === '') continue
-        cf[fieldId] = v
+        cf[fieldId] = String(v)
       }
-      try {
-        const newId = await upsertContact({
-          email: (row[COL_AdminEmail] || '').trim() || undefined,
-          phone: sanitizePhone(row[COL_AdminPhone]),
-          firstName: adminName,
-          tags: ['amministratore'],
-          customField: cf,
-        })
-        if (newId) {
-          await upsertCachedFromGhl({
-            id: newId,
-            firstName: adminName,
-            tags: ['amministratore'],
-            customFields: Object.entries(cf).map(([id, value]) => ({ id, value: String(value) })),
-          })
-          await sb.from('apulia_contacts').update({ first_payment_at: now }).eq('id', newId)
-          adminCreates++
-        }
-      } catch (err) {
-        console.error(`[pdp-finalize] auto-create admin ${code} failed:`, err)
+      cf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO] = adminName
+      cf[APULIA_FIELD.CODICE_AMMINISTRATORE] = code
+
+      const id = randomUUID()
+      newAdmins.push({
+        id,
+        ghl_id: null,
+        sync_status: 'pending_create',
+        email: ((row[COL_AdminEmail] || '').trim()) || null,
+        phone: sanitizePhone(row[COL_AdminPhone]) ?? null,
+        first_name: adminName,
+        last_name: null,
+        tags: [APULIA_TAG.AMMINISTRATORE],
+        custom_fields: cf,
+        pod_pdr: null,
+        codice_amministratore: code,
+        amministratore_name: adminName,
+        cliente: null,
+        comune: null,
+        stato: null,
+        compenso_per_pod: null,
+        pod_override: null,
+        commissione_totale: null,
+        is_amministratore: true,
+        is_switch_out: false,
+        ghl_updated_at: null,
+      })
+      ops.push({ contact_id: id, ghl_id: null, action: 'create' })
+      adminCreates++
+    }
+
+    if (newAdmins.length) {
+      const CHUNK = 500
+      for (let i = 0; i < newAdmins.length; i += CHUNK) {
+        const slice = newAdmins.slice(i, i + CHUNK)
+        const { error } = await sb.from('apulia_contacts').insert(slice)
+        if (error) throw new Error(`finalize admin insert: ${error.message}`)
       }
+      // Stamp first_payment_at on the same set in a follow-up update so it
+      // isn't part of the bulk insert (column lives outside CachedContactRow).
+      const ids = newAdmins.map((r) => r.id)
+      await sb.from('apulia_contacts').update({ first_payment_at: now }).in('id', ids)
+      await enqueueOps(ops)
     }
   }
 
@@ -223,5 +336,65 @@ function sanitizePhone(raw: string | undefined): string | undefined {
   return '+39' + digits
 }
 
-// Re-export type for callers
-export type { ApuliaContact }
+function num(v: string | undefined | null): number | null {
+  if (v == null || v === '') return null
+  const n = Number(String(v).replace(/[^\d.,-]/g, '').replace(',', '.'))
+  return Number.isFinite(n) ? n : null
+}
+
+interface ExistingRow {
+  id: string
+  ghl_id: string | null
+  first_name: string | null
+  tags: string[] | null
+  custom_fields: Record<string, string> | null
+  is_switch_out: boolean
+  pod_pdr: string | null
+}
+
+interface ExistingAdmin {
+  id: string
+  codice_amministratore: string
+  first_payment_at: string | null
+}
+
+interface NewRow {
+  id: string
+  ghl_id: string | null
+  sync_status: 'pending_create'
+  email: string | null
+  phone: string | null
+  first_name: string | null
+  last_name: string | null
+  tags: string[]
+  custom_fields: Record<string, string>
+  pod_pdr: string | null
+  codice_amministratore: string | null
+  amministratore_name: string | null
+  cliente: string | null
+  comune: string | null
+  stato: string | null
+  compenso_per_pod: number | null
+  pod_override: number | null
+  commissione_totale: number | null
+  is_amministratore: boolean
+  is_switch_out: boolean
+  ghl_updated_at: string | null
+}
+
+interface UpdatedRow {
+  id: string
+  first_name: string | null
+  tags: string[]
+  custom_fields: Record<string, string>
+  pod_pdr: string
+  codice_amministratore: string | null
+  amministratore_name: string | null
+  cliente: string | null
+  comune: string | null
+  stato: string | null
+  is_switch_out: boolean
+  sync_status: 'pending_update'
+}
+
+export type { ApuliaContact } from './contacts'

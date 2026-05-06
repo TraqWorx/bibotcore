@@ -1,7 +1,6 @@
-import { ghlFetch, pmap } from './ghl'
-import { fetchAllContacts, indexByCodiceAmministratore } from './contacts'
-import { APULIA_FIELD, APULIA_TAG, getField } from './fields'
-import { fullSyncCache } from './cache'
+import { createAdminClient } from '@/lib/supabase-server'
+import { APULIA_FIELD } from './fields'
+import { enqueueOps, type QueueOpInput } from './sync-queue'
 
 export interface RecomputeResult {
   admins: number
@@ -11,62 +10,87 @@ export interface RecomputeResult {
 }
 
 /**
- * Recompute "Commissione Totale" on every amministratore contact.
+ * Recompute "Commissione Totale" on every amministratore — DB-first.
  *
- * For each admin: count their PODs (matched on Codice amministratore) that
- * are NOT switched-out. Per-POD amount = POD Override custom field if set,
- * else admin's compenso_per_pod. Sum and write back to the admin contact.
+ * Reads admins + pods from apulia_contacts, aggregates commissions per
+ * codice_amministratore, writes back to the admin's commissione_totale
+ * column when the value changed, and enqueues a 'set_field' op so the
+ * worker pushes the new value to GHL.
  */
 export async function recomputeCommissions(): Promise<RecomputeResult> {
-  const all = await fetchAllContacts()
-  const admins = all.filter((c) => c.tags?.includes(APULIA_TAG.AMMINISTRATORE))
-  const pods = all.filter((c) => !c.tags?.includes(APULIA_TAG.AMMINISTRATORE))
-  const activePods = pods.filter((c) => !c.tags?.includes(APULIA_TAG.SWITCH_OUT))
+  const sb = createAdminClient()
 
-  // Group active PODs by Codice amministratore.
-  const byCode = new Map<string, { compenso: number; total: number; count: number }>()
-  // First seed with each admin's compenso default.
-  for (const a of admins) {
-    const code = getField(a.customFields, APULIA_FIELD.CODICE_AMMINISTRATORE)?.trim()
-    const compenso = num(getField(a.customFields, APULIA_FIELD.COMPENSO_PER_POD))
-    if (code) byCode.set(code, { compenso, total: 0, count: 0 })
+  const [{ data: adminsRaw }, { data: podsRaw }] = await Promise.all([
+    sb.from('apulia_contacts')
+      .select('id, ghl_id, codice_amministratore, compenso_per_pod, commissione_totale, custom_fields')
+      .eq('is_amministratore', true),
+    sb.from('apulia_contacts')
+      .select('codice_amministratore, pod_override, is_switch_out')
+      .eq('is_amministratore', false),
+  ])
+
+  type AdminRow = {
+    id: string
+    ghl_id: string | null
+    codice_amministratore: string | null
+    compenso_per_pod: number | null
+    commissione_totale: number | null
+    custom_fields: Record<string, string> | null
   }
-  // Aggregate.
+  type PodRow = {
+    codice_amministratore: string | null
+    pod_override: number | null
+    is_switch_out: boolean
+  }
+
+  const admins = (adminsRaw ?? []) as AdminRow[]
+  const pods = (podsRaw ?? []) as PodRow[]
+  const activePods = pods.filter((p) => !p.is_switch_out)
+
+  const byCode = new Map<string, { compenso: number; total: number; count: number }>()
+  for (const a of admins) {
+    if (a.codice_amministratore) {
+      byCode.set(a.codice_amministratore, {
+        compenso: Number(a.compenso_per_pod) || 0,
+        total: 0,
+        count: 0,
+      })
+    }
+  }
   for (const p of activePods) {
-    const code = getField(p.customFields, APULIA_FIELD.CODICE_AMMINISTRATORE)?.trim()
-    if (!code) continue
-    const entry = byCode.get(code)
+    if (!p.codice_amministratore) continue
+    const entry = byCode.get(p.codice_amministratore)
     if (!entry) continue
-    const override = num(getField(p.customFields, APULIA_FIELD.POD_OVERRIDE))
+    const override = Number(p.pod_override) || 0
     entry.total += override > 0 ? override : entry.compenso
     entry.count += 1
   }
 
-  // Write back, only when value changed (cheap per-call avoidance).
-  const adminsByCode = indexByCodiceAmministratore(admins)
+  const ops: QueueOpInput[] = []
   let totalSum = 0
-  await pmap(
-    [...byCode.entries()],
-    async ([code, entry]) => {
-      totalSum += entry.total
-      const admin = adminsByCode.get(code)
-      if (!admin) return
-      const current = num(getField(admin.customFields, APULIA_FIELD.COMMISSIONE_TOTALE))
-      // Cents-resolution comparison so trailing-zero floats don't flap.
-      if (Math.round(current * 100) === Math.round(entry.total * 100)) return
-      const r = await ghlFetch(`/contacts/${admin.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ customFields: [{ id: APULIA_FIELD.COMMISSIONE_TOTALE, value: entry.total }] }),
-      })
-      if (!r.ok) console.error(`[recompute] update ${admin.id}: ${r.status} ${await r.text()}`)
-    },
-    8,
-  )
+  for (const a of admins) {
+    if (!a.codice_amministratore) continue
+    const entry = byCode.get(a.codice_amministratore)
+    if (!entry) continue
+    totalSum += entry.total
+    const current = Number(a.commissione_totale) || 0
+    if (Math.round(current * 100) === Math.round(entry.total * 100)) continue
 
-  // After GHL is updated, refresh the local cache so reads reflect the new
-  // commission totals immediately (otherwise the page would show stale values
-  // until the next full-sync).
-  await fullSyncCache().catch((err) => console.error('[recompute] cache sync:', err))
+    const newCf = { ...(a.custom_fields ?? {}), [APULIA_FIELD.COMMISSIONE_TOTALE]: String(entry.total) }
+    await sb.from('apulia_contacts').update({
+      commissione_totale: entry.total,
+      custom_fields: newCf,
+      sync_status: 'pending_update',
+    }).eq('id', a.id)
+    ops.push({
+      contact_id: a.id,
+      ghl_id: a.ghl_id ?? null,
+      action: 'set_field',
+      payload: { fieldId: APULIA_FIELD.COMMISSIONE_TOTALE, value: entry.total },
+    })
+  }
+
+  await enqueueOps(ops)
 
   return {
     admins: admins.length,
@@ -74,10 +98,4 @@ export async function recomputeCommissions(): Promise<RecomputeResult> {
     podsActive: activePods.length,
     totalCommissionCents: Math.round(totalSum * 100),
   }
-}
-
-function num(v: string | undefined): number {
-  if (!v) return 0
-  const n = Number(String(v).replace(/[^\d.,-]/g, '').replace(',', '.'))
-  return Number.isFinite(n) ? n : 0
 }

@@ -52,6 +52,7 @@ export async function listAdminPickerOptions(): Promise<{ contactId: string; nam
     .from('apulia_contacts')
     .select('id, first_name, last_name, codice_amministratore')
     .eq('is_amministratore', true)
+    .neq('sync_status', 'pending_delete')
     .not('codice_amministratore', 'is', null)
     .order('first_name')
   return ((data ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null; codice_amministratore: string | null }>)
@@ -66,10 +67,10 @@ export async function listAdminPickerOptions(): Promise<{ contactId: string; nam
 export async function loadSnapshot(): Promise<ApuliaSnapshot> {
   const sb = createAdminClient()
   const [{ count: totalAdmins }, { count: totalPodsActive }, { count: totalPodsSwitchedOut }, { data: admins }] = await Promise.all([
-    sb.from('apulia_contacts').select('id', { count: 'exact', head: true }).eq('is_amministratore', true),
-    sb.from('apulia_contacts').select('id', { count: 'exact', head: true }).eq('is_amministratore', false).eq('is_switch_out', false),
-    sb.from('apulia_contacts').select('id', { count: 'exact', head: true }).eq('is_amministratore', false).eq('is_switch_out', true),
-    sb.from('apulia_contacts').select('commissione_totale').eq('is_amministratore', true),
+    sb.from('apulia_contacts').select('id', { count: 'exact', head: true }).eq('is_amministratore', true).neq('sync_status', 'pending_delete'),
+    sb.from('apulia_contacts').select('id', { count: 'exact', head: true }).eq('is_amministratore', false).eq('is_switch_out', false).neq('sync_status', 'pending_delete'),
+    sb.from('apulia_contacts').select('id', { count: 'exact', head: true }).eq('is_amministratore', false).eq('is_switch_out', true).neq('sync_status', 'pending_delete'),
+    sb.from('apulia_contacts').select('commissione_totale').eq('is_amministratore', true).neq('sync_status', 'pending_delete'),
   ])
   const total = (admins ?? []).reduce((s, a) => s + (Number(a.commissione_totale) || 0), 0)
   return {
@@ -94,7 +95,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
   const sb = createAdminClient()
 
   const [{ data: admins }, { data: podCounts }, { data: schedule }, { data: latestPayments }] = await Promise.all([
-    sb.from('apulia_contacts').select('id, first_name, last_name, email, phone, codice_amministratore, compenso_per_pod, commissione_totale').eq('is_amministratore', true),
+    sb.from('apulia_contacts').select('id, first_name, last_name, email, phone, codice_amministratore, compenso_per_pod, commissione_totale').eq('is_amministratore', true).neq('sync_status', 'pending_delete'),
     sb.rpc('apulia_admin_pod_counts'),
     sb.rpc('apulia_admin_schedule') as unknown as Promise<{ data: ScheduleRow[] | null }>,
     sb.from('apulia_payments').select('contact_id, paid_at').not('period_idx', 'is', null).order('paid_at', { ascending: false }),
@@ -140,7 +141,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
 
 export async function adminWithPods(adminContactId: string): Promise<{ admin: AdminRow | null; activePods: PodRow[]; switchedPods: PodRow[] }> {
   const sb = createAdminClient()
-  const { data: a } = await sb.from('apulia_contacts').select('*').eq('id', adminContactId).single()
+  const { data: a } = await sb.from('apulia_contacts').select('*').eq('id', adminContactId).neq('sync_status', 'pending_delete').maybeSingle()
   if (!a) return { admin: null, activePods: [], switchedPods: [] }
   const code = a.codice_amministratore as string | null
   const compenso = Number(a.compenso_per_pod) || 0
@@ -149,8 +150,8 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
   let switchedPods: CachedContactRow[] = []
   if (code) {
     const [{ data: act }, { data: sw }] = await Promise.all([
-      sb.from('apulia_contacts').select('*').eq('codice_amministratore', code).eq('is_amministratore', false).eq('is_switch_out', false).order('pod_pdr'),
-      sb.from('apulia_contacts').select('*').eq('codice_amministratore', code).eq('is_amministratore', false).eq('is_switch_out', true).order('pod_pdr'),
+      sb.from('apulia_contacts').select('*').eq('codice_amministratore', code).eq('is_amministratore', false).eq('is_switch_out', false).neq('sync_status', 'pending_delete').order('pod_pdr'),
+      sb.from('apulia_contacts').select('*').eq('codice_amministratore', code).eq('is_amministratore', false).eq('is_switch_out', true).neq('sync_status', 'pending_delete').order('pod_pdr'),
     ])
     activePods = (act ?? []) as CachedContactRow[]
     switchedPods = (sw ?? []) as CachedContactRow[]
@@ -230,6 +231,7 @@ export async function listCondomini(f: CondominiFilters): Promise<CondominiResul
     .from('apulia_contacts')
     .select('*', { count: 'exact' })
     .eq('is_amministratore', false)
+    .neq('sync_status', 'pending_delete')
 
   if (f.stato === 'active') q = q.eq('is_switch_out', false)
   else if (f.stato === 'switch_out') q = q.eq('is_switch_out', true)
@@ -254,8 +256,8 @@ export async function listCondomini(f: CondominiFilters): Promise<CondominiResul
 
   // Distinct comuni / amministratori for filter dropdowns.
   const [{ data: comuniRaw }, { data: ammRaw }] = await Promise.all([
-    sb.from('apulia_contacts').select('comune').eq('is_amministratore', false).not('comune', 'is', null).limit(2000),
-    sb.from('apulia_contacts').select('amministratore_name').eq('is_amministratore', false).not('amministratore_name', 'is', null).limit(2000),
+    sb.from('apulia_contacts').select('comune').eq('is_amministratore', false).neq('sync_status', 'pending_delete').not('comune', 'is', null).limit(2000),
+    sb.from('apulia_contacts').select('amministratore_name').eq('is_amministratore', false).neq('sync_status', 'pending_delete').not('amministratore_name', 'is', null).limit(2000),
   ])
   const comuni = [...new Set((comuniRaw ?? []).map((r) => r.comune as string).filter(Boolean))].sort((a, b) => a.localeCompare(b))
   const amministratori = [...new Set((ammRaw ?? []).map((r) => r.amministratore_name as string).filter(Boolean))].sort((a, b) => a.localeCompare(b))

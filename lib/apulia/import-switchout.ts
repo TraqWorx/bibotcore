@@ -1,6 +1,8 @@
-import { fetchAllContacts, indexByPodPdr, addTag, pmap } from './contacts'
+import { createAdminClient } from '@/lib/supabase-server'
 import { APULIA_TAG } from './fields'
+import { normalizePod } from './cache'
 import { recomputeCommissions, type RecomputeResult } from './recompute'
+import { enqueueOps, type QueueOpInput } from './sync-queue'
 
 export type SwitchOutEvent =
   | { type: 'preflight' }
@@ -12,40 +14,88 @@ export type SwitchOutEvent =
 
 const POD_COL_CANDIDATES = ['Pod Pdr', 'POD/PDR', 'POD PDR']
 
+interface ExistingPod {
+  id: string
+  ghl_id: string | null
+  pod_pdr: string | null
+  tags: string[] | null
+  is_switch_out: boolean
+}
+
+/**
+ * DB-first switch-out import. Looks up condomini in apulia_contacts by
+ * pod_pdr; rows that aren't yet switch_out get the SWITCH_OUT tag added,
+ * sync_status flipped to pending_update, and an 'add_tag' op enqueued.
+ *
+ * Final commission recompute runs synchronously (DB-only).
+ */
 export async function* importSwitchOut(rows: Record<string, string>[]): AsyncGenerator<SwitchOutEvent> {
   const startedAt = Date.now()
   yield { type: 'preflight' }
 
-  const existing = await fetchAllContacts()
-  const byPod = indexByPodPdr(existing)
+  const sb = createAdminClient()
   const podColumn = POD_COL_CANDIDATES.find((c) => rows[0] && c in rows[0])
 
-  yield { type: 'start', total: rows.length }
-
-  let tagged = 0, alreadyTagged = 0, unmatched = 0, skipped = 0, done = 0
-
-  const CHUNK = 40
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const chunk = rows.slice(i, i + CHUNK)
-    await pmap(chunk, async (row) => {
-      const pod = podColumn ? (row[podColumn] || '').toUpperCase().trim() : ''
-      if (!pod) { skipped++; done++; return }
-      const c = byPod.get(pod)
-      if (!c) { unmatched++; done++; return }
-      if (c.tags?.includes(APULIA_TAG.SWITCH_OUT)) { alreadyTagged++; done++; return }
-      try {
-        await addTag(c.id, APULIA_TAG.SWITCH_OUT)
-        tagged++
-      } catch (err) {
-        console.error(`[importSwitchOut] tag failed (POD ${pod}):`, err)
-        unmatched++
-      } finally {
-        done++
-      }
-    }, 8)
-    yield { type: 'progress', done, total: rows.length, tagged, alreadyTagged, unmatched, skipped }
+  const podsInFile: string[] = []
+  for (const row of rows) {
+    const raw = podColumn ? (row[podColumn] || '').toUpperCase().trim() : ''
+    const norm = normalizePod(raw)
+    if (norm) podsInFile.push(norm)
   }
 
+  // Pull every condomino touched by this file in one query.
+  const { data: existing } = podsInFile.length
+    ? await sb
+        .from('apulia_contacts')
+        .select('id, ghl_id, pod_pdr, tags, is_switch_out')
+        .eq('is_amministratore', false)
+        .in('pod_pdr', [...new Set(podsInFile)])
+    : { data: [] as ExistingPod[] }
+  const byPod = new Map((existing as ExistingPod[] | null ?? [])
+    .filter((r) => r.pod_pdr)
+    .map((r) => [r.pod_pdr as string, r]))
+
+  yield { type: 'start', total: rows.length }
+  let tagged = 0, alreadyTagged = 0, unmatched = 0, skipped = 0, done = 0
+
+  const updates: Record<string, unknown>[] = []
+  const ops: QueueOpInput[] = []
+
+  for (const row of rows) {
+    const raw = podColumn ? (row[podColumn] || '').toUpperCase().trim() : ''
+    const pod = normalizePod(raw)
+    if (!pod) { skipped++; done++; continue }
+    const c = byPod.get(pod)
+    if (!c) { unmatched++; done++; continue }
+    if (c.is_switch_out || (c.tags ?? []).includes(APULIA_TAG.SWITCH_OUT)) {
+      alreadyTagged++; done++; continue
+    }
+    const newTags = Array.from(new Set([...(c.tags ?? []), APULIA_TAG.SWITCH_OUT]))
+    updates.push({ id: c.id, tags: newTags, is_switch_out: true, sync_status: 'pending_update' })
+    ops.push({
+      contact_id: c.id,
+      ghl_id: c.ghl_id ?? null,
+      action: 'add_tag',
+      payload: { tag: APULIA_TAG.SWITCH_OUT },
+    })
+    tagged++
+    done++
+    if (done % 100 === 0) {
+      yield { type: 'progress', done, total: rows.length, tagged, alreadyTagged, unmatched, skipped }
+    }
+  }
+
+  const CHUNK = 500
+  if (updates.length) {
+    for (let i = 0; i < updates.length; i += CHUNK) {
+      const slice = updates.slice(i, i + CHUNK)
+      const { error } = await sb.from('apulia_contacts').upsert(slice, { onConflict: 'id' })
+      if (error) throw new Error(`switch-out update ${i}: ${error.message}`)
+    }
+  }
+  await enqueueOps(ops)
+
+  yield { type: 'progress', done, total: rows.length, tagged, alreadyTagged, unmatched, skipped }
   yield { type: 'recompute' }
   const recompute = await recomputeCommissions()
 

@@ -45,8 +45,10 @@ export async function POST(req: NextRequest) {
   const payload = row.payload as Payload | null
   const meta = row.payload_meta as PayloadMeta | null
   if (!payload?.rows || !meta) {
-    await sb.from('apulia_imports').update({ status: 'failed', finished_at: new Date().toISOString() }).eq('id', id)
-    return NextResponse.json({ error: 'Missing payload' }, { status: 500 })
+    // New-style DB-first PDP imports run to completion synchronously and
+    // never persist a payload. If the dispatcher hits this row before the
+    // POST finishes, just no-op; the POST handler will mark it completed.
+    return NextResponse.json({ skipped: true, reason: 'no payload (db-first import)' })
   }
 
   const total = payload.rows.length
