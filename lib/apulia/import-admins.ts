@@ -150,11 +150,44 @@ export async function* importAdmins(rows: Record<string, string>[], importId?: s
     }
   }
 
+  // Defensive dedup: collapse inserts by codice_amministratore so we can
+  // never produce two pending_create rows for the same code, regardless
+  // of whether the in-loop byCode lookup somehow missed a match. Any
+  // dropped rows turn into UPDATE ops on the kept row instead.
+  const insertsByCode = new Map<string, Record<string, unknown>>()
+  const droppedDupes: Array<{ kept: Record<string, unknown>; dropped: Record<string, unknown> }> = []
+  for (const ins of inserts) {
+    const code = ins.codice_amministratore as string | null
+    if (!code) { /* shouldn't happen — admin without code was skipped */ continue }
+    const existing = insertsByCode.get(code)
+    if (!existing) { insertsByCode.set(code, ins); continue }
+    droppedDupes.push({ kept: existing, dropped: ins })
+  }
+  if (droppedDupes.length > 0) {
+    console.warn(`[importAdmins] In-loop dedup missed ${droppedDupes.length} duplicate code(s); collapsing as final pass.`)
+    // Cancel the dropped rows' create ops in our local ops list (they
+    // would have referenced contact_ids that won't exist after dedup).
+    const droppedIds = new Set(droppedDupes.map((d) => d.dropped.id as string))
+    for (let i = ops.length - 1; i >= 0; i--) {
+      if (droppedIds.has(ops[i].contact_id)) ops.splice(i, 1)
+    }
+    // For each dropped row, fold its values into an UPDATE on the kept row
+    // so the data still gets written (kept row's payload + dropped row's
+    // custom fields merged).
+    for (const { kept, dropped } of droppedDupes) {
+      const keptCf = (kept.custom_fields as Record<string, string> | null) ?? {}
+      const droppedCf = (dropped.custom_fields as Record<string, string> | null) ?? {}
+      const mergedCf = { ...keptCf, ...droppedCf }
+      kept.custom_fields = mergedCf
+    }
+  }
+  const finalInserts = [...insertsByCode.values()]
+
   // Persist DB writes.
   const CHUNK = 500
-  if (inserts.length) {
-    for (let i = 0; i < inserts.length; i += CHUNK) {
-      const slice = inserts.slice(i, i + CHUNK)
+  if (finalInserts.length) {
+    for (let i = 0; i < finalInserts.length; i += CHUNK) {
+      const slice = finalInserts.slice(i, i + CHUNK)
       const { error } = await sb.from('apulia_contacts').insert(slice)
       if (error) throw new Error(`admins insert ${i}: ${error.message}`)
     }
@@ -167,6 +200,8 @@ export async function* importAdmins(rows: Record<string, string>[], importId?: s
     }
   }
   await enqueueOps(ops, importId ?? null)
+  // Adjust the reported counter: collapsed dupes shouldn't count as creates.
+  created -= droppedDupes.length
 
   yield { type: 'progress', done, total: rows.length, created, updated, skipped }
   yield { type: 'done', created, updated, skipped, durationMs: Date.now() - startedAt }
