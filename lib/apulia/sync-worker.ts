@@ -107,7 +107,7 @@ export async function drainQueue(): Promise<DrainResult> {
     const next = new Date(Date.now() + RATE_LIMIT_PAUSE_MS).toISOString()
     await sb
       .from('apulia_sync_queue')
-      .update({ status: 'pending', next_attempt_at: next, last_error: 'GHL rate-limited; paused 90s' })
+      .update({ status: 'pending', next_attempt_at: next, last_error: 'Rate limit GHL: pausa di 90 secondi prima di riprovare' })
       .in('id', ops.map((o) => o.id))
       .eq('status', 'in_progress')
   }
@@ -137,18 +137,18 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
         const text = await r.text()
         if (r.status === 400 && /duplicat/i.test(text)) {
           const ur = await ghlFetch('/contacts/upsert', { method: 'POST', body: JSON.stringify(body) })
-          if (!ur.ok) throw new Error(`POST /contacts/upsert -> ${ur.status} ${(await ur.text()).slice(0, 200)}`)
+          if (!ur.ok) throw new Error(`Upsert contatto GHL fallito (${ur.status}): ${(await ur.text()).slice(0, 200)}`)
           const uj = (await ur.json()) as { contact?: { id: string }; id?: string }
           newGhlId = uj.contact?.id ?? uj.id
           viaUpsert = true
         } else {
-          throw new Error(`POST /contacts -> ${r.status} ${text.slice(0, 200)}`)
+          throw new Error(`Creazione contatto GHL fallita (${r.status}): ${text.slice(0, 200)}`)
         }
       } else {
         const j = (await r.json()) as { contact?: { id: string }; id?: string }
         newGhlId = j.contact?.id ?? j.id
       }
-      if (!newGhlId) throw new Error('GHL did not return a contact id')
+      if (!newGhlId) throw new Error('GHL non ha restituito un id contatto')
 
       // Stamp ghl_id back. The unique index on apulia_contacts.ghl_id can
       // refuse this if a sibling Bibot row already claimed the same GHL
@@ -162,12 +162,12 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
       if (stamp.error) {
         if (/duplicate key|unique constraint/i.test(stamp.error.message)) {
           throw new Error(
-            `GHL contact ${newGhlId} is already linked to another Bibot row ` +
-            `(email/phone collision${viaUpsert ? ' via upsert fallback' : ''}). ` +
-            `Likely duplicate input row.`,
+            `Il contatto GHL ${newGhlId} è già collegato a un'altra riga Bibot ` +
+            `(collisione email/telefono${viaUpsert ? ' tramite upsert' : ''}). ` +
+            `Probabile riga duplicata in input.`,
           )
         }
-        throw new Error(`stamp ghl_id: ${stamp.error.message}`)
+        throw new Error(`Errore salvataggio ghl_id: ${stamp.error.message}`)
       }
       await markCompleted(op.id)
       // Stamp ghl_id onto sibling pending ops for this contact so they
@@ -178,10 +178,10 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
     case 'update': {
       if (!row) { await markCompleted(op.id); return 'completed' }
       const ghlId = row.ghl_id ?? op.ghl_id
-      if (!ghlId) { await markPending(op.id, 30_000, 'awaiting create'); return 'requeued' }
+      if (!ghlId) { await markPending(op.id, 30_000, 'In attesa della creazione su GHL'); return 'requeued' }
       const body = buildContactBody(row, { create: false })
       const r = await ghlFetch(`/contacts/${ghlId}`, { method: 'PUT', body: JSON.stringify(body) })
-      if (!r.ok) throw new Error(`PUT /contacts/${ghlId} -> ${r.status} ${(await r.text()).slice(0, 200)}`)
+      if (!r.ok) throw new Error(`Aggiornamento contatto GHL fallito (${r.status}): ${(await r.text()).slice(0, 200)}`)
       await markCompleted(op.id)
       await maybeFlipToSynced(row.id)
       return 'completed'
@@ -191,7 +191,7 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
       if (ghlId) {
         const r = await ghlFetch(`/contacts/${ghlId}`, { method: 'DELETE' })
         if (!r.ok && r.status !== 404) {
-          throw new Error(`DELETE /contacts/${ghlId} -> ${r.status} ${(await r.text()).slice(0, 200)}`)
+          throw new Error(`Eliminazione contatto GHL fallita (${r.status}): ${(await r.text()).slice(0, 200)}`)
         }
       }
       // Hard-delete the row + cancel any sibling pending ops.
@@ -206,9 +206,9 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
       const tag = (op.payload as { tag?: string } | null)?.tag
       if (!tag) { await markCompleted(op.id); return 'completed' }
       const ghlId = row?.ghl_id ?? op.ghl_id
-      if (!ghlId) { await markPending(op.id, 30_000, 'awaiting create'); return 'requeued' }
+      if (!ghlId) { await markPending(op.id, 30_000, 'In attesa della creazione su GHL'); return 'requeued' }
       const r = await ghlFetch(`/contacts/${ghlId}/tags`, { method: 'POST', body: JSON.stringify({ tags: [tag] }) })
-      if (!r.ok && r.status !== 404) throw new Error(`POST /contacts/${ghlId}/tags -> ${r.status} ${(await r.text()).slice(0, 200)}`)
+      if (!r.ok && r.status !== 404) throw new Error(`Aggiunta tag "${tag}" fallita (${r.status}): ${(await r.text()).slice(0, 200)}`)
       await markCompleted(op.id)
       if (op.contact_id) await maybeFlipToSynced(op.contact_id)
       return 'completed'
@@ -217,10 +217,10 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
       const tag = (op.payload as { tag?: string } | null)?.tag
       if (!tag) { await markCompleted(op.id); return 'completed' }
       const ghlId = row?.ghl_id ?? op.ghl_id
-      if (!ghlId) { await markPending(op.id, 30_000, 'awaiting create'); return 'requeued' }
+      if (!ghlId) { await markPending(op.id, 30_000, 'In attesa della creazione su GHL'); return 'requeued' }
       const r = await ghlFetch(`/contacts/${ghlId}/tags`, { method: 'DELETE', body: JSON.stringify({ tags: [tag] }) })
       // 404 / "tag not on contact" is fine — idempotent semantics.
-      if (!r.ok && r.status !== 404) throw new Error(`DELETE /contacts/${ghlId}/tags -> ${r.status} ${(await r.text()).slice(0, 200)}`)
+      if (!r.ok && r.status !== 404) throw new Error(`Rimozione tag "${tag}" fallita (${r.status}): ${(await r.text()).slice(0, 200)}`)
       await markCompleted(op.id)
       if (op.contact_id) await maybeFlipToSynced(op.contact_id)
       return 'completed'
@@ -231,12 +231,12 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
       const value = p.value
       if (!fieldId) { await markCompleted(op.id); return 'completed' }
       const ghlId = row?.ghl_id ?? op.ghl_id
-      if (!ghlId) { await markPending(op.id, 30_000, 'awaiting create'); return 'requeued' }
+      if (!ghlId) { await markPending(op.id, 30_000, 'In attesa della creazione su GHL'); return 'requeued' }
       const r = await ghlFetch(`/contacts/${ghlId}`, {
         method: 'PUT',
         body: JSON.stringify({ customFields: [{ id: fieldId, value: value ?? '' }] }),
       })
-      if (!r.ok) throw new Error(`PUT /contacts/${ghlId} (field ${fieldId}) -> ${r.status} ${(await r.text()).slice(0, 200)}`)
+      if (!r.ok) throw new Error(`Aggiornamento campo "${fieldId}" su GHL fallito (${r.status}): ${(await r.text()).slice(0, 200)}`)
       await markCompleted(op.id)
       if (op.contact_id) await maybeFlipToSynced(op.contact_id)
       return 'completed'

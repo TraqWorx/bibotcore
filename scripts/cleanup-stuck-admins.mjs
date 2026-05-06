@@ -62,7 +62,7 @@ for (const s of stuck) {
   if (s.email) {
     const emailMates = (byEmail.get(s.email) ?? []).filter((x) => x.id !== s.id && x.ghl_id)
     if (emailMates.length > 0) {
-      const msg = `Email collision: GHL contact ${emailMates[0].ghl_id} already linked to admin ${emailMates[0].first_name} (code ${emailMates[0].codice_amministratore}). Two admins in your file share this email; resolve duplicates and re-import this one.`
+      const msg = `Collisione email: il contatto GHL ${emailMates[0].ghl_id} è già collegato all'amministratore ${emailMates[0].first_name} (codice ${emailMates[0].codice_amministratore}). Due amministratori nel file condividono questa email; rimuovi i duplicati e reimporta questo.`
       console.log(`MARK FAILED ${s.id} (${s.first_name}, code ${s.codice_amministratore}) — ${msg}`)
       await sb.from('apulia_sync_queue').update({ status: 'failed', last_error: msg }).eq('contact_id', s.id).in('status', ['pending', 'completed'])
       await sb.from('apulia_contacts').update({ sync_status: 'failed', sync_error: msg }).eq('id', s.id)
