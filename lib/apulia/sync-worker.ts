@@ -309,6 +309,14 @@ async function handleError(op: QueueRow, message: string): Promise<void> {
       attempts,
       last_error: message.slice(0, 1000),
     }).eq('id', op.id)
+    // Also mark the contact's sync_status='failed' + copy the error so it
+    // surfaces in dashboards / list pages, not just the queue panel.
+    if (op.contact_id) {
+      await sb.from('apulia_contacts').update({
+        sync_status: 'failed',
+        sync_error: message.slice(0, 1000),
+      }).eq('id', op.contact_id)
+    }
     return
   }
   const backoffMs = Math.min(MAX_BACKOFF_MS, Math.pow(2, attempts) * 1000)
