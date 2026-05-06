@@ -33,6 +33,21 @@ function sanitizePhone(raw: string | undefined): string | undefined {
   return '+39' + digits
 }
 
+/**
+ * Parse a money/number cell that might be formatted like " 100.00 € " or
+ * "1.234,56 €". Strips currency symbols and whitespace, swaps Italian
+ * decimal commas for periods, returns null on empty / unparsable.
+ */
+function parseAmount(raw: string | undefined): number | null {
+  if (raw == null) return null
+  const s = String(raw).trim()
+  if (!s) return null
+  const cleaned = s.replace(/[^\d.,-]/g, '').replace(',', '.')
+  if (!cleaned) return null
+  const n = Number(cleaned)
+  return Number.isFinite(n) ? n : null
+}
+
 interface ExistingAdmin {
   id: string
   ghl_id: string | null
@@ -93,11 +108,10 @@ export async function* importAdmins(rows: Record<string, string>[], importId?: s
     if (row[COL.Address]) cf['oCvfwCelHDn6gWEljqUJ'] = row[COL.Address]
     if (row[COL.City]) cf['EXO9WD4aLV2aPiMYxXUU'] = row[COL.City]
     if (row[COL.Province]) cf['opaPQWrWwDiaAeyoMbN5'] = row[COL.Province]
-    const compenso = row[COL.Compenso] ? Number(String(row[COL.Compenso]).replace(',', '.')) : null
-    if (compenso != null && Number.isFinite(compenso) && compenso > 0) {
-      cf[APULIA_FIELD.COMPENSO_PER_POD] = String(compenso)
+    const compensoNum = parseAmount(row[COL.Compenso])
+    if (compensoNum != null && compensoNum > 0) {
+      cf[APULIA_FIELD.COMPENSO_PER_POD] = String(compensoNum)
     }
-    const compensoNum = compenso != null && Number.isFinite(compenso) && compenso > 0 ? compenso : null
 
     const existing = byCode.get(code)
     if (existing) {

@@ -72,10 +72,17 @@ export default async function Page() {
   const syncImports = Array.isArray(syncImportsResult) ? syncImportsResult : []
   const queueBadge = queueStats.pending + queueStats.inProgress + queueStats.failed
 
-  // Tag usage across the cache.
-  const { data: tagRows } = await sb.from('apulia_contacts').select('tags')
+  // Tag usage across the cache. Paginate because PostgREST caps a single
+  // select at 1000 rows and apulia_contacts can be much larger.
+  const tagRows: Array<{ tags: string[] | null }> = []
+  for (let from = 0; ; from += 1000) {
+    const { data } = await sb.from('apulia_contacts').select('tags').range(from, from + 999)
+    if (!data || data.length === 0) break
+    tagRows.push(...(data as Array<{ tags: string[] | null }>))
+    if (data.length < 1000) break
+  }
   const tagCountMap = new Map<string, number>()
-  for (const r of (tagRows ?? []) as { tags: string[] | null }[]) {
+  for (const r of tagRows) {
     for (const t of r.tags ?? []) tagCountMap.set(t, (tagCountMap.get(t) ?? 0) + 1)
   }
   const tagUsage = Array.from(tagCountMap.entries())
