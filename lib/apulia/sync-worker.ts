@@ -131,29 +131,47 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
       }
       const body = buildContactBody(row, { create: true })
       const r = await ghlFetch('/contacts/', { method: 'POST', body: JSON.stringify(body) })
+      let newGhlId: string | undefined
+      let viaUpsert = false
       if (!r.ok) {
-        // Duplicate email/phone is non-fatal — try to recover via /contacts/upsert.
         const text = await r.text()
         if (r.status === 400 && /duplicat/i.test(text)) {
-          // Use upsert endpoint to capture the existing contact id.
           const ur = await ghlFetch('/contacts/upsert', { method: 'POST', body: JSON.stringify(body) })
           if (!ur.ok) throw new Error(`POST /contacts/upsert -> ${ur.status} ${(await ur.text()).slice(0, 200)}`)
           const uj = (await ur.json()) as { contact?: { id: string }; id?: string }
-          const newId = uj.contact?.id ?? uj.id
-          if (!newId) throw new Error('GHL upsert did not return a contact id')
-          await sb.from('apulia_contacts').update({ ghl_id: newId, sync_status: 'synced' }).eq('id', row.id)
-          await markCompleted(op.id)
-          return 'completed'
+          newGhlId = uj.contact?.id ?? uj.id
+          viaUpsert = true
+        } else {
+          throw new Error(`POST /contacts -> ${r.status} ${text.slice(0, 200)}`)
         }
-        throw new Error(`POST /contacts -> ${r.status} ${text.slice(0, 200)}`)
+      } else {
+        const j = (await r.json()) as { contact?: { id: string }; id?: string }
+        newGhlId = j.contact?.id ?? j.id
       }
-      const j = (await r.json()) as { contact?: { id: string }; id?: string }
-      const newGhlId = j.contact?.id ?? j.id
       if (!newGhlId) throw new Error('GHL did not return a contact id')
-      await sb.from('apulia_contacts').update({ ghl_id: newGhlId, sync_status: 'synced' }).eq('id', row.id)
+
+      // Stamp ghl_id back. The unique index on apulia_contacts.ghl_id can
+      // refuse this if a sibling Bibot row already claimed the same GHL
+      // contact (input data had two rows that GHL collapsed by email or
+      // phone). When that happens we DON'T silently complete — it's a
+      // real data-integrity issue the user needs to know about.
+      const stamp = await sb
+        .from('apulia_contacts')
+        .update({ ghl_id: newGhlId, sync_status: 'synced' })
+        .eq('id', row.id)
+      if (stamp.error) {
+        if (/duplicate key|unique constraint/i.test(stamp.error.message)) {
+          throw new Error(
+            `GHL contact ${newGhlId} is already linked to another Bibot row ` +
+            `(email/phone collision${viaUpsert ? ' via upsert fallback' : ''}). ` +
+            `Likely duplicate input row.`,
+          )
+        }
+        throw new Error(`stamp ghl_id: ${stamp.error.message}`)
+      }
       await markCompleted(op.id)
-      // Also stamp ghl_id onto any other queued ops for this contact so
-      // they don't have to wait through one cycle of "ghl_id null → requeue".
+      // Stamp ghl_id onto sibling pending ops for this contact so they
+      // don't have to wait a cycle of "ghl_id null → requeue".
       await sb.from('apulia_sync_queue').update({ ghl_id: newGhlId }).eq('contact_id', row.id).is('ghl_id', null).neq('id', op.id)
       return 'completed'
     }
