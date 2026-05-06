@@ -30,6 +30,19 @@ const RATE_LIMIT_PAUSE_MS = 90_000
 const MAX_ATTEMPTS = 10
 const MAX_BACKOFF_MS = 5 * 60_000
 
+/**
+ * Throw this for failures that won't resolve on retry — typically
+ * data-integrity conflicts (email/phone collision between distinct
+ * Bibot rows). The worker marks the op + contact as failed immediately
+ * without burning retry attempts.
+ */
+export class PermanentSyncError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'PermanentSyncError'
+  }
+}
+
 export interface DrainResult {
   claimed: number
   completed: number
@@ -98,7 +111,11 @@ export async function drainQueue(): Promise<DrainResult> {
           rateLimited = true
           return
         }
-        await handleError(op, err instanceof Error ? err.message : String(err))
+        if (err instanceof PermanentSyncError) {
+          await markFailedNow(op, err.message)
+        } else {
+          await handleError(op, err instanceof Error ? err.message : String(err))
+        }
         failed++
       }
     }
@@ -188,12 +205,15 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
             await markCompleted(op.id)
             return 'completed'
           }
-          // Case B: email/phone collision between distinct entities.
-          throw new Error(
+          // Case B: email/phone collision between distinct entities. This
+          // is a permanent data conflict — retrying won't help, so we
+          // throw a PermanentSyncError to skip retries and mark failed
+          // immediately.
+          throw new PermanentSyncError(
             `Il contatto GHL ${newGhlId} è già collegato a un'altra riga Bibot ` +
             `(${sibling?.first_name ?? 'sconosciuta'}, codice ${sibling?.codice_amministratore ?? '—'}). ` +
             `Collisione email/telefono${viaUpsert ? ' tramite upsert' : ''}. ` +
-            `Risolvi i duplicati e reimporta.`,
+            `Modifica i dati in conflitto per riprovare automaticamente.`,
           )
         }
         throw new Error(`Errore salvataggio ghl_id: ${stamp.error.message}`)
@@ -318,6 +338,23 @@ async function markPending(opId: string, delayMs: number, reason: string): Promi
     next_attempt_at: new Date(Date.now() + delayMs).toISOString(),
     last_error: reason,
   }).eq('id', opId)
+}
+
+/** Mark an op + contact as failed immediately, no retries. */
+async function markFailedNow(op: QueueRow, message: string): Promise<void> {
+  const sb = createAdminClient()
+  await sb.from('apulia_sync_queue').update({
+    status: 'failed',
+    attempts: (op.attempts ?? 0) + 1,
+    last_error: message.slice(0, 1000),
+    last_attempt_at: new Date().toISOString(),
+  }).eq('id', op.id)
+  if (op.contact_id) {
+    await sb.from('apulia_contacts').update({
+      sync_status: 'failed',
+      sync_error: message.slice(0, 1000),
+    }).eq('id', op.contact_id)
+  }
 }
 
 async function handleError(op: QueueRow, message: string): Promise<void> {
