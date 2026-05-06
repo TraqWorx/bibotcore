@@ -263,7 +263,7 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
       if (!ghlId) { await markPending(op.id, 30_000, 'In attesa della creazione su GHL'); return 'requeued' }
       const r = await ghlFetch(`/contacts/${ghlId}`, {
         method: 'PUT',
-        body: JSON.stringify({ customFields: [{ id: fieldId, value: value ?? '' }] }),
+        body: JSON.stringify({ customFields: [{ id: fieldId, value: normalizeFieldValue(value ?? '') }] }),
       })
       if (!r.ok) throw new Error(`Aggiornamento campo "${fieldId}" su GHL fallito (${r.status}): ${(await r.text()).slice(0, 200)}`)
       await markCompleted(op.id)
@@ -275,7 +275,7 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
 
 function buildContactBody(row: ContactRow, opts: { create: boolean }): Record<string, unknown> {
   const cf = (row.custom_fields ?? {}) as Record<string, string>
-  const customFields = Object.entries(cf).map(([id, value]) => ({ id, value }))
+  const customFields = Object.entries(cf).map(([id, value]) => ({ id, value: normalizeFieldValue(value) }))
   const body: Record<string, unknown> = { customFields }
   if (row.first_name != null) body.firstName = row.first_name
   if (row.last_name != null) body.lastName = row.last_name
@@ -284,6 +284,26 @@ function buildContactBody(row: ContactRow, opts: { create: boolean }): Record<st
   if (row.tags != null) body.tags = row.tags
   if (opts.create) body.locationId = APULIA_LOCATION_ID
   return body
+}
+
+/**
+ * Normalize values before pushing to GHL.
+ *
+ * Italian-formatted dates (DD/MM/YYYY) are converted to ISO YYYY-MM-DD
+ * because GHL date custom fields reject the slash form ("Invalid Custom
+ * Field Value"). Excel cell display strings often look like "22/12/2023"
+ * or "31/12/3999" (sentinel "no end date" value) — we convert both.
+ *
+ * Anything that isn't a recognizable DD/MM/YYYY string is passed through.
+ */
+function normalizeFieldValue(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  const m = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (!m) return value
+  const dd = m[1].padStart(2, '0')
+  const mm = m[2].padStart(2, '0')
+  const yyyy = m[3]
+  return `${yyyy}-${mm}-${dd}`
 }
 
 async function markCompleted(opId: string): Promise<void> {
