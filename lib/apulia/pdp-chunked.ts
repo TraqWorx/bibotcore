@@ -105,6 +105,7 @@ export async function processPdpChunk(
     const { data } = await sb
       .from('apulia_contacts')
       .select('id, ghl_id, first_name, tags, custom_fields, is_switch_out, pod_pdr')
+      .neq('sync_status', 'pending_delete')
       .in('pod_pdr', podsInSlice)
     for (const r of (data ?? []) as ExistingRow[]) {
       if (r.pod_pdr) existingMap.set(r.pod_pdr, r)

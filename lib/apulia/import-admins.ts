@@ -65,6 +65,7 @@ export async function* importAdmins(rows: Record<string, string>[], importId?: s
         .from('apulia_contacts')
         .select('id, ghl_id, codice_amministratore, custom_fields, tags')
         .eq('is_amministratore', true)
+        .neq('sync_status', 'pending_delete')
         .in('codice_amministratore', [...codes])
     : { data: [] as ExistingAdmin[] }
   const byCode = new Map((existingRaw as ExistingAdmin[] | null ?? []).map((a) => [a.codice_amministratore, a]))
