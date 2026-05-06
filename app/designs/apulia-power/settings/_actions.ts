@@ -111,12 +111,20 @@ export async function listSyncImports(): Promise<SyncImportSummary[] | { error: 
     .order('created_at', { ascending: false })
     .limit(50)
 
-  // Pull every op count grouped by import_id + status. Doing it client-side
-  // because supabase-js doesn't expose GROUP BY without an RPC.
-  const { data: opRows } = await sb
-    .from('apulia_sync_queue')
-    .select('import_id, status')
-    .limit(100_000)
+  // Pull every op count grouped by import_id + status. PostgREST caps
+  // a single query at db-max-rows (1000 in our config), so paginate
+  // until we've seen everything. Done client-side because supabase-js
+  // doesn't expose GROUP BY without a custom RPC.
+  const opRows: Array<{ import_id: string | null; status: string }> = []
+  for (let from = 0; ; from += 1000) {
+    const { data } = await sb
+      .from('apulia_sync_queue')
+      .select('import_id, status')
+      .range(from, from + 999)
+    if (!data || data.length === 0) break
+    opRows.push(...(data as Array<{ import_id: string | null; status: string }>))
+    if (data.length < 1000) break
+  }
 
   const counts = new Map<string, { pending: number; inProgress: number; completed: number; failed: number; total: number }>()
   for (const r of opRows ?? []) {
