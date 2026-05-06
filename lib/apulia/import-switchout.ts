@@ -85,10 +85,19 @@ export async function* importSwitchOut(rows: Record<string, string>[], importId?
     }
   }
 
+  // Dedup updates by id so two file rows pointing at the same Bibot row
+  // don't blow up the upsert (Postgres rejects two identical conflict
+  // targets in the same statement).
+  const updatesById = new Map<string, Record<string, unknown>>()
+  for (const u of updates) {
+    updatesById.set(u.id as string, u)
+  }
+  const finalUpdates = [...updatesById.values()]
+
   const CHUNK = 500
-  if (updates.length) {
-    for (let i = 0; i < updates.length; i += CHUNK) {
-      const slice = updates.slice(i, i + CHUNK)
+  if (finalUpdates.length) {
+    for (let i = 0; i < finalUpdates.length; i += CHUNK) {
+      const slice = finalUpdates.slice(i, i + CHUNK)
       const { error } = await sb.from('apulia_contacts').upsert(slice, { onConflict: 'id' })
       if (error) throw new Error(`switch-out update ${i}: ${error.message}`)
     }

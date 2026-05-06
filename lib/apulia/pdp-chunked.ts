@@ -202,18 +202,55 @@ export async function processPdpChunk(
     processedCount++
   }
 
+  // Defensive dedup: two file rows pointing at the same Bibot row would
+  // produce two upsert entries with the same id, which Postgres rejects
+  // ("ON CONFLICT DO UPDATE command cannot affect row a second time").
+  // Same for two new rows with the same POD. Collapse: last write wins,
+  // but custom_fields are merged so we don't lose data from earlier rows.
+  const updatesById = new Map<string, UpdatedRow>()
+  for (const u of updates) {
+    const prev = updatesById.get(u.id)
+    if (prev) u.custom_fields = { ...prev.custom_fields, ...u.custom_fields }
+    updatesById.set(u.id, u)
+  }
+  const insertsByPod = new Map<string, NewRow>()
+  const droppedInserts: NewRow[] = []
+  for (const ins of inserts) {
+    const pod = ins.pod_pdr
+    if (!pod) continue
+    const prev = insertsByPod.get(pod)
+    if (prev) {
+      // Same POD already pending insert — fold this row's data in (so
+      // later columns from the file don't get lost) and drop this row.
+      prev.custom_fields = { ...prev.custom_fields, ...ins.custom_fields }
+      droppedInserts.push(ins)
+      continue
+    }
+    insertsByPod.set(pod, ins)
+  }
+  // Drop ops for collapsed inserts so the queue doesn't reference dead ids.
+  if (droppedInserts.length > 0) {
+    const droppedIds = new Set(droppedInserts.map((r) => r.id))
+    for (let i = ops.length - 1; i >= 0; i--) {
+      if (droppedIds.has(ops[i].contact_id)) ops.splice(i, 1)
+    }
+    counters.created -= droppedInserts.length
+  }
+
   // Persist DB writes in chunks.
+  const finalInserts = [...insertsByPod.values()]
+  const finalUpdates = [...updatesById.values()]
   const CHUNK = 500
-  if (inserts.length) {
-    for (let i = 0; i < inserts.length; i += CHUNK) {
-      const slice = inserts.slice(i, i + CHUNK)
+  if (finalInserts.length) {
+    for (let i = 0; i < finalInserts.length; i += CHUNK) {
+      const slice = finalInserts.slice(i, i + CHUNK)
       const { error } = await sb.from('apulia_contacts').insert(slice)
       if (error) throw new Error(`pdp insert ${i}: ${error.message}`)
     }
   }
-  if (updates.length) {
-    for (let i = 0; i < updates.length; i += CHUNK) {
-      const slice = updates.slice(i, i + CHUNK)
+  if (finalUpdates.length) {
+    for (let i = 0; i < finalUpdates.length; i += CHUNK) {
+      const slice = finalUpdates.slice(i, i + CHUNK)
       const { error } = await sb.from('apulia_contacts').upsert(slice, { onConflict: 'id' })
       if (error) throw new Error(`pdp update ${i}: ${error.message}`)
     }
