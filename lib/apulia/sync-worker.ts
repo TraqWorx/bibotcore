@@ -214,6 +214,15 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
             .select('id, codice_amministratore, pod_pdr, first_name, is_amministratore')
             .eq('ghl_id', newGhlId)
             .maybeSingle()
+          // Race with the inbound GHL webhook: GHL fires ContactCreate
+          // immediately after we POST, the webhook handler matches by
+          // POD/codice, and stamps ghl_id on this same row before we
+          // get to. Sibling is then the row itself — just complete the op.
+          if (sibling && sibling.id === row.id) {
+            await markCompleted(op.id)
+            await sb.from('apulia_sync_queue').update({ ghl_id: newGhlId }).eq('contact_id', row.id).is('ghl_id', null).neq('id', op.id)
+            return 'completed'
+          }
           // Same entity = same kind (admin/condomino) AND same identity
           // (codice for admins, pod_pdr for condomini). codice on a
           // condomino is its admin's code, not its own — so we must NOT
