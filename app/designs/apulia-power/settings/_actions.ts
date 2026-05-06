@@ -4,8 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import { fullSyncCache } from '@/lib/apulia/cache'
-import { removeTag } from '@/lib/apulia/contacts'
-import { pmap } from '@/lib/apulia/ghl'
+import { enqueueOps } from '@/lib/apulia/sync-queue'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -48,9 +47,9 @@ export async function resyncCache(): Promise<{ total: number; deleted: number; e
 }
 
 /**
- * Remove a tag from every contact in the Apulia location. Used by the
- * Settings → Tag manager to permanently get rid of a tag. Concurrent
- * (8 in flight) and best-effort: failures are counted, not thrown.
+ * Remove a tag from every Apulia contact. DB-first: strips the tag from
+ * apulia_contacts.tags, marks rows pending_update, and enqueues one
+ * remove_tag op per row for the worker.
  */
 export async function deleteTagGlobally(tag: string): Promise<{ removed: number; failed: number; error?: string }> {
   const guard = await ensureOwner()
@@ -59,23 +58,28 @@ export async function deleteTagGlobally(tag: string): Promise<{ removed: number;
   if (!t) return { removed: 0, failed: 0, error: 'Tag vuoto' }
 
   const sb = createAdminClient()
-  const { data: rows } = await sb.from('apulia_contacts').select('id, tags').contains('tags', [t])
+  const { data: rows } = await sb
+    .from('apulia_contacts')
+    .select('id, ghl_id, tags')
+    .contains('tags', [t])
+    .neq('sync_status', 'pending_delete')
   if (!rows || rows.length === 0) return { removed: 0, failed: 0 }
 
-  let removed = 0, failed = 0
-  await pmap(rows, async (r) => {
-    try {
-      await removeTag(r.id, t)
-      const remaining = (r.tags ?? []).filter((x: string) => x !== t)
-      await sb.from('apulia_contacts').update({ tags: remaining }).eq('id', r.id)
-      removed++
-    } catch {
-      failed++
-    }
-  }, 8)
+  // Update tags array per row.
+  for (const r of rows) {
+    const remaining = ((r.tags as string[] | null) ?? []).filter((x) => x !== t)
+    await sb.from('apulia_contacts').update({ tags: remaining, sync_status: 'pending_update' }).eq('id', r.id)
+  }
+  // Enqueue one remove_tag op per row.
+  await enqueueOps(rows.map((r) => ({
+    contact_id: r.id as string,
+    ghl_id: (r.ghl_id as string | null) ?? null,
+    action: 'remove_tag' as const,
+    payload: { tag: t },
+  })))
 
   revalidatePath('/designs/apulia-power/settings')
   revalidatePath('/designs/apulia-power/condomini')
   revalidatePath('/designs/apulia-power/amministratori')
-  return { removed, failed }
+  return { removed: rows.length, failed: 0 }
 }

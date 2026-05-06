@@ -1,12 +1,11 @@
 'use server'
 
+import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
-import { APULIA_FIELD, currentPeriod } from '@/lib/apulia/fields'
-import { upsertContact, deleteContact } from '@/lib/apulia/contacts'
-import { upsertCachedFromGhl, patchCached, fullSyncCache } from '@/lib/apulia/cache'
-import { ghlFetch, pmap } from '@/lib/apulia/ghl'
+import { APULIA_FIELD, APULIA_TAG, currentPeriod } from '@/lib/apulia/fields'
+import { enqueueOp, enqueueOps } from '@/lib/apulia/sync-queue'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -20,17 +19,12 @@ async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   return { email: user.email ?? '' }
 }
 
-/**
- * Bulk Paga — record a payment row for every selected admin in one shot.
- * Idempotent: re-marking already-paid admins is a no-op (unique on contact+period).
- */
 export async function bulkMarkPaid(adminContactIds: string[], amounts: Record<string, number>): Promise<{ paid: number; skipped: number; error?: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return { paid: 0, skipped: 0, error: guard.error }
   const sb = createAdminClient()
   const period = currentPeriod()
 
-  // Find admins already paid for this period — those are "skipped".
   const { data: existing } = await sb.from('apulia_payments')
     .select('contact_id')
     .eq('period', period)
@@ -69,12 +63,13 @@ export interface CreateAdminInput {
   city?: string
   province?: string
   compensoPerPod?: number
-  firstPaymentAt?: string // ISO date
+  firstPaymentAt?: string
 }
 
 /**
- * Manually create one amministratore. Tagged `amministratore`, custom
- * fields populated from the form, anchor stamped to provided date or now.
+ * Manually create one amministratore — DB-first. INSERTs a fresh uuid row
+ * with sync_status='pending_create' and ghl_id=null; the worker pushes
+ * to GHL and stamps ghl_id back.
  */
 export async function createAdmin(input: CreateAdminInput): Promise<{ id?: string; error?: string }> {
   const guard = await ensureOwner()
@@ -86,16 +81,16 @@ export async function createAdmin(input: CreateAdminInput): Promise<{ id?: strin
   if (!name) return { error: 'Nome richiesto' }
   if (!code) return { error: 'Codice amministratore richiesto' }
 
-  // Reject duplicates by code.
   const { data: existing } = await sb
     .from('apulia_contacts')
     .select('id')
     .eq('is_amministratore', true)
     .eq('codice_amministratore', code)
+    .neq('sync_status', 'pending_delete')
     .maybeSingle()
   if (existing) return { error: `Amministratore con codice ${code} esiste già` }
 
-  const cf: Record<string, string | number> = {
+  const cf: Record<string, string> = {
     [APULIA_FIELD.AMMINISTRATORE_CONDOMINIO]: name,
     [APULIA_FIELD.CODICE_AMMINISTRATORE]: code,
   }
@@ -103,47 +98,54 @@ export async function createAdmin(input: CreateAdminInput): Promise<{ id?: strin
   if (input.partitaIva) cf[APULIA_FIELD.PARTITA_IVA_AMMINISTRATORE] = input.partitaIva
   if (input.phone) cf[APULIA_FIELD.TELEFONO_AMMINISTRATORE] = input.phone
   if (input.email) cf[APULIA_FIELD.EMAIL_BILLING] = input.email
-  if (input.address) cf['oCvfwCelHDn6gWEljqUJ'] = input.address                 // Indirizzo
-  if (input.city) cf['EXO9WD4aLV2aPiMYxXUU'] = input.city                       // Città
-  if (input.province) cf['opaPQWrWwDiaAeyoMbN5'] = input.province               // Provincia
-  if (input.compensoPerPod && input.compensoPerPod > 0) cf[APULIA_FIELD.COMPENSO_PER_POD] = input.compensoPerPod
-
-  let newId: string
-  try {
-    newId = await upsertContact({
-      email: input.email,
-      phone: input.phone,
-      firstName: name,
-      tags: ['amministratore'],
-      customField: cf,
-    })
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Creazione fallita' }
+  if (input.address) cf['oCvfwCelHDn6gWEljqUJ'] = input.address
+  if (input.city) cf['EXO9WD4aLV2aPiMYxXUU'] = input.city
+  if (input.province) cf['opaPQWrWwDiaAeyoMbN5'] = input.province
+  if (input.compensoPerPod && input.compensoPerPod > 0) {
+    cf[APULIA_FIELD.COMPENSO_PER_POD] = String(input.compensoPerPod)
   }
-  if (!newId) return { error: 'ID contatto non restituito' }
 
-  await upsertCachedFromGhl({
-    id: newId,
-    firstName: name,
-    email: input.email,
-    phone: input.phone,
-    tags: ['amministratore'],
-    customFields: Object.entries(cf).map(([id, value]) => ({ id, value: String(value) })),
-  })
-
+  const id = randomUUID()
   const anchor = input.firstPaymentAt ? new Date(input.firstPaymentAt) : new Date()
-  await sb.from('apulia_contacts').update({ first_payment_at: anchor.toISOString() }).eq('id', newId)
+
+  const { error } = await sb.from('apulia_contacts').insert({
+    id,
+    ghl_id: null,
+    sync_status: 'pending_create',
+    email: input.email ?? null,
+    phone: input.phone ?? null,
+    first_name: name,
+    last_name: null,
+    tags: [APULIA_TAG.AMMINISTRATORE],
+    custom_fields: cf,
+    pod_pdr: null,
+    codice_amministratore: code,
+    amministratore_name: name,
+    cliente: null,
+    comune: input.city ?? null,
+    stato: null,
+    compenso_per_pod: input.compensoPerPod && input.compensoPerPod > 0 ? input.compensoPerPod : null,
+    pod_override: null,
+    commissione_totale: null,
+    is_amministratore: true,
+    is_switch_out: false,
+    ghl_updated_at: null,
+    first_payment_at: anchor.toISOString(),
+  })
+  if (error) return { error: error.message }
+
+  await enqueueOp({ contact_id: id, ghl_id: null, action: 'create' })
 
   revalidatePath('/designs/apulia-power/amministratori')
   revalidatePath('/designs/apulia-power/dashboard')
   revalidatePath('/designs/apulia-power/settings')
-  return { id: newId }
+  return { id }
 }
 
 /**
- * Update the per-POD compenso for one amministratore. Pushes to Bibot custom
- * field, patches the cache, then recomputes commissione_totale (since POD
- * rows without a per-POD override fall back to this value).
+ * Update compenso_per_pod for one admin. Recomputes commissione_totale
+ * (DB-only) and enqueues a set_field op for the new compenso plus a
+ * set_field op for the new total.
  */
 export async function setCompensoPerPod(adminContactId: string, amount: number): Promise<{ total?: number; error?: string }> {
   const guard = await ensureOwner()
@@ -153,21 +155,19 @@ export async function setCompensoPerPod(adminContactId: string, amount: number):
   const sb = createAdminClient()
   const { data: admin } = await sb
     .from('apulia_contacts')
-    .select('codice_amministratore')
+    .select('ghl_id, codice_amministratore, custom_fields')
     .eq('id', adminContactId)
     .eq('is_amministratore', true)
+    .neq('sync_status', 'pending_delete')
     .maybeSingle()
   if (!admin) return { error: 'Amministratore non trovato' }
 
-  const r = await ghlFetch(`/contacts/${adminContactId}`, {
-    method: 'PUT',
-    body: JSON.stringify({ customFields: [{ id: APULIA_FIELD.COMPENSO_PER_POD, value: amount > 0 ? amount : '' }] }),
-  })
-  if (!r.ok) return { error: `Bibot ${r.status}: ${(await r.text()).slice(0, 200)}` }
+  const newCompenso = amount > 0 ? amount : null
+  const cf = { ...((admin.custom_fields ?? {}) as Record<string, string>) }
+  if (newCompenso != null) cf[APULIA_FIELD.COMPENSO_PER_POD] = String(newCompenso)
+  else delete cf[APULIA_FIELD.COMPENSO_PER_POD]
 
-  await patchCached(adminContactId, { compenso_per_pod: amount > 0 ? amount : null })
-
-  // Recompute total from cache (override wins, else compenso).
+  // Compute new total before persisting so cf carries it too.
   let newTotal = 0
   if (admin.codice_amministratore) {
     const { data: pods } = await sb
@@ -176,13 +176,32 @@ export async function setCompensoPerPod(adminContactId: string, amount: number):
       .eq('codice_amministratore', admin.codice_amministratore)
       .eq('is_amministratore', false)
       .eq('is_switch_out', false)
-    newTotal = (pods ?? []).reduce((s, p) => s + (Number(p.pod_override) || amount), 0)
-    const tr = await ghlFetch(`/contacts/${adminContactId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ customFields: [{ id: APULIA_FIELD.COMMISSIONE_TOTALE, value: newTotal }] }),
-    })
-    if (tr.ok) await patchCached(adminContactId, { commissione_totale: newTotal })
+      .neq('sync_status', 'pending_delete')
+    newTotal = (pods ?? []).reduce((s, p) => s + (Number(p.pod_override) || (newCompenso ?? 0)), 0)
+    cf[APULIA_FIELD.COMMISSIONE_TOTALE] = String(newTotal)
   }
+
+  await sb.from('apulia_contacts').update({
+    compenso_per_pod: newCompenso,
+    commissione_totale: newTotal || null,
+    custom_fields: cf,
+    sync_status: 'pending_update',
+  }).eq('id', adminContactId)
+
+  await enqueueOps([
+    {
+      contact_id: adminContactId,
+      ghl_id: admin.ghl_id ?? null,
+      action: 'set_field',
+      payload: { fieldId: APULIA_FIELD.COMPENSO_PER_POD, value: newCompenso ?? '' },
+    },
+    {
+      contact_id: adminContactId,
+      ghl_id: admin.ghl_id ?? null,
+      action: 'set_field',
+      payload: { fieldId: APULIA_FIELD.COMMISSIONE_TOTALE, value: newTotal },
+    },
+  ])
 
   revalidatePath('/designs/apulia-power/amministratori')
   revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
@@ -192,8 +211,8 @@ export async function setCompensoPerPod(adminContactId: string, amount: number):
 }
 
 /**
- * Bulk delete admins. POD linked to any of them are detached (their
- * codice_amministratore is cleared) so they remain in Bibot but unassigned.
+ * Soft-delete admins in bulk. Linked POD condomini have their
+ * codice_amministratore cleared so they remain in Bibot but unassigned.
  */
 export async function bulkDeleteAdmins(ids: string[]): Promise<{ deleted: number; failed: number; error?: string }> {
   const guard = await ensureOwner()
@@ -201,34 +220,52 @@ export async function bulkDeleteAdmins(ids: string[]): Promise<{ deleted: number
   if (ids.length === 0) return { deleted: 0, failed: 0 }
 
   const sb = createAdminClient()
-  const { data: rows } = await sb.from('apulia_contacts').select('id, codice_amministratore').in('id', ids).eq('is_amministratore', true)
-  const codes = (rows ?? []).map((r) => r.codice_amministratore).filter((c): c is string => Boolean(c))
+  const { data: rows } = await sb
+    .from('apulia_contacts')
+    .select('id, ghl_id, codice_amministratore')
+    .in('id', ids)
+    .eq('is_amministratore', true)
+  if (!rows?.length) return { deleted: 0, failed: 0 }
+  const codes = rows.map((r) => r.codice_amministratore).filter((c): c is string => Boolean(c))
 
-  let deleted = 0, failed = 0
-  await pmap(rows ?? [], async (r) => {
-    try {
-      await deleteContact(r.id)
-      await sb.from('apulia_contacts').delete().eq('id', r.id)
-      deleted++
-    } catch {
-      failed++
-    }
-  }, 6)
+  // Hard-delete ones that never made it to GHL (ghl_id is null) — saves a
+  // pointless GHL DELETE later.
+  const localOnly = rows.filter((r) => !r.ghl_id).map((r) => r.id)
+  const remote = rows.filter((r) => r.ghl_id) as Array<{ id: string; ghl_id: string }>
 
-  if (codes.length > 0) {
-    await sb
-      .from('apulia_contacts')
-      .update({ codice_amministratore: null, amministratore_name: null })
-      .in('codice_amministratore', codes)
-      .eq('is_amministratore', false)
+  if (localOnly.length) {
+    await sb.from('apulia_sync_queue').delete().in('contact_id', localOnly).eq('status', 'pending')
+    await sb.from('apulia_contacts').delete().in('id', localOnly)
+  }
+  if (remote.length) {
+    await sb.from('apulia_contacts').update({ sync_status: 'pending_delete' }).in('id', remote.map((r) => r.id))
+    await enqueueOps(remote.map((r) => ({ contact_id: r.id, ghl_id: r.ghl_id, action: 'delete' as const })))
   }
 
-  // Reconcile against GHL — bulk semantics can miss webhooks.
-  try { await fullSyncCache() } catch { /* ignore */ }
+  // Detach POD condomini from the deleted admins.
+  if (codes.length > 0) {
+    const { data: orphans } = await sb
+      .from('apulia_contacts')
+      .select('id, ghl_id')
+      .in('codice_amministratore', codes)
+      .eq('is_amministratore', false)
+      .neq('sync_status', 'pending_delete')
+    if (orphans?.length) {
+      await sb
+        .from('apulia_contacts')
+        .update({ codice_amministratore: null, amministratore_name: null, sync_status: 'pending_update' })
+        .in('id', orphans.map((r) => r.id))
+      const ops = orphans.flatMap((r) => [
+        { contact_id: r.id, ghl_id: r.ghl_id ?? null, action: 'set_field' as const, payload: { fieldId: APULIA_FIELD.CODICE_AMMINISTRATORE, value: '' } },
+        { contact_id: r.id, ghl_id: r.ghl_id ?? null, action: 'set_field' as const, payload: { fieldId: APULIA_FIELD.AMMINISTRATORE_CONDOMINIO, value: '' } },
+      ])
+      await enqueueOps(ops)
+    }
+  }
 
   revalidatePath('/designs/apulia-power/amministratori')
   revalidatePath('/designs/apulia-power/condomini')
   revalidatePath('/designs/apulia-power/dashboard')
   revalidatePath('/designs/apulia-power/settings')
-  return { deleted, failed }
+  return { deleted: rows.length, failed: 0 }
 }

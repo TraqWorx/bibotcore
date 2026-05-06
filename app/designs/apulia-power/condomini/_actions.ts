@@ -1,12 +1,11 @@
 'use server'
 
+import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
-import { upsertContact, deleteContact } from '@/lib/apulia/contacts'
-import { upsertCachedFromGhl, fullSyncCache } from '@/lib/apulia/cache'
-import { pmap } from '@/lib/apulia/ghl'
 import { APULIA_FIELD } from '@/lib/apulia/fields'
+import { enqueueOp, enqueueOps } from '@/lib/apulia/sync-queue'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -33,6 +32,10 @@ export interface CreateCondominoInput {
   codiceFiscale?: string
 }
 
+/**
+ * Manually create one condominio — DB-first. INSERTs a fresh uuid row with
+ * sync_status='pending_create' and ghl_id=null; the worker pushes to GHL.
+ */
 export async function createCondomino(input: CreateCondominoInput): Promise<{ id?: string; error?: string }> {
   const guard = await ensureOwner()
   if ('error' in guard) return { error: guard.error }
@@ -42,10 +45,15 @@ export async function createCondomino(input: CreateCondominoInput): Promise<{ id
   if (!cliente) return { error: 'Cliente richiesto' }
 
   const sb = createAdminClient()
-  const { data: existing } = await sb.from('apulia_contacts').select('id').eq('pod_pdr', podPdr).maybeSingle()
+  const { data: existing } = await sb
+    .from('apulia_contacts')
+    .select('id')
+    .eq('pod_pdr', podPdr)
+    .neq('sync_status', 'pending_delete')
+    .maybeSingle()
   if (existing) return { error: `Esiste già un condominio con POD ${podPdr}` }
 
-  const cf: Record<string, string | number> = {
+  const cf: Record<string, string> = {
     [APULIA_FIELD.POD_PDR]: podPdr,
     [APULIA_FIELD.CLIENTE]: cliente,
   }
@@ -55,30 +63,51 @@ export async function createCondomino(input: CreateCondominoInput): Promise<{ id
   if (input.comune?.trim()) cf['EXO9WD4aLV2aPiMYxXUU'] = input.comune.trim()
   if (input.provincia?.trim()) cf['opaPQWrWwDiaAeyoMbN5'] = input.provincia.trim()
 
-  let newId: string
-  try {
-    newId = await upsertContact({
-      email: input.email?.trim() || undefined,
-      phone: input.phone?.trim() || undefined,
-      firstName: cliente,
-      customField: cf,
-    })
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Creazione fallita' }
+  // If we know the codice, also denormalize the admin name to the row.
+  let adminName: string | null = null
+  if (input.codiceAmministratore?.trim()) {
+    const { data: admin } = await sb
+      .from('apulia_contacts')
+      .select('first_name, last_name')
+      .eq('is_amministratore', true)
+      .eq('codice_amministratore', input.codiceAmministratore.trim())
+      .neq('sync_status', 'pending_delete')
+      .maybeSingle()
+    adminName = admin ? [admin.first_name, admin.last_name].filter(Boolean).join(' ') : null
+    if (adminName) cf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO] = adminName
   }
-  if (!newId) return { error: 'ID non restituito' }
 
-  await upsertCachedFromGhl({
-    id: newId,
-    firstName: cliente,
-    email: input.email?.trim(),
-    phone: input.phone?.trim(),
-    customFields: Object.entries(cf).map(([id, value]) => ({ id, value: String(value) })),
+  const id = randomUUID()
+  const { error } = await sb.from('apulia_contacts').insert({
+    id,
+    ghl_id: null,
+    sync_status: 'pending_create',
+    email: input.email?.trim() || null,
+    phone: input.phone?.trim() || null,
+    first_name: cliente,
+    last_name: null,
+    tags: [],
+    custom_fields: cf,
+    pod_pdr: podPdr,
+    codice_amministratore: input.codiceAmministratore?.trim() || null,
+    amministratore_name: adminName,
+    cliente,
+    comune: input.comune?.trim() || null,
+    stato: null,
+    compenso_per_pod: null,
+    pod_override: null,
+    commissione_totale: null,
+    is_amministratore: false,
+    is_switch_out: false,
+    ghl_updated_at: null,
   })
+  if (error) return { error: error.message }
+
+  await enqueueOp({ contact_id: id, ghl_id: null, action: 'create' })
 
   revalidatePath('/designs/apulia-power/condomini')
   revalidatePath('/designs/apulia-power/dashboard')
-  return { id: newId }
+  return { id }
 }
 
 export interface BulkDeleteFilters {
@@ -89,9 +118,8 @@ export interface BulkDeleteFilters {
 }
 
 /**
- * Delete many condomini in one shot. Best-effort: counts errors, never throws.
- * Either pass an explicit list of ids, or pass filters and we'll resolve to
- * every matching condominio (used by the "select all matching" UI).
+ * Soft-delete many condomini at once. Worker hard-deletes from
+ * apulia_contacts after each GHL ack.
  */
 export async function bulkDeleteCondomini(input: { ids?: string[]; filters?: BulkDeleteFilters }): Promise<{ deleted: number; failed: number; error?: string }> {
   const guard = await ensureOwner()
@@ -102,7 +130,7 @@ export async function bulkDeleteCondomini(input: { ids?: string[]; filters?: Bul
   if (input.ids && input.ids.length > 0) {
     ids = input.ids
   } else if (input.filters) {
-    let q = sb.from('apulia_contacts').select('id').eq('is_amministratore', false)
+    let q = sb.from('apulia_contacts').select('id').eq('is_amministratore', false).neq('sync_status', 'pending_delete')
     const f = input.filters
     if (f.stato === 'active') q = q.eq('is_switch_out', false)
     else if (f.stato === 'switch_out') q = q.eq('is_switch_out', true)
@@ -117,22 +145,22 @@ export async function bulkDeleteCondomini(input: { ids?: string[]; filters?: Bul
   }
   if (ids.length === 0) return { deleted: 0, failed: 0 }
 
-  let deleted = 0, failed = 0
-  await pmap(ids, async (id) => {
-    try {
-      await deleteContact(id)
-      await sb.from('apulia_contacts').delete().eq('id', id)
-      deleted++
-    } catch {
-      failed++
-    }
-  }, 6)
+  const { data: rows } = await sb.from('apulia_contacts').select('id, ghl_id').in('id', ids)
+  if (!rows?.length) return { deleted: 0, failed: 0 }
 
-  // Belt-and-suspenders: GHL bulk semantics can miss webhooks, so
-  // reconcile the cache against GHL after any large delete.
-  try { await fullSyncCache() } catch { /* ignore */ }
+  const localOnly = rows.filter((r) => !r.ghl_id).map((r) => r.id)
+  const remote = rows.filter((r) => r.ghl_id) as Array<{ id: string; ghl_id: string }>
+
+  if (localOnly.length) {
+    await sb.from('apulia_sync_queue').delete().in('contact_id', localOnly).eq('status', 'pending')
+    await sb.from('apulia_contacts').delete().in('id', localOnly)
+  }
+  if (remote.length) {
+    await sb.from('apulia_contacts').update({ sync_status: 'pending_delete' }).in('id', remote.map((r) => r.id))
+    await enqueueOps(remote.map((r) => ({ contact_id: r.id, ghl_id: r.ghl_id, action: 'delete' as const })))
+  }
 
   revalidatePath('/designs/apulia-power/condomini')
   revalidatePath('/designs/apulia-power/dashboard')
-  return { deleted, failed }
+  return { deleted: rows.length, failed: 0 }
 }

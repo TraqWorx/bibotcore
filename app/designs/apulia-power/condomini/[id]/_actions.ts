@@ -3,10 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
-import { ghlFetch } from '@/lib/apulia/ghl'
-import { upsertContact, addTag as ghlAddTag, removeTag as ghlRemoveTag, deleteContact } from '@/lib/apulia/contacts'
-import { deleteCached } from '@/lib/apulia/cache'
 import { APULIA_FIELD } from '@/lib/apulia/fields'
+import { enqueueOp } from '@/lib/apulia/sync-queue'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -26,25 +24,20 @@ function pathsToRevalidate(id: string) {
   revalidatePath('/designs/apulia-power/dashboard')
 }
 
-/** Update one custom field on a condominio contact. Pushes to Bibot then patches the cache. */
+/** Bibot is now source of truth — UPDATE the row, enqueue the GHL push. */
 export async function updateCondominoField(contactId: string, fieldId: string, value: string): Promise<{ error?: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return guard
-  const r = await ghlFetch(`/contacts/${contactId}`, {
-    method: 'PUT',
-    body: JSON.stringify({ customFields: [{ id: fieldId, value }] }),
-  })
-  if (!r.ok) return { error: `Bibot ${r.status}: ${(await r.text()).slice(0, 200)}` }
 
-  // Update cache: re-fetch the contact for accurate downstream fields, but
-  // a targeted JSON-merge keeps things snappy. We patch the JSON cf and any
-  // shortcut columns that mirror it.
   const sb = createAdminClient()
-  const { data: row } = await sb.from('apulia_contacts').select('custom_fields').eq('id', contactId).single()
-  const cf = { ...((row?.custom_fields ?? {}) as Record<string, string>) }
+  const { data: row } = await sb.from('apulia_contacts').select('ghl_id, custom_fields').eq('id', contactId).maybeSingle()
+  if (!row) return { error: 'Contatto non trovato' }
+
+  const cf = { ...((row.custom_fields ?? {}) as Record<string, string>) }
   if (value) cf[fieldId] = value
   else delete cf[fieldId]
-  const patch: Record<string, unknown> = { custom_fields: cf }
+
+  const patch: Record<string, unknown> = { custom_fields: cf, sync_status: 'pending_update' }
   if (fieldId === APULIA_FIELD.POD_PDR) patch.pod_pdr = value || null
   if (fieldId === APULIA_FIELD.CODICE_AMMINISTRATORE) patch.codice_amministratore = value || null
   if (fieldId === APULIA_FIELD.AMMINISTRATORE_CONDOMINIO) patch.amministratore_name = value || null
@@ -53,64 +46,67 @@ export async function updateCondominoField(contactId: string, fieldId: string, v
   if (fieldId === APULIA_FIELD.POD_OVERRIDE) patch.pod_override = value ? Number(String(value).replace(',', '.')) : null
   if (fieldId === APULIA_FIELD.COMPENSO_PER_POD) patch.compenso_per_pod = value ? Number(String(value).replace(',', '.')) : null
   if (fieldId === 'EXO9WD4aLV2aPiMYxXUU') patch.comune = value || null
-  await sb.from('apulia_contacts').update(patch).eq('id', contactId)
+
+  const { error } = await sb.from('apulia_contacts').update(patch).eq('id', contactId)
+  if (error) return { error: error.message }
+
+  await enqueueOp({
+    contact_id: contactId,
+    ghl_id: row.ghl_id ?? null,
+    action: 'set_field',
+    payload: { fieldId, value },
+  })
 
   pathsToRevalidate(contactId)
 }
 
-/** Update core contact fields (firstName/lastName/email/phone). */
 export async function updateCondominoCore(contactId: string, field: 'firstName' | 'lastName' | 'email' | 'phone', value: string): Promise<{ error?: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return guard
-  try {
-    await upsertContact({ id: contactId, [field]: value })
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Aggiornamento fallito' }
-  }
-  const dbField = field === 'firstName' ? 'first_name' : field === 'lastName' ? 'last_name' : field
+
   const sb = createAdminClient()
-  await sb.from('apulia_contacts').update({ [dbField]: value || null }).eq('id', contactId)
+  const { data: row } = await sb.from('apulia_contacts').select('ghl_id').eq('id', contactId).maybeSingle()
+  if (!row) return { error: 'Contatto non trovato' }
+
+  const dbField = field === 'firstName' ? 'first_name' : field === 'lastName' ? 'last_name' : field
+  const { error } = await sb.from('apulia_contacts').update({
+    [dbField]: value || null,
+    sync_status: 'pending_update',
+  }).eq('id', contactId)
+  if (error) return { error: error.message }
+
+  await enqueueOp({ contact_id: contactId, ghl_id: row.ghl_id ?? null, action: 'update' })
   pathsToRevalidate(contactId)
 }
 
 export async function addCondominoTag(contactId: string, tag: string): Promise<{ error?: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return guard
-  if (!tag.trim()) return { error: 'Tag vuoto' }
-  try {
-    await ghlAddTag(contactId, tag.trim())
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Add tag fallito' }
-  }
-  // Refresh tags array in cache.
+  const t = tag.trim()
+  if (!t) return { error: 'Tag vuoto' }
+
   const sb = createAdminClient()
-  const { data: row } = await sb.from('apulia_contacts').select('tags').eq('id', contactId).single()
-  const tags = Array.from(new Set([...(row?.tags ?? []), tag.trim()]))
-  await sb.from('apulia_contacts').update({ tags }).eq('id', contactId)
+  const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags').eq('id', contactId).maybeSingle()
+  if (!row) return { error: 'Contatto non trovato' }
+  const tags = Array.from(new Set([...((row.tags as string[] | null) ?? []), t]))
+  await sb.from('apulia_contacts').update({ tags, sync_status: 'pending_update' }).eq('id', contactId)
+  await enqueueOp({ contact_id: contactId, ghl_id: row.ghl_id ?? null, action: 'add_tag', payload: { tag: t } })
   pathsToRevalidate(contactId)
 }
 
 export async function removeCondominoTag(contactId: string, tag: string): Promise<{ error?: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return guard
-  try {
-    await ghlRemoveTag(contactId, tag)
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Remove tag fallito' }
-  }
+
   const sb = createAdminClient()
-  const { data: row } = await sb.from('apulia_contacts').select('tags').eq('id', contactId).single()
-  const tags = (row?.tags ?? []).filter((t: string) => t !== tag)
-  await sb.from('apulia_contacts').update({ tags }).eq('id', contactId)
+  const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags').eq('id', contactId).maybeSingle()
+  if (!row) return { error: 'Contatto non trovato' }
+  const tags = ((row.tags as string[] | null) ?? []).filter((x) => x !== tag)
+  await sb.from('apulia_contacts').update({ tags, sync_status: 'pending_update' }).eq('id', contactId)
+  await enqueueOp({ contact_id: contactId, ghl_id: row.ghl_id ?? null, action: 'remove_tag', payload: { tag } })
   pathsToRevalidate(contactId)
 }
 
-/**
- * Atomically link this condominio to an existing amministratore by code.
- * Writes BOTH `Codice amministratore` AND `Amministratore condominio` (name)
- * to Bibot in one PUT, and patches both cache columns. Pass empty string to
- * detach.
- */
 export async function setCondominoAdminByCode(contactId: string, code: string): Promise<{ error?: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return guard
@@ -123,47 +119,55 @@ export async function setCondominoAdminByCode(contactId: string, code: string): 
       .select('first_name, last_name')
       .eq('is_amministratore', true)
       .eq('codice_amministratore', trimmed)
+      .neq('sync_status', 'pending_delete')
       .maybeSingle()
     if (!admin) return { error: `Nessun amministratore con codice ${trimmed}` }
     name = [admin.first_name, admin.last_name].filter(Boolean).join(' ')
   }
 
-  const r = await ghlFetch(`/contacts/${contactId}`, {
-    method: 'PUT',
-    body: JSON.stringify({
-      customFields: [
-        { id: APULIA_FIELD.CODICE_AMMINISTRATORE, value: trimmed },
-        { id: APULIA_FIELD.AMMINISTRATORE_CONDOMINIO, value: name },
-      ],
-    }),
-  })
-  if (!r.ok) return { error: `Bibot ${r.status}: ${(await r.text()).slice(0, 200)}` }
+  const { data: row } = await sb.from('apulia_contacts').select('ghl_id, custom_fields').eq('id', contactId).maybeSingle()
+  if (!row) return { error: 'Contatto non trovato' }
 
-  const { data: row } = await sb.from('apulia_contacts').select('custom_fields').eq('id', contactId).single()
-  const cf = { ...((row?.custom_fields ?? {}) as Record<string, string>) }
+  const cf = { ...((row.custom_fields ?? {}) as Record<string, string>) }
   if (trimmed) cf[APULIA_FIELD.CODICE_AMMINISTRATORE] = trimmed
   else delete cf[APULIA_FIELD.CODICE_AMMINISTRATORE]
   if (name) cf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO] = name
   else delete cf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO]
+
   await sb.from('apulia_contacts').update({
     custom_fields: cf,
     codice_amministratore: trimmed || null,
     amministratore_name: name || null,
+    sync_status: 'pending_update',
   }).eq('id', contactId)
 
+  await enqueueOp({ contact_id: contactId, ghl_id: row.ghl_id ?? null, action: 'update' })
   pathsToRevalidate(contactId)
 }
 
+/**
+ * Soft-delete: flip sync_status to pending_delete and enqueue. The worker
+ * hard-deletes the row from apulia_contacts after GHL acknowledges.
+ * UI reads filter pending_delete out so the row disappears immediately.
+ */
 export async function deleteCondomino(contactId: string): Promise<{ error?: string; redirect?: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return guard
-  try {
-    await deleteContact(contactId)
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Eliminazione fallita' }
+
+  const sb = createAdminClient()
+  const { data: row } = await sb.from('apulia_contacts').select('ghl_id').eq('id', contactId).maybeSingle()
+  if (!row) return { error: 'Contatto non trovato' }
+
+  if (!row.ghl_id) {
+    // Never made it to GHL — just hard-delete locally and clean any
+    // pending queue ops. Saves a useless GHL DELETE.
+    await sb.from('apulia_sync_queue').delete().eq('contact_id', contactId).eq('status', 'pending')
+    await sb.from('apulia_contacts').delete().eq('id', contactId)
+  } else {
+    await sb.from('apulia_contacts').update({ sync_status: 'pending_delete' }).eq('id', contactId)
+    await enqueueOp({ contact_id: contactId, ghl_id: row.ghl_id, action: 'delete' })
   }
-  await deleteCached(contactId)
+
   pathsToRevalidate(contactId)
   return { redirect: '/designs/apulia-power/condomini' }
 }
-
