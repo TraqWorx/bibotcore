@@ -20,6 +20,8 @@ interface ContactRow {
   last_name: string | null
   tags: string[] | null
   custom_fields: Record<string, string> | null
+  codice_amministratore: string | null
+  pod_pdr: string | null
 }
 
 const BATCH_LIMIT = 40
@@ -119,7 +121,7 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
   const sb = createAdminClient()
   const contactId = op.contact_id
   const row = contactId
-    ? ((await sb.from('apulia_contacts').select('id, ghl_id, email, phone, first_name, last_name, tags, custom_fields').eq('id', contactId).maybeSingle()).data as ContactRow | null)
+    ? ((await sb.from('apulia_contacts').select('id, ghl_id, email, phone, first_name, last_name, tags, custom_fields, codice_amministratore, pod_pdr').eq('id', contactId).maybeSingle()).data as ContactRow | null)
     : null
 
   switch (op.action) {
@@ -153,18 +155,45 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
       // Stamp ghl_id back. The unique index on apulia_contacts.ghl_id can
       // refuse this if a sibling Bibot row already claimed the same GHL
       // contact (input data had two rows that GHL collapsed by email or
-      // phone). When that happens we DON'T silently complete — it's a
-      // real data-integrity issue the user needs to know about.
+      // phone). When that happens, decide between two outcomes:
+      //
+      //   A. Sibling has the SAME identifier (codice_amministratore for
+      //      admins, pod_pdr for condomini) — it's a true duplicate of
+      //      this row. Delete this Bibot row and mark op completed.
+      //
+      //   B. Sibling has a DIFFERENT identifier but GHL collapsed both
+      //      to one contact (typically same email). Leave this row in
+      //      place and mark op failed so the user can fix the data.
       const stamp = await sb
         .from('apulia_contacts')
         .update({ ghl_id: newGhlId, sync_status: 'synced' })
         .eq('id', row.id)
       if (stamp.error) {
         if (/duplicate key|unique constraint/i.test(stamp.error.message)) {
+          const { data: sibling } = await sb
+            .from('apulia_contacts')
+            .select('id, codice_amministratore, pod_pdr, first_name')
+            .eq('ghl_id', newGhlId)
+            .maybeSingle()
+          const sameId = (
+            (row.codice_amministratore && sibling?.codice_amministratore && row.codice_amministratore === sibling.codice_amministratore) ||
+            (!row.codice_amministratore && row.pod_pdr && sibling?.pod_pdr && row.pod_pdr === sibling.pod_pdr)
+          )
+          if (sibling && sameId) {
+            // Case A: true duplicate. Hard-delete this row + cancel any
+            // sibling pending ops. The canonical row (sibling) carries
+            // the data forward.
+            await sb.from('apulia_sync_queue').delete().eq('contact_id', row.id).neq('id', op.id).in('status', ['pending', 'in_progress'])
+            await sb.from('apulia_contacts').delete().eq('id', row.id)
+            await markCompleted(op.id)
+            return 'completed'
+          }
+          // Case B: email/phone collision between distinct entities.
           throw new Error(
             `Il contatto GHL ${newGhlId} è già collegato a un'altra riga Bibot ` +
-            `(collisione email/telefono${viaUpsert ? ' tramite upsert' : ''}). ` +
-            `Probabile riga duplicata in input.`,
+            `(${sibling?.first_name ?? 'sconosciuta'}, codice ${sibling?.codice_amministratore ?? '—'}). ` +
+            `Collisione email/telefono${viaUpsert ? ' tramite upsert' : ''}. ` +
+            `Risolvi i duplicati e reimporta.`,
           )
         }
         throw new Error(`Errore salvataggio ghl_id: ${stamp.error.message}`)
