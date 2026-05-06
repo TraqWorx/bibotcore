@@ -12,6 +12,8 @@ export interface CondominoRow {
   amministratore?: string
   comune?: string
   switchedOut: boolean
+  syncStatus?: string
+  syncError?: string | null
 }
 
 interface Props {
@@ -23,16 +25,23 @@ interface Props {
 export default function CondominiBulkSelect({ rows, total, filters }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [allMatching, setAllMatching] = useState(false)
+  const [hideFailed, setHideFailed] = useState(false)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const router = useRouter()
 
-  const allChecked = rows.length > 0 && rows.every((r) => selected.has(r.contactId))
-  const someChecked = !allChecked && rows.some((r) => selected.has(r.contactId))
-  const pageSelectedCount = useMemo(() => rows.filter((r) => selected.has(r.contactId)).length, [rows, selected])
+  const failedCount = rows.filter((r) => r.syncStatus === 'failed').length
+  const visibleRows = useMemo(
+    () => (hideFailed ? rows.filter((r) => r.syncStatus !== 'failed') : rows),
+    [rows, hideFailed],
+  )
+
+  const allChecked = visibleRows.length > 0 && visibleRows.every((r) => selected.has(r.contactId))
+  const someChecked = !allChecked && visibleRows.some((r) => selected.has(r.contactId))
+  const pageSelectedCount = useMemo(() => visibleRows.filter((r) => selected.has(r.contactId)).length, [visibleRows, selected])
   const selectedCount = allMatching ? total : pageSelectedCount
-  const showAcrossPagesPrompt = allChecked && !allMatching && total > rows.length
+  const showAcrossPagesPrompt = allChecked && !allMatching && total > visibleRows.length
 
   function toggle(id: string) {
     if (allMatching) setAllMatching(false)
@@ -47,7 +56,7 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
   function toggleAll() {
     setAllMatching(false)
     if (allChecked) setSelected(new Set())
-    else setSelected(new Set(rows.map((r) => r.contactId)))
+    else setSelected(new Set(visibleRows.map((r) => r.contactId)))
   }
 
   function clearAll() {
@@ -56,7 +65,7 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
   }
 
   function bulkDelete() {
-    const ids = rows.filter((r) => selected.has(r.contactId)).map((r) => r.contactId)
+    const ids = visibleRows.filter((r) => selected.has(r.contactId)).map((r) => r.contactId)
     const count = allMatching ? total : ids.length
     if (count === 0) return
     const msg = allMatching
@@ -77,6 +86,16 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
 
   return (
     <>
+      {failedCount > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--ap-line)', background: 'color-mix(in srgb, var(--ap-danger, #dc2626) 8%, transparent)', fontSize: 12 }}>
+          <span style={{ color: 'var(--ap-danger, #dc2626)', fontWeight: 700 }}>⚠ {failedCount} non sincronizzati con GHL</span>
+          <span style={{ color: 'var(--ap-text-muted)' }}>— righe in rosso. Apri il dettaglio per il motivo.</span>
+          <label style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <input type="checkbox" checked={hideFailed} onChange={(e) => setHideFailed(e.target.checked)} />
+            <span>Nascondi falliti</span>
+          </label>
+        </div>
+      )}
       {(selectedCount > 0 || flash) && (
         <div style={{
           padding: '10px 16px',
@@ -156,16 +175,22 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td></tr>}
-          {rows.map((p) => {
+          {visibleRows.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td></tr>}
+          {visibleRows.map((p) => {
             const checked = selected.has(p.contactId)
+            const isFailed = p.syncStatus === 'failed'
+            const rowBg = isFailed
+              ? 'color-mix(in srgb, var(--ap-danger, #dc2626) 10%, transparent)'
+              : checked
+                ? 'var(--ap-bg-soft, #eff6ff)'
+                : undefined
             const cellLink = (content: React.ReactNode) => (
-              <Link href={`/designs/apulia-power/condomini/${p.contactId}`} style={{ color: 'var(--ap-text)', textDecoration: 'none', display: 'block' }}>
+              <Link href={`/designs/apulia-power/condomini/${p.contactId}`} style={{ color: isFailed ? 'var(--ap-danger, #dc2626)' : 'var(--ap-text)', textDecoration: 'none', display: 'block' }}>
                 {content}
               </Link>
             )
             return (
-              <tr key={p.contactId} style={checked ? { background: 'var(--ap-bg-soft, #eff6ff)' } : undefined}>
+              <tr key={p.contactId} style={{ background: rowBg, borderLeft: isFailed ? '3px solid var(--ap-danger, #dc2626)' : undefined }}>
                 <td onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
@@ -174,7 +199,9 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
                     aria-label={`Seleziona ${p.pod}`}
                   />
                 </td>
-                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{cellLink(p.pod)}</td>
+                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                  {cellLink(<>{p.pod}{isFailed && <span style={{ marginLeft: 6 }} title={p.syncError ?? 'Sync fallito'}>⚠</span>}</>)}
+                </td>
                 <td>{cellLink(p.cliente ?? '—')}</td>
                 <td>{cellLink(p.amministratore ?? '—')}</td>
                 <td>{cellLink(p.comune ?? '—')}</td>

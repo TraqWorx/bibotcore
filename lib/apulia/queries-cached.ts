@@ -40,6 +40,10 @@ export interface PodRow {
   switchedOut: boolean
   override: number
   amount: number
+  /** Mirrors apulia_contacts.sync_status. */
+  syncStatus?: string
+  /** Worker's last error message when sync_status='failed'. */
+  syncError?: string | null
 }
 
 export interface ApuliaSnapshot {
@@ -268,7 +272,7 @@ export async function listCondomini(f: CondominiFilters): Promise<CondominiResul
   const comuni = [...new Set((comuniRaw ?? []).map((r) => r.comune as string).filter(Boolean))].sort((a, b) => a.localeCompare(b))
   const amministratori = [...new Set((ammRaw ?? []).map((r) => r.amministratore_name as string).filter(Boolean))].sort((a, b) => a.localeCompare(b))
 
-  const podRows: PodRow[] = ((rows ?? []) as CachedContactRow[]).map((r) => ({
+  const podRows: PodRow[] = ((rows ?? []) as Array<CachedContactRow & { sync_error?: string | null }>).map((r) => ({
     contactId: r.id,
     pod: r.pod_pdr ?? '—',
     cliente: [r.first_name, r.last_name].filter(Boolean).join(' ') || r.cliente || undefined,
@@ -278,6 +282,8 @@ export async function listCondomini(f: CondominiFilters): Promise<CondominiResul
     switchedOut: r.is_switch_out,
     override: Number(r.pod_override) || 0,
     amount: 0,
+    syncStatus: r.sync_status,
+    syncError: r.sync_error ?? null,
   }))
 
   return { total: count ?? 0, rows: podRows, comuni, amministratori }
