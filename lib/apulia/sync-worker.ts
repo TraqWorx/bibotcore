@@ -22,6 +22,7 @@ interface ContactRow {
   custom_fields: Record<string, string> | null
   codice_amministratore: string | null
   pod_pdr: string | null
+  is_amministratore: boolean
 }
 
 const BATCH_LIMIT = 40
@@ -138,7 +139,7 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
   const sb = createAdminClient()
   const contactId = op.contact_id
   const row = contactId
-    ? ((await sb.from('apulia_contacts').select('id, ghl_id, email, phone, first_name, last_name, tags, custom_fields, codice_amministratore, pod_pdr').eq('id', contactId).maybeSingle()).data as ContactRow | null)
+    ? ((await sb.from('apulia_contacts').select('id, ghl_id, email, phone, first_name, last_name, tags, custom_fields, codice_amministratore, pod_pdr, is_amministratore').eq('id', contactId).maybeSingle()).data as ContactRow | null)
     : null
 
   switch (op.action) {
@@ -189,12 +190,18 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
         if (/duplicate key|unique constraint/i.test(stamp.error.message)) {
           const { data: sibling } = await sb
             .from('apulia_contacts')
-            .select('id, codice_amministratore, pod_pdr, first_name')
+            .select('id, codice_amministratore, pod_pdr, first_name, is_amministratore')
             .eq('ghl_id', newGhlId)
             .maybeSingle()
-          const sameId = (
-            (row.codice_amministratore && sibling?.codice_amministratore && row.codice_amministratore === sibling.codice_amministratore) ||
-            (!row.codice_amministratore && row.pod_pdr && sibling?.pod_pdr && row.pod_pdr === sibling.pod_pdr)
+          // Same entity = same kind (admin/condomino) AND same identity
+          // (codice for admins, pod_pdr for condomini). codice on a
+          // condomino is its admin's code, not its own — so we must NOT
+          // match an admin against a condomino just because they share
+          // an admin code.
+          const sameKind = sibling != null && row.is_amministratore === sibling.is_amministratore
+          const sameId = sameKind && (
+            (row.is_amministratore && row.codice_amministratore && sibling.codice_amministratore && row.codice_amministratore === sibling.codice_amministratore) ||
+            (!row.is_amministratore && row.pod_pdr && sibling.pod_pdr && row.pod_pdr === sibling.pod_pdr)
           )
           if (sibling && sameId) {
             // Case A: true duplicate. Hard-delete this row + cancel any
