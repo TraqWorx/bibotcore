@@ -152,15 +152,36 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
       const body = buildContactBody(row, { create: true })
       const r = await ghlFetch('/contacts/', { method: 'POST', body: JSON.stringify(body) })
       let newGhlId: string | undefined
-      let viaUpsert = false
       if (!r.ok) {
         const text = await r.text()
         if (r.status === 400 && /duplicat/i.test(text)) {
-          const ur = await ghlFetch('/contacts/upsert', { method: 'POST', body: JSON.stringify(body) })
-          if (!ur.ok) throw new Error(`Upsert contatto GHL fallito (${ur.status}): ${(await ur.text()).slice(0, 200)}`)
-          const uj = (await ur.json()) as { contact?: { id: string }; id?: string }
-          newGhlId = uj.contact?.id ?? uj.id
-          viaUpsert = true
+          // GHL says this email/phone is already on a different contact.
+          // We previously called /contacts/upsert here — but upsert
+          // OVERWRITES the existing GHL contact's fields with our body,
+          // which silently corrupts the other entity (e.g. an admin gets
+          // its data overwritten by a colliding condomino). Instead:
+          // search for the existing contact by email/phone, surface the
+          // conflict, and fail this op without writing.
+          const existingId = await findGhlContactByEmailOrPhone(row.email, row.phone)
+          if (!existingId) {
+            // GHL claimed a duplicate but we can't locate it — surface as
+            // a regular error and let the retry path handle it.
+            throw new Error(`Creazione contatto GHL fallita (${r.status}): ${text.slice(0, 200)}`)
+          }
+          // Find the Bibot row that already holds that GHL id (if any),
+          // build a clear conflict message, and mark this op as
+          // permanently failed.
+          const { data: sibling } = await sb
+            .from('apulia_contacts')
+            .select('id, codice_amministratore, pod_pdr, first_name, is_amministratore')
+            .eq('ghl_id', existingId)
+            .maybeSingle()
+          throw new PermanentSyncError(
+            `Email/telefono già in uso da un altro contatto in GHL ` +
+            `(${sibling?.first_name ?? 'sconosciuto'}, ` +
+            `${sibling?.is_amministratore ? `amministratore codice ${sibling.codice_amministratore ?? '—'}` : `condominio POD ${sibling?.pod_pdr ?? '—'}`}). ` +
+            `Modifica i dati in conflitto per riprovare automaticamente.`,
+          )
         } else {
           throw new Error(`Creazione contatto GHL fallita (${r.status}): ${text.slice(0, 200)}`)
         }
@@ -219,7 +240,7 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
           throw new PermanentSyncError(
             `Il contatto GHL ${newGhlId} è già collegato a un'altra riga Bibot ` +
             `(${sibling?.first_name ?? 'sconosciuta'}, codice ${sibling?.codice_amministratore ?? '—'}). ` +
-            `Collisione email/telefono${viaUpsert ? ' tramite upsert' : ''}. ` +
+            `Collisione email/telefono. ` +
             `Modifica i dati in conflitto per riprovare automaticamente.`,
           )
         }
@@ -298,6 +319,31 @@ async function processOp(op: QueueRow): Promise<'completed' | 'requeued'> {
       return 'completed'
     }
   }
+}
+
+/**
+ * Look up an existing GHL contact by email or phone (the two fields GHL
+ * deduplicates on). Used after a 400-duplicate response from /contacts
+ * to identify which contact is blocking us — without overwriting it
+ * (which is what /contacts/upsert would do).
+ */
+async function findGhlContactByEmailOrPhone(email: string | null, phone: string | null): Promise<string | null> {
+  for (const [field, value] of [['email', email], ['phone', phone]] as const) {
+    if (!value) continue
+    const r = await ghlFetch('/contacts/search', {
+      method: 'POST',
+      body: JSON.stringify({
+        locationId: APULIA_LOCATION_ID,
+        pageLimit: 1,
+        filters: [{ field, operator: 'eq', value }],
+      }),
+    })
+    if (!r.ok) continue
+    const j = (await r.json()) as { contacts?: Array<{ id: string }> }
+    const id = j.contacts?.[0]?.id
+    if (id) return id
+  }
+  return null
 }
 
 function buildContactBody(row: ContactRow, opts: { create: boolean }): Record<string, unknown> {
