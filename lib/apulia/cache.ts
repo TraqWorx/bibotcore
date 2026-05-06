@@ -99,42 +99,80 @@ export function cacheRowFromGhlContact(c: ApuliaContact): CachedContactRow {
 export const toCacheRow = cacheRowFromGhlContact
 
 /**
- * Full sync: pulls every contact from GHL, upserts the local cache,
- * deletes rows whose ghl_id is no longer present.
+ * Full sync: reconciles apulia_contacts with whatever's currently in GHL.
+ * Used as a safety net for missed webhooks (e.g. GHL bulk operations
+ * that don't fan out per-contact events). Bibot is the source of truth,
+ * so this routine is conservative:
  *
- * Rows with `ghl_id IS NULL` are Bibot-minted creates that the worker
- * hasn't yet pushed to GHL — they're left untouched.
+ *   - Rows where ghl_id IS NULL are in-flight Bibot creates — never
+ *     touched.
+ *   - Rows where sync_status IS NOT 'synced' are mid-mutation locally —
+ *     never touched (the worker is about to push our version).
+ *   - Existing rows matched by ghl_id get their fields refreshed.
+ *   - GHL contacts with no Bibot match are inserted fresh (id=ghl_id
+ *     legacy convention).
+ *   - Rows whose ghl_id is no longer in GHL AND sync_status='synced'
+ *     are deleted.
+ *
+ * Returns counts: total contacts seen in GHL, rows updated, rows
+ * inserted, rows deleted.
  */
-export async function fullSyncCache(): Promise<{ total: number; deleted: number }> {
+export async function fullSyncCache(): Promise<{ total: number; deleted: number; updated: number; inserted: number; skipped: number }> {
   const sb = createAdminClient()
   const all = await fetchAllContacts()
-  const rows = all.map(cacheRowFromGhlContact)
+  const incoming = all.map(cacheRowFromGhlContact)
 
-  // Upsert by ghl_id. We can't use Supabase upsert(onConflict: 'ghl_id')
-  // because that would also overwrite the row's `id` column for legacy rows
-  // where id != ghl_id won't ever happen here (rows from GHL always have
-  // id == ghl_id), but for in-flight rows that we match on POD/codice we'd
-  // clobber their uuid. So we route through upsertCachedFromGhl one-by-one
-  // for any row that could have a fallback match — and bulk-upsert the rest.
-  //
-  // For the bulk path: only rows that map cleanly to existing-by-ghl_id or
-  // new-with-ghl_id-as-pk are safe.
-  const chunkSize = 500
-  for (let i = 0; i < rows.length; i += chunkSize) {
-    const chunk = rows.slice(i, i + chunkSize)
-    const { error } = await sb.from('apulia_contacts').upsert(chunk, { onConflict: 'id' })
-    if (error) throw new Error(`cache upsert chunk ${i}: ${error.message}`)
+  // Pull existing rows we might match on (ghl_id-keyed map).
+  const { data: existingRaw } = await sb
+    .from('apulia_contacts')
+    .select('id, ghl_id, sync_status')
+    .not('ghl_id', 'is', null)
+  type ExistingRow = { id: string; ghl_id: string; sync_status: string }
+  const byGhlId = new Map<string, ExistingRow>(((existingRaw ?? []) as ExistingRow[]).map((r) => [r.ghl_id, r]))
+
+  let updated = 0
+  let inserted = 0
+  let skipped = 0
+
+  // Partition: existing-by-ghl_id (UPDATE), new (INSERT). Skip rows where
+  // the local copy is mid-mutation.
+  const updateRows: CachedContactRow[] = []
+  const insertRows: CachedContactRow[] = []
+
+  for (const row of incoming) {
+    if (!row.ghl_id) continue // shouldn't happen — every GHL contact has an id
+    const existing = byGhlId.get(row.ghl_id)
+    if (existing) {
+      if (existing.sync_status !== 'synced') { skipped++; continue }
+      // UPDATE in place, preserving existing id (so apulia_payments FKs hold).
+      updateRows.push({ ...row, id: existing.id })
+      updated++
+    } else {
+      insertRows.push(row) // id == ghl_id (legacy convention, set by helper)
+      inserted++
+    }
   }
 
-  // Delete stale rows that have a ghl_id no longer in GHL. Never touch rows
-  // where ghl_id IS NULL — those are Bibot creates the worker hasn't pushed.
-  const liveIds = new Set(rows.map((r) => r.ghl_id).filter(Boolean) as string[])
-  const { data: cachedRows } = await sb
-    .from('apulia_contacts')
-    .select('id, ghl_id')
-    .not('ghl_id', 'is', null)
-  const stale = (cachedRows ?? [])
-    .filter((r) => r.ghl_id && !liveIds.has(r.ghl_id))
+  const CHUNK = 500
+  // UPDATEs via upsert(onConflict='id') — incoming row already keyed by
+  // existing.id from the partition step.
+  for (let i = 0; i < updateRows.length; i += CHUNK) {
+    const slice = updateRows.slice(i, i + CHUNK)
+    const { error } = await sb.from('apulia_contacts').upsert(slice, { onConflict: 'id' })
+    if (error) throw new Error(`fullSyncCache update chunk ${i}: ${error.message}`)
+  }
+  for (let i = 0; i < insertRows.length; i += CHUNK) {
+    const slice = insertRows.slice(i, i + CHUNK)
+    const { error } = await sb.from('apulia_contacts').insert(slice)
+    if (error) throw new Error(`fullSyncCache insert chunk ${i}: ${error.message}`)
+  }
+
+  // Stale detection: rows with ghl_id set but no longer present in GHL.
+  // Only delete when sync_status='synced' — anything pending is mid-flight
+  // and the worker will reconcile on its next attempt.
+  const liveIds = new Set(incoming.map((r) => r.ghl_id).filter(Boolean) as string[])
+  const stale = ((existingRaw ?? []) as ExistingRow[])
+    .filter((r) => !liveIds.has(r.ghl_id) && r.sync_status === 'synced')
     .map((r) => r.id)
   let deleted = 0
   if (stale.length) {
@@ -142,7 +180,7 @@ export async function fullSyncCache(): Promise<{ total: number; deleted: number 
     if (!error) deleted = stale.length
   }
 
-  return { total: rows.length, deleted }
+  return { total: incoming.length, deleted, updated, inserted, skipped }
 }
 
 /**
