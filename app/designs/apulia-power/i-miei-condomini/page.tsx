@@ -16,6 +16,10 @@ export default async function Page() {
   const { admin, activePods, switchedPods } = await adminWithPods(session.contactId)
   if (!admin) return <div className="ap-card ap-card-pad">Profilo non trovato.</div>
 
+  function fmtDate(iso?: string): string {
+    return iso ? new Date(iso).toLocaleDateString('it-IT') : '—'
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <header>
@@ -24,13 +28,17 @@ export default async function Page() {
       </header>
 
       <section className="ap-card">
-        <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)' }}><h2 style={{ fontSize: 14, fontWeight: 800 }}>Attivi</h2></header>
+        <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ fontSize: 14, fontWeight: 800 }}>Attivi <span style={{ color: 'var(--ap-text-faint)', fontWeight: 500 }}>· {activePods.length}</span></h2>
+          <span className="ap-pill" data-tone="blue">Inclusi nella commissione</span>
+        </header>
         <table className="ap-table">
-          <thead><tr><th>POD/PDR</th><th>Cliente</th><th style={{ textAlign: 'right' }}>Compenso</th></tr></thead>
+          <thead><tr><th>Aggiunto il</th><th>POD/PDR</th><th>Cliente</th><th style={{ textAlign: 'right' }}>Compenso</th></tr></thead>
           <tbody>
-            {activePods.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessuno.</td></tr>}
+            {activePods.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessun condominio attivo.</td></tr>}
             {activePods.map((p) => (
               <tr key={p.contactId}>
+                <td style={{ fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{fmtDate(p.addedAt)}</td>
                 <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.pod}</td>
                 <td>{p.cliente ?? '—'}</td>
                 <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtEur(p.amount)}</td>
@@ -40,19 +48,25 @@ export default async function Page() {
         </table>
       </section>
 
-      {switchedPods.length > 0 && (
-        <section className="ap-card">
-          <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)' }}><h2 style={{ fontSize: 14, fontWeight: 800 }}>Switch-out</h2></header>
-          <table className="ap-table">
-            <thead><tr><th>POD/PDR</th><th>Cliente</th></tr></thead>
-            <tbody>
-              {switchedPods.map((p) => (
-                <tr key={p.contactId}><td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.pod}</td><td>{p.cliente ?? '—'}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
+      <section className="ap-card">
+        <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ fontSize: 14, fontWeight: 800 }}>Switch-out <span style={{ color: 'var(--ap-text-faint)', fontWeight: 500 }}>· {switchedPods.length}</span></h2>
+          <span className="ap-pill" data-tone="gray">Esclusi dalla commissione</span>
+        </header>
+        <table className="ap-table">
+          <thead><tr><th>Aggiunto il</th><th>POD/PDR</th><th>Cliente</th></tr></thead>
+          <tbody>
+            {switchedPods.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessun switch-out.</td></tr>}
+            {switchedPods.map((p) => (
+              <tr key={p.contactId}>
+                <td style={{ fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{fmtDate(p.addedAt)}</td>
+                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.pod}</td>
+                <td>{p.cliente ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
     </div>
   )
 }

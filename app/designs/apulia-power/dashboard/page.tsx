@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { listAdminsWithStats, loadSnapshot } from '@/lib/apulia/queries'
-import { currentPeriod } from '@/lib/apulia/fields'
+import { currentPeriod, APULIA_FIELD } from '@/lib/apulia/fields'
 import { createAdminClient } from '@/lib/supabase-server'
 import DateRangeForm from '../stores/_components/DateRangeForm'
 
@@ -179,7 +179,26 @@ async function AdminView({ codice, contactId }: { codice?: string; contactId?: s
   if (!admin) return <div className="ap-card ap-card-pad">Profilo non trovato.</div>
 
   const sb = createAdminClient()
-  const { data: payments } = await sb.from('apulia_payments').select('period, amount_cents, paid_at').eq('contact_id', contactId).order('paid_at', { ascending: false }).limit(6)
+  const [{ data: payments }, { data: contactRow }] = await Promise.all([
+    sb.from('apulia_payments').select('period, amount_cents, paid_at').eq('contact_id', contactId).order('paid_at', { ascending: false }).limit(6),
+    sb.from('apulia_contacts').select('email, phone, custom_fields').eq('id', contactId).maybeSingle(),
+  ])
+
+  // Read-only "Dettagli contatto" panel: show the admin their own GHL data
+  // so they can verify what we have on file. Editing happens through the
+  // owner — we don't expose the full editor here.
+  const cf = (contactRow?.custom_fields ?? {}) as Record<string, string>
+  const contactDetails: Array<{ label: string; value: string | null }> = [
+    { label: 'Email', value: contactRow?.email ?? cf[APULIA_FIELD.EMAIL_BILLING] ?? null },
+    { label: 'Telefono', value: contactRow?.phone ?? cf[APULIA_FIELD.TELEFONO_AMMINISTRATORE] ?? null },
+    { label: 'Codice Fiscale', value: cf[APULIA_FIELD.CODICE_FISCALE_AMMINISTRATORE] ?? null },
+    { label: 'Partita IVA', value: cf[APULIA_FIELD.PARTITA_IVA_AMMINISTRATORE] ?? null },
+    // Indirizzo / Città / Provincia field IDs aren't exported as constants;
+    // pull by raw id (also referenced this way in import-admins.ts).
+    { label: 'Indirizzo', value: cf['oCvfwCelHDn6gWEljqUJ'] ?? null },
+    { label: 'Città', value: cf['EXO9WD4aLV2aPiMYxXUU'] ?? null },
+    { label: 'Provincia', value: cf['opaPQWrWwDiaAeyoMbN5'] ?? null },
+  ].filter((d) => d.value && d.value.trim() !== '')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -203,6 +222,23 @@ async function AdminView({ codice, contactId }: { codice?: string; contactId?: s
           <div className="ap-stat-foot">{admin.paidThisPeriod ? `Ricevuto il ${admin.paidAt ? new Date(admin.paidAt).toLocaleDateString('it-IT') : ''}` : 'In attesa di pagamento'}</div>
         </div>
       </div>
+
+      {contactDetails.length > 0 && (
+        <section className="ap-card">
+          <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ fontSize: 14, fontWeight: 800 }}>Dettagli contatto</h2>
+            <span style={{ fontSize: 11, color: 'var(--ap-text-faint)' }}>Per modifiche, contatta l&apos;amministrazione.</span>
+          </header>
+          <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            {contactDetails.map((d) => (
+              <div key={d.label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{d.label}</span>
+                <span style={{ fontSize: 13 }}>{d.value}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="ap-card">
         <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)' }}><h2 style={{ fontSize: 14, fontWeight: 800 }}>I miei condomini attivi</h2></header>
