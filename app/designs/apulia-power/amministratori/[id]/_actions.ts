@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
-import { APULIA_FIELD } from '@/lib/apulia/fields'
+import { APULIA_FIELD, APULIA_TAG } from '@/lib/apulia/fields'
 import { APULIA_IMPERSONATE_COOKIE } from '@/lib/apulia/auth'
 import { enqueueOp } from '@/lib/apulia/sync-queue'
 
@@ -377,10 +377,15 @@ export async function addAdminTag(contactId: string, tag: string): Promise<{ err
   if (!t) return { error: 'Tag vuoto' }
 
   const sb = createAdminClient()
-  const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags').eq('id', contactId).maybeSingle()
+  const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags, is_amministratore').eq('id', contactId).maybeSingle()
   if (!row) return { error: 'Contatto non trovato' }
   const tags = Array.from(new Set([...((row.tags as string[] | null) ?? []), t]))
-  await sb.from('apulia_contacts').update({ tags, sync_status: 'pending_update' }).eq('id', contactId)
+  // Tag→flag mirroring: re-adding "amministratore" puts the contact
+  // back in the /amministratori list.
+  const isAdminTag = t.toLowerCase() === APULIA_TAG.AMMINISTRATORE.toLowerCase()
+  const patch: Record<string, unknown> = { tags, sync_status: 'pending_update' }
+  if (isAdminTag && !row.is_amministratore) patch.is_amministratore = true
+  await sb.from('apulia_contacts').update(patch).eq('id', contactId)
   await enqueueOrRetryCreate(contactId, row.ghl_id ?? null, 'add_tag', { tag: t })
   pathsToRevalidateAdmin(contactId)
 }
@@ -390,10 +395,16 @@ export async function removeAdminTag(contactId: string, tag: string): Promise<{ 
   if ('error' in guard) return guard
 
   const sb = createAdminClient()
-  const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags').eq('id', contactId).maybeSingle()
+  const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags, is_amministratore').eq('id', contactId).maybeSingle()
   if (!row) return { error: 'Contatto non trovato' }
   const tags = ((row.tags as string[] | null) ?? []).filter((x) => x !== tag)
-  await sb.from('apulia_contacts').update({ tags, sync_status: 'pending_update' }).eq('id', contactId)
+  // Tag→flag mirroring: removing "amministratore" drops the contact
+  // from the amministratori list. The row stays in apulia_contacts so
+  // re-tagging restores it (history preserved).
+  const isAdminTag = tag.toLowerCase() === APULIA_TAG.AMMINISTRATORE.toLowerCase()
+  const patch: Record<string, unknown> = { tags, sync_status: 'pending_update' }
+  if (isAdminTag && row.is_amministratore) patch.is_amministratore = false
+  await sb.from('apulia_contacts').update(patch).eq('id', contactId)
   await enqueueOrRetryCreate(contactId, row.ghl_id ?? null, 'remove_tag', { tag })
   pathsToRevalidateAdmin(contactId)
 }

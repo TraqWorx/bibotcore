@@ -7,6 +7,7 @@ import { fetchApuliaFieldGroups } from '@/lib/apulia/field-meta'
 import PodTable from './_components/PodTable'
 import ImpersonateButton from './_components/ImpersonateButton'
 import AdminFullEditor from './_components/AdminFullEditor'
+import { listDistinctTags } from '@/lib/apulia/tags'
 import DeleteContactButton from '../../_components/DeleteContactButton'
 import SettingsTabs from '../../settings/_components/SettingsTabs'
 import { deleteAdmin } from './_actions'
@@ -26,10 +27,11 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   if (!admin) notFound()
 
   const sb = createAdminClient()
-  const [{ data: payments }, { data: contactRow }, fieldGroups] = await Promise.all([
+  const [{ data: payments }, { data: contactRow }, fieldGroups, tagSuggestions] = await Promise.all([
     sb.from('apulia_payments').select('id, period, amount_cents, paid_at, paid_by, note, pod_contact_id').eq('contact_id', id).order('paid_at', { ascending: false }),
     sb.from('apulia_contacts').select('first_name, last_name, email, phone, tags, custom_fields, sync_status, sync_error, ghl_id').eq('id', id).maybeSingle(),
     fetchApuliaFieldGroups(),
+    listDistinctTags(),
   ])
   const customFields = (contactRow?.custom_fields ?? {}) as Record<string, string>
   const tags: string[] = (contactRow?.tags ?? []) as string[]
@@ -201,6 +203,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 }}
                 customFields={customFields}
                 tags={tags}
+                tagSuggestions={tagSuggestions}
                 groups={fieldGroups}
               />
             ),

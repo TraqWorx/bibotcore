@@ -6,6 +6,7 @@ import { fetchApuliaFieldGroups } from '@/lib/apulia/field-meta'
 import { APULIA_FIELD } from '@/lib/apulia/fields'
 import { normalizePod } from '@/lib/apulia/cache'
 import { listAdminPickerOptions } from '@/lib/apulia/queries-cached'
+import { listDistinctTags } from '@/lib/apulia/tags'
 import CondominoEditor from './_components/CondominoEditor'
 import DeleteContactButton from '../../_components/DeleteContactButton'
 import { deleteCondomino } from './_actions'
@@ -18,10 +19,11 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const { id } = await params
 
   const sb = createAdminClient()
-  const [{ data: contact }, fieldGroups, adminOptions] = await Promise.all([
+  const [{ data: contact }, fieldGroups, adminOptions, tagSuggestions] = await Promise.all([
     sb.from('apulia_contacts').select('*').eq('id', id).maybeSingle(),
     fetchApuliaFieldGroups(),
     listAdminPickerOptions(),
+    listDistinctTags(),
   ])
   if (!contact || contact.is_amministratore) notFound()
   const syncStatus = (contact as { sync_status?: string }).sync_status
@@ -96,6 +98,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         }}
         customFields={cf}
         tags={tags}
+        tagSuggestions={tagSuggestions}
         groups={fieldGroups}
         adminOptions={adminOptions}
         currentAdminCode={codiceAmm}

@@ -48,13 +48,14 @@ interface Props {
   core: { firstName: string; lastName: string; email: string; phone: string }
   customFields: Record<string, string>
   tags: string[]
+  tagSuggestions?: string[]
   groups: GroupDef[]
   adminOptions: AdminOption[]
   currentAdminCode: string
   currentAdminName: string
 }
 
-export default function CondominoEditor({ contactId, core, customFields, tags, groups, adminOptions, currentAdminCode, currentAdminName }: Props) {
+export default function CondominoEditor({ contactId, core, customFields, tags, tagSuggestions, groups, adminOptions, currentAdminCode, currentAdminName }: Props) {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {}
     groups.forEach((g, i) => { init[g.title] = i < 2 })
@@ -120,7 +121,7 @@ export default function CondominoEditor({ contactId, core, customFields, tags, g
 
       <section className="ap-card ap-card-pad">
         <h3 style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>Tag</h3>
-        <TagEditor contactId={contactId} initial={tags} add={addCondominoTag} remove={removeCondominoTag} />
+        <TagEditor contactId={contactId} initial={tags} suggestions={tagSuggestions} add={addCondominoTag} remove={removeCondominoTag} />
       </section>
 
       {groups.map((g) => {

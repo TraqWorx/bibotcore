@@ -27,10 +27,11 @@ interface Props {
   core: { firstName: string; lastName: string; email: string; phone: string }
   customFields: Record<string, string>
   tags: string[]
+  tagSuggestions?: string[]
   groups: GroupDef[]
 }
 
-export default function AdminFullEditor({ contactId, core, customFields, tags, groups }: Props) {
+export default function AdminFullEditor({ contactId, core, customFields, tags, tagSuggestions, groups }: Props) {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {}
     groups.forEach((g) => { init[g.title] = ['Amministratore condominio', 'Cliente', 'Fatturazione'].includes(g.title) })
@@ -55,7 +56,7 @@ export default function AdminFullEditor({ contactId, core, customFields, tags, g
 
       <section className="ap-card ap-card-pad">
         <h3 style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>Tag</h3>
-        <TagEditor contactId={contactId} initial={tags} add={addAdminTag} remove={removeAdminTag} />
+        <TagEditor contactId={contactId} initial={tags} suggestions={tagSuggestions} add={addAdminTag} remove={removeAdminTag} />
       </section>
 
       {groups.map((g) => {
