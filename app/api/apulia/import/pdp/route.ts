@@ -90,6 +90,15 @@ export async function POST(req: NextRequest) {
         progress_done: rows.length,
         finished_at: new Date().toISOString(),
         last_progress_at: new Date().toISOString(),
+        summary: {
+          skippedReasons: { no_pod: counters.skipped },
+          rowsWithPod: rows.length - counters.skipped,
+          newCondominiCreated: counters.created,
+          existingCondominiUpdated: counters.updated,
+          switchOutCleared: counters.untagged,
+          newAdminsAutoCreated: adminCreates,
+          recompute: recomputed,
+        },
       }).eq('id', importId)
     }
 

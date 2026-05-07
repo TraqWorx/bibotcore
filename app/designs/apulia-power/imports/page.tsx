@@ -13,7 +13,7 @@ export default async function ImportsPage() {
   const sb = createAdminClient()
   const { data: history } = await sb
     .from('apulia_imports')
-    .select('id, kind, filename, rows_total, created, updated, tagged, untagged, unmatched, skipped, duration_ms, triggered_by, created_at, status, progress_done, progress_total, last_progress_at')
+    .select('id, kind, filename, rows_total, created, updated, tagged, untagged, unmatched, skipped, duration_ms, triggered_by, created_at, status, progress_done, progress_total, last_progress_at, summary, error_msg')
     .order('created_at', { ascending: false })
     .limit(15)
 

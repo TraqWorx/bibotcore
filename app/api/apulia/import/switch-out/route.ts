@@ -68,15 +68,27 @@ export async function POST(req: NextRequest) {
         send({ type: 'error', message: err instanceof Error ? err.message : 'failed' })
       } finally {
         if (importId) {
+          const tagged = (summary.tagged as number) ?? 0
+          const unmatched = (summary.unmatched as number) ?? 0
+          const skipped = (summary.skipped as number) ?? 0
+          const alreadyTagged = (summary.alreadyTagged as number) ?? 0
+          const recompute = summary.recompute ?? null
           await sb2.from('apulia_imports').update({
             status: failed ? 'failed' : 'completed',
-            progress_done: (summary.tagged as number ?? 0) + (summary.unmatched as number ?? 0) + (summary.skipped as number ?? 0),
-            tagged: (summary.tagged as number) ?? 0,
-            unmatched: (summary.unmatched as number) ?? 0,
-            skipped: (summary.skipped as number) ?? 0,
+            progress_done: tagged + unmatched + skipped + alreadyTagged,
+            tagged,
+            unmatched,
+            skipped,
             duration_ms: (summary.durationMs as number) ?? null,
             finished_at: new Date().toISOString(),
             last_progress_at: new Date().toISOString(),
+            summary: {
+              skippedReasons: { no_pod: skipped },
+              newSwitchOuts: tagged,
+              alreadyMarkedSwitchOut: alreadyTagged,
+              podsNotInBibot: unmatched,
+              recompute,
+            },
           }).eq('id', importId).then(() => undefined, () => undefined)
         }
         try { controller.close() } catch { /* already closed */ }

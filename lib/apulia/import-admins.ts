@@ -3,11 +3,25 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { APULIA_FIELD, APULIA_TAG } from './fields'
 import { enqueueOps, type QueueOpInput } from './sync-queue'
 
+export interface AdminImportSummary {
+  /** Reasons rows were skipped, with counts. */
+  skippedReasons: { missing_name_or_code: number }
+  /** File rows that contained both name AND code but their code already
+   *  matched a non-deleted admin row — those went to UPDATE. */
+  matchedExistingByCode: number
+  /** File-internal duplicates collapsed by the defensive dedup pass. */
+  collapsedDuplicateCodes: number
+  /** Number of admin custom-fields-merged updates queued to GHL. */
+  updateOpsQueued: number
+  /** Number of admin create ops queued to GHL. */
+  createOpsQueued: number
+}
+
 export type AdminImportEvent =
   | { type: 'preflight' }
   | { type: 'start'; total: number }
   | { type: 'progress'; done: number; total: number; created: number; updated: number; skipped: number }
-  | { type: 'done'; created: number; updated: number; skipped: number; durationMs: number }
+  | { type: 'done'; created: number; updated: number; skipped: number; durationMs: number; summary: AdminImportSummary }
   | { type: 'error'; message: string }
 
 const COL = {
@@ -219,5 +233,12 @@ export async function* importAdmins(rows: Record<string, string>[], importId?: s
   created -= droppedDupes.length
 
   yield { type: 'progress', done, total: rows.length, created, updated, skipped }
-  yield { type: 'done', created, updated, skipped, durationMs: Date.now() - startedAt }
+  const summary: AdminImportSummary = {
+    skippedReasons: { missing_name_or_code: skipped },
+    matchedExistingByCode: updated,
+    collapsedDuplicateCodes: droppedDupes.length,
+    updateOpsQueued: updated,
+    createOpsQueued: finalInserts.length,
+  }
+  yield { type: 'done', created, updated, skipped, durationMs: Date.now() - startedAt, summary }
 }

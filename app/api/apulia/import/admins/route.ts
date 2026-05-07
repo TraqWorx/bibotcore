@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
             duration_ms: (summary.durationMs as number) ?? null,
             finished_at: new Date().toISOString(),
             last_progress_at: new Date().toISOString(),
+            summary: summary.summary ?? null,
           }).eq('id', importId).then(() => undefined, () => undefined)
         }
         try { controller.close() } catch { /* already closed */ }
