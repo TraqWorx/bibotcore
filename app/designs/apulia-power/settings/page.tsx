@@ -2,12 +2,14 @@ import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { currentPeriod } from '@/lib/apulia/fields'
 import { createAdminClient } from '@/lib/supabase-server'
+import { listApuliaWorkflows } from '@/lib/apulia/workflows'
 import AdminPaymentSchedule, { type AdminScheduleEntry } from './_components/AdminPaymentSchedule'
 import CompensiTable, { type CompensoEntry } from './_components/CompensiTable'
 import SettingsTabs from './_components/SettingsTabs'
 import SyncImportHistory from './_components/SyncImportHistory'
 import SyncQueuePanel from './_components/SyncQueuePanel'
 import TagManager from './_components/TagManager'
+import WorkflowsPanel from './_components/WorkflowsPanel'
 import { getSyncQueueStats, listSyncImports } from './_actions'
 
 export const dynamic = 'force-dynamic'
@@ -82,10 +84,13 @@ export default async function Page() {
   const dueNowCount = adminScheduleEntries.filter((a) => a.isDueNow).length
   const noCompensoCount = compensiEntries.filter((a) => a.compensoPerPod === 0).length
 
-  const [queueStatsResult, syncImportsResult] = await Promise.all([
+  const [queueStatsResult, syncImportsResult, workflowsResult] = await Promise.all([
     getSyncQueueStats(),
     listSyncImports(),
+    listApuliaWorkflows().catch((e) => ({ error: e instanceof Error ? e.message : 'failed' })),
   ])
+  const workflows = Array.isArray(workflowsResult) ? workflowsResult : []
+  const workflowsError = !Array.isArray(workflowsResult) && 'error' in workflowsResult ? workflowsResult.error : null
   const queueStats = 'error' in queueStatsResult
     ? { pending: 0, inProgress: 0, failed: 0, completedLast24h: 0, oldestPendingMinutes: null }
     : queueStatsResult
@@ -302,6 +307,30 @@ export default async function Page() {
                   />
                 </div>
               </div>
+            ),
+          },
+          {
+            id: 'workflows',
+            label: 'Automations',
+            badge: workflows.filter((w) => (w.status ?? '').toLowerCase() === 'published').length || undefined,
+            content: (
+              <section className="ap-card">
+                <header style={{ padding: '16px 20px', borderBottom: '1px solid var(--ap-line)' }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 800 }}>Automations GHL</h2>
+                  <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
+                    Tutti i workflow configurati sulla location Apulia. Solo lettura — lo stato si modifica in GHL.
+                  </p>
+                </header>
+                <div style={{ padding: '16px 20px' }}>
+                  {workflowsError ? (
+                    <div style={{ padding: 16, fontSize: 13, color: 'var(--ap-danger)' }}>
+                      Errore caricamento da GHL: {workflowsError}
+                    </div>
+                  ) : (
+                    <WorkflowsPanel workflows={workflows} />
+                  )}
+                </div>
+              </section>
             ),
           },
         ]}
