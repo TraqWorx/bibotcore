@@ -122,13 +122,23 @@ export async function fullSyncCache(): Promise<{ total: number; deleted: number;
   const all = await fetchAllContacts()
   const incoming = all.map(cacheRowFromGhlContact)
 
-  // Pull existing rows we might match on (ghl_id-keyed map).
-  const { data: existingRaw } = await sb
-    .from('apulia_contacts')
-    .select('id, ghl_id, sync_status')
-    .not('ghl_id', 'is', null)
+  // Pull existing rows we might match on (ghl_id-keyed map). Paginate
+  // because PostgREST caps a single select at 1000 rows; without this
+  // a partial map causes incoming rows to mis-classify as "new" and the
+  // bulk INSERT fails with primary-key collisions on id=ghl_id.
   type ExistingRow = { id: string; ghl_id: string; sync_status: string }
-  const byGhlId = new Map<string, ExistingRow>(((existingRaw ?? []) as ExistingRow[]).map((r) => [r.ghl_id, r]))
+  const existingRaw: ExistingRow[] = []
+  for (let from = 0; ; from += 1000) {
+    const { data } = await sb
+      .from('apulia_contacts')
+      .select('id, ghl_id, sync_status')
+      .not('ghl_id', 'is', null)
+      .range(from, from + 999)
+    if (!data || data.length === 0) break
+    existingRaw.push(...(data as ExistingRow[]))
+    if (data.length < 1000) break
+  }
+  const byGhlId = new Map<string, ExistingRow>(existingRaw.map((r) => [r.ghl_id, r]))
 
   let updated = 0
   let inserted = 0
@@ -171,7 +181,7 @@ export async function fullSyncCache(): Promise<{ total: number; deleted: number;
   // Only delete when sync_status='synced' — anything pending is mid-flight
   // and the worker will reconcile on its next attempt.
   const liveIds = new Set(incoming.map((r) => r.ghl_id).filter(Boolean) as string[])
-  const stale = ((existingRaw ?? []) as ExistingRow[])
+  const stale = existingRaw
     .filter((r) => !liveIds.has(r.ghl_id) && r.sync_status === 'synced')
     .map((r) => r.id)
   let deleted = 0
