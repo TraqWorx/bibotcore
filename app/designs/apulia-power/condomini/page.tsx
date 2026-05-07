@@ -7,6 +7,7 @@ import AddCondominoPanel from './_components/AddCondominoPanel'
 import CondominiBulkSelect from './_components/CondominiBulkSelect'
 import { ResyncButton } from '../settings/_components/SettingsForms'
 import StaleSyncTrigger from '../_components/StaleSyncTrigger'
+import SearchableSelect from '../_components/SearchableSelect'
 import { createAdminClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
@@ -81,17 +82,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
         </div>
         <div>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Amministratore</label>
-          <select className="ap-input" name="amministratore" defaultValue={sp.amministratore ?? ''} style={{ marginTop: 4 }}>
-            <option value="">Tutti</option>
-            {amministratori.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
+          <div style={{ marginTop: 4 }}>
+            <SearchableSelect name="amministratore" options={amministratori} defaultValue={sp.amministratore ?? ''} placeholder="Tutti — digita per cercare" />
+          </div>
         </div>
         <div>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Comune</label>
-          <select className="ap-input" name="comune" defaultValue={sp.comune ?? ''} style={{ marginTop: 4 }}>
-            <option value="">Tutti</option>
-            {comuni.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <div style={{ marginTop: 4 }}>
+            <SearchableSelect name="comune" options={comuni} defaultValue={sp.comune ?? ''} placeholder="Tutti — digita per cercare" />
+          </div>
         </div>
         <div>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Stato</label>

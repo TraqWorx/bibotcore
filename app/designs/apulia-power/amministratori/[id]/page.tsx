@@ -10,6 +10,7 @@ import MarkPaidButton from './_components/MarkPaidButton'
 import ImpersonateButton from './_components/ImpersonateButton'
 import AdminFullEditor from './_components/AdminFullEditor'
 import DeleteContactButton from '../../_components/DeleteContactButton'
+import SettingsTabs from '../../settings/_components/SettingsTabs'
 import { deleteAdmin } from './_actions'
 
 export const dynamic = 'force-dynamic'
@@ -26,7 +27,6 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const { admin, activePods, switchedPods } = await adminWithPods(id)
   if (!admin) notFound()
 
-  // Payment history + raw custom fields for invoicing details
   const sb = createAdminClient()
   const [{ data: payments }, { data: contactRow }, fieldGroups] = await Promise.all([
     sb.from('apulia_payments').select('period, amount_cents, paid_at, paid_by, note').eq('contact_id', id).order('paid_at', { ascending: false }),
@@ -71,13 +71,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             Compenso per POD: <strong>{fmtEur(admin.compensoPerPod)}</strong>
           </p>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <MarkPaidButton adminContactId={id} amount={admin.total} alreadyPaid={admin.paidThisPeriod} />
           <ImpersonateButton adminContactId={id} />
           <DeleteContactButton
             contactId={id}
             action={deleteAdmin}
-            label="Elimina amministratore"
+            label="Elimina"
             confirmText={`Eliminare l'amministratore ${admin.name}?\nQuesta azione non si può annullare.`}
           />
         </div>
@@ -99,58 +99,86 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </div>
       </div>
 
-      <AdminFullEditor
-        contactId={id}
-        core={{
-          firstName: contactRow?.first_name ?? '',
-          lastName: contactRow?.last_name ?? '',
-          email: contactRow?.email ?? '',
-          phone: contactRow?.phone ?? '',
-        }}
-        customFields={customFields}
-        tags={tags}
-        groups={fieldGroups}
+      <SettingsTabs
+        tabs={[
+          {
+            id: 'condomini',
+            label: 'Condomini attivi',
+            badge: activePods.length || undefined,
+            content: (
+              <section className="ap-card">
+                <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h2 style={{ fontSize: 14, fontWeight: 800 }}>Condomini attivi <span style={{ color: 'var(--ap-text-faint)', fontWeight: 500 }}>· {activePods.length}</span></h2>
+                  <span className="ap-pill" data-tone="blue">Inclusi nella commissione</span>
+                </header>
+                <PodTable pods={activePods} defaultAmount={admin.compensoPerPod} adminContactId={id} />
+              </section>
+            ),
+          },
+          {
+            id: 'switchout',
+            label: 'Switch-out',
+            badge: switchedPods.length || undefined,
+            content: (
+              <section className="ap-card">
+                <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h2 style={{ fontSize: 14, fontWeight: 800 }}>Switch-out <span style={{ color: 'var(--ap-text-faint)', fontWeight: 500 }}>· {switchedPods.length}</span></h2>
+                  <span className="ap-pill" data-tone="gray">Esclusi dalla commissione</span>
+                </header>
+                <PodTable pods={switchedPods} defaultAmount={admin.compensoPerPod} adminContactId={id} />
+              </section>
+            ),
+          },
+          {
+            id: 'pagamenti',
+            label: 'Storico pagamenti',
+            badge: payments?.length || undefined,
+            content: (
+              <section className="ap-card">
+                <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)' }}>
+                  <h2 style={{ fontSize: 14, fontWeight: 800 }}>Storico pagamenti</h2>
+                </header>
+                <table className="ap-table">
+                  <thead>
+                    <tr><th>Periodo</th><th style={{ textAlign: 'right' }}>Importo</th><th>Pagato il</th><th>Da</th><th>Nota</th></tr>
+                  </thead>
+                  <tbody>
+                    {(payments ?? []).length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessun pagamento registrato.</td></tr>}
+                    {(payments ?? []).map((p) => (
+                      <tr key={p.period}>
+                        <td style={{ fontWeight: 600 }}>{p.period}{p.period === period && <span className="ap-pill" data-tone="blue" style={{ marginLeft: 8, fontSize: 9 }}>corrente</span>}</td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtEur(p.amount_cents / 100)}</td>
+                        <td>{new Date(p.paid_at).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                        <td style={{ color: 'var(--ap-text-muted)', fontSize: 12 }}>{p.paid_by ?? '—'}</td>
+                        <td style={{ color: 'var(--ap-text-muted)', fontSize: 12 }}>{p.note ?? ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {paidThisPeriod && <div style={{ padding: '12px 20px', fontSize: 12, color: 'var(--ap-text-muted)' }}>Periodo corrente già archiviato.</div>}
+              </section>
+            ),
+          },
+          {
+            id: 'dettagli',
+            label: 'Dettagli contatto',
+            content: (
+              <AdminFullEditor
+                contactId={id}
+                core={{
+                  firstName: contactRow?.first_name ?? '',
+                  lastName: contactRow?.last_name ?? '',
+                  email: contactRow?.email ?? '',
+                  phone: contactRow?.phone ?? '',
+                }}
+                customFields={customFields}
+                tags={tags}
+                groups={fieldGroups}
+              />
+            ),
+          },
+        ]}
       />
-
-      <section className="ap-card">
-        <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: 14, fontWeight: 800 }}>Condomini attivi <span style={{ color: 'var(--ap-text-faint)', fontWeight: 500 }}>· {activePods.length}</span></h2>
-          <span className="ap-pill" data-tone="blue">Inclusi nella commissione</span>
-        </header>
-        <PodTable pods={activePods} defaultAmount={admin.compensoPerPod} adminContactId={id} />
-      </section>
-
-      <section className="ap-card">
-        <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: 14, fontWeight: 800 }}>Switch-out <span style={{ color: 'var(--ap-text-faint)', fontWeight: 500 }}>· {switchedPods.length}</span></h2>
-          <span className="ap-pill" data-tone="gray">Esclusi dalla commissione</span>
-        </header>
-        <PodTable pods={switchedPods} defaultAmount={admin.compensoPerPod} adminContactId={id} />
-      </section>
-
-      <section className="ap-card">
-        <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)' }}>
-          <h2 style={{ fontSize: 14, fontWeight: 800 }}>Storico pagamenti</h2>
-        </header>
-        <table className="ap-table">
-          <thead>
-            <tr><th>Periodo</th><th style={{ textAlign: 'right' }}>Importo</th><th>Pagato il</th><th>Da</th><th>Nota</th></tr>
-          </thead>
-          <tbody>
-            {(payments ?? []).length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessun pagamento registrato.</td></tr>}
-            {(payments ?? []).map((p) => (
-              <tr key={p.period}>
-                <td style={{ fontWeight: 600 }}>{p.period}{p.period === period && <span className="ap-pill" data-tone="blue" style={{ marginLeft: 8, fontSize: 9 }}>corrente</span>}</td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtEur(p.amount_cents / 100)}</td>
-                <td>{new Date(p.paid_at).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                <td style={{ color: 'var(--ap-text-muted)', fontSize: 12 }}>{p.paid_by ?? '—'}</td>
-                <td style={{ color: 'var(--ap-text-muted)', fontSize: 12 }}>{p.note ?? ''}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {paidThisPeriod && <div style={{ padding: '12px 20px', fontSize: 12, color: 'var(--ap-text-muted)' }}>Periodo corrente già archiviato.</div>}
-      </section>
     </div>
   )
 }

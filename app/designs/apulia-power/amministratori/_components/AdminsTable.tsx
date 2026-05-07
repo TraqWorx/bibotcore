@@ -33,13 +33,27 @@ export default function AdminsTable({ admins, period }: { admins: AdminRow[]; pe
   const [pending, startTransition] = useTransition()
   const [flash, setFlash] = useState<string | null>(null)
   const [hideFailed, setHideFailed] = useState(false)
+  const [searchQ, setSearchQ] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'due' | 'paid' | 'scheduled' | 'no_date'>('all')
   const router = useRouter()
 
   const failedCount = admins.filter((a) => a.syncStatus === 'failed').length
-  const visibleAdmins = useMemo(
-    () => (hideFailed ? admins.filter((a) => a.syncStatus !== 'failed') : admins),
-    [admins, hideFailed],
-  )
+  const visibleAdmins = useMemo(() => {
+    let out = hideFailed ? admins.filter((a) => a.syncStatus !== 'failed') : admins
+    const q = searchQ.trim().toLowerCase()
+    if (q) {
+      out = out.filter((a) =>
+        (a.name ?? '').toLowerCase().includes(q) ||
+        (a.email ?? '').toLowerCase().includes(q) ||
+        (a.codiceAmministratore ?? '').toLowerCase().includes(q),
+      )
+    }
+    if (statusFilter === 'due') out = out.filter((a) => a.isDueNow)
+    else if (statusFilter === 'paid') out = out.filter((a) => a.paidThisPeriod)
+    else if (statusFilter === 'scheduled') out = out.filter((a) => !a.isDueNow && !!a.firstPaymentAt)
+    else if (statusFilter === 'no_date') out = out.filter((a) => !a.firstPaymentAt)
+    return out
+  }, [admins, hideFailed, searchQ, statusFilter])
 
   const allSelected = visibleAdmins.length > 0 && visibleAdmins.every((a) => selected.has(a.contactId))
   const selectedTotal = useMemo(
@@ -94,6 +108,31 @@ export default function AdminsTable({ admins, period }: { admins: AdminRow[]; pe
 
   return (
     <>
+      <div style={{ display: 'flex', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--ap-line)', alignItems: 'center', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          value={searchQ}
+          onChange={(e) => setSearchQ(e.target.value)}
+          placeholder="Cerca per nome, email, codice…"
+          className="ap-input"
+          style={{ height: 32, fontSize: 13, flex: '1 1 240px', minWidth: 240 }}
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+          className="ap-input"
+          style={{ height: 32, fontSize: 13, minWidth: 180 }}
+        >
+          <option value="all">Tutti gli stati</option>
+          <option value="due">Da pagare ora</option>
+          <option value="paid">Già pagati periodo corrente</option>
+          <option value="scheduled">Programmati</option>
+          <option value="no_date">Senza data 1° pagamento</option>
+        </select>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ap-text-muted)' }}>
+          {visibleAdmins.length} di {admins.length}
+        </span>
+      </div>
       {failedCount > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', borderBottom: '1px solid var(--ap-line)', background: 'color-mix(in srgb, var(--ap-danger, #dc2626) 8%, transparent)', fontSize: 12 }}>
           <span style={{ color: 'var(--ap-danger, #dc2626)', fontWeight: 700 }}>⚠ {failedCount} non sincronizzati con GHL</span>

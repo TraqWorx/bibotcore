@@ -5,25 +5,36 @@ import { listGhlForms, listGhlCalendars } from '@/lib/apulia/ghl-resources'
 import { createAdminClient } from '@/lib/supabase-server'
 import CopyButton from './_components/CopyButton'
 import StoreResourcePicker from './_components/StoreResourcePicker'
+import DateRangeForm from './_components/DateRangeForm'
 
 export const dynamic = 'force-dynamic'
 
-export default async function Page() {
+interface SearchParams { from?: string; to?: string }
+
+export default async function Page({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const session = await getApuliaSession()
   if (session.role !== 'owner') redirect('/designs/apulia-power/dashboard')
+  const sp = await searchParams
 
   const sb = createAdminClient()
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setHours(0, 0, 0, 0)
+  // Default range: current month-to-date.
+  const today = new Date()
+  const defaultFrom = new Date(today.getFullYear(), today.getMonth(), 1)
+  const fromStr = sp.from || defaultFrom.toISOString().slice(0, 10)
+  const toStr = sp.to || today.toISOString().slice(0, 10)
+  const fromIso = new Date(`${fromStr}T00:00:00`).toISOString()
+  // To is exclusive end; add a day to include the entire 'to' day.
+  const toEnd = new Date(`${toStr}T00:00:00`)
+  toEnd.setDate(toEnd.getDate() + 1)
+  const toIso = toEnd.toISOString()
 
   const [stores, ghlForms, ghlCalendars, { data: leadCountsRaw }] = await Promise.all([
     listStores(),
     listGhlForms(),
     listGhlCalendars(),
-    sb.rpc('apulia_lead_counts_per_store', { since_iso: startOfMonth.toISOString() }),
+    sb.rpc('apulia_lead_counts_per_store_range', { from_iso: fromIso, to_iso: toIso }),
   ])
-  const counts = new Map((leadCountsRaw ?? []).map((r: { slug: string; month_count: number; total_count: number }) => [r.slug, r]))
+  const counts = new Map((leadCountsRaw ?? []).map((r: { slug: string; range_count: number; total_count: number }) => [r.slug, r]))
   const formOptions = ghlForms.map((f) => ({ id: f.id, name: f.name }))
   const calendarOptions = ghlCalendars.map((c) => ({ id: c.id, name: c.name, slug: c.slug ?? null, widgetSlug: c.widgetSlug ?? null }))
 
@@ -32,15 +43,17 @@ export default async function Page() {
       <header>
         <h1 className="ap-page-title">Store fisici</h1>
         <p className="ap-page-subtitle">
-          Per ogni store: form e calendario sono ospitati su GHL. Modifica il form/calendario in GHL e l&apos;URL aggiornato (e il QR) viene riflesso qui automaticamente. Per contare le iscrizioni, configura un workflow GHL sul form: <em>On Form Submission → Add Tag <code>store-&#123;slug&#125;</code></em>.
+          Per ogni store: form e calendario sono ospitati su GHL. Modifica il form/calendario in GHL e l&apos;URL aggiornato (e il QR) viene riflesso qui automaticamente. Per contare le iscrizioni, configura un workflow GHL sul form: <em>On Form Submission → Add Tag <code>&#123;slug&#125;</code></em> (es. <code>barletta</code>) o <code>store-&#123;slug&#125;</code>.
         </p>
       </header>
+
+      <DateRangeForm initialFrom={fromStr} initialTo={toStr} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16 }}>
         {stores.map((s) => {
           const leadUrl = leadFormUrlFor(s.form_id)
           const bookingUrl = bookingUrlFor(s.calendar_widget_slug)
-          const c = counts.get(s.slug) as { month_count?: number; total_count?: number } | undefined
+          const c = counts.get(s.slug) as { range_count?: number; total_count?: number } | undefined
           return (
             <div key={s.id} className="ap-card ap-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
@@ -53,8 +66,8 @@ export default async function Page() {
 
               <div style={{ display: 'flex', gap: 12 }}>
                 <div className="ap-stat" data-tone="accent" style={{ flex: 1 }}>
-                  <div className="ap-stat-label">Lead mese corrente</div>
-                  <div className="ap-stat-value">{c?.month_count ?? 0}</div>
+                  <div className="ap-stat-label">Lead nel periodo</div>
+                  <div className="ap-stat-value">{c?.range_count ?? 0}</div>
                 </div>
                 <div className="ap-stat" data-tone="neutral" style={{ flex: 1 }}>
                   <div className="ap-stat-label">Lead totali</div>
