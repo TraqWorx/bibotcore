@@ -46,6 +46,14 @@ export interface PodRow {
   syncError?: string | null
   /** When this row was first cached in Bibot (cached_at, set on insert). */
   addedAt?: string
+  /** Last time this POD was marked paid. */
+  lastPaidAt?: string
+  /** When this POD comes due again: lastPaidAt + 6mo, or addedAt for new PODs. */
+  nextDueDate?: string
+  /** 'paid' = within 6mo of last payment; 'due' = unpaid or cycle elapsed. */
+  paymentStatus?: 'paid' | 'due'
+  /** Number of payments recorded for this POD over its lifetime. */
+  paidCount?: number
 }
 
 export interface ApuliaSnapshot {
@@ -104,11 +112,51 @@ interface ScheduleRow {
 export async function listAdminsWithStats(): Promise<AdminRow[]> {
   const sb = createAdminClient()
 
-  const [{ data: admins }, { data: podCounts }, { data: schedule }, { data: latestPayments }] = await Promise.all([
+  // Pull admins + per-admin pod counts + the active POD list (need each
+  // POD's id, codice_amministratore, override, cached_at to reconstruct
+  // per-POD paid/due status rolled up to the admin level).
+  const fetchActivePods = async (): Promise<Array<{ id: string; codice_amministratore: string | null; pod_override: number | null; cached_at: string }>> => {
+    const out: Array<{ id: string; codice_amministratore: string | null; pod_override: number | null; cached_at: string }> = []
+    for (let from = 0; ; from += 1000) {
+      const { data } = await sb
+        .from('apulia_contacts')
+        .select('id, codice_amministratore, pod_override, cached_at')
+        .eq('is_amministratore', false).eq('is_switch_out', false)
+        .neq('sync_status', 'pending_delete')
+        .range(from, from + 999)
+      if (!data || data.length === 0) break
+      out.push(...(data as typeof out))
+      if (data.length < 1000) break
+    }
+    return out
+  }
+  const fetchPodPayments = async (): Promise<Map<string, { lastPaidAt: string }>> => {
+    const map = new Map<string, { lastPaidAt: string }>()
+    for (let from = 0; ; from += 1000) {
+      const { data } = await sb
+        .from('apulia_payments')
+        .select('pod_contact_id, paid_at')
+        .not('pod_contact_id', 'is', null)
+        .order('paid_at', { ascending: false })
+        .range(from, from + 999)
+      if (!data || data.length === 0) break
+      for (const r of data as Array<{ pod_contact_id: string; paid_at: string }>) {
+        const existing = map.get(r.pod_contact_id)
+        if (!existing) map.set(r.pod_contact_id, { lastPaidAt: r.paid_at })
+        else if (r.paid_at > existing.lastPaidAt) existing.lastPaidAt = r.paid_at
+      }
+      if (data.length < 1000) break
+    }
+    return map
+  }
+
+  const [{ data: admins }, { data: podCounts }, { data: schedule }, { data: latestPayments }, activePods, podPaymentMap] = await Promise.all([
     sb.from('apulia_contacts').select('id, first_name, last_name, email, phone, codice_amministratore, compenso_per_pod, commissione_totale, sync_status, sync_error').eq('is_amministratore', true).neq('sync_status', 'pending_delete'),
     sb.rpc('apulia_admin_pod_counts'),
     sb.rpc('apulia_admin_schedule') as unknown as Promise<{ data: ScheduleRow[] | null }>,
     sb.from('apulia_payments').select('contact_id, paid_at').not('period_idx', 'is', null).order('paid_at', { ascending: false }),
+    fetchActivePods(),
+    fetchPodPayments(),
   ])
 
   const countMap = new Map<string, { active: number; switched: number }>()
@@ -121,28 +169,62 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
     if (!latestPaidMap.has(p.contact_id)) latestPaidMap.set(p.contact_id, p.paid_at as string)
   }
 
+  // Group active PODs by codice_amministratore for fast per-admin rollup.
+  const podsByCode = new Map<string, typeof activePods>()
+  for (const p of activePods) {
+    const c = p.codice_amministratore
+    if (!c) continue
+    let arr = podsByCode.get(c)
+    if (!arr) { arr = []; podsByCode.set(c, arr) }
+    arr.push(p)
+  }
+  const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000
+  const todayMs = Date.now()
+
   const rows: AdminRow[] = (admins ?? []).map((a) => {
     const code = a.codice_amministratore ?? undefined
     const counts = (code && countMap.get(code)) || { active: 0, switched: 0 }
     const sched = scheduleMap.get(a.id)
+    const compenso = Number(a.compenso_per_pod) || 0
+
+    // Roll per-POD payment status up to the admin: how many PODs are
+    // currently due, how much owed, when's the next pod's cycle ending.
+    let dueCount = 0
+    let dueTotal = 0
+    let nextDue: string | undefined
+    if (code) {
+      for (const p of podsByCode.get(code) ?? []) {
+        const pay = podPaymentMap.get(p.id)
+        const amount = Number(p.pod_override) || compenso
+        const isPaid = pay && new Date(pay.lastPaidAt).getTime() + SIX_MONTHS_MS > todayMs
+        if (!isPaid) {
+          dueCount += 1
+          dueTotal += amount
+        } else if (pay) {
+          const nextMs = new Date(pay.lastPaidAt).getTime() + SIX_MONTHS_MS
+          const iso = new Date(nextMs).toISOString()
+          if (!nextDue || iso < nextDue) nextDue = iso
+        }
+      }
+    }
+    const isDueNow = dueCount > 0
     return {
       contactId: a.id,
       name: [a.first_name, a.last_name].filter(Boolean).join(' ') || a.email || '—',
       email: a.email ?? undefined,
       phone: a.phone ?? undefined,
       codiceAmministratore: code,
-      compensoPerPod: Number(a.compenso_per_pod) || 0,
+      compensoPerPod: compenso,
       podsActive: counts.active,
       podsSwitchedOut: counts.switched,
-      total: Number(a.commissione_totale) || 0,
-      // "Paid this period" now means: the most recent due period has been paid.
-      paidThisPeriod: sched ? sched.paid_count > 0 && sched.paid_count >= sched.next_period_idx - 1 && !sched.is_due_now : false,
+      total: dueTotal, // "Da pagare" — only currently-due PODs.
+      paidThisPeriod: !isDueNow && counts.active > 0,
       paidAt: latestPaidMap.get(a.id),
       firstPaymentAt: sched?.first_payment_at ?? undefined,
-      nextDueDate: sched?.next_due_date ?? undefined,
+      nextDueDate: nextDue ?? sched?.next_due_date ?? undefined,
       nextPeriodIdx: sched?.next_period_idx,
-      isDueNow: sched?.is_due_now ?? false,
-      overdueCount: sched?.overdue_count ?? 0,
+      isDueNow,
+      overdueCount: dueCount,
       syncStatus: (a as { sync_status?: string }).sync_status ?? undefined,
       syncError: (a as { sync_error?: string | null }).sync_error ?? null,
     }
@@ -179,8 +261,50 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
     ;[activePods, switchedPods] = await Promise.all([fetchAll(false), fetchAll(true)])
   }
 
+  // Per-POD payment history: latest paid_at + count per pod_contact_id.
+  // Paginate to avoid the PostgREST 1000-row cap when an admin has many
+  // long-lived PODs with multiple payments each.
+  const allPodIds = [...activePods, ...switchedPods].map((p) => p.id)
+  const podPaymentMap = new Map<string, { lastPaidAt: string; count: number }>()
+  if (allPodIds.length > 0) {
+    for (let from = 0; ; from += 1000) {
+      const { data: payRows } = await sb
+        .from('apulia_payments')
+        .select('pod_contact_id, paid_at')
+        .in('pod_contact_id', allPodIds)
+        .order('paid_at', { ascending: false })
+        .range(from, from + 999)
+      if (!payRows || payRows.length === 0) break
+      for (const r of payRows) {
+        const id = (r as { pod_contact_id: string | null }).pod_contact_id
+        if (!id) continue
+        const paidAt = (r as { paid_at: string }).paid_at
+        const cur = podPaymentMap.get(id)
+        if (!cur) podPaymentMap.set(id, { lastPaidAt: paidAt, count: 1 })
+        else { cur.count += 1; if (paidAt > cur.lastPaidAt) cur.lastPaidAt = paidAt }
+      }
+      if (payRows.length < 1000) break
+    }
+  }
+
+  const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000
+  const todayMs = Date.now()
+
   function asPodRow(p: CachedContactRow): PodRow {
     const override = Number(p.pod_override) || 0
+    const pay = podPaymentMap.get(p.id)
+    const cachedAt = (p as { cached_at?: string }).cached_at
+    let nextDueDate: string | undefined
+    let paymentStatus: 'paid' | 'due' = 'due'
+    if (pay) {
+      const nextMs = new Date(pay.lastPaidAt).getTime() + SIX_MONTHS_MS
+      nextDueDate = new Date(nextMs).toISOString()
+      paymentStatus = nextMs > todayMs ? 'paid' : 'due'
+    } else if (cachedAt) {
+      // No payment yet — POD is due now (since insertion).
+      nextDueDate = cachedAt
+      paymentStatus = 'due'
+    }
     return {
       contactId: p.id,
       pod: p.pod_pdr ?? '—',
@@ -191,7 +315,11 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
       switchedOut: p.is_switch_out,
       override,
       amount: override > 0 ? override : compenso,
-      addedAt: (p as { cached_at?: string }).cached_at,
+      addedAt: cachedAt,
+      lastPaidAt: pay?.lastPaidAt,
+      nextDueDate,
+      paymentStatus,
+      paidCount: pay?.count ?? 0,
     }
   }
 
@@ -207,6 +335,20 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
     .limit(1)
     .maybeSingle()
 
+  // Roll per-POD status up to the admin level so the detail page header
+  // shows "PODs da pagare = N · € X" anchored to per-POD cycles, not the
+  // legacy admin-level apulia_admin_schedule. Switched-out PODs are
+  // excluded from commissions.
+  const activePodRows = activePods.map(asPodRow)
+  const switchedPodRows = switchedPods.map(asPodRow)
+  const dueRows = activePodRows.filter((r) => r.paymentStatus === 'due')
+  const paidRows = activePodRows.filter((r) => r.paymentStatus === 'paid')
+  const dueTotal = dueRows.reduce((s, r) => s + r.amount, 0)
+  const earliestNextDue = paidRows
+    .map((r) => r.nextDueDate)
+    .filter((d): d is string => !!d)
+    .sort()[0]
+
   const adminRow: AdminRow = {
     contactId: a.id,
     name: [a.first_name, a.last_name].filter(Boolean).join(' ') || a.email || '—',
@@ -216,17 +358,18 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
     compensoPerPod: compenso,
     podsActive: activePods.length,
     podsSwitchedOut: switchedPods.length,
-    total: Number(a.commissione_totale) || 0,
-    paidThisPeriod: sched ? sched.paid_count > 0 && sched.paid_count >= sched.next_period_idx - 1 && !sched.is_due_now : false,
+    // total now means "soldi attualmente da pagare" (only due PODs).
+    total: dueTotal,
+    paidThisPeriod: dueRows.length === 0 && paidRows.length > 0,
     paidAt: latestPay?.paid_at as string | undefined,
     firstPaymentAt: sched?.first_payment_at ?? undefined,
-    nextDueDate: sched?.next_due_date ?? undefined,
+    nextDueDate: earliestNextDue ?? sched?.next_due_date ?? undefined,
     nextPeriodIdx: sched?.next_period_idx,
-    isDueNow: sched?.is_due_now ?? false,
-    overdueCount: sched?.overdue_count ?? 0,
+    isDueNow: dueRows.length > 0,
+    overdueCount: dueRows.length,
   }
 
-  return { admin: adminRow, activePods: activePods.map(asPodRow), switchedPods: switchedPods.map(asPodRow) }
+  return { admin: adminRow, activePods: activePodRows, switchedPods: switchedPodRows }
 }
 
 export interface CondominiFilters {

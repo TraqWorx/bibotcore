@@ -134,10 +134,10 @@ export default function AdminsTable({ admins, period }: { admins: AdminRow[]; pe
           style={{ height: 34, fontSize: 13, flex: '1 1 200px', minWidth: 200 }}
         >
           <option value="all">Tutti gli stati</option>
-          <option value="due">Da pagare ora</option>
-          <option value="paid">Già pagati periodo corrente</option>
-          <option value="scheduled">Programmati</option>
-          <option value="no_date">Senza data 1° pagamento</option>
+          <option value="due">Da Pagare</option>
+          <option value="paid">Pagato</option>
+          <option value="scheduled">Programmato</option>
+          <option value="no_date">Senza POD / senza data</option>
         </select>
         <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
           {visibleAdmins.length} di {admins.length}
@@ -214,10 +214,10 @@ export default function AdminsTable({ admins, period }: { admins: AdminRow[]; pe
                 </td>
                 <td>
                   {a.isDueNow
-                    ? <span className="ap-pill" data-tone="red">Da pagare ora{a.overdueCount && a.overdueCount > 1 ? ` (+${a.overdueCount - 1})` : ''}</span>
-                    : a.firstPaymentAt
-                      ? <span className="ap-pill" data-tone="green">Programmato</span>
-                      : <span className="ap-pill" data-tone="gray">Senza data</span>}
+                    ? <span className="ap-pill" data-tone="red">Da Pagare{a.overdueCount && a.overdueCount > 0 ? ` · ${a.overdueCount} POD` : ''}</span>
+                    : a.podsActive > 0
+                      ? <span className="ap-pill" data-tone="green">Pagato</span>
+                      : <span className="ap-pill" data-tone="gray">Senza POD</span>}
                 </td>
               </tr>
             )

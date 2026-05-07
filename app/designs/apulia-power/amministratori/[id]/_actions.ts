@@ -126,6 +126,96 @@ export async function markPaid(adminContactId: string, amountCents: number, note
   revalidatePath('/designs/apulia-power/dashboard')
 }
 
+/**
+ * Mark a set of PODs as paid in one go. Each POD gets its own row in
+ * apulia_payments (pod_contact_id NOT NULL) and starts a fresh 6-month
+ * cycle anchored to paid_at. Amount per POD = override > 0 ? override
+ * : admin's compenso_per_pod.
+ *
+ * `customAmounts` (cents) overrides the per-POD amount when supplied —
+ * used when the owner edits the value before clicking "Paga".
+ */
+export async function markPodsPaid(
+  adminContactId: string,
+  podContactIds: string[],
+  customAmounts?: Record<string, number>,
+  note?: string,
+): Promise<{ paid: number; error?: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { paid: 0, error: guard.error }
+  if (podContactIds.length === 0) return { paid: 0 }
+
+  const sb = createAdminClient()
+  const { data: admin } = await sb
+    .from('apulia_contacts')
+    .select('id, compenso_per_pod, codice_amministratore')
+    .eq('id', adminContactId)
+    .maybeSingle()
+  if (!admin) return { paid: 0, error: 'Amministratore non trovato' }
+  const compenso = Number(admin.compenso_per_pod) || 0
+
+  const { data: pods } = await sb
+    .from('apulia_contacts')
+    .select('id, pod_override, pod_pdr')
+    .in('id', podContactIds)
+  const podMap = new Map((pods ?? []).map((p) => [p.id, p]))
+
+  const nowIso = new Date().toISOString()
+  const rows = podContactIds.map((podId) => {
+    const pod = podMap.get(podId)
+    const override = Number(pod?.pod_override) || 0
+    const cents = customAmounts?.[podId] ?? Math.round(((override > 0 ? override : compenso) * 100))
+    return {
+      contact_id: adminContactId,
+      pod_contact_id: podId,
+      period: `pod-${podId}-${nowIso}`,
+      amount_cents: cents,
+      paid_at: nowIso,
+      paid_by: guard.email,
+      note: note ?? null,
+    }
+  })
+
+  const { error } = await sb.from('apulia_payments').insert(rows)
+  if (error) return { paid: 0, error: error.message }
+
+  revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
+  revalidatePath('/designs/apulia-power/amministratori')
+  revalidatePath('/designs/apulia-power/pagamenti')
+  revalidatePath('/designs/apulia-power/dashboard')
+  return { paid: rows.length }
+}
+
+/**
+ * Annulla l'ultimo pagamento di uno specifico POD (utile in caso di
+ * errore). Cancella solo la riga più recente in apulia_payments per
+ * quel POD; eventuali pagamenti più vecchi restano in archivio.
+ */
+export async function unmarkPodPaid(
+  podContactId: string,
+  adminContactId: string,
+): Promise<{ error: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+
+  const sb = createAdminClient()
+  const { data: latest } = await sb
+    .from('apulia_payments')
+    .select('id')
+    .eq('pod_contact_id', podContactId)
+    .order('paid_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (!latest) return { error: 'Nessun pagamento da annullare per questo POD' }
+  const { error } = await sb.from('apulia_payments').delete().eq('id', latest.id)
+  if (error) return { error: error.message }
+
+  revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
+  revalidatePath('/designs/apulia-power/amministratori')
+  revalidatePath('/designs/apulia-power/pagamenti')
+  revalidatePath('/designs/apulia-power/dashboard')
+}
+
 export async function unmarkPaid(adminContactId: string): Promise<{ error: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return guard
