@@ -3,8 +3,43 @@
 import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
-import { APULIA_FIELD } from '@/lib/apulia/fields'
+import { APULIA_FIELD, APULIA_TAG } from '@/lib/apulia/fields'
 import { enqueueOp } from '@/lib/apulia/sync-queue'
+
+/**
+ * Recompute commissione_totale for one admin and enqueue the GHL push.
+ * Called whenever a POD's switch-out flag flips (active count changes).
+ */
+async function recomputeAdminTotal(adminContactId: string): Promise<void> {
+  const sb = createAdminClient()
+  const { data: admin } = await sb.from('apulia_contacts').select('id, ghl_id, codice_amministratore, compenso_per_pod, commissione_totale, custom_fields').eq('id', adminContactId).maybeSingle()
+  if (!admin?.codice_amministratore) return
+  const compenso = Number(admin.compenso_per_pod) || 0
+  let total = 0
+  for (let from = 0; ; from += 1000) {
+    const { data: pods } = await sb.from('apulia_contacts').select('pod_override').eq('codice_amministratore', admin.codice_amministratore).eq('is_amministratore', false).eq('is_switch_out', false).neq('sync_status', 'pending_delete').range(from, from + 999)
+    if (!pods || pods.length === 0) break
+    for (const p of pods) {
+      const ovr = Number(p.pod_override) || 0
+      total += ovr > 0 ? ovr : compenso
+    }
+    if (pods.length < 1000) break
+  }
+  const stored = Number(admin.commissione_totale) || 0
+  if (Math.round(stored * 100) === Math.round(total * 100)) return
+  const cf = { ...((admin.custom_fields ?? {}) as Record<string, string>), [APULIA_FIELD.COMMISSIONE_TOTALE]: String(total) }
+  await sb.from('apulia_contacts').update({ commissione_totale: total, custom_fields: cf, sync_status: 'pending_update' }).eq('id', admin.id)
+  await enqueueOp({ contact_id: admin.id, ghl_id: admin.ghl_id ?? null, action: 'set_field', payload: { fieldId: APULIA_FIELD.COMMISSIONE_TOTALE, value: total } })
+}
+
+/** Find the admin row a POD belongs to (by codice_amministratore). */
+async function adminForCondomino(contactId: string): Promise<string | null> {
+  const sb = createAdminClient()
+  const { data: row } = await sb.from('apulia_contacts').select('codice_amministratore').eq('id', contactId).maybeSingle()
+  if (!row?.codice_amministratore) return null
+  const { data: admin } = await sb.from('apulia_contacts').select('id').eq('is_amministratore', true).eq('codice_amministratore', row.codice_amministratore).neq('sync_status', 'pending_delete').maybeSingle()
+  return admin?.id ?? null
+}
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -103,11 +138,20 @@ export async function addCondominoTag(contactId: string, tag: string): Promise<{
   if (!t) return { error: 'Tag vuoto' }
 
   const sb = createAdminClient()
-  const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags').eq('id', contactId).maybeSingle()
+  const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags, is_switch_out').eq('id', contactId).maybeSingle()
   if (!row) return { error: 'Contatto non trovato' }
   const tags = Array.from(new Set([...((row.tags as string[] | null) ?? []), t]))
-  await sb.from('apulia_contacts').update({ tags, sync_status: 'pending_update' }).eq('id', contactId)
+  // Tag→flag mirroring: if the user added "switch-out" (any case) the
+  // boolean must follow so the POD drops out of the commission sum.
+  const isSwitchOutTag = t.toLowerCase() === APULIA_TAG.SWITCH_OUT.toLowerCase()
+  const patch: Record<string, unknown> = { tags, sync_status: 'pending_update' }
+  if (isSwitchOutTag && !row.is_switch_out) patch.is_switch_out = true
+  await sb.from('apulia_contacts').update(patch).eq('id', contactId)
   await enqueueOrRetryCreate(contactId, row.ghl_id ?? null, 'add_tag', { tag: t })
+  if (isSwitchOutTag) {
+    const adminId = await adminForCondomino(contactId)
+    if (adminId) await recomputeAdminTotal(adminId)
+  }
   pathsToRevalidate(contactId)
 }
 
@@ -116,11 +160,20 @@ export async function removeCondominoTag(contactId: string, tag: string): Promis
   if ('error' in guard) return guard
 
   const sb = createAdminClient()
-  const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags').eq('id', contactId).maybeSingle()
+  const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags, is_switch_out').eq('id', contactId).maybeSingle()
   if (!row) return { error: 'Contatto non trovato' }
   const tags = ((row.tags as string[] | null) ?? []).filter((x) => x !== tag)
-  await sb.from('apulia_contacts').update({ tags, sync_status: 'pending_update' }).eq('id', contactId)
+  // Tag→flag mirroring: removing "switch-out" should put the POD back
+  // into the commission calculation. Flip the flag and recompute.
+  const isSwitchOutTag = tag.toLowerCase() === APULIA_TAG.SWITCH_OUT.toLowerCase()
+  const patch: Record<string, unknown> = { tags, sync_status: 'pending_update' }
+  if (isSwitchOutTag && row.is_switch_out) patch.is_switch_out = false
+  await sb.from('apulia_contacts').update(patch).eq('id', contactId)
   await enqueueOrRetryCreate(contactId, row.ghl_id ?? null, 'remove_tag', { tag })
+  if (isSwitchOutTag) {
+    const adminId = await adminForCondomino(contactId)
+    if (adminId) await recomputeAdminTotal(adminId)
+  }
   pathsToRevalidate(contactId)
 }
 
