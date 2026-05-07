@@ -137,7 +137,7 @@ export default function OpportunityDrawer({ opp, pipeline, onClose }: { opp: Opp
               href={
                 contact.is_amministratore
                   ? `/designs/apulia-power/amministratori/${contact.id}`
-                  : `/designs/apulia-power/condomini?q=${encodeURIComponent(contact.pod_pdr ?? contact.email ?? '')}`
+                  : `/designs/apulia-power/condomini/${contact.id}`
               }
               className="ap-btn ap-btn-primary"
               style={{ fontSize: 13 }}
