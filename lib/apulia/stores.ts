@@ -8,6 +8,7 @@ export interface Store {
   address: string | null
   calendar_id: string | null
   calendar_widget_slug: string | null
+  form_id: string | null
   pipeline_id: string | null
   display_order: number
   active: boolean
@@ -25,17 +26,24 @@ export async function getStoreBySlug(slug: string): Promise<Store | null> {
   return data as Store | null
 }
 
-/** Public booking widget URL hosted by the underlying CRM. */
+/**
+ * GHL-hosted booking widget URL for a calendar slug. Editing the
+ * calendar in GHL is reflected immediately — the URL points at GHL's
+ * hosted widget.
+ */
 export function bookingUrlFor(widgetSlug: string | null | undefined): string | null {
   if (!widgetSlug) return null
-  // Note: 'bookings' (plural) — singular returns 404.
   return `https://api.leadconnectorhq.com/widget/bookings/${widgetSlug}`
 }
 
-/** Public lead form URL on this app. */
-export function leadFormUrlFor(slug: string, baseUrl?: string): string {
-  const base = baseUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? 'https://core.bibotcrm.it'
-  return `${base}/apulia/lead/${slug}`
+/**
+ * GHL-hosted form widget URL. Returns null when the store has no form
+ * assigned. Submissions land directly in GHL; count rolls into Bibot
+ * via a GHL workflow that adds the store-{slug} tag on submit.
+ */
+export function leadFormUrlFor(formId: string | null | undefined): string | null {
+  if (!formId) return null
+  return `https://api.leadconnectorhq.com/widget/form/${formId}`
 }
 
 /** Free third-party QR generator. No keys, just a stable URL. */
