@@ -43,18 +43,27 @@ export async function initPdp(
     if (id) colFieldMap[h] = id
   }
   const sb = createAdminClient()
-  const { data } = await sb
-    .from('apulia_contacts')
-    .select('id, first_name, tags, pod_pdr')
-    .eq('is_amministratore', false)
-    .not('pod_pdr', 'is', null)
+  // Paginate — PostgREST caps a single select at 1000 rows. Without
+  // this, byPodInit would only know about the first 1000 condomini and
+  // cross-chunk dedup of file rows pointing at existing PODs would fail
+  // for everything past that cut-off, producing duplicate inserts.
   const byPodInit: Record<string, CompactContact> = {}
-  for (const r of data ?? []) {
-    if (r.pod_pdr) byPodInit[String(r.pod_pdr)] = {
-      id: String(r.id),
-      firstName: r.first_name ?? undefined,
-      tags: (r.tags as string[] | null) ?? [],
+  for (let from = 0; ; from += 1000) {
+    const { data } = await sb
+      .from('apulia_contacts')
+      .select('id, first_name, tags, pod_pdr')
+      .eq('is_amministratore', false)
+      .not('pod_pdr', 'is', null)
+      .range(from, from + 999)
+    if (!data || data.length === 0) break
+    for (const r of data) {
+      if (r.pod_pdr) byPodInit[String(r.pod_pdr)] = {
+        id: String(r.id),
+        firstName: r.first_name ?? undefined,
+        tags: (r.tags as string[] | null) ?? [],
+      }
     }
+    if (data.length < 1000) break
   }
   return { byPodInit, colFieldMap, headers }
 }

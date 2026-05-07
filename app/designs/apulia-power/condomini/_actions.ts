@@ -130,33 +130,55 @@ export async function bulkDeleteCondomini(input: { ids?: string[]; filters?: Bul
   if (input.ids && input.ids.length > 0) {
     ids = input.ids
   } else if (input.filters) {
-    let q = sb.from('apulia_contacts').select('id').eq('is_amministratore', false).neq('sync_status', 'pending_delete')
     const f = input.filters
-    if (f.stato === 'active') q = q.eq('is_switch_out', false)
-    else if (f.stato === 'switch_out') q = q.eq('is_switch_out', true)
-    if (f.comune) q = q.eq('comune', f.comune)
-    if (f.amministratore) q = q.eq('amministratore_name', f.amministratore)
-    if (f.q) {
-      const term = f.q.replace(/[%_]/g, (m) => `\\${m}`)
-      q = q.or(`pod_pdr.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,cliente.ilike.%${term}%,amministratore_name.ilike.%${term}%`)
+    const buildQuery = () => {
+      let q = sb.from('apulia_contacts').select('id').eq('is_amministratore', false).neq('sync_status', 'pending_delete')
+      if (f.stato === 'active') q = q.eq('is_switch_out', false)
+      else if (f.stato === 'switch_out') q = q.eq('is_switch_out', true)
+      if (f.comune) q = q.eq('comune', f.comune)
+      if (f.amministratore) q = q.eq('amministratore_name', f.amministratore)
+      if (f.q) {
+        const term = f.q.replace(/[%_]/g, (m) => `\\${m}`)
+        q = q.or(`pod_pdr.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,cliente.ilike.%${term}%,amministratore_name.ilike.%${term}%`)
+      }
+      return q
     }
-    const { data } = await q
-    ids = (data ?? []).map((r) => r.id as string)
+    // Paginate — a "delete all matching" call could match >1000 rows.
+    for (let from = 0; ; from += 1000) {
+      const { data } = await buildQuery().range(from, from + 999)
+      if (!data || data.length === 0) break
+      ids.push(...data.map((r) => r.id as string))
+      if (data.length < 1000) break
+    }
   }
   if (ids.length === 0) return { deleted: 0, failed: 0 }
 
-  const { data: rows } = await sb.from('apulia_contacts').select('id, ghl_id').in('id', ids)
+  // Fetch row state in chunks too — `.in('id', ids)` has the same cap.
+  const rows: Array<{ id: string; ghl_id: string | null }> = []
+  for (let i = 0; i < ids.length; i += 500) {
+    const slice = ids.slice(i, i + 500)
+    const { data } = await sb.from('apulia_contacts').select('id, ghl_id').in('id', slice)
+    if (data) rows.push(...(data as Array<{ id: string; ghl_id: string | null }>))
+  }
   if (!rows?.length) return { deleted: 0, failed: 0 }
 
   const localOnly = rows.filter((r) => !r.ghl_id).map((r) => r.id)
   const remote = rows.filter((r) => r.ghl_id) as Array<{ id: string; ghl_id: string }>
 
+  // Chunk all .in() ops by 500 ids — URL length + 1000-row caps.
+  const CHUNK = 500
   if (localOnly.length) {
-    await sb.from('apulia_sync_queue').delete().in('contact_id', localOnly).eq('status', 'pending')
-    await sb.from('apulia_contacts').delete().in('id', localOnly)
+    for (let i = 0; i < localOnly.length; i += CHUNK) {
+      const slice = localOnly.slice(i, i + CHUNK)
+      await sb.from('apulia_sync_queue').delete().in('contact_id', slice).eq('status', 'pending')
+      await sb.from('apulia_contacts').delete().in('id', slice)
+    }
   }
   if (remote.length) {
-    await sb.from('apulia_contacts').update({ sync_status: 'pending_delete' }).in('id', remote.map((r) => r.id))
+    const remoteIds = remote.map((r) => r.id)
+    for (let i = 0; i < remoteIds.length; i += CHUNK) {
+      await sb.from('apulia_contacts').update({ sync_status: 'pending_delete' }).in('id', remoteIds.slice(i, i + CHUNK))
+    }
     await enqueueOps(remote.map((r) => ({ contact_id: r.id, ghl_id: r.ghl_id, action: 'delete' as const })))
   }
 

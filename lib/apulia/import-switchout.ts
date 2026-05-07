@@ -43,15 +43,24 @@ export async function* importSwitchOut(rows: Record<string, string>[], importId?
     if (norm) podsInFile.push(norm)
   }
 
-  // Pull every condomino touched by this file in one query.
-  const { data: existing } = podsInFile.length
-    ? await sb
-        .from('apulia_contacts')
-        .select('id, ghl_id, pod_pdr, tags, is_switch_out')
-        .eq('is_amministratore', false)
-        .in('pod_pdr', [...new Set(podsInFile)])
-    : { data: [] as ExistingPod[] }
-  const byPod = new Map((existing as ExistingPod[] | null ?? [])
+  // Pull every condomino touched by this file. PostgREST caps a single
+  // .in() at 1000 results — we batch the lookup in chunks of 500 PODs
+  // so a 4000-row switch-out file doesn't silently mis-classify the
+  // tail as "unmatched".
+  const uniquePods = [...new Set(podsInFile)]
+  const existing: ExistingPod[] = []
+  const LOOKUP_CHUNK = 500
+  for (let i = 0; i < uniquePods.length; i += LOOKUP_CHUNK) {
+    const slice = uniquePods.slice(i, i + LOOKUP_CHUNK)
+    const { data } = await sb
+      .from('apulia_contacts')
+      .select('id, ghl_id, pod_pdr, tags, is_switch_out')
+      .eq('is_amministratore', false)
+      .neq('sync_status', 'pending_delete')
+      .in('pod_pdr', slice)
+    if (data) existing.push(...(data as ExistingPod[]))
+  }
+  const byPod = new Map(existing
     .filter((r) => r.pod_pdr)
     .map((r) => [r.pod_pdr as string, r]))
 

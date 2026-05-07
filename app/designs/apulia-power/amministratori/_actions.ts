@@ -233,28 +233,46 @@ export async function bulkDeleteAdmins(ids: string[]): Promise<{ deleted: number
   const localOnly = rows.filter((r) => !r.ghl_id).map((r) => r.id)
   const remote = rows.filter((r) => r.ghl_id) as Array<{ id: string; ghl_id: string }>
 
+  // Chunk all .in() ops by 500 ids — URL length + 1000-row caps.
+  const CHUNK = 500
   if (localOnly.length) {
-    await sb.from('apulia_sync_queue').delete().in('contact_id', localOnly).eq('status', 'pending')
-    await sb.from('apulia_contacts').delete().in('id', localOnly)
+    for (let i = 0; i < localOnly.length; i += CHUNK) {
+      const slice = localOnly.slice(i, i + CHUNK)
+      await sb.from('apulia_sync_queue').delete().in('contact_id', slice).eq('status', 'pending')
+      await sb.from('apulia_contacts').delete().in('id', slice)
+    }
   }
   if (remote.length) {
-    await sb.from('apulia_contacts').update({ sync_status: 'pending_delete' }).in('id', remote.map((r) => r.id))
+    const remoteIds = remote.map((r) => r.id)
+    for (let i = 0; i < remoteIds.length; i += CHUNK) {
+      await sb.from('apulia_contacts').update({ sync_status: 'pending_delete' }).in('id', remoteIds.slice(i, i + CHUNK))
+    }
     await enqueueOps(remote.map((r) => ({ contact_id: r.id, ghl_id: r.ghl_id, action: 'delete' as const })))
   }
 
-  // Detach POD condomini from the deleted admins.
+  // Detach POD condomini from the deleted admins. Paginate the
+  // discovery query AND chunk the subsequent updates.
   if (codes.length > 0) {
-    const { data: orphans } = await sb
-      .from('apulia_contacts')
-      .select('id, ghl_id')
-      .in('codice_amministratore', codes)
-      .eq('is_amministratore', false)
-      .neq('sync_status', 'pending_delete')
-    if (orphans?.length) {
-      await sb
+    const orphans: Array<{ id: string; ghl_id: string | null }> = []
+    for (let from = 0; ; from += 1000) {
+      const { data } = await sb
         .from('apulia_contacts')
-        .update({ codice_amministratore: null, amministratore_name: null, sync_status: 'pending_update' })
-        .in('id', orphans.map((r) => r.id))
+        .select('id, ghl_id')
+        .in('codice_amministratore', codes)
+        .eq('is_amministratore', false)
+        .neq('sync_status', 'pending_delete')
+        .range(from, from + 999)
+      if (!data || data.length === 0) break
+      orphans.push(...(data as Array<{ id: string; ghl_id: string | null }>))
+      if (data.length < 1000) break
+    }
+    if (orphans.length) {
+      const orphanIds = orphans.map((r) => r.id)
+      for (let i = 0; i < orphanIds.length; i += CHUNK) {
+        await sb.from('apulia_contacts')
+          .update({ codice_amministratore: null, amministratore_name: null, sync_status: 'pending_update' })
+          .in('id', orphanIds.slice(i, i + CHUNK))
+      }
       const ops = orphans.flatMap((r) => [
         { contact_id: r.id, ghl_id: r.ghl_id ?? null, action: 'set_field' as const, payload: { fieldId: APULIA_FIELD.CODICE_AMMINISTRATORE, value: '' } },
         { contact_id: r.id, ghl_id: r.ghl_id ?? null, action: 'set_field' as const, payload: { fieldId: APULIA_FIELD.AMMINISTRATORE_CONDOMINIO, value: '' } },

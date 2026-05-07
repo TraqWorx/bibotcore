@@ -159,12 +159,22 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
   let activePods: CachedContactRow[] = []
   let switchedPods: CachedContactRow[] = []
   if (code) {
-    const [{ data: act }, { data: sw }] = await Promise.all([
-      sb.from('apulia_contacts').select('*').eq('codice_amministratore', code).eq('is_amministratore', false).eq('is_switch_out', false).neq('sync_status', 'pending_delete').order('pod_pdr'),
-      sb.from('apulia_contacts').select('*').eq('codice_amministratore', code).eq('is_amministratore', false).eq('is_switch_out', true).neq('sync_status', 'pending_delete').order('pod_pdr'),
-    ])
-    activePods = (act ?? []) as CachedContactRow[]
-    switchedPods = (sw ?? []) as CachedContactRow[]
+    // Paginate so admins with >1000 PODs see all of them.
+    const fetchAll = async (isSwitchOut: boolean): Promise<CachedContactRow[]> => {
+      const out: CachedContactRow[] = []
+      for (let from = 0; ; from += 1000) {
+        const { data } = await sb
+          .from('apulia_contacts').select('*')
+          .eq('codice_amministratore', code).eq('is_amministratore', false)
+          .eq('is_switch_out', isSwitchOut).neq('sync_status', 'pending_delete')
+          .order('pod_pdr').range(from, from + 999)
+        if (!data || data.length === 0) break
+        out.push(...(data as CachedContactRow[]))
+        if (data.length < 1000) break
+      }
+      return out
+    }
+    ;[activePods, switchedPods] = await Promise.all([fetchAll(false), fetchAll(true)])
   }
 
   function asPodRow(p: CachedContactRow): PodRow {

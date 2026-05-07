@@ -267,22 +267,30 @@ export async function deleteTagGlobally(tag: string): Promise<{ removed: number;
   if (!t) return { removed: 0, failed: 0, error: 'Tag vuoto' }
 
   const sb = createAdminClient()
-  const { data: rows } = await sb
-    .from('apulia_contacts')
-    .select('id, ghl_id, tags')
-    .contains('tags', [t])
-    .neq('sync_status', 'pending_delete')
-  if (!rows || rows.length === 0) return { removed: 0, failed: 0 }
+  // Paginate — a popular tag could be on >1000 rows.
+  const rows: Array<{ id: string; ghl_id: string | null; tags: string[] | null }> = []
+  for (let from = 0; ; from += 1000) {
+    const { data } = await sb
+      .from('apulia_contacts')
+      .select('id, ghl_id, tags')
+      .contains('tags', [t])
+      .neq('sync_status', 'pending_delete')
+      .range(from, from + 999)
+    if (!data || data.length === 0) break
+    rows.push(...(data as Array<{ id: string; ghl_id: string | null; tags: string[] | null }>))
+    if (data.length < 1000) break
+  }
+  if (rows.length === 0) return { removed: 0, failed: 0 }
 
   // Update tags array per row.
   for (const r of rows) {
-    const remaining = ((r.tags as string[] | null) ?? []).filter((x) => x !== t)
+    const remaining = (r.tags ?? []).filter((x) => x !== t)
     await sb.from('apulia_contacts').update({ tags: remaining, sync_status: 'pending_update' }).eq('id', r.id)
   }
   // Enqueue one remove_tag op per row.
   await enqueueOps(rows.map((r) => ({
-    contact_id: r.id as string,
-    ghl_id: (r.ghl_id as string | null) ?? null,
+    contact_id: r.id,
+    ghl_id: r.ghl_id ?? null,
     action: 'remove_tag' as const,
     payload: { tag: t },
   })))
