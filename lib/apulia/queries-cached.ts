@@ -130,8 +130,8 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
     }
     return out
   }
-  const fetchPodPayments = async (): Promise<Map<string, { lastPaidAt: string }>> => {
-    const map = new Map<string, { lastPaidAt: string }>()
+  const fetchPodPayments = async (): Promise<Map<string, { lastPaidAt: string; count: number }>> => {
+    const map = new Map<string, { lastPaidAt: string; count: number }>()
     for (let from = 0; ; from += 1000) {
       const { data } = await sb
         .from('apulia_payments')
@@ -142,8 +142,8 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
       if (!data || data.length === 0) break
       for (const r of data as Array<{ pod_contact_id: string; paid_at: string }>) {
         const existing = map.get(r.pod_contact_id)
-        if (!existing) map.set(r.pod_contact_id, { lastPaidAt: r.paid_at })
-        else if (r.paid_at > existing.lastPaidAt) existing.lastPaidAt = r.paid_at
+        if (!existing) map.set(r.pod_contact_id, { lastPaidAt: r.paid_at, count: 1 })
+        else { existing.count += 1; if (r.paid_at > existing.lastPaidAt) existing.lastPaidAt = r.paid_at }
       }
       if (data.length < 1000) break
     }
@@ -178,7 +178,6 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
     if (!arr) { arr = []; podsByCode.set(c, arr) }
     arr.push(p)
   }
-  const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000
   const todayMs = Date.now()
 
   const rows: AdminRow[] = (admins ?? []).map((a) => {
@@ -187,22 +186,25 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
     const sched = scheduleMap.get(a.id)
     const compenso = Number(a.compenso_per_pod) || 0
 
-    // Roll per-POD payment status up to the admin: how many PODs are
-    // currently due, how much owed, when's the next pod's cycle ending.
+    // Roll per-POD payment status up to the admin: same rule as the
+    // detail page — nextDueDate = addedAt + paidCount * 6mo (calendar
+    // months, anchored to addedAt forever, not paid_at).
     let dueCount = 0
     let dueTotal = 0
     let nextDue: string | undefined
     if (code) {
       for (const p of podsByCode.get(code) ?? []) {
         const pay = podPaymentMap.get(p.id)
+        const paidCount = pay?.count ?? 0
         const amount = Number(p.pod_override) || compenso
-        const isPaid = pay && new Date(pay.lastPaidAt).getTime() + SIX_MONTHS_MS > todayMs
+        const nd = new Date(p.cached_at)
+        nd.setMonth(nd.getMonth() + paidCount * 6)
+        const isPaid = nd.getTime() > todayMs
         if (!isPaid) {
           dueCount += 1
           dueTotal += amount
-        } else if (pay) {
-          const nextMs = new Date(pay.lastPaidAt).getTime() + SIX_MONTHS_MS
-          const iso = new Date(nextMs).toISOString()
+        } else {
+          const iso = nd.toISOString()
           if (!nextDue || iso < nextDue) nextDue = iso
         }
       }
@@ -261,9 +263,9 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
     ;[activePods, switchedPods] = await Promise.all([fetchAll(false), fetchAll(true)])
   }
 
-  // Per-POD payment history: latest paid_at + count per pod_contact_id.
-  // Paginate to avoid the PostgREST 1000-row cap when an admin has many
-  // long-lived PODs with multiple payments each.
+  // Per-POD payment history: count + most recent paid_at, keyed by
+  // pod_contact_id. Paginate to avoid the PostgREST 1000-row cap when
+  // an admin has many long-lived PODs with multiple payments each.
   const allPodIds = [...activePods, ...switchedPods].map((p) => p.id)
   const podPaymentMap = new Map<string, { lastPaidAt: string; count: number }>()
   if (allPodIds.length > 0) {
@@ -287,23 +289,28 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
     }
   }
 
-  const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000
   const todayMs = Date.now()
 
   function asPodRow(p: CachedContactRow): PodRow {
     const override = Number(p.pod_override) || 0
     const pay = podPaymentMap.get(p.id)
+    const paidCount = pay?.count ?? 0
     const cachedAt = (p as { cached_at?: string }).cached_at
+    // Cycle is anchored to the date the POD was added (cached_at) and
+    // never re-anchored on payment: cycle N runs addedAt+(N-1)*6mo …
+    // addedAt+N*6mo. nextDueDate = addedAt + paidCount * 6mo (in
+    // calendar months). For paidCount=0 that's addedAt itself, so the
+    // POD is "Da Pagare" the moment it lands. For paidCount=1 it's
+    // exactly addedAt+6mo (the bug was using 180 days).
     let nextDueDate: string | undefined
     let paymentStatus: 'paid' | 'due' = 'due'
-    if (pay) {
-      const nextMs = new Date(pay.lastPaidAt).getTime() + SIX_MONTHS_MS
-      nextDueDate = new Date(nextMs).toISOString()
-      paymentStatus = nextMs > todayMs ? 'paid' : 'due'
-    } else if (cachedAt) {
-      // No payment yet — POD is due now (since insertion).
-      nextDueDate = cachedAt
-      paymentStatus = 'due'
+    if (cachedAt) {
+      const nd = new Date(cachedAt)
+      nd.setMonth(nd.getMonth() + paidCount * 6)
+      nextDueDate = nd.toISOString()
+      paymentStatus = nd.getTime() <= todayMs ? 'due' : 'paid'
+    } else {
+      paymentStatus = paidCount === 0 ? 'due' : 'paid'
     }
     return {
       contactId: p.id,

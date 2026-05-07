@@ -39,8 +39,25 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [pending, startTransition] = useTransition()
   const [flash, setFlash] = useState<string | null>(null)
+  const [addedFrom, setAddedFrom] = useState('')
+  const [addedTo, setAddedTo] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'due' | 'paid'>('all')
 
-  const dueRows = useMemo(() => pods.filter((p) => p.paymentStatus === 'due'), [pods])
+  const visiblePods = useMemo(() => {
+    let out = pods
+    if (addedFrom) {
+      const f = new Date(addedFrom + 'T00:00:00').getTime()
+      out = out.filter((p) => p.addedAt && new Date(p.addedAt).getTime() >= f)
+    }
+    if (addedTo) {
+      const t = new Date(addedTo + 'T23:59:59').getTime()
+      out = out.filter((p) => p.addedAt && new Date(p.addedAt).getTime() <= t)
+    }
+    if (statusFilter !== 'all') out = out.filter((p) => p.paymentStatus === statusFilter)
+    return out
+  }, [pods, addedFrom, addedTo, statusFilter])
+
+  const dueRows = useMemo(() => visiblePods.filter((p) => p.paymentStatus === 'due'), [visiblePods])
   const selectedRows = useMemo(() => pods.filter((p) => selected.has(p.contactId)), [pods, selected])
   const selectedTotal = selectedRows.reduce((s, r) => s + r.amount, 0)
   const allDueSelected = dueRows.length > 0 && dueRows.every((r) => selected.has(r.contactId))
@@ -79,8 +96,31 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
     })
   }
 
+  const filtersActive = !!(addedFrom || addedTo || statusFilter !== 'all')
+
   return (
     <>
+      {payable && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', borderBottom: '1px solid var(--ap-line)', flexWrap: 'wrap' }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Aggiunti dal</label>
+          <input type="date" value={addedFrom} onChange={(e) => setAddedFrom(e.target.value)} className="ap-input" style={{ height: 30, fontSize: 12 }} />
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>al</label>
+          <input type="date" value={addedTo} onChange={(e) => setAddedTo(e.target.value)} className="ap-input" style={{ height: 30, fontSize: 12 }} />
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} className="ap-input" style={{ height: 30, fontSize: 12 }}>
+            <option value="all">Tutti gli stati</option>
+            <option value="due">Solo Da Pagare</option>
+            <option value="paid">Solo Pagati</option>
+          </select>
+          {filtersActive && (
+            <button type="button" className="ap-btn ap-btn-ghost" style={{ height: 30, fontSize: 11 }} onClick={() => { setAddedFrom(''); setAddedTo(''); setStatusFilter('all') }}>
+              Reset
+            </button>
+          )}
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+            {visiblePods.length} di {pods.length}
+          </span>
+        </div>
+      )}
       {payable && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--ap-line)', flexWrap: 'wrap', background: selected.size ? 'color-mix(in srgb, var(--ap-blue-soft) 50%, white)' : 'transparent' }}>
           {selected.size > 0 ? (
@@ -97,7 +137,7 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
             <span style={{ fontSize: 12, color: 'var(--ap-text-muted)' }}>
               Seleziona uno o più POD da pagare. {dueRows.length > 0 && (
                 <button type="button" onClick={selectAllDue} style={{ background: 'transparent', border: 'none', color: 'var(--ap-blue)', cursor: 'pointer', fontWeight: 700, padding: 0, fontSize: 12 }}>
-                  Seleziona tutti i {dueRows.length} da pagare
+                  {filtersActive ? `Seleziona ${dueRows.length} filtrati da pagare` : `Seleziona tutti i ${dueRows.length} da pagare`}
                 </button>
               )}
             </span>
@@ -130,12 +170,14 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
           </tr>
         </thead>
         <tbody>
-          {pods.length === 0 && (
+          {visiblePods.length === 0 && (
             <tr>
-              <td colSpan={payable ? 10 : 5} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td>
+              <td colSpan={payable ? 10 : 5} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>
+                {pods.length === 0 ? 'Nessun condominio.' : 'Nessun risultato per i filtri selezionati.'}
+              </td>
             </tr>
           )}
-          {pods.map((p) => (
+          {visiblePods.map((p) => (
             <Row
               key={p.contactId}
               pod={p}
