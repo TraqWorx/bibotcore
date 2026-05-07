@@ -20,15 +20,9 @@ export interface RecomputeResult {
 export async function recomputeCommissions(): Promise<RecomputeResult> {
   const sb = createAdminClient()
 
-  const [{ data: adminsRaw }, { data: podsRaw }] = await Promise.all([
-    sb.from('apulia_contacts')
-      .select('id, ghl_id, codice_amministratore, compenso_per_pod, commissione_totale, custom_fields')
-      .eq('is_amministratore', true),
-    sb.from('apulia_contacts')
-      .select('codice_amministratore, pod_override, is_switch_out')
-      .eq('is_amministratore', false),
-  ])
-
+  // PostgREST caps a single select at 1000 rows. With several thousand
+  // condomini we MUST paginate or the totals will be silently truncated
+  // to whatever subset comes back.
   type AdminRow = {
     id: string
     ghl_id: string | null
@@ -42,9 +36,28 @@ export async function recomputeCommissions(): Promise<RecomputeResult> {
     pod_override: number | null
     is_switch_out: boolean
   }
-
-  const admins = (adminsRaw ?? []) as AdminRow[]
-  const pods = (podsRaw ?? []) as PodRow[]
+  const admins: AdminRow[] = []
+  const pods: PodRow[] = []
+  for (let from = 0; ; from += 1000) {
+    const { data } = await sb.from('apulia_contacts')
+      .select('id, ghl_id, codice_amministratore, compenso_per_pod, commissione_totale, custom_fields')
+      .eq('is_amministratore', true)
+      .neq('sync_status', 'pending_delete')
+      .range(from, from + 999)
+    if (!data || data.length === 0) break
+    admins.push(...(data as AdminRow[]))
+    if (data.length < 1000) break
+  }
+  for (let from = 0; ; from += 1000) {
+    const { data } = await sb.from('apulia_contacts')
+      .select('codice_amministratore, pod_override, is_switch_out')
+      .eq('is_amministratore', false)
+      .neq('sync_status', 'pending_delete')
+      .range(from, from + 999)
+    if (!data || data.length === 0) break
+    pods.push(...(data as PodRow[]))
+    if (data.length < 1000) break
+  }
   const activePods = pods.filter((p) => !p.is_switch_out)
 
   const byCode = new Map<string, { compenso: number; total: number; count: number }>()
