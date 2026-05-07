@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { listAdminsWithStats } from '@/lib/apulia/queries'
@@ -19,33 +20,32 @@ export default async function Page() {
   if (session.role !== 'owner') redirect('/designs/apulia-power/dashboard')
 
   const sb = createAdminClient()
-  // Cumulative "Già pagato" reads directly from apulia_payments. Paginate
-  // so we don't hit the PostgREST 1000-row cap once history grows.
-  const fetchPaidTotal = async (): Promise<number> => {
+  const period = currentPeriod()
+  // Scope "Già pagato" to the current semester so the figure stays
+  // bounded over years instead of growing forever. /pagamenti is the
+  // place to drill into full history.
+  const fetchPaidThisPeriod = async (): Promise<number> => {
     let total = 0
     for (let from = 0; ; from += 1000) {
-      const { data } = await sb.from('apulia_payments').select('amount_cents').range(from, from + 999)
+      const { data } = await sb.from('apulia_payments').select('amount_cents, paid_at').range(from, from + 999)
       if (!data || data.length === 0) break
-      for (const r of data) total += Number((r as { amount_cents: number }).amount_cents) || 0
+      for (const r of data as Array<{ amount_cents: number; paid_at: string }>) {
+        if (currentPeriod(new Date(r.paid_at)) === period) total += Number(r.amount_cents) || 0
+      }
       if (data.length < 1000) break
     }
     return total / 100
   }
-  const [admins, { data: latestCache }, totalPaidAllTime] = await Promise.all([
+  const [admins, { data: latestCache }, paidThisPeriodTotal] = await Promise.all([
     listAdminsWithStats(),
     sb.from('apulia_contacts').select('cached_at').order('cached_at', { ascending: false }).limit(1).maybeSingle(),
-    fetchPaidTotal(),
+    fetchPaidThisPeriod(),
   ])
   const cacheAgeMinutes = latestCache?.cached_at
     ? (Date.now() - new Date(latestCache.cached_at).getTime()) / 60000
     : Number.POSITIVE_INFINITY
-  // "Da pagare" = somma dei POD attualmente da pagare (scaduti).
-  // "Già pagato" = totale cumulativo di tutto ciò che è stato registrato
-  // come pagamento (cresce nel tempo).
   const totalDue = admins.reduce((s, a) => s + a.total, 0)
-  const totalPaid = totalPaidAllTime
   const dueNowCount = admins.filter((a) => a.isDueNow).length
-  const period = currentPeriod()
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -67,9 +67,13 @@ export default async function Page() {
             <div className="ap-stat-value">{fmtEur(totalDue)}</div>
           </div>
           <div className="ap-stat" data-tone="good" style={{ minWidth: 180 }}>
-            <div className="ap-stat-label">Già pagato</div>
-            <div className="ap-stat-value">{fmtEur(totalPaid)}</div>
-            <div className="ap-stat-foot">cumulativo · tutti i pagamenti registrati</div>
+            <div className="ap-stat-label">Pagato {period}</div>
+            <div className="ap-stat-value">{fmtEur(paidThisPeriodTotal)}</div>
+            <div className="ap-stat-foot">
+              <Link href="/designs/apulia-power/pagamenti" style={{ color: 'var(--ap-blue)', textDecoration: 'none', fontWeight: 700 }}>
+                Storico completo →
+              </Link>
+            </div>
           </div>
         </div>
       </header>

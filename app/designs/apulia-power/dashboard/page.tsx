@@ -59,8 +59,6 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
         <p className="ap-page-subtitle">Panoramica della rete commerciale Apulia Power. Periodo corrente: <strong>{period}</strong>.</p>
       </header>
 
-      <DateRangeForm initialFrom={fromIso} initialTo={toIso} basePath="/designs/apulia-power/dashboard" />
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
         <div className="ap-stat" data-tone="accent">
           <div className="ap-stat-label">Condomini attivi</div>
@@ -93,6 +91,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
           <div className="ap-stat-foot">{admins.filter((a) => a.paidThisPeriod).length} amministratori in corso</div>
         </div>
       </div>
+
+      <DateRangeForm initialFrom={fromIso} initialTo={toIso} basePath="/designs/apulia-power/dashboard" />
 
       <section className="ap-card">
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid var(--ap-line)' }}>
