@@ -184,24 +184,54 @@ interface PdpSummary {
   existingCondominiUpdated?: number
   switchOutCleared?: number
   newAdminsAutoCreated?: number
+  collapsedDuplicatePods?: number
+  duplicatePodSamples?: Array<{ pod: string; rows: number }>
   recompute?: { admins?: number; pods?: number; podsActive?: number; totalCommissionCents?: number }
 }
 
 function PdpDetails({ r, summary }: { r: ImportRow; summary: PdpSummary | null }) {
+  const fileRows = r.rows_total ?? 0
+  const noPod = summary?.skippedReasons?.no_pod ?? r.skipped ?? 0
+  const collapsed = summary?.collapsedDuplicatePods ?? 0
+  const created = summary?.newCondominiCreated ?? r.created ?? 0
+  const updated = summary?.existingCondominiUpdated ?? r.updated ?? 0
+  const accountedFor = noPod + collapsed + created + updated
+  const drift = fileRows - accountedFor
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-      <Stat label="Righe nel file" value={r.rows_total ?? 0} />
-      <Stat label="Con POD/PDR" value={summary?.rowsWithPod ?? (r.rows_total ?? 0) - (r.skipped ?? 0)} />
-      <Stat label="Saltate (no POD)" value={summary?.skippedReasons?.no_pod ?? r.skipped ?? 0} accent={r.skipped ? 'amber' : undefined} />
-      <Stat label="Condomini creati" value={summary?.newCondominiCreated ?? r.created ?? 0} accent="green" />
-      <Stat label="Condomini aggiornati" value={summary?.existingCondominiUpdated ?? r.updated ?? 0} />
-      <Stat label="Switch-out riattivati" value={summary?.switchOutCleared ?? r.untagged ?? 0} />
-      <Stat label="Nuovi amministratori (auto)" value={summary?.newAdminsAutoCreated ?? 0} accent="green" />
-      {summary?.recompute && (
-        <>
-          <Stat label="POD attivi (totale)" value={summary.recompute.podsActive ?? 0} />
-          <Stat label="Commissione totale" value={`EUR ${((summary.recompute.totalCommissionCents ?? 0) / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`} />
-        </>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: 12, color: 'var(--ap-text-muted)', lineHeight: 1.6 }}>
+        <strong>Bilancio righe del file:</strong> {fileRows.toLocaleString('it-IT')} totali = {created.toLocaleString('it-IT')} create + {updated.toLocaleString('it-IT')} aggiornate + {noPod.toLocaleString('it-IT')} saltate + {collapsed.toLocaleString('it-IT')} duplicati uniti
+        {drift !== 0 && fileRows > 0 && (
+          <span style={{ color: 'var(--ap-warning)' }}> &nbsp;({drift > 0 ? `+${drift}` : drift} non quadra — possibile race con webhook)</span>
+        )}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+        <Stat label="Righe nel file" value={fileRows} />
+        <Stat label="Con POD/PDR" value={summary?.rowsWithPod ?? fileRows - noPod} />
+        <Stat label="Saltate (cella POD vuota)" value={noPod} accent={noPod ? 'amber' : undefined} />
+        <Stat label="Duplicati POD nel file (uniti)" value={collapsed} accent={collapsed ? 'amber' : undefined} />
+        <Stat label="Condomini creati (nuovi)" value={created} accent="green" />
+        <Stat label="Condomini aggiornati (esistenti)" value={updated} />
+        <Stat label="Switch-out riattivati" value={summary?.switchOutCleared ?? r.untagged ?? 0} />
+        <Stat label="Nuovi amministratori (auto)" value={summary?.newAdminsAutoCreated ?? 0} accent="green" />
+        {summary?.recompute && (
+          <>
+            <Stat label="POD attivi totali" value={summary.recompute.podsActive ?? 0} />
+            <Stat label="Commissione totale" value={`EUR ${((summary.recompute.totalCommissionCents ?? 0) / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`} />
+          </>
+        )}
+      </div>
+      {summary?.duplicatePodSamples && summary.duplicatePodSamples.length > 0 && (
+        <details style={{ fontSize: 11 }}>
+          <summary style={{ cursor: 'pointer', color: 'var(--ap-warning)', fontWeight: 700 }}>
+            POD duplicati nel file ({summary.duplicatePodSamples.length})
+          </summary>
+          <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: 11, color: 'var(--ap-text-muted)' }}>
+            {summary.duplicatePodSamples.map((d, i) => (
+              <li key={i}><code>{d.pod}</code> — {d.rows} righe nel file (collassate in 1)</li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   )

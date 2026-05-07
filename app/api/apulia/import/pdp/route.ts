@@ -60,6 +60,8 @@ export async function POST(req: NextRequest) {
   const importId = imp?.id as string | undefined
 
   let counters = { created: 0, updated: 0, untagged: 0, unmatched: 0, skipped: 0 }
+  let totalCollapsedDuplicates = 0
+  const allDuplicatePodSamples: Array<{ pod: string; rows: number }> = []
   const createdInRun: Record<string, { id: string; firstName?: string; tags?: string[] }> = {}
 
   try {
@@ -68,6 +70,8 @@ export async function POST(req: NextRequest) {
       const view = { ...init.byPodInit, ...createdInRun }
       const out = await processPdpChunk(slice, init.colFieldMap, view, counters, importId)
       counters = out.counters
+      totalCollapsedDuplicates += out.collapsedDuplicates ?? 0
+      if (out.duplicatePodSamples) allDuplicatePodSamples.push(...out.duplicatePodSamples)
       Object.assign(createdInRun, out.newCreated)
       if (importId) {
         await sb.from('apulia_imports').update({
@@ -97,6 +101,8 @@ export async function POST(req: NextRequest) {
           existingCondominiUpdated: counters.updated,
           switchOutCleared: counters.untagged,
           newAdminsAutoCreated: adminCreates,
+          collapsedDuplicatePods: totalCollapsedDuplicates,
+          duplicatePodSamples: allDuplicatePodSamples.slice(0, 10),
           recompute: recomputed,
         },
       }).eq('id', importId)

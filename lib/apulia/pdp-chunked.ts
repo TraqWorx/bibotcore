@@ -81,6 +81,11 @@ export interface ChunkOutput {
   newCreated: Record<string, CompactContact>
   rateLimited?: boolean
   processedCount?: number
+  /** File rows in this slice whose POD duplicated another row in the
+   *  same slice — collapsed by the defensive dedup pass before insert. */
+  collapsedDuplicates?: number
+  /** Sample of PODs that appeared >1 time in this slice (for diagnostics). */
+  duplicatePodSamples?: Array<{ pod: string; rows: number }>
 }
 
 /**
@@ -225,9 +230,11 @@ export async function processPdpChunk(
   }
   const insertsByPod = new Map<string, NewRow>()
   const droppedInserts: NewRow[] = []
+  const dupCounts = new Map<string, number>() // pod → #rows in this slice (for diagnostics)
   for (const ins of inserts) {
     const pod = ins.pod_pdr
     if (!pod) continue
+    dupCounts.set(pod, (dupCounts.get(pod) ?? 0) + 1)
     const prev = insertsByPod.get(pod)
     if (prev) {
       // Same POD already pending insert — fold this row's data in (so
@@ -245,6 +252,10 @@ export async function processPdpChunk(
       if (droppedIds.has(ops[i].contact_id)) ops.splice(i, 1)
     }
     counters.created -= droppedInserts.length
+  }
+  const duplicatePodSamples: Array<{ pod: string; rows: number }> = []
+  for (const [pod, n] of dupCounts.entries()) {
+    if (n > 1) duplicatePodSamples.push({ pod, rows: n })
   }
 
   // Persist DB writes in chunks.
@@ -267,7 +278,14 @@ export async function processPdpChunk(
   }
   await enqueueOps(ops, importId ?? null)
 
-  return { counters, newCreated, rateLimited: false, processedCount }
+  return {
+    counters,
+    newCreated,
+    rateLimited: false,
+    processedCount,
+    collapsedDuplicates: droppedInserts.length,
+    duplicatePodSamples,
+  }
 }
 
 /**
