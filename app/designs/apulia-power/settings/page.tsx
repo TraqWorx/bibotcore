@@ -18,10 +18,29 @@ export default async function Page() {
 
   const sb = createAdminClient()
 
+  // Count payments per admin via raw apulia_payments query so per-POD
+  // payments (period_idx IS NULL, pod_contact_id IS NOT NULL) get counted
+  // alongside legacy admin-level rows. The apulia_admin_schedule RPC's
+  // paid_count only counts admin-level rows with period_idx set.
+  // Paginate to avoid the PostgREST 1000-row cap.
+  const fetchPaidCounts = async (): Promise<Map<string, number>> => {
+    const map = new Map<string, number>()
+    for (let from = 0; ; from += 1000) {
+      const { data } = await sb.from('apulia_payments').select('contact_id').range(from, from + 999)
+      if (!data || data.length === 0) break
+      for (const r of data as Array<{ contact_id: string }>) {
+        map.set(r.contact_id, (map.get(r.contact_id) ?? 0) + 1)
+      }
+      if (data.length < 1000) break
+    }
+    return map
+  }
+
   const [
     { data: admins },
     { data: schedule },
     { data: podCounts },
+    paidCountMap,
   ] = await Promise.all([
     sb.from('apulia_contacts')
       .select('id, first_name, last_name, codice_amministratore, first_payment_at, compenso_per_pod, commissione_totale')
@@ -29,6 +48,7 @@ export default async function Page() {
       .order('first_name'),
     sb.rpc('apulia_admin_schedule'),
     sb.rpc('apulia_admin_pod_counts'),
+    fetchPaidCounts(),
   ])
 
   type ScheduleRow = { contact_id: string; first_payment_at: string | null; paid_count: number; next_period_idx: number; next_due_date: string | null; is_due_now: boolean; overdue_count: number }
@@ -43,7 +63,7 @@ export default async function Page() {
       podsActive: podCountMap.get(a.codice_amministratore ?? '') ?? 0,
       firstPaymentAt: a.first_payment_at,
       nextDueDate: sched?.next_due_date ?? null,
-      paidCount: sched?.paid_count ?? 0,
+      paidCount: paidCountMap.get(a.id) ?? 0,
       isDueNow: sched?.is_due_now ?? false,
       overdueCount: sched?.overdue_count ?? 0,
     }
