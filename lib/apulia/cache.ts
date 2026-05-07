@@ -69,7 +69,13 @@ export function cacheRowFromGhlContact(c: ApuliaContact): CachedContactRow {
   for (const f of c.customFields ?? []) {
     if (f.id && f.value != null) cf[f.id] = String(f.value)
   }
-  const isAdmin = Boolean(c.tags?.includes(APULIA_TAG.AMMINISTRATORE))
+  // GHL stores tags lowercased and webhooks them back lowercase, so a
+  // case-sensitive .includes('Switch-out') against the tag we sent
+  // ('Switch-out') would fail and flip is_switch_out back to false.
+  // Compare on lowercased tags only.
+  const tagsLower = (c.tags ?? []).map((t) => t.toLowerCase())
+  const isAdmin = tagsLower.includes(APULIA_TAG.AMMINISTRATORE.toLowerCase())
+  const isSwitchOut = tagsLower.includes(APULIA_TAG.SWITCH_OUT.toLowerCase())
   return {
     id: c.id,
     ghl_id: c.id,
@@ -90,7 +96,7 @@ export function cacheRowFromGhlContact(c: ApuliaContact): CachedContactRow {
     pod_override: num(cf[APULIA_FIELD.POD_OVERRIDE]),
     commissione_totale: num(cf[APULIA_FIELD.COMMISSIONE_TOTALE]),
     is_amministratore: isAdmin,
-    is_switch_out: Boolean(c.tags?.includes(APULIA_TAG.SWITCH_OUT)),
+    is_switch_out: isSwitchOut,
     ghl_updated_at: null,
   }
 }
@@ -231,7 +237,8 @@ export async function upsertCachedFromGhl(c: ApuliaContact): Promise<void> {
   }
   const pod = normalizePod(cf[APULIA_FIELD.POD_PDR])
   const codice = cf[APULIA_FIELD.CODICE_AMMINISTRATORE] ?? null
-  const isAdmin = Boolean(c.tags?.includes(APULIA_TAG.AMMINISTRATORE))
+  const tagsLowerFallback = (c.tags ?? []).map((t) => t.toLowerCase())
+  const isAdmin = tagsLowerFallback.includes(APULIA_TAG.AMMINISTRATORE.toLowerCase())
 
   let fallbackId: string | null = null
   if (isAdmin && codice) {
