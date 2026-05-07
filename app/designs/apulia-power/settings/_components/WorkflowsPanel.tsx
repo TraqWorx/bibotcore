@@ -10,19 +10,51 @@ interface Workflow {
 }
 
 /**
- * Group workflows by inferred "folder" since GHL's public API doesn't
- * expose actual folder metadata. Heuristic:
- *   - "store N <…>" → group "Store N"
- *   - else: use first word of the name (e.g., "Bisceglie", "Torino")
- *   - utility names that don't fit → "Generale"
+ * Mirror of the GHL workflow folders the owner uses on Apulia.
+ * GHL doesn't expose folder metadata over the public API (verified —
+ * /workflows/folders 404s, /workflows/{id} 404s, includeFolders=422),
+ * so this mapping is hand-maintained to match what the owner sees in
+ * the GHL UI. Update the STORE_CITY map (or the city-only fallbacks)
+ * if the folder structure changes.
  */
+const STORE_CITY: Record<number, string> = {
+  1: 'Bisceglie',
+  2: 'Barletta',
+  3: 'Casagiove',
+  4: 'Caserta',
+  5: 'Napoli Secondigliano',
+  6: 'Torino',
+  7: 'Messina',
+}
+
+const CITY_TO_STORE: Record<string, number> = Object.fromEntries(
+  Object.entries(STORE_CITY).map(([n, c]) => [c.toLowerCase(), Number(n)]),
+)
+
+function folderLabel(storeNum: number): string {
+  return `Store ${storeNum} – ${STORE_CITY[storeNum]} Automations`
+}
+
 function inferFolder(name: string): string {
+  const lower = name.toLowerCase()
+
+  // 1. Explicit "store N <…>" prefix.
   const storeMatch = name.match(/^store\s+(\d+)/i)
-  if (storeMatch) return `Store ${storeMatch[1]}`
-  const firstWord = (name.split(/\s+/)[0] ?? '').replace(/[^\w]/g, '')
-  if (/^(promo|qualification|workflow)$/i.test(firstWord)) return 'Generale'
-  if (!firstWord) return 'Generale'
-  return firstWord.charAt(0).toUpperCase() + firstWord.slice(1)
+  if (storeMatch) {
+    const n = Number(storeMatch[1])
+    if (STORE_CITY[n]) return folderLabel(n)
+    return `Store ${n}`
+  }
+
+  // 2. Workflow name leads with a known city — match longest first so
+  //    "Napoli Secondigliano" wins over "Napoli".
+  const cityKeys = Object.keys(CITY_TO_STORE).sort((a, b) => b.length - a.length)
+  for (const c of cityKeys) {
+    if (lower.startsWith(c)) return folderLabel(CITY_TO_STORE[c])
+  }
+
+  // 3. Fallback bucket for utility / cross-store flows.
+  return 'Generale'
 }
 
 export default function WorkflowsPanel({ workflows }: { workflows: Workflow[] }) {
@@ -46,10 +78,11 @@ export default function WorkflowsPanel({ workflows }: { workflows: Workflow[] })
       if (!arr) { arr = []; map.set(folder, arr) }
       arr.push(w)
     }
-    // Sort: Store N numerically asc; cities alphabetically; "Generale" last.
+    // Sort: "Store N – …" numerically asc, "Generale" last, anything
+    // else alphabetical.
     return Array.from(map.entries()).sort(([a], [b]) => {
-      const ma = a.match(/^Store (\d+)$/)
-      const mb = b.match(/^Store (\d+)$/)
+      const ma = a.match(/^Store (\d+)/)
+      const mb = b.match(/^Store (\d+)/)
       if (ma && mb) return Number(ma[1]) - Number(mb[1])
       if (ma) return -1
       if (mb) return 1
@@ -91,7 +124,7 @@ export default function WorkflowsPanel({ workflows }: { workflows: Workflow[] })
       </div>
 
       <div style={{ fontSize: 11, color: 'var(--ap-text-faint)', marginBottom: 12 }}>
-        Lo stato è gestito direttamente in GHL — l&apos;API non permette di cambiarlo da qui. Le cartelle sono dedotte dal nome (GHL non espone i folder).
+        Lo stato è gestito direttamente in GHL — l&apos;API non permette di cambiarlo da qui. Le cartelle rispecchiano la struttura GHL Store/città.
       </div>
 
       {grouped.length === 0 && (
