@@ -32,21 +32,35 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
 
   // Owner view
   const [snap, admins] = await Promise.all([loadSnapshot(), listAdminsWithStats()])
-  // "Da pagare" = totale commissioni non ancora incassate (sia scaduto sia futuro).
-  // "Già pagato" = somma di chi ha già pagato il periodo corrente.
-  const totalDue = admins.filter((a) => !a.paidThisPeriod).reduce((s, a) => s + a.total, 0)
-  const totalPaid = admins.filter((a) => a.paidThisPeriod).reduce((s, a) => s + a.total, 0)
+  const totalDue = admins.reduce((s, a) => s + a.total, 0)
   const dueNowCount = admins.filter((a) => a.isDueNow).length
   const period = currentPeriod()
 
   // Recent imports + leads-per-store (selected range) + today's
-  // appointments grouped by store.
+  // appointments grouped by store + payments made this calendar month.
   const sb = createAdminClient()
-  const [{ data: recent }, { data: leadsByStore }, todayAppts] = await Promise.all([
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const fetchPaidThisMonth = async (): Promise<number> => {
+    let total = 0
+    for (let from = 0; ; from += 1000) {
+      const { data } = await sb
+        .from('apulia_payments')
+        .select('amount_cents')
+        .gte('paid_at', monthStart.toISOString())
+        .range(from, from + 999)
+      if (!data || data.length === 0) break
+      for (const r of data as Array<{ amount_cents: number }>) total += Number(r.amount_cents) || 0
+      if (data.length < 1000) break
+    }
+    return total / 100
+  }
+  const [{ data: recent }, { data: leadsByStore }, todayAppts, paidThisMonthTotal] = await Promise.all([
     sb.from('apulia_imports').select('id, kind, filename, rows_total, created_at').order('created_at', { ascending: false }).limit(5),
     sb.rpc('apulia_lead_counts_per_store_range', { from_iso: fromTs, to_iso: toTs }) as unknown as Promise<{ data: { slug: string; range_count: number; total_count: number }[] | null }>,
     listTodayAppointmentsByStore(),
+    fetchPaidThisMonth(),
   ])
+  const monthLabel = monthStart.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
   const stores = await import('@/lib/apulia/stores').then((m) => m.listStores())
   const leadsMap = new Map((leadsByStore ?? []).map((r) => [r.slug, r]))
   const totalLeadsRange = (leadsByStore ?? []).reduce((s, r) => s + (r.range_count || 0), 0)
@@ -91,9 +105,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
           <div className="ap-stat-foot">{dueNowCount > 0 ? `${dueNowCount} con scadenza oggi o in arretrato` : 'Nessun arretrato — tutti programmati'}</div>
         </div>
         <div className="ap-stat" data-tone="good">
-          <div className="ap-stat-label">Già pagato (totale)</div>
-          <div className="ap-stat-value">{fmtEur(totalPaid)}</div>
-          <div className="ap-stat-foot">{admins.filter((a) => a.paidThisPeriod).length} amministratori in corso</div>
+          <div className="ap-stat-label" style={{ textTransform: 'capitalize' }}>Pagato {monthLabel}</div>
+          <div className="ap-stat-value">{fmtEur(paidThisMonthTotal)}</div>
+          <div className="ap-stat-foot">
+            <Link href="/designs/apulia-power/pagamenti" style={{ color: 'var(--ap-blue)', textDecoration: 'none', fontWeight: 700 }}>
+              Storico completo →
+            </Link>
+          </div>
         </div>
       </div>
 
