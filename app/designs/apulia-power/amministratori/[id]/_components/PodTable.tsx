@@ -100,48 +100,48 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
 
   return (
     <>
-      {payable && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', borderBottom: '1px solid var(--ap-line)', flexWrap: 'wrap' }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Aggiunti dal</label>
-          <input type="date" value={addedFrom} onChange={(e) => setAddedFrom(e.target.value)} className="ap-input" style={{ height: 30, fontSize: 12 }} />
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>al</label>
-          <input type="date" value={addedTo} onChange={(e) => setAddedTo(e.target.value)} className="ap-input" style={{ height: 30, fontSize: 12 }} />
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} className="ap-input" style={{ height: 30, fontSize: 12 }}>
+      {payable && selected.size === 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderBottom: '1px solid var(--ap-line)', flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid var(--ap-line)', borderRadius: 8, padding: '4px 8px', background: 'var(--ap-bg, #fff)' }}>
+            <span style={{ fontSize: 11, color: 'var(--ap-text-muted)', whiteSpace: 'nowrap' }}>Aggiunti</span>
+            <input type="date" value={addedFrom} onChange={(e) => setAddedFrom(e.target.value)} style={{ border: 'none', background: 'transparent', fontSize: 12, height: 24, outline: 'none', minWidth: 120 }} />
+            <span style={{ fontSize: 11, color: 'var(--ap-text-faint)' }}>→</span>
+            <input type="date" value={addedTo} onChange={(e) => setAddedTo(e.target.value)} style={{ border: 'none', background: 'transparent', fontSize: 12, height: 24, outline: 'none', minWidth: 120 }} />
+          </div>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} className="ap-input" style={{ height: 32, fontSize: 12, minWidth: 150 }}>
             <option value="all">Tutti gli stati</option>
             <option value="due">Solo Da Pagare</option>
             <option value="paid">Solo Pagati</option>
           </select>
           {filtersActive && (
-            <button type="button" className="ap-btn ap-btn-ghost" style={{ height: 30, fontSize: 11 }} onClick={() => { setAddedFrom(''); setAddedTo(''); setStatusFilter('all') }}>
+            <button type="button" className="ap-btn ap-btn-ghost" style={{ height: 32, fontSize: 12 }} onClick={() => { setAddedFrom(''); setAddedTo(''); setStatusFilter('all') }}>
               Reset
             </button>
           )}
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
             {visiblePods.length} di {pods.length}
           </span>
-        </div>
-      )}
-      {payable && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--ap-line)', flexWrap: 'wrap', background: selected.size ? 'color-mix(in srgb, var(--ap-blue-soft) 50%, white)' : 'transparent' }}>
-          {selected.size > 0 ? (
-            <>
-              <span style={{ fontWeight: 700, fontSize: 13 }}>
-                {selected.size} selezionati · {fmtEur(selectedTotal)}
-              </span>
-              <button className="ap-btn ap-btn-primary" onClick={payNow} disabled={pending}>
-                {pending ? 'Pago…' : `💸 Paga ${fmtEur(selectedTotal)}`}
-              </button>
-              <button className="ap-btn ap-btn-ghost" onClick={clearSel} disabled={pending}>Annulla selezione</button>
-            </>
-          ) : (
-            <span style={{ fontSize: 12, color: 'var(--ap-text-muted)' }}>
-              Seleziona uno o più POD da pagare. {dueRows.length > 0 && (
-                <button type="button" onClick={selectAllDue} style={{ background: 'transparent', border: 'none', color: 'var(--ap-blue)', cursor: 'pointer', fontWeight: 700, padding: 0, fontSize: 12 }}>
-                  {filtersActive ? `Seleziona ${dueRows.length} filtrati da pagare` : `Seleziona tutti i ${dueRows.length} da pagare`}
-                </button>
-              )}
+          {dueRows.length > 0 && (
+            <button type="button" onClick={selectAllDue} className="ap-btn ap-btn-ghost" style={{ marginLeft: 'auto', height: 32, fontSize: 12, color: 'var(--ap-blue)', fontWeight: 700 }}>
+              ☑ {filtersActive ? `Seleziona ${dueRows.length} filtrati` : `Seleziona tutti i ${dueRows.length} da pagare`}
+            </button>
+          )}
+          {flash && (
+            <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: flash.startsWith('Errore') ? 'var(--ap-danger)' : 'var(--ap-success)' }}>
+              {flash}
             </span>
           )}
+        </div>
+      )}
+      {payable && selected.size > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--ap-line)', flexWrap: 'wrap', background: 'color-mix(in srgb, var(--ap-blue-soft) 50%, white)' }}>
+          <span style={{ fontWeight: 700, fontSize: 13 }}>
+            {selected.size} selezionati · {fmtEur(selectedTotal)}
+          </span>
+          <button className="ap-btn ap-btn-primary" onClick={payNow} disabled={pending}>
+            {pending ? 'Pago…' : `💸 Paga ${fmtEur(selectedTotal)}`}
+          </button>
+          <button className="ap-btn ap-btn-ghost" onClick={clearSel} disabled={pending}>Annulla selezione</button>
           {flash && (
             <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: flash.startsWith('Errore') ? 'var(--ap-danger)' : 'var(--ap-success)' }}>
               {flash}
