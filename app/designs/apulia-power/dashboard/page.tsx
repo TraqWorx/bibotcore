@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { listAdminsWithStats, loadSnapshot } from '@/lib/apulia/queries'
-import { currentPeriod, APULIA_FIELD } from '@/lib/apulia/fields'
+import { APULIA_FIELD } from '@/lib/apulia/fields'
 import { createAdminClient } from '@/lib/supabase-server'
 import { listTodayAppointmentsByStore } from '@/lib/apulia/appointments'
 import DateRangeForm from '../stores/_components/DateRangeForm'
@@ -34,7 +34,6 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
   const [snap, admins] = await Promise.all([loadSnapshot(), listAdminsWithStats()])
   const totalDue = admins.reduce((s, a) => s + a.total, 0)
   const dueNowCount = admins.filter((a) => a.isDueNow).length
-  const period = currentPeriod()
 
   // Recent imports + leads-per-store (selected range) + today's
   // appointments grouped by store + payments made this calendar month.
@@ -75,7 +74,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <header>
         <h1 className="ap-page-title">Dashboard</h1>
-        <p className="ap-page-subtitle">Panoramica della rete commerciale Apulia Power. Periodo corrente: <strong>{period}</strong>.</p>
+        <p className="ap-page-subtitle">Panoramica della rete commerciale Apulia Power.</p>
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
@@ -260,7 +259,6 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
 }
 
 async function AdminView({ codice, contactId }: { codice?: string; contactId?: string }) {
-  const period = currentPeriod()
   if (!contactId) {
     return (
       <div className="ap-card ap-card-pad">
@@ -298,7 +296,7 @@ async function AdminView({ codice, contactId }: { codice?: string; contactId?: s
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <header>
         <h1 className="ap-page-title">Ciao {admin.name}</h1>
-        <p className="ap-page-subtitle">Cod. Amministratore: <strong style={{ fontFamily: 'monospace' }}>{codice ?? '—'}</strong> · Periodo corrente: <strong>{period}</strong>.</p>
+        <p className="ap-page-subtitle">Cod. Amministratore: <strong style={{ fontFamily: 'monospace' }}>{codice ?? '—'}</strong>.</p>
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
@@ -311,7 +309,7 @@ async function AdminView({ codice, contactId }: { codice?: string; contactId?: s
           <div className="ap-stat-value">{admin.podsSwitchedOut}</div>
         </div>
         <div className="ap-stat" data-tone={admin.paidThisPeriod ? 'good' : 'neutral'}>
-          <div className="ap-stat-label">Da ricevere {period}</div>
+          <div className="ap-stat-label">Da ricevere</div>
           <div className="ap-stat-value">{fmtEur(admin.total)}</div>
           <div className="ap-stat-foot">{admin.paidThisPeriod ? `Ricevuto il ${admin.paidAt ? new Date(admin.paidAt).toLocaleDateString('it-IT') : ''}` : 'In attesa di pagamento'}</div>
         </div>

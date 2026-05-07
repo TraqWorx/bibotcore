@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
-import { moveOpportunityStage } from '@/lib/apulia/opportunities'
+import { moveOpportunityStage, syncOpportunities } from '@/lib/apulia/opportunities'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -22,4 +22,16 @@ export async function moveOpportunity(opportunityId: string, pipelineStageId: st
   const r = await moveOpportunityStage(opportunityId, pipelineStageId)
   if (!r.ok) return { error: r.error ?? 'Spostamento fallito' }
   revalidatePath('/designs/apulia-power/opportunita')
+}
+
+export async function resyncOpportunities(): Promise<{ pipelines?: number; opportunities?: number; error?: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { error: guard.error }
+  try {
+    const r = await syncOpportunities()
+    revalidatePath('/designs/apulia-power/opportunita')
+    return r
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'sync failed' }
+  }
 }

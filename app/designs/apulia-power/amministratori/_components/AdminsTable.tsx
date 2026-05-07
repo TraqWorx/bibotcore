@@ -28,7 +28,7 @@ function fmtEur(n: number): string {
   return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })
 }
 
-export default function AdminsTable({ admins, period }: { admins: AdminRow[]; period: string }) {
+export default function AdminsTable({ admins }: { admins: AdminRow[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [pending, startTransition] = useTransition()
   const [flash, setFlash] = useState<string | null>(null)

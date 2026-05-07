@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { listAdminsWithStats } from '@/lib/apulia/queries'
 import { createAdminClient } from '@/lib/supabase-server'
-import { currentPeriod } from '@/lib/apulia/fields'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,8 +22,20 @@ export default async function Page() {
   const session = await getApuliaSession()
   if (session.role !== 'owner') redirect('/designs/apulia-power/dashboard')
 
-  const period = currentPeriod()
   const admins = await listAdminsWithStats()
+  // Bucket key = YYYY-MM of paid_at (calendar month). The user wanted to
+  // drop the semester division because per-POD cycles are admin-specific.
+  const monthKey = (iso: string): string => {
+    const d = new Date(iso)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+  const monthLabel = (key: string): string => {
+    const [y, m] = key.split('-')
+    const d = new Date(Number(y), Number(m) - 1, 1)
+    return d.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
+  }
+  const now = new Date()
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
   const sb = createAdminClient()
   const { data: rawPayments } = await sb.from('apulia_payments')
@@ -44,21 +55,19 @@ export default async function Page() {
     }
   }
 
-  // Bucket each payment by semester (H1/H2 of paid_at year). Per-POD rows
-  // have a synthetic period string ("pod-{id}-{ts}") that's not human-
-  // readable, so we always derive the bucket from paid_at instead. Legacy
-  // admin-level rows that already have a real period code (e.g. "2026-H1")
-  // still land in the right bucket because currentPeriod(paid_at) returns
-  // the same value.
+  // Bucket each payment by calendar month. Per-POD rows have synthetic
+  // period strings ("pod-{id}-{ts}") that aren't human-readable, so we
+  // always derive the bucket from paid_at — and a calendar month matches
+  // the new "Pagato {mese}" indicator on the dashboard.
   const bucketed = new Map<string, PaymentRow[]>()
   for (const p of payments) {
-    const bucket = currentPeriod(new Date(p.paid_at))
+    const bucket = monthKey(p.paid_at)
     let arr = bucketed.get(bucket)
     if (!arr) { arr = []; bucketed.set(bucket, arr) }
     arr.push(p)
   }
-  // Always include the current period even if no payments yet recorded.
-  if (!bucketed.has(period)) bucketed.set(period, [])
+  // Always include the current month even if no payments recorded yet.
+  if (!bucketed.has(currentMonth)) bucketed.set(currentMonth, [])
 
   const buckets = [...bucketed.keys()].sort().reverse()
   const adminById = new Map(admins.map((a) => [a.contactId, a]))
@@ -69,20 +78,20 @@ export default async function Page() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <header>
         <h1 className="ap-page-title">Pagamenti</h1>
-        <p className="ap-page-subtitle">Storico pagamenti raggruppato per semestre. Periodo corrente: <strong>{period}</strong>.</p>
+        <p className="ap-page-subtitle">Storico pagamenti raggruppato per mese.</p>
       </header>
 
       {buckets.map((bucket) => {
         const bucketPayments = bucketed.get(bucket) ?? []
-        const isCurrent = bucket === period
+        const isCurrent = bucket === currentMonth
         const totalPaid = bucketPayments.reduce((s, p) => s + p.amount_cents, 0) / 100
         return (
           <section key={bucket} className="ap-card">
             <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 800 }}>
-                Periodo {bucket}
-                {isCurrent && <span className="ap-pill" data-tone="blue" style={{ marginLeft: 10, fontSize: 10 }}>corrente</span>}
-                <span style={{ color: 'var(--ap-text-faint)', fontWeight: 500, marginLeft: 8 }}>· {bucketPayments.length} pagamenti</span>
+              <h2 style={{ fontSize: 16, fontWeight: 800, textTransform: 'capitalize' }}>
+                {monthLabel(bucket)}
+                {isCurrent && <span className="ap-pill" data-tone="blue" style={{ marginLeft: 10, fontSize: 10, textTransform: 'lowercase' }}>corrente</span>}
+                <span style={{ color: 'var(--ap-text-faint)', fontWeight: 500, marginLeft: 8, textTransform: 'lowercase' }}>· {bucketPayments.length} pagamenti</span>
               </h2>
               <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
                 <span>Pagati: <strong>{fmtEur(totalPaid)}</strong></span>

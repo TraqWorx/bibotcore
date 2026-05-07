@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
-import { currentPeriod } from '@/lib/apulia/fields'
 import { createAdminClient } from '@/lib/supabase-server'
 import { listApuliaWorkflows } from '@/lib/apulia/workflows'
 import AdminPaymentSchedule, { type AdminScheduleEntry } from './_components/AdminPaymentSchedule'
@@ -118,7 +117,6 @@ export default async function Page() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1080 }}>
       <header>
         <h1 className="ap-page-title">Impostazioni</h1>
-        <p className="ap-page-subtitle">Periodo corrente: <strong>{currentPeriod()}</strong>.</p>
       </header>
 
       <SettingsTabs

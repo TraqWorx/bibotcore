@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { listAdminsWithStats } from '@/lib/apulia/queries'
-import { currentPeriod } from '@/lib/apulia/fields'
 import AdminsTable from './_components/AdminsTable'
 import AddAdminPanel from './_components/AddAdminPanel'
 import { ResyncButton } from '../settings/_components/SettingsForms'
@@ -85,7 +84,7 @@ export default async function Page() {
       </header>
 
       <section className="ap-card">
-        <AdminsTable admins={admins} period={currentPeriod()} />
+        <AdminsTable admins={admins} />
       </section>
     </div>
   )
