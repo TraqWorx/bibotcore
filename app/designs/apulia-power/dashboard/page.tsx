@@ -3,6 +3,7 @@ import { getApuliaSession } from '@/lib/apulia/auth'
 import { listAdminsWithStats, loadSnapshot } from '@/lib/apulia/queries'
 import { currentPeriod } from '@/lib/apulia/fields'
 import { createAdminClient } from '@/lib/supabase-server'
+import DateRangeForm from '../stores/_components/DateRangeForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,10 +11,23 @@ function fmtEur(n: number): string {
   return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })
 }
 
-export default async function Page() {
+interface SearchParams { from?: string; to?: string }
+
+export default async function Page({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const session = await getApuliaSession()
 
   if (session.role === 'amministratore') return <AdminView codice={session.codiceAmministratore} contactId={session.contactId} />
+
+  const sp = (await searchParams) ?? {}
+  // Default range: current month → today.
+  const now = new Date()
+  const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+  const defaultTo = now.toISOString().slice(0, 10)
+  const fromIso = sp.from && sp.from.length === 10 ? sp.from : defaultFrom
+  const toIso = sp.to && sp.to.length === 10 ? sp.to : defaultTo
+  const fromTs = new Date(fromIso + 'T00:00:00Z').toISOString()
+  const toTs = new Date(toIso + 'T23:59:59Z').toISOString()
+  const isCustomRange = !!(sp.from || sp.to)
 
   // Owner view
   const [snap, admins] = await Promise.all([loadSnapshot(), listAdminsWithStats()])
@@ -24,16 +38,19 @@ export default async function Page() {
   const dueNowCount = admins.filter((a) => a.isDueNow).length
   const period = currentPeriod()
 
-  // Recent imports + leads-per-store (current month)
+  // Recent imports + leads-per-store (selected range)
   const sb = createAdminClient()
-  const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0)
   const [{ data: recent }, { data: leadsByStore }] = await Promise.all([
     sb.from('apulia_imports').select('id, kind, filename, rows_total, created_at').order('created_at', { ascending: false }).limit(5),
-    sb.rpc('apulia_lead_counts_per_store', { since_iso: startOfMonth.toISOString() }) as unknown as Promise<{ data: { slug: string; month_count: number; total_count: number }[] | null }>,
+    sb.rpc('apulia_lead_counts_per_store_range', { from_iso: fromTs, to_iso: toTs }) as unknown as Promise<{ data: { slug: string; range_count: number; total_count: number }[] | null }>,
   ])
   const stores = await import('@/lib/apulia/stores').then((m) => m.listStores())
   const leadsMap = new Map((leadsByStore ?? []).map((r) => [r.slug, r]))
-  const totalLeadsMonth = (leadsByStore ?? []).reduce((s, r) => s + (r.month_count || 0), 0)
+  const totalLeadsRange = (leadsByStore ?? []).reduce((s, r) => s + (r.range_count || 0), 0)
+
+  const rangeLabel = isCustomRange
+    ? `dal ${new Date(fromIso).toLocaleDateString('it-IT')} al ${new Date(toIso).toLocaleDateString('it-IT')}`
+    : 'mese corrente'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -41,6 +58,8 @@ export default async function Page() {
         <h1 className="ap-page-title">Dashboard</h1>
         <p className="ap-page-subtitle">Panoramica della rete commerciale Apulia Power. Periodo corrente: <strong>{period}</strong>.</p>
       </header>
+
+      <DateRangeForm initialFrom={fromIso} initialTo={toIso} basePath="/designs/apulia-power/dashboard" />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
         <div className="ap-stat" data-tone="accent">
@@ -59,9 +78,9 @@ export default async function Page() {
           <div className="ap-stat-foot">esclusi dal calcolo commissione</div>
         </div>
         <div className="ap-stat" data-tone="accent">
-          <div className="ap-stat-label">Lead mese corrente</div>
-          <div className="ap-stat-value">{totalLeadsMonth.toLocaleString('it-IT')}</div>
-          <div className="ap-stat-foot">da QR / form pubblici</div>
+          <div className="ap-stat-label">Lead nel periodo</div>
+          <div className="ap-stat-value">{totalLeadsRange.toLocaleString('it-IT')}</div>
+          <div className="ap-stat-foot">{rangeLabel} · da QR / form pubblici</div>
         </div>
         <div className="ap-stat" data-tone={dueNowCount > 0 ? 'warn' : undefined}>
           <div className="ap-stat-label">Da pagare</div>
@@ -77,19 +96,19 @@ export default async function Page() {
 
       <section className="ap-card">
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid var(--ap-line)' }}>
-          <h2 style={{ fontSize: 14, fontWeight: 800 }}>Lead per store</h2>
+          <h2 style={{ fontSize: 14, fontWeight: 800 }}>Lead per store <span style={{ color: 'var(--ap-text-faint)', fontWeight: 500 }}>· {rangeLabel}</span></h2>
           <Link href="/designs/apulia-power/stores" style={{ fontSize: 12, fontWeight: 700, color: 'var(--ap-blue)', textDecoration: 'none' }}>Gestisci →</Link>
         </header>
         <table className="ap-table">
-          <thead><tr><th>Store</th><th style={{ textAlign: 'right' }}>Mese corrente</th><th style={{ textAlign: 'right' }}>Totale</th></tr></thead>
+          <thead><tr><th>Store</th><th style={{ textAlign: 'right' }}>Nel periodo</th><th style={{ textAlign: 'right' }}>Totale</th></tr></thead>
           <tbody>
             {stores.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessuno store configurato.</td></tr>}
             {stores.map((s) => {
-              const r = leadsMap.get(s.slug) as { month_count?: number; total_count?: number } | undefined
+              const r = leadsMap.get(s.slug) as { range_count?: number; total_count?: number } | undefined
               return (
                 <tr key={s.id}>
                   <td><strong>{s.name}</strong>{s.city && <span style={{ color: 'var(--ap-text-muted)', fontSize: 11, marginLeft: 6 }}>{s.city}</span>}</td>
-                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{(r?.month_count ?? 0)}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{(r?.range_count ?? 0)}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--ap-text-muted)' }}>{(r?.total_count ?? 0)}</td>
                 </tr>
               )

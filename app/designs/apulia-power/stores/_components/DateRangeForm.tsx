@@ -6,9 +6,11 @@ import { useState } from 'react'
 interface Props {
   initialFrom: string
   initialTo: string
+  /** Path to push the new query params to. Defaults to /designs/apulia-power/stores. */
+  basePath?: string
 }
 
-export default function DateRangeForm({ initialFrom, initialTo }: Props) {
+export default function DateRangeForm({ initialFrom, initialTo, basePath = '/designs/apulia-power/stores' }: Props) {
   const router = useRouter()
   const [from, setFrom] = useState(initialFrom)
   const [to, setTo] = useState(initialTo)
@@ -18,7 +20,7 @@ export default function DateRangeForm({ initialFrom, initialTo }: Props) {
     const u = new URLSearchParams()
     if (from) u.set('from', from)
     if (to) u.set('to', to)
-    router.push(`/designs/apulia-power/stores${u.toString() ? '?' + u.toString() : ''}`)
+    router.push(`${basePath}${u.toString() ? '?' + u.toString() : ''}`)
   }
 
   function preset(kind: 'month' | '90days' | 'year' | 'all') {

@@ -51,13 +51,17 @@ export default function StaleSyncTrigger({ ageMinutes, staleMinutes = 2 }: Props
     })()
   }, [staleMinutes, router, ageMinutes])
 
-  if (state === 'idle' || state === 'done') return null
+  // Hide on idle/done/error: this is a best-effort background cache refresh,
+  // not a row-level GHL sync. Failures here just mean the page may be a
+  // few minutes stale; the next visit (or the hourly cron) will catch up.
+  // Showing "⚠ Sync fallito" was confusing users who interpreted it as
+  // their data not being synced to GHL (it is — that's the per-row queue).
+  if (state !== 'checking' && state !== 'syncing') return null
 
   return (
     <span style={{ fontSize: 11, color: 'var(--ap-text-faint)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
       {state === 'checking' && <>↻ Verifico…</>}
       {state === 'syncing' && <>↻ Aggiorno…</>}
-      {state === 'error' && <span style={{ color: 'var(--ap-danger)' }}>⚠ Sync fallito</span>}
     </span>
   )
 }

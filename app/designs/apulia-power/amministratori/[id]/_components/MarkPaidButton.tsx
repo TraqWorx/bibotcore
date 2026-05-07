@@ -32,10 +32,14 @@ export default function MarkPaidButton({ adminContactId, amount, alreadyPaid }: 
         <button className="ap-btn ap-btn-ghost" onClick={unpay} disabled={pending}>
           ↶ Annulla pagamento
         </button>
-      ) : (
-        <button className="ap-btn ap-btn-primary" onClick={pay} disabled={pending || !cents}>
-          {pending ? 'Salvataggio…' : `Segna come pagato — € ${amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`}
+      ) : cents > 0 ? (
+        <button className="ap-btn ap-btn-primary" onClick={pay} disabled={pending} title={`Segna come pagato € ${amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`}>
+          {pending ? 'Salvataggio…' : `💸 Paga € ${amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`}
         </button>
+      ) : (
+        <span className="ap-pill" data-tone="gray" style={{ fontSize: 11, padding: '6px 10px' }}>
+          Niente da pagare — € 0,00
+        </span>
       )}
       {error && <span style={{ color: 'var(--ap-danger)', fontSize: 12 }}>{error}</span>}
     </div>

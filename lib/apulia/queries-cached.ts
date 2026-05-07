@@ -44,6 +44,8 @@ export interface PodRow {
   syncStatus?: string
   /** Worker's last error message when sync_status='failed'. */
   syncError?: string | null
+  /** When this row was first cached in Bibot (cached_at, set on insert). */
+  addedAt?: string
 }
 
 export interface ApuliaSnapshot {
@@ -189,6 +191,7 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
       switchedOut: p.is_switch_out,
       override,
       amount: override > 0 ? override : compenso,
+      addedAt: (p as { cached_at?: string }).cached_at,
     }
   }
 

@@ -11,6 +11,7 @@ interface PodRow {
   switchedOut: boolean
   override: number
   amount: number
+  addedAt?: string
 }
 
 interface Props {
@@ -26,13 +27,14 @@ export default function PodTable({ pods, defaultAmount, adminContactId }: Props)
         <tr>
           <th>POD/PDR</th>
           <th>Cliente</th>
+          <th>Aggiunto il</th>
           <th style={{ textAlign: 'right' }}>Default</th>
           <th style={{ textAlign: 'right' }}>Override</th>
           <th style={{ textAlign: 'right' }}>Importo</th>
         </tr>
       </thead>
       <tbody>
-        {pods.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td></tr>}
+        {pods.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td></tr>}
         {pods.map((p) => (
           <Row key={p.contactId} pod={p} defaultAmount={defaultAmount} adminContactId={adminContactId} />
         ))}
@@ -65,6 +67,7 @@ function Row({ pod, defaultAmount, adminContactId }: { pod: PodRow; defaultAmoun
     <tr>
       <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{pod.pod}</td>
       <td>{pod.cliente ?? '—'}</td>
+      <td style={{ fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{pod.addedAt ? new Date(pod.addedAt).toLocaleDateString('it-IT') : '—'}</td>
       <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--ap-text-muted)' }}>€ {defaultAmount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
       <td style={{ textAlign: 'right' }}>
         <input

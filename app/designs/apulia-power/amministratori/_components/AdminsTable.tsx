@@ -108,33 +108,8 @@ export default function AdminsTable({ admins, period }: { admins: AdminRow[]; pe
 
   return (
     <>
-      <div style={{ display: 'flex', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--ap-line)', alignItems: 'center', flexWrap: 'wrap' }}>
-        <input
-          type="text"
-          value={searchQ}
-          onChange={(e) => setSearchQ(e.target.value)}
-          placeholder="Cerca per nome, email, codice…"
-          className="ap-input"
-          style={{ height: 32, fontSize: 13, flex: '1 1 240px', minWidth: 240 }}
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className="ap-input"
-          style={{ height: 32, fontSize: 13, minWidth: 180 }}
-        >
-          <option value="all">Tutti gli stati</option>
-          <option value="due">Da pagare ora</option>
-          <option value="paid">Già pagati periodo corrente</option>
-          <option value="scheduled">Programmati</option>
-          <option value="no_date">Senza data 1° pagamento</option>
-        </select>
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ap-text-muted)' }}>
-          {visibleAdmins.length} di {admins.length}
-        </span>
-      </div>
       {failedCount > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', borderBottom: '1px solid var(--ap-line)', background: 'color-mix(in srgb, var(--ap-danger, #dc2626) 8%, transparent)', fontSize: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', borderBottom: '1px solid var(--ap-line)', background: 'color-mix(in srgb, var(--ap-danger, #dc2626) 8%, transparent)', fontSize: 12, flexWrap: 'wrap' }}>
           <span style={{ color: 'var(--ap-danger, #dc2626)', fontWeight: 700 }}>⚠ {failedCount} non sincronizzati con GHL</span>
           <span style={{ color: 'var(--ap-text-muted)' }}>— righe in rosso. Apri il dettaglio per il motivo.</span>
           <label style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
@@ -143,6 +118,31 @@ export default function AdminsTable({ admins, period }: { admins: AdminRow[]; pe
           </label>
         </div>
       )}
+      <div style={{ display: 'flex', gap: 10, padding: '12px 20px', borderBottom: '1px solid var(--ap-line)', alignItems: 'center', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          value={searchQ}
+          onChange={(e) => setSearchQ(e.target.value)}
+          placeholder="Cerca per nome, email, codice…"
+          className="ap-input"
+          style={{ height: 34, fontSize: 13, flex: '2 1 260px', minWidth: 220 }}
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+          className="ap-input"
+          style={{ height: 34, fontSize: 13, flex: '1 1 200px', minWidth: 200 }}
+        >
+          <option value="all">Tutti gli stati</option>
+          <option value="due">Da pagare ora</option>
+          <option value="paid">Già pagati periodo corrente</option>
+          <option value="scheduled">Programmati</option>
+          <option value="no_date">Senza data 1° pagamento</option>
+        </select>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+          {visibleAdmins.length} di {admins.length}
+        </span>
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--ap-line)', background: selected.size ? 'color-mix(in srgb, var(--ap-blue-soft) 50%, white)' : 'transparent' }}>
         {selected.size > 0 ? (
           <>
