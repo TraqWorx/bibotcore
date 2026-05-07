@@ -43,7 +43,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
       <header>
         <h1 className="ap-page-title">Store fisici</h1>
         <p className="ap-page-subtitle">
-          Per ogni store: form e calendario sono ospitati su GHL. Modifica il form/calendario in GHL e l&apos;URL aggiornato (e il QR) viene riflesso qui automaticamente. Per contare le iscrizioni, configura un workflow GHL sul form: <em>On Form Submission → Add Tag <code>&#123;slug&#125;</code></em> (es. <code>barletta</code>) o <code>store-&#123;slug&#125;</code>.
+          Per ogni store: form e calendario sono ospitati esternamente. Modifica il form/calendario alla fonte e l&apos;URL aggiornato (e il QR) viene riflesso qui automaticamente. Per contare le iscrizioni, configura un workflow sul form: <em>On Form Submission → Add Tag <code>&#123;slug&#125;</code></em> (es. <code>barletta</code>) o <code>store-&#123;slug&#125;</code>.
         </p>
       </header>
 
@@ -100,7 +100,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
                     </div>
                   </div>
                 ) : (
-                  <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: 0 }}>Seleziona un form GHL sopra per generare l&apos;URL pubblico e il QR.</p>
+                  <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: 0 }}>Seleziona un form sopra per generare l&apos;URL pubblico e il QR.</p>
                 )}
               </div>
 
@@ -113,7 +113,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
                     <a className="ap-btn ap-btn-ghost" style={{ height: 32, padding: '0 12px', fontSize: 11 }} href={bookingUrl} target="_blank" rel="noreferrer">Apri</a>
                   </div>
                 ) : (
-                  <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: 0 }}>Seleziona un calendario GHL sopra per attivare il link pubblico.</p>
+                  <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: 0 }}>Seleziona un calendario sopra per attivare il link pubblico.</p>
                 )}
               </div>
             </div>

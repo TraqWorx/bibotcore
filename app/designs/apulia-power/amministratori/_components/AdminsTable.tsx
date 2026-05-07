@@ -110,7 +110,7 @@ export default function AdminsTable({ admins }: { admins: AdminRow[] }) {
     <>
       {failedCount > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', borderBottom: '1px solid var(--ap-line)', background: 'color-mix(in srgb, var(--ap-danger, #dc2626) 8%, transparent)', fontSize: 12, flexWrap: 'wrap' }}>
-          <span style={{ color: 'var(--ap-danger, #dc2626)', fontWeight: 700 }}>⚠ {failedCount} non sincronizzati con GHL</span>
+          <span style={{ color: 'var(--ap-danger, #dc2626)', fontWeight: 700 }}>⚠ {failedCount} non sincronizzati</span>
           <span style={{ color: 'var(--ap-text-muted)' }}>— righe in rosso. Apri il dettaglio per il motivo.</span>
           <label style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input type="checkbox" checked={hideFailed} onChange={(e) => setHideFailed(e.target.checked)} />

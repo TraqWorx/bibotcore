@@ -166,10 +166,10 @@ export default async function Page() {
             content: (
               <section className="ap-card">
                 <header style={{ padding: '16px 20px', borderBottom: '1px solid var(--ap-line)' }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 800 }}>Coda di sincronizzazione GHL</h2>
+                  <h2 style={{ fontSize: 16, fontWeight: 800 }}>Coda di sincronizzazione</h2>
                   <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
-                    Operazioni in attesa di essere inviate a GHL. Bibot è la fonte di verità;
-                    le modifiche sono già applicate in locale e vengono propagate qui in background.
+                    Operazioni in attesa di essere sincronizzate. Bibot è la fonte di verità;
+                    le modifiche sono già applicate in locale e vengono propagate in background.
                   </p>
                 </header>
                 <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -314,15 +314,15 @@ export default async function Page() {
             content: (
               <section className="ap-card">
                 <header style={{ padding: '16px 20px', borderBottom: '1px solid var(--ap-line)' }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 800 }}>Automations GHL</h2>
+                  <h2 style={{ fontSize: 16, fontWeight: 800 }}>Automations</h2>
                   <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
-                    Tutti i workflow configurati sulla location Apulia. Solo lettura — lo stato si modifica in GHL.
+                    Tutti i workflow configurati su Apulia. Solo lettura.
                   </p>
                 </header>
                 <div style={{ padding: '16px 20px' }}>
                   {workflowsError ? (
                     <div style={{ padding: 16, fontSize: 13, color: 'var(--ap-danger)' }}>
-                      Errore caricamento da GHL: {workflowsError}
+                      Errore caricamento workflow: {workflowsError}
                     </div>
                   ) : (
                     <WorkflowsPanel workflows={workflows} />

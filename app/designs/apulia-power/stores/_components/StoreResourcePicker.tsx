@@ -58,7 +58,7 @@ export default function StoreResourcePicker({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ap-text-muted)' }}>Form GHL</span>
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ap-text-muted)' }}>Form</span>
           <select
             value={currentFormId ?? ''}
             onChange={(e) => changeForm(e.target.value)}
@@ -71,7 +71,7 @@ export default function StoreResourcePicker({
           </select>
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ap-text-muted)' }}>Calendario GHL</span>
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ap-text-muted)' }}>Calendario</span>
           <select
             value={currentCalendarId ?? ''}
             onChange={(e) => changeCalendar(e.target.value)}

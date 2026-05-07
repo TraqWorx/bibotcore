@@ -33,14 +33,14 @@ export default async function Page() {
         <div>
           <h1 className="ap-page-title">Opportunità</h1>
           <p className="ap-page-subtitle">
-            Vista kanban delle pipeline GHL · trascina una card per spostarla in un altro stage. I dati sono memorizzati localmente per velocità.
+            Vista kanban delle pipeline · trascina una card per spostarla in un altro stage.
           </p>
         </div>
       </header>
 
       {bootstrapError && (
         <div className="ap-card ap-card-pad" style={{ background: 'color-mix(in srgb, var(--ap-danger) 10%, transparent)', color: 'var(--ap-danger)', fontSize: 13 }}>
-          ⚠ Errore caricamento iniziale da GHL: {bootstrapError}
+          ⚠ Errore caricamento iniziale: {bootstrapError}
         </div>
       )}
 

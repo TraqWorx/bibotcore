@@ -53,8 +53,8 @@ export default function SyncQueuePanel({ initial }: Props) {
       )}
 
       <p style={{ fontSize: 11, color: 'var(--ap-text-faint)', margin: 0, lineHeight: 1.5 }}>
-        Le modifiche in Bibot vengono applicate immediatamente al database e poi inviate
-        a GHL in background. La coda viene drenata automaticamente ogni minuto.
+        Le modifiche vengono applicate immediatamente al database di Bibot e poi
+        sincronizzate in background. La coda viene drenata automaticamente ogni minuto.
       </p>
     </div>
   )

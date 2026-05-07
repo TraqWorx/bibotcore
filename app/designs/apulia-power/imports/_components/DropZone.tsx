@@ -48,7 +48,7 @@ export default function DropZone({ kind, title, subtitle, endpoint, emoji }: Pro
       if (ctype.includes('application/json')) {
         // Resumable import: server returned an id, watch progress in Storico.
         const j = await r.json()
-        setProgress({ done: 0, total: Number(j.total) || 0, phase: 'Importato in Bibot · sync GHL in corso' })
+        setProgress({ done: 0, total: Number(j.total) || 0, phase: 'Importato in Bibot · sincronizzazione in corso' })
         setSummary({ type: 'done', enqueued: true, importId: j.importId } as unknown as SummaryShape)
         router.refresh()
         return
@@ -139,7 +139,7 @@ export default function DropZone({ kind, title, subtitle, endpoint, emoji }: Pro
             <span className="ap-pill" data-tone="green">✓ Importato</span>
           </div>
           <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', margin: 0 }}>
-            I dati sono già in Bibot. Il push verso GHL avviene in background — segui il progresso in <strong>Impostazioni → Coda sync</strong>. Puoi navigare via, la sincronizzazione continua.
+            I dati sono già in Bibot. La sincronizzazione avviene in background — segui il progresso in <strong>Impostazioni → Coda sync</strong>. Puoi navigare via, la sincronizzazione continua.
           </p>
         </div>
       )}

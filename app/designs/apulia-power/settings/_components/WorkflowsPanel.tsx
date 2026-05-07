@@ -124,7 +124,7 @@ export default function WorkflowsPanel({ workflows }: { workflows: Workflow[] })
       </div>
 
       <div style={{ fontSize: 11, color: 'var(--ap-text-faint)', marginBottom: 12 }}>
-        Lo stato è gestito direttamente in GHL — l&apos;API non permette di cambiarlo da qui. Le cartelle rispecchiano la struttura GHL Store/città.
+        Solo lettura. Le cartelle rispecchiano la struttura Store/città.
       </div>
 
       {grouped.length === 0 && (

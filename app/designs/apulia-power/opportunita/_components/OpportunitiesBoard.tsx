@@ -62,7 +62,7 @@ export default function OpportunitiesBoard({ pipelines, opportunities, syncedAt 
       <div className="ap-card ap-card-pad" style={{ textAlign: 'center', color: 'var(--ap-text-faint)', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <span>Nessuna pipeline in cache.</span>
         <button className="ap-btn ap-btn-primary" onClick={triggerSync} disabled={pendingSync} style={{ alignSelf: 'center' }}>
-          {pendingSync ? 'Sincronizzo…' : 'Sincronizza da GHL'}
+          {pendingSync ? 'Sincronizzo…' : 'Sincronizza'}
         </button>
       </div>
     )
@@ -132,7 +132,7 @@ export default function OpportunitiesBoard({ pipelines, opportunities, syncedAt 
             style={{ height: 36 }}
             title={syncedAt ? `Ultimo sync: ${new Date(syncedAt).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}` : 'Mai sincronizzato'}
           >
-            {pendingSync ? '↻ Sync…' : '↻ Aggiorna da GHL'}
+            {pendingSync ? '↻ Sync…' : '↻ Aggiorna'}
           </button>
           <span style={{ fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
             {filteredOpps.length} · {fmtEur(totalValue)}

@@ -117,7 +117,7 @@ export default function SyncImportHistory({ imports }: Props) {
                             <th>Contatto</th>
                             <th>Azione</th>
                             <th>Tentativi</th>
-                            <th>Errore / GHL id</th>
+                            <th>Errore / ID esterno</th>
                           </tr>
                         </thead>
                         <tbody>

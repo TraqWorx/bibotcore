@@ -57,14 +57,14 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
       {syncStatus === 'failed' && (
         <div style={{ padding: '14px 18px', borderRadius: 8, background: 'color-mix(in srgb, var(--ap-danger, #dc2626) 12%, transparent)', border: '1px solid var(--ap-danger, #dc2626)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <strong style={{ color: 'var(--ap-danger, #dc2626)', fontSize: 13 }}>⚠ Non sincronizzato con GHL</strong>
+          <strong style={{ color: 'var(--ap-danger, #dc2626)', fontSize: 13 }}>⚠ Non sincronizzato</strong>
           <span style={{ fontSize: 12, color: 'var(--ap-text)', lineHeight: 1.5 }}>
             {syncError ?? 'Sincronizzazione fallita. Modifica i dati in conflitto per riprovare.'}
           </span>
           <span style={{ fontSize: 11, color: 'var(--ap-text-muted)' }}>
             {ghlId
-              ? <>GHL id: <code style={{ fontFamily: 'monospace' }}>{ghlId}</code></>
-              : 'Questo contatto non è ancora presente in GHL. Modificalo per ritentare automaticamente.'}
+              ? <>ID esterno: <code style={{ fontFamily: 'monospace' }}>{ghlId}</code></>
+              : 'Questo contatto non è ancora sincronizzato. Modificalo per ritentare automaticamente.'}
           </span>
         </div>
       )}
