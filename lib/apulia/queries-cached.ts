@@ -134,7 +134,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
       podsSwitchedOut: counts.switched,
       total: Number(a.commissione_totale) || 0,
       // "Paid this period" now means: the most recent due period has been paid.
-      paidThisPeriod: sched ? sched.paid_count >= sched.next_period_idx - 1 && !sched.is_due_now : false,
+      paidThisPeriod: sched ? sched.paid_count > 0 && sched.paid_count >= sched.next_period_idx - 1 && !sched.is_due_now : false,
       paidAt: latestPaidMap.get(a.id),
       firstPaymentAt: sched?.first_payment_at ?? undefined,
       nextDueDate: sched?.next_due_date ?? undefined,
@@ -214,7 +214,7 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
     podsActive: activePods.length,
     podsSwitchedOut: switchedPods.length,
     total: Number(a.commissione_totale) || 0,
-    paidThisPeriod: sched ? sched.paid_count >= sched.next_period_idx - 1 && !sched.is_due_now : false,
+    paidThisPeriod: sched ? sched.paid_count > 0 && sched.paid_count >= sched.next_period_idx - 1 && !sched.is_due_now : false,
     paidAt: latestPay?.paid_at as string | undefined,
     firstPaymentAt: sched?.first_payment_at ?? undefined,
     nextDueDate: sched?.next_due_date ?? undefined,

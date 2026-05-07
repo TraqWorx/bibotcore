@@ -26,7 +26,9 @@ export default async function Page() {
   const cacheAgeMinutes = latestCache?.cached_at
     ? (Date.now() - new Date(latestCache.cached_at).getTime()) / 60000
     : Number.POSITIVE_INFINITY
-  const totalDue = admins.filter((a) => a.isDueNow).reduce((s, a) => s + a.total, 0)
+  // "Da pagare" = totale commissioni non ancora pagate (sia scaduto sia futuro).
+  // "Già pagato" = somma dei pagamenti del periodo corrente.
+  const totalDue = admins.filter((a) => !a.paidThisPeriod).reduce((s, a) => s + a.total, 0)
   const totalPaid = admins.filter((a) => a.paidThisPeriod).reduce((s, a) => s + a.total, 0)
   const dueNowCount = admins.filter((a) => a.isDueNow).length
   const period = currentPeriod()

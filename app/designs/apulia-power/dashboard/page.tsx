@@ -17,7 +17,9 @@ export default async function Page() {
 
   // Owner view
   const [snap, admins] = await Promise.all([loadSnapshot(), listAdminsWithStats()])
-  const totalDue = admins.filter((a) => a.isDueNow).reduce((s, a) => s + a.total, 0)
+  // "Da pagare" = totale commissioni non ancora incassate (sia scaduto sia futuro).
+  // "Già pagato" = somma di chi ha già pagato il periodo corrente.
+  const totalDue = admins.filter((a) => !a.paidThisPeriod).reduce((s, a) => s + a.total, 0)
   const totalPaid = admins.filter((a) => a.paidThisPeriod).reduce((s, a) => s + a.total, 0)
   const dueNowCount = admins.filter((a) => a.isDueNow).length
   const period = currentPeriod()
@@ -62,9 +64,9 @@ export default async function Page() {
           <div className="ap-stat-foot">da QR / form pubblici</div>
         </div>
         <div className="ap-stat" data-tone={dueNowCount > 0 ? 'warn' : undefined}>
-          <div className="ap-stat-label">Da pagare oggi</div>
+          <div className="ap-stat-label">Da pagare</div>
           <div className="ap-stat-value">{fmtEur(totalDue)}</div>
-          <div className="ap-stat-foot">{dueNowCount} amministratori con scadenza oggi o in arretrato</div>
+          <div className="ap-stat-foot">{dueNowCount > 0 ? `${dueNowCount} con scadenza oggi o in arretrato` : 'Nessun arretrato — tutti programmati'}</div>
         </div>
         <div className="ap-stat" data-tone="good">
           <div className="ap-stat-label">Già pagato (totale)</div>
