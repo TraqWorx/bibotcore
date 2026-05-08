@@ -8,6 +8,21 @@ import { ad } from '@/lib/admin/ui'
 export const dynamic = 'force-dynamic'
 
 /**
+ * Folder names under app/designs/ that aren't actual designs. They're
+ * routing helpers (the dynamic [design] segment, the OAuth authorize
+ * page, marketing previews). Auto-register must skip them or they
+ * pollute the catalog.
+ */
+const NON_DESIGN_FOLDERS = new Set(['authorize', 'demo', 'linear-preview', 'luxury-preview'])
+
+/**
+ * Folders whose DB slug differs from the folder name (kept in sync with
+ * lib/designs/slugMap.ts). We must not auto-register the folder name
+ * because the canonical row already exists under the mapped slug.
+ */
+const FOLDERS_WITH_MAPPED_SLUGS = new Set(['apulia-tourism'])
+
+/**
  * Auto-register design folders that exist in app/designs/* but aren't in
  * the designs table. New design folders show up in the catalog without a
  * manual SQL insert.
@@ -17,7 +32,14 @@ async function autoRegisterDesigns(supabase: ReturnType<typeof createAdminClient
     const dir = path.join(process.cwd(), 'app/designs')
     if (!fs.existsSync(dir)) return
     const folders = fs.readdirSync(dir, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && !d.name.startsWith('_') && !d.name.startsWith('.'))
+      .filter((d) =>
+        d.isDirectory() &&
+        !d.name.startsWith('_') &&
+        !d.name.startsWith('.') &&
+        !d.name.startsWith('[') && // Next.js dynamic route segments
+        !NON_DESIGN_FOLDERS.has(d.name) &&
+        !FOLDERS_WITH_MAPPED_SLUGS.has(d.name),
+      )
       .map((d) => d.name)
     if (folders.length === 0) return
     const { data: known } = await supabase.from('designs').select('slug')
