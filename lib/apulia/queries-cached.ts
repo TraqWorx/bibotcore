@@ -28,6 +28,8 @@ export interface AdminRow {
   syncStatus?: string
   /** Worker's last error message when sync_status='failed'. */
   syncError?: string | null
+  /** When this admin row was first cached in Bibot. */
+  addedAt?: string
 }
 
 export interface PodRow {
@@ -151,7 +153,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
   }
 
   const [{ data: admins }, { data: podCounts }, { data: schedule }, { data: latestPayments }, activePods, podPaymentMap] = await Promise.all([
-    sb.from('apulia_contacts').select('id, first_name, last_name, email, phone, codice_amministratore, compenso_per_pod, commissione_totale, sync_status, sync_error').eq('is_amministratore', true).neq('sync_status', 'pending_delete'),
+    sb.from('apulia_contacts').select('id, first_name, last_name, email, phone, codice_amministratore, compenso_per_pod, commissione_totale, sync_status, sync_error, cached_at').eq('is_amministratore', true).neq('sync_status', 'pending_delete'),
     sb.rpc('apulia_admin_pod_counts'),
     sb.rpc('apulia_admin_schedule') as unknown as Promise<{ data: ScheduleRow[] | null }>,
     sb.from('apulia_payments').select('contact_id, paid_at').not('period_idx', 'is', null).order('paid_at', { ascending: false }),
@@ -229,6 +231,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
       overdueCount: dueCount,
       syncStatus: (a as { sync_status?: string }).sync_status ?? undefined,
       syncError: (a as { sync_error?: string | null }).sync_error ?? null,
+      addedAt: (a as { cached_at?: string }).cached_at,
     }
   })
   rows.sort((a, b) => b.total - a.total)
@@ -435,7 +438,7 @@ export async function listCondomini(f: CondominiFilters): Promise<CondominiResul
   const comuni = [...new Set((comuniRaw ?? []).map((r) => r.comune as string).filter(Boolean))].sort((a, b) => a.localeCompare(b))
   const amministratori = [...new Set((ammRaw ?? []).map((r) => r.amministratore_name as string).filter(Boolean))].sort((a, b) => a.localeCompare(b))
 
-  const podRows: PodRow[] = ((rows ?? []) as Array<CachedContactRow & { sync_error?: string | null }>).map((r) => ({
+  const podRows: PodRow[] = ((rows ?? []) as Array<CachedContactRow & { sync_error?: string | null; cached_at?: string }>).map((r) => ({
     contactId: r.id,
     pod: r.pod_pdr ?? '—',
     cliente: [r.first_name, r.last_name].filter(Boolean).join(' ') || r.cliente || undefined,
@@ -447,6 +450,7 @@ export async function listCondomini(f: CondominiFilters): Promise<CondominiResul
     amount: 0,
     syncStatus: r.sync_status,
     syncError: r.sync_error ?? null,
+    addedAt: r.cached_at,
   }))
 
   return { total: count ?? 0, rows: podRows, comuni, amministratori }

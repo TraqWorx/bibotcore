@@ -22,6 +22,7 @@ interface AdminRow {
   overdueCount?: number
   syncStatus?: string
   syncError?: string | null
+  addedAt?: string
 }
 
 function fmtEur(n: number): string {
@@ -177,6 +178,7 @@ export default function AdminsTable({ admins }: { admins: AdminRow[] }) {
             <th style={{ width: 36 }}>
               <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={admins.length === 0} aria-label="Seleziona tutti" />
             </th>
+            <th>Aggiunto il</th>
             <th>Amministratore</th>
             <th>Cod. Amm.</th>
             <th style={{ textAlign: 'right' }}>POD attivi</th>
@@ -186,7 +188,7 @@ export default function AdminsTable({ admins }: { admins: AdminRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {visibleAdmins.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32, color: 'var(--ap-text-faint)' }}>Nessun amministratore.</td></tr>}
+          {visibleAdmins.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: 32, color: 'var(--ap-text-faint)' }}>Nessun amministratore.</td></tr>}
           {visibleAdmins.map((a) => {
             const isFailed = a.syncStatus === 'failed'
             const rowBg = isFailed
@@ -198,6 +200,9 @@ export default function AdminsTable({ admins }: { admins: AdminRow[] }) {
               <tr key={a.contactId} style={{ background: rowBg, borderLeft: isFailed ? '3px solid var(--ap-danger, #dc2626)' : undefined }}>
                 <td>
                   <input type="checkbox" checked={selected.has(a.contactId)} onChange={() => toggle(a.contactId)} aria-label={`Seleziona ${a.name}`} />
+                </td>
+                <td style={{ fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                  {a.addedAt ? new Date(a.addedAt).toLocaleDateString('it-IT') : '—'}
                 </td>
                 <td>
                   <Link href={`/designs/apulia-power/amministratori/${a.contactId}`} style={{ textDecoration: 'none', color: isFailed ? 'var(--ap-danger, #dc2626)' : 'var(--ap-text)', fontWeight: 600 }}>

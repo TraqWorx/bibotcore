@@ -14,6 +14,7 @@ export interface CondominoRow {
   switchedOut: boolean
   syncStatus?: string
   syncError?: string | null
+  addedAt?: string
 }
 
 interface Props {
@@ -167,6 +168,7 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
                 aria-label="Seleziona tutti"
               />
             </th>
+            <th>Aggiunto il</th>
             <th>POD/PDR</th>
             <th>Cliente</th>
             <th>Amministratore</th>
@@ -175,7 +177,7 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
           </tr>
         </thead>
         <tbody>
-          {visibleRows.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td></tr>}
+          {visibleRows.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td></tr>}
           {visibleRows.map((p) => {
             const checked = selected.has(p.contactId)
             const isFailed = p.syncStatus === 'failed'
@@ -198,6 +200,9 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
                     onChange={() => toggle(p.contactId)}
                     aria-label={`Seleziona ${p.pod}`}
                   />
+                </td>
+                <td style={{ fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                  {cellLink(p.addedAt ? new Date(p.addedAt).toLocaleDateString('it-IT') : '—')}
                 </td>
                 <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
                   {cellLink(<>{p.pod}{isFailed && <span style={{ marginLeft: 6 }} title={p.syncError ?? 'Sync fallito'}>⚠</span>}</>)}

@@ -8,11 +8,19 @@ interface Props {
   initial: string[]
   /** All tags currently in use across the cache, for type-ahead suggestions. */
   suggestions?: string[]
+  /**
+   * Tags that drive role state and must never be added or removed via the
+   * tag UI (amministratore, switch-out, etc). They render but the × is
+   * suppressed and submit is blocked. Compared case-insensitively.
+   */
+  protectedTags?: string[]
   add: (contactId: string, tag: string) => Promise<{ error?: string } | undefined>
   remove: (contactId: string, tag: string) => Promise<{ error?: string } | undefined>
 }
 
-export default function TagEditor({ contactId, initial, suggestions = [], add, remove }: Props) {
+export default function TagEditor({ contactId, initial, suggestions = [], protectedTags = [], add, remove }: Props) {
+  const protectedSet = new Set(protectedTags.map((t) => t.toLowerCase()))
+  const isProtected = (tag: string) => protectedSet.has(tag.toLowerCase())
   const [tags, setTags] = useState<string[]>(initial ?? [])
   const [draft, setDraft] = useState('')
   const [pending, startTransition] = useTransition()
@@ -25,7 +33,8 @@ export default function TagEditor({ contactId, initial, suggestions = [], add, r
   const matches = useMemo(() => {
     const q = draft.trim().toLowerCase()
     const used = new Set(tags.map((t) => t.toLowerCase()))
-    const pool = suggestions.filter((s) => !used.has(s.toLowerCase()))
+    // Filter both used + protected so they never appear as suggestions.
+    const pool = suggestions.filter((s) => !used.has(s.toLowerCase()) && !isProtected(s))
     if (!q) return pool.slice(0, 50) // show top 50 when input is empty
     return pool.filter((s) => s.toLowerCase().includes(q)).slice(0, 50)
   }, [draft, suggestions, tags])
@@ -45,6 +54,12 @@ export default function TagEditor({ contactId, initial, suggestions = [], add, r
   function commitAdd(value: string) {
     const t = value.trim()
     if (!t) return
+    if (isProtected(t)) {
+      setError(`Il tag "${t}" è gestito automaticamente — non aggiungerlo manualmente.`)
+      setDraft('')
+      setOpen(false)
+      return
+    }
     if (tags.some((x) => x.toLowerCase() === t.toLowerCase())) { setDraft(''); setOpen(false); return }
     setError(null)
     setDraft('')
@@ -94,20 +109,32 @@ export default function TagEditor({ contactId, initial, suggestions = [], add, r
     <div ref={wrapRef} style={{ position: 'relative' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', minHeight: 28 }}>
         {tags.length === 0 && <span style={{ fontSize: 12, color: 'var(--ap-text-faint)' }}>Nessun tag.</span>}
-        {tags.map((t) => (
-          <span key={t} className="ap-pill" data-tone="blue" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            {t}
-            <button
-              type="button"
-              onClick={() => submitRemove(t)}
-              disabled={pending}
-              aria-label={`Rimuovi ${t}`}
-              style={{ background: 'transparent', border: 'none', color: 'inherit', fontSize: 14, lineHeight: 1, padding: 0, cursor: 'pointer', opacity: 0.6 }}
+        {tags.map((t) => {
+          const locked = isProtected(t)
+          return (
+            <span
+              key={t}
+              className="ap-pill"
+              data-tone={locked ? 'gray' : 'blue'}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              title={locked ? 'Tag di sistema — gestito automaticamente' : undefined}
             >
-              ×
-            </button>
-          </span>
-        ))}
+              {locked && <span aria-hidden="true">🔒</span>}
+              {t}
+              {!locked && (
+                <button
+                  type="button"
+                  onClick={() => submitRemove(t)}
+                  disabled={pending}
+                  aria-label={`Rimuovi ${t}`}
+                  style={{ background: 'transparent', border: 'none', color: 'inherit', fontSize: 14, lineHeight: 1, padding: 0, cursor: 'pointer', opacity: 0.6 }}
+                >
+                  ×
+                </button>
+              )}
+            </span>
+          )
+        })}
       </div>
       <div style={{ display: 'flex', gap: 6, marginTop: 8, position: 'relative' }}>
         <input

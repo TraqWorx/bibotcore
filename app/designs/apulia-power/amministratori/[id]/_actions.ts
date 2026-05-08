@@ -375,6 +375,9 @@ export async function addAdminTag(contactId: string, tag: string): Promise<{ err
   if ('error' in guard) return guard
   const t = tag.trim()
   if (!t) return { error: 'Tag vuoto' }
+  if (t.toLowerCase() === APULIA_TAG.AMMINISTRATORE.toLowerCase()) {
+    return { error: 'Il tag amministratore è gestito dal sistema.' }
+  }
 
   const sb = createAdminClient()
   const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags, is_amministratore').eq('id', contactId).maybeSingle()
@@ -393,6 +396,9 @@ export async function addAdminTag(contactId: string, tag: string): Promise<{ err
 export async function removeAdminTag(contactId: string, tag: string): Promise<{ error?: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return guard
+  if (tag.toLowerCase() === APULIA_TAG.AMMINISTRATORE.toLowerCase()) {
+    return { error: 'Il tag amministratore è gestito dal sistema. Usa Elimina per declassare.' }
+  }
 
   const sb = createAdminClient()
   const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags, is_amministratore').eq('id', contactId).maybeSingle()

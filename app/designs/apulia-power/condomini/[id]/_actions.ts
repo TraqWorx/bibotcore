@@ -136,6 +136,12 @@ export async function addCondominoTag(contactId: string, tag: string): Promise<{
   if ('error' in guard) return guard
   const t = tag.trim()
   if (!t) return { error: 'Tag vuoto' }
+  // The "amministratore" tag drives is_amministratore — promotion must
+  // go through the dedicated "+ Nuovo amministratore" flow so the row
+  // gets compenso_per_pod / first_payment_at / etc. in one shot.
+  if (t.toLowerCase() === APULIA_TAG.AMMINISTRATORE.toLowerCase()) {
+    return { error: 'Per promuovere a amministratore usa "+ Nuovo amministratore".' }
+  }
 
   const sb = createAdminClient()
   const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags, is_switch_out').eq('id', contactId).maybeSingle()
@@ -158,6 +164,9 @@ export async function addCondominoTag(contactId: string, tag: string): Promise<{
 export async function removeCondominoTag(contactId: string, tag: string): Promise<{ error?: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return guard
+  if (tag.toLowerCase() === APULIA_TAG.AMMINISTRATORE.toLowerCase()) {
+    return { error: 'Il tag amministratore è gestito dal sistema. Usa Elimina per declassare.' }
+  }
 
   const sb = createAdminClient()
   const { data: row } = await sb.from('apulia_contacts').select('ghl_id, tags, is_switch_out').eq('id', contactId).maybeSingle()
