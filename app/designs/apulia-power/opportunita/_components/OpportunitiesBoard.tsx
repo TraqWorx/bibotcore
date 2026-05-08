@@ -37,7 +37,25 @@ export default function OpportunitiesBoard({ pipelines, opportunities, syncedAt 
   const router = useRouter()
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
-  useEffect(() => { setOpps(opportunities) }, [opportunities])
+  // Track in-flight optimistic moves so we don't fight the drop animation
+  // when the server-revalidated prop arrives mid-transition. The card was
+  // "temporarily disappearing" because each setOpps call mid-drop forces
+  // the Draggable to remount.
+  const pendingMoveIds = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    setOpps((prev) => {
+      const prevById = new Map(prev.map((o) => [o.id, o]))
+      // For each new prop opp: if it's pending a local move, keep our
+      // stage; otherwise take the server value.
+      return opportunities.map((o) => {
+        if (pendingMoveIds.current.has(o.id)) {
+          const local = prevById.get(o.id)
+          if (local) return { ...o, pipelineStageId: local.pipelineStageId }
+        }
+        return o
+      })
+    })
+  }, [opportunities])
 
   const pipeline = pipelines.find((p) => p.id === pipelineId) ?? pipelines[0]
   const filteredOpps = useMemo(() => {
@@ -83,13 +101,25 @@ export default function OpportunitiesBoard({ pipelines, opportunities, syncedAt 
     const toStage = res.destination.droppableId
     if (fromStage === toStage) return
     const oppId = res.draggableId
+
+    // Mark this opp as "we just moved it locally" so the next server-
+    // revalidated prop change doesn't override our optimistic stage.
+    pendingMoveIds.current.add(oppId)
     setOpps((prev) => prev.map((o) => o.id === oppId ? { ...o, pipelineStageId: toStage } : o))
+
     void moveOpportunity(oppId, toStage).then((r) => {
       if (r?.error) {
+        // Revert and clear the pending mark so the prop sync wins next time.
+        pendingMoveIds.current.delete(oppId)
         setOpps((prev) => prev.map((o) => o.id === oppId ? { ...o, pipelineStageId: fromStage } : o))
         setSyncFlash(`Errore: ${r.error}`)
         setTimeout(() => setSyncFlash(null), 4000)
+        return
       }
+      // Success — clear the pending mark after the prop round-trips so
+      // a later resync (which may legitimately move the card elsewhere)
+      // is honored. 2s is plenty for revalidatePath to land.
+      setTimeout(() => { pendingMoveIds.current.delete(oppId) }, 2000)
     })
   }
 
