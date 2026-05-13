@@ -11,13 +11,19 @@ export default async function Page() {
   if (session.role !== 'owner') redirect('/designs/apulia-power/dashboard')
 
   const sb = createAdminClient()
-  // First-load bootstrap: if cache is empty, sync once now so the
-  // owner doesn't see an empty board on page open. Subsequent loads
-  // read directly from the cache.
+  // First-load bootstrap: if cache is empty, sync inline (the user has
+  // nothing to look at yet). If cache is just stale (>30 min), fire a
+  // refresh in the background so the page renders instantly with what's
+  // there and the next visit sees fresh data.
+  const STALE_MS = 30 * 60 * 1000
   const { count: cacheCount } = await sb.from('apulia_opportunities').select('ghl_id', { count: 'exact', head: true })
+  const { data: lastSyncRow } = await sb.from('apulia_opportunities').select('synced_at').order('synced_at', { ascending: false }).limit(1).maybeSingle()
+  const lastSyncAge = lastSyncRow?.synced_at ? Date.now() - new Date(lastSyncRow.synced_at).getTime() : Infinity
   let bootstrapError: string | null = null
   if ((cacheCount ?? 0) === 0) {
     try { await syncOpportunities() } catch (e) { bootstrapError = e instanceof Error ? e.message : 'sync failed' }
+  } else if (lastSyncAge > STALE_MS) {
+    void syncOpportunities().catch(() => {})
   }
 
   const [pipelines, opportunities, { data: latestSync }] = await Promise.all([

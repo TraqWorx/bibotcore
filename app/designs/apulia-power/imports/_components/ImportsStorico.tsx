@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 export interface ImportRow {
   id: string
@@ -30,6 +30,12 @@ const STALL_THRESHOLD_MS = 60_000
 export default function ImportsStorico({ initial }: { initial: ImportRow[] }) {
   const [rows, setRows] = useState<ImportRow[]>(initial)
   const [openId, setOpenId] = useState<string | null>(null)
+  // Mirror rows in a ref so the poll loop can read the latest value
+  // without forcing the effect to re-mount on every setRows (which would
+  // pin the next-tick delay to POLL_MS forever, never reaching the
+  // idle 30s branch).
+  const rowsRef = useRef<ImportRow[]>(initial)
+  rowsRef.current = rows
 
   useEffect(() => {
     let cancelled = false
@@ -45,13 +51,14 @@ export default function ImportsStorico({ initial }: { initial: ImportRow[] }) {
         }
       } catch { /* keep polling */ }
       if (cancelled) return
-      const anyRunning = rows.some((r) => r.status === 'running')
+      const anyRunning = rowsRef.current.some((r) => r.status === 'running')
       timer = setTimeout(tick, anyRunning ? POLL_MS : 30_000)
     }
 
-    timer = setTimeout(tick, POLL_MS)
+    const anyRunningInitial = rowsRef.current.some((r) => r.status === 'running')
+    timer = setTimeout(tick, anyRunningInitial ? POLL_MS : 30_000)
     return () => { cancelled = true; if (timer) clearTimeout(timer) }
-  }, [rows])
+  }, [])
 
   return (
     <div style={{ overflowX: 'auto' }}>
