@@ -32,8 +32,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
 
   // Owner view
   const [snap, admins] = await Promise.all([loadSnapshot(), listAdminsWithStats()])
-  const totalDue = admins.reduce((s, a) => s + a.total, 0)
-  const dueNowCount = admins.filter((a) => a.isDueNow).length
+  // "Da pagare" is per-POD: count of PODs with next-due ≤ today + their sum.
+  const totalDue = snap.totalDueAmount
+  const dueNowCount = snap.totalPodsDueNow
 
   // Recent imports + leads-per-store (selected range) + today's
   // appointments grouped by store + payments made this calendar month.
@@ -99,9 +100,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
           <div className="ap-stat-foot">{rangeLabel} · da QR / form pubblici</div>
         </div>
         <div className="ap-stat" data-tone={dueNowCount > 0 ? 'warn' : undefined}>
-          <div className="ap-stat-label">Da pagare</div>
+          <div className="ap-stat-label">Da pagare oggi</div>
           <div className="ap-stat-value">{fmtEur(totalDue)}</div>
-          <div className="ap-stat-foot">{dueNowCount > 0 ? `${dueNowCount} con scadenza oggi o in arretrato` : 'Nessun arretrato — tutti programmati'}</div>
+          <div className="ap-stat-foot">{dueNowCount > 0 ? `${dueNowCount} POD ${dueNowCount === 1 ? 'in scadenza' : 'in scadenza'}` : 'Nessun POD in scadenza'}</div>
         </div>
         <div className="ap-stat" data-tone="good">
           <div className="ap-stat-label" style={{ textTransform: 'capitalize' }}>Pagato {monthLabel}</div>

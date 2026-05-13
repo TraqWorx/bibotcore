@@ -8,6 +8,7 @@ import { normalizePod } from '@/lib/apulia/cache'
 import { listAdminPickerOptions } from '@/lib/apulia/queries-cached'
 import { listDistinctTags } from '@/lib/apulia/tags'
 import CondominoEditor from './_components/CondominoEditor'
+import PodPaymentField from './_components/PodPaymentField'
 import DeleteContactButton from '../../_components/DeleteContactButton'
 import { deleteCondomino } from './_actions'
 
@@ -39,17 +40,37 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const codiceAmm = (cf[APULIA_FIELD.CODICE_AMMINISTRATORE] as string | undefined) ?? contact.codice_amministratore ?? ''
   const adminName = (cf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO] as string | undefined) ?? contact.amministratore_name ?? ''
 
-  // Find admin contact id by code (if any) so we can link to it.
+  // Find admin contact id by code (if any) so we can link to it, plus
+  // the admin's compenso for the payment widget amount column.
   let adminContactId: string | null = null
+  let adminCompenso = 0
   if (codiceAmm) {
     const { data: a } = await sb
       .from('apulia_contacts')
-      .select('id')
+      .select('id, compenso_per_pod')
       .eq('is_amministratore', true)
       .eq('codice_amministratore', codiceAmm)
       .maybeSingle()
     adminContactId = a?.id ?? null
+    adminCompenso = Number(a?.compenso_per_pod) || 0
   }
+
+  // Per-POD payment status: anchor on first_payment_at (else cached_at).
+  const firstPaymentAt = (contact as { first_payment_at?: string | null }).first_payment_at ?? null
+  const cachedAt = (contact as { cached_at?: string }).cached_at
+  const anchorIso = firstPaymentAt ?? cachedAt ?? null
+  const { data: podPays } = await sb.from('apulia_payments').select('paid_at').eq('pod_contact_id', id)
+  const paidCount = podPays?.length ?? 0
+  let nextDueDate: string | null = null
+  let isDueNow = false
+  if (anchorIso) {
+    const nd = new Date(anchorIso)
+    nd.setMonth(nd.getMonth() + paidCount * 6)
+    nextDueDate = nd.toISOString()
+    isDueNow = nd.getTime() <= Date.now()
+  }
+  const override = Number(contact.pod_override) || 0
+  const podAmount = override > 0 ? override : adminCompenso
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -87,6 +108,17 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           confirmText={`Eliminare il condominio ${cliente} (POD ${podPdr})?\nQuesta azione non si può annullare.`}
         />
       </header>
+
+      {!contact.is_switch_out && (
+        <PodPaymentField
+          contactId={id}
+          firstPaymentAt={firstPaymentAt}
+          nextDueDate={nextDueDate}
+          paidCount={paidCount}
+          isDueNow={isDueNow}
+          amount={podAmount}
+        />
+      )}
 
       <CondominoEditor
         contactId={id}

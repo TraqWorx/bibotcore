@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { createAdminClient } from '@/lib/supabase-server'
 import { listApuliaWorkflows } from '@/lib/apulia/workflows'
-import AdminPaymentSchedule, { type AdminScheduleEntry } from './_components/AdminPaymentSchedule'
+import PodPaymentSchedule, { type PodScheduleEntry } from './_components/PodPaymentSchedule'
 import CompensiTable, { type CompensoEntry } from './_components/CompensiTable'
 import SettingsTabs from './_components/SettingsTabs'
 import SyncImportHistory from './_components/SyncImportHistory'
@@ -19,19 +19,40 @@ export default async function Page() {
 
   const sb = createAdminClient()
 
-  // Count payments per admin via raw apulia_payments query so per-POD
-  // payments (period_idx IS NULL, pod_contact_id IS NOT NULL) get counted
-  // alongside legacy admin-level rows. The apulia_admin_schedule RPC's
-  // paid_count only counts admin-level rows with period_idx set.
-  // Paginate to avoid the PostgREST 1000-row cap.
-  const fetchPaidCounts = async (): Promise<Map<string, number>> => {
+  // Active PODs + admins + per-POD payment counts. Paginate everywhere
+  // because PostgREST caps a single select at 1000 rows.
+  type PodLite = {
+    id: string
+    pod_pdr: string | null
+    first_name: string | null
+    last_name: string | null
+    cliente: string | null
+    codice_amministratore: string | null
+    amministratore_name: string | null
+    pod_override: number | null
+    cached_at: string
+    first_payment_at: string | null
+  }
+  const fetchActivePods = async (): Promise<PodLite[]> => {
+    const out: PodLite[] = []
+    for (let from = 0; ; from += 1000) {
+      const { data } = await sb.from('apulia_contacts')
+        .select('id, pod_pdr, first_name, last_name, cliente, codice_amministratore, amministratore_name, pod_override, cached_at, first_payment_at')
+        .eq('is_amministratore', false).eq('is_switch_out', false).neq('sync_status', 'pending_delete')
+        .order('pod_pdr', { nullsFirst: false })
+        .range(from, from + 999)
+      if (!data || data.length === 0) break
+      out.push(...(data as PodLite[]))
+      if (data.length < 1000) break
+    }
+    return out
+  }
+  const fetchPodPaymentCounts = async (): Promise<Map<string, number>> => {
     const map = new Map<string, number>()
     for (let from = 0; ; from += 1000) {
-      const { data } = await sb.from('apulia_payments').select('contact_id').range(from, from + 999)
+      const { data } = await sb.from('apulia_payments').select('pod_contact_id').not('pod_contact_id', 'is', null).range(from, from + 999)
       if (!data || data.length === 0) break
-      for (const r of data as Array<{ contact_id: string }>) {
-        map.set(r.contact_id, (map.get(r.contact_id) ?? 0) + 1)
-      }
+      for (const r of data as Array<{ pod_contact_id: string }>) map.set(r.pod_contact_id, (map.get(r.pod_contact_id) ?? 0) + 1)
       if (data.length < 1000) break
     }
     return map
@@ -39,34 +60,57 @@ export default async function Page() {
 
   const [
     { data: admins },
-    { data: schedule },
     { data: podCounts },
-    paidCountMap,
+    activePods,
+    podPaymentCounts,
   ] = await Promise.all([
     sb.from('apulia_contacts')
-      .select('id, first_name, last_name, codice_amministratore, first_payment_at, compenso_per_pod, commissione_totale')
+      .select('id, first_name, last_name, codice_amministratore, compenso_per_pod, commissione_totale')
       .eq('is_amministratore', true)
       .order('first_name'),
-    sb.rpc('apulia_admin_schedule'),
     sb.rpc('apulia_admin_pod_counts'),
-    fetchPaidCounts(),
+    fetchActivePods(),
+    fetchPodPaymentCounts(),
   ])
 
-  type ScheduleRow = { contact_id: string; first_payment_at: string | null; paid_count: number; next_period_idx: number; next_due_date: string | null; is_due_now: boolean; overdue_count: number }
-  const scheduleMap = new Map(((schedule ?? []) as ScheduleRow[]).map((s) => [s.contact_id, s]))
   const podCountMap = new Map(((podCounts ?? []) as Array<{ codice_amministratore: string; active: number }>).map((r) => [r.codice_amministratore, Number(r.active)]))
+  const compensoByCode = new Map<string, number>()
+  const adminByCode = new Map<string, { id: string; name: string }>()
+  for (const a of admins ?? []) {
+    const name = [a.first_name, a.last_name].filter(Boolean).join(' ') || 'Senza nome'
+    if (a.codice_amministratore) {
+      compensoByCode.set(a.codice_amministratore, Number(a.compenso_per_pod) || 0)
+      adminByCode.set(a.codice_amministratore, { id: a.id, name })
+    }
+  }
 
-  const adminScheduleEntries: AdminScheduleEntry[] = (admins ?? []).map((a) => {
-    const sched = scheduleMap.get(a.id)
+  const todayMs = Date.now()
+  const podScheduleEntries: PodScheduleEntry[] = activePods.map((p) => {
+    const paidCount = podPaymentCounts.get(p.id) ?? 0
+    const anchorIso = p.first_payment_at ?? p.cached_at
+    let nextDue: string | null = null
+    let isDueNow = false
+    if (anchorIso) {
+      const nd = new Date(anchorIso)
+      nd.setMonth(nd.getMonth() + paidCount * 6)
+      nextDue = nd.toISOString()
+      isDueNow = nd.getTime() <= todayMs
+    }
+    const override = Number(p.pod_override) || 0
+    const compenso = compensoByCode.get(p.codice_amministratore ?? '') ?? 0
+    const cliente = [p.first_name, p.last_name].filter(Boolean).join(' ') || p.cliente || ''
+    const adminRec = p.codice_amministratore ? adminByCode.get(p.codice_amministratore) : undefined
     return {
-      contactId: a.id,
-      name: [a.first_name, a.last_name].filter(Boolean).join(' ') || 'Senza nome',
-      podsActive: podCountMap.get(a.codice_amministratore ?? '') ?? 0,
-      firstPaymentAt: a.first_payment_at,
-      nextDueDate: sched?.next_due_date ?? null,
-      paidCount: paidCountMap.get(a.id) ?? 0,
-      isDueNow: sched?.is_due_now ?? false,
-      overdueCount: sched?.overdue_count ?? 0,
+      contactId: p.id,
+      pod: p.pod_pdr ?? '—',
+      cliente,
+      amministratore: adminRec?.name ?? p.amministratore_name ?? '',
+      amministratoreId: adminRec?.id,
+      firstPaymentAt: p.first_payment_at,
+      nextDueDate: nextDue,
+      paidCount,
+      isDueNow,
+      amount: override > 0 ? override : compenso,
     }
   })
 
@@ -80,7 +124,7 @@ export default async function Page() {
     }))
     .sort((a, b) => b.podsActive - a.podsActive)
 
-  const dueNowCount = adminScheduleEntries.filter((a) => a.isDueNow).length
+  const dueNowCount = podScheduleEntries.filter((p) => p.isDueNow).length
   const noCompensoCount = compensiEntries.filter((a) => a.compensoPerPod === 0).length
 
   const [queueStatsResult, syncImportsResult, workflowsResult] = await Promise.all([
@@ -128,14 +172,14 @@ export default async function Page() {
             content: (
               <section className="ap-card">
                 <header style={{ padding: '16px 20px', borderBottom: '1px solid var(--ap-line)' }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 800 }}>Date di pagamento per amministratore</h2>
+                  <h2 style={{ fontSize: 16, fontWeight: 800 }}>Date di pagamento per POD</h2>
                   <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
-                    Ogni amministratore ha un proprio ciclo di 6 mesi. La prima data viene impostata automaticamente al primo upload PDP che lo include.
-                    Modificala manualmente se necessario; la prossima scadenza si aggiorna automaticamente.
+                    Ogni POD ha un proprio ciclo di 6 mesi. La prima data viene impostata automaticamente al primo upload PDP che lo include.
+                    Modificala manualmente se necessario; la prossima scadenza si aggiorna automaticamente (1° pagamento + N×6 mesi).
                   </p>
                 </header>
                 <div style={{ padding: '16px 20px' }}>
-                  <AdminPaymentSchedule admins={adminScheduleEntries} />
+                  <PodPaymentSchedule pods={podScheduleEntries} />
                 </div>
               </section>
             ),

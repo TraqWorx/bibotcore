@@ -60,6 +60,23 @@ function pathsToRevalidate(id: string) {
 }
 
 /**
+ * Set a POD's payment anchor. The next due date is anchor + paidCount*6mo,
+ * so moving the anchor shifts every future cycle for this POD.
+ */
+export async function setPodFirstPaymentDate(contactId: string, isoDate: string): Promise<{ error: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+  const d = new Date(isoDate)
+  if (Number.isNaN(d.getTime())) return { error: 'Data non valida' }
+  const sb = createAdminClient()
+  const { error } = await sb.from('apulia_contacts').update({ first_payment_at: d.toISOString() }).eq('id', contactId)
+  if (error) return { error: error.message }
+  pathsToRevalidate(contactId)
+  revalidatePath('/designs/apulia-power/amministratori')
+  revalidatePath('/designs/apulia-power/settings')
+}
+
+/**
  * If the row never made it to GHL (ghl_id null — pending_create or
  * previously failed), re-queue a fresh 'create' op so the worker tries
  * to push the latest local snapshot. Otherwise queue the requested

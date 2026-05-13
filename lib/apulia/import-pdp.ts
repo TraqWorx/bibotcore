@@ -115,50 +115,34 @@ export async function* importPdp(rows: Record<string, string>[], headers: string
   }
 
   // Auto-create admin contacts for any new Codice amministratore in this
-  // CSV that doesn't yet have an `amministratore`-tagged contact. Stamp
-  // first_payment_at = now on every admin (newly created or pre-existing
-  // without an anchor).
+  // CSV that doesn't yet have an `amministratore`-tagged contact. Payment
+  // schedule lives on PODs (not admins) — no first_payment_at stamping here.
   try {
     const { createAdminClient } = await import('@/lib/supabase-server')
     const { upsertContact } = await import('./contacts')
     const { upsertCachedFromGhl } = await import('./cache')
     const sb = createAdminClient()
 
-    // Build map: code → first row data (used as admin profile source).
     const firstRowByCode = new Map<string, Record<string, string>>()
     for (const row of rows) {
       const code = (row[COL.CodiceAmm] || '').trim()
       if (code && !firstRowByCode.has(code)) firstRowByCode.set(code, row)
     }
-    if (firstRowByCode.size === 0) {
-      // nothing to do
-    } else {
-      // Look up which codes already have an admin contact in the cache.
+    if (firstRowByCode.size > 0) {
       const { data: existingAdmins } = await sb
         .from('apulia_contacts')
-        .select('id, codice_amministratore, first_payment_at')
+        .select('id, codice_amministratore')
         .eq('is_amministratore', true)
         .in('codice_amministratore', [...firstRowByCode.keys()])
       const existingByCode = new Map((existingAdmins ?? []).map((a) => [a.codice_amministratore, a]))
-      const now = new Date().toISOString()
 
       for (const [code, row] of firstRowByCode) {
-        const existing = existingByCode.get(code)
-        if (existing) {
-          // Stamp first_payment_at if missing.
-          if (!existing.first_payment_at) {
-            await sb.from('apulia_contacts').update({ first_payment_at: now }).eq('id', existing.id)
-          }
-          continue
-        }
-        // Create the admin contact in Bibot.
+        if (existingByCode.has(code)) continue
         const adminName = (row[COL.AdminName] || '').trim() || `Amministratore ${code}`
         const cf: Record<string, string | number> = {}
         for (const [colName, fieldId] of colFieldMap) {
           const v = row[colName]
           if (v == null || v === '') continue
-          // Only carry admin-relevant fields, skip POD-specific ones.
-          // Simplest: include all that map; harmless on contact.
           cf[fieldId] = v
         }
         try {
@@ -176,7 +160,6 @@ export async function* importPdp(rows: Record<string, string>[], headers: string
               tags: ['amministratore'],
               customFields: Object.entries(cf).map(([id, value]) => ({ id, value: String(value) })),
             })
-            await sb.from('apulia_contacts').update({ first_payment_at: now }).eq('id', newId)
           }
         } catch (err) {
           console.error(`[importPdp] auto-create admin ${code} failed:`, err)

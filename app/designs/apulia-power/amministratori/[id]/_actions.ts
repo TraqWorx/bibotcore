@@ -97,35 +97,6 @@ export async function setPodOverride(podContactId: string, amount: number, admin
   revalidatePath('/designs/apulia-power/dashboard')
 }
 
-export async function markPaid(adminContactId: string, amountCents: number, note?: string): Promise<{ error: string } | undefined> {
-  const guard = await ensureOwner()
-  if ('error' in guard) return guard
-
-  const sb = createAdminClient()
-  const { data: schedule } = await sb.rpc('apulia_admin_schedule')
-  type ScheduleRow = { contact_id: string; first_payment_at: string | null; paid_count: number; next_period_idx: number; next_due_date: string | null; is_due_now: boolean; overdue_count: number }
-  const sched = ((schedule ?? []) as ScheduleRow[]).find((s) => s.contact_id === adminContactId)
-  if (!sched) return { error: 'Schedule non trovato' }
-  if (!sched.first_payment_at) return { error: "Imposta prima la data del 1° pagamento dell'amministratore" }
-
-  const { error } = await sb.from('apulia_payments').insert({
-    contact_id: adminContactId,
-    period: `idx-${sched.next_period_idx}`,
-    period_idx: sched.next_period_idx,
-    period_due_date: sched.next_due_date,
-    amount_cents: amountCents,
-    paid_at: new Date().toISOString(),
-    paid_by: guard.email,
-    note: note ?? null,
-  })
-  if (error) return { error: error.message }
-
-  revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
-  revalidatePath('/designs/apulia-power/amministratori')
-  revalidatePath('/designs/apulia-power/pagamenti')
-  revalidatePath('/designs/apulia-power/dashboard')
-}
-
 /**
  * Mark a set of PODs as paid in one go. Each POD gets its own row in
  * apulia_payments (pod_contact_id NOT NULL) and starts a fresh 6-month
@@ -214,43 +185,6 @@ export async function unmarkPodPaid(
   revalidatePath('/designs/apulia-power/amministratori')
   revalidatePath('/designs/apulia-power/pagamenti')
   revalidatePath('/designs/apulia-power/dashboard')
-}
-
-export async function unmarkPaid(adminContactId: string): Promise<{ error: string } | undefined> {
-  const guard = await ensureOwner()
-  if ('error' in guard) return guard
-
-  const sb = createAdminClient()
-  const { data: latest } = await sb
-    .from('apulia_payments')
-    .select('id')
-    .eq('contact_id', adminContactId)
-    .not('period_idx', 'is', null)
-    .order('period_idx', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (!latest) return { error: 'Nessun pagamento da annullare' }
-  const { error } = await sb.from('apulia_payments').delete().eq('id', latest.id)
-  if (error) return { error: error.message }
-
-  revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
-  revalidatePath('/designs/apulia-power/amministratori')
-  revalidatePath('/designs/apulia-power/pagamenti')
-  revalidatePath('/designs/apulia-power/dashboard')
-}
-
-export async function setFirstPaymentDate(adminContactId: string, isoDate: string): Promise<{ error: string } | undefined> {
-  const guard = await ensureOwner()
-  if ('error' in guard) return guard
-  const d = new Date(isoDate)
-  if (Number.isNaN(d.getTime())) return { error: 'Data non valida' }
-  const sb = createAdminClient()
-  const { error } = await sb.from('apulia_contacts').update({ first_payment_at: d.toISOString() }).eq('id', adminContactId)
-  if (error) return { error: error.message }
-  revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
-  revalidatePath('/designs/apulia-power/amministratori')
-  revalidatePath('/designs/apulia-power/dashboard')
-  revalidatePath('/designs/apulia-power/settings')
 }
 
 export async function startImpersonation(adminContactId: string): Promise<{ error: string } | undefined> {

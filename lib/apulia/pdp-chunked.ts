@@ -130,6 +130,7 @@ export async function processPdpChunk(
   const updates: UpdatedRow[] = []
   const ops: QueueOpInput[] = []
   let processedCount = 0
+  const importNow = new Date().toISOString()
 
   for (const row of rowsSlice) {
     const pod = normalizePod((row[COL.PodPdr] || '').toUpperCase().trim())
@@ -208,6 +209,7 @@ export async function processPdpChunk(
         is_amministratore: false,
         is_switch_out: false,
         ghl_updated_at: null,
+        first_payment_at: importNow,
       }
       inserts.push(inserted)
       ops.push({ contact_id: id, ghl_id: null, action: 'create' })
@@ -319,23 +321,16 @@ export async function finalizePdp(
   if (firstRowByCode.size > 0) {
     const { data: existingAdmins } = await sb
       .from('apulia_contacts')
-      .select('id, codice_amministratore, first_payment_at')
+      .select('id, codice_amministratore')
       .eq('is_amministratore', true)
       .in('codice_amministratore', [...firstRowByCode.keys()])
-    const existingByCode = new Map(((existingAdmins ?? []) as ExistingAdmin[]).map((a) => [a.codice_amministratore, a]))
-    const now = new Date().toISOString()
+    const existingByCode = new Map(((existingAdmins ?? []) as Pick<ExistingAdmin, 'id' | 'codice_amministratore'>[]).map((a) => [a.codice_amministratore, a]))
 
     const newAdmins: NewRow[] = []
     const ops: QueueOpInput[] = []
 
     for (const [code, row] of firstRowByCode) {
-      const existing = existingByCode.get(code)
-      if (existing) {
-        if (!existing.first_payment_at) {
-          await sb.from('apulia_contacts').update({ first_payment_at: now }).eq('id', existing.id)
-        }
-        continue
-      }
+      if (existingByCode.has(code)) continue
       const adminName = (row[COL_AdminName] || '').trim() || `Amministratore ${code}`
       const cf: Record<string, string> = {}
       for (const [colName, fieldId] of Object.entries(colFieldMap)) {
@@ -369,6 +364,7 @@ export async function finalizePdp(
         is_amministratore: true,
         is_switch_out: false,
         ghl_updated_at: null,
+        first_payment_at: null,
       })
       ops.push({ contact_id: id, ghl_id: null, action: 'create' })
       adminCreates++
@@ -381,10 +377,6 @@ export async function finalizePdp(
         const { error } = await sb.from('apulia_contacts').insert(slice)
         if (error) throw new Error(`finalize admin insert: ${error.message}`)
       }
-      // Stamp first_payment_at on the same set in a follow-up update so it
-      // isn't part of the bulk insert (column lives outside CachedContactRow).
-      const ids = newAdmins.map((r) => r.id)
-      await sb.from('apulia_contacts').update({ first_payment_at: now }).in('id', ids)
       await enqueueOps(ops, importId ?? null)
     }
   }
@@ -447,6 +439,8 @@ interface NewRow {
   is_amministratore: boolean
   is_switch_out: boolean
   ghl_updated_at: string | null
+  /** Per-POD payment anchor: import date by default, editable per POD. */
+  first_payment_at: string | null
 }
 
 interface UpdatedRow {
