@@ -63,7 +63,6 @@ export interface CreateAdminInput {
   city?: string
   province?: string
   compensoPerPod?: number
-  firstPaymentAt?: string
 }
 
 /**
@@ -106,7 +105,6 @@ export async function createAdmin(input: CreateAdminInput): Promise<{ id?: strin
   }
 
   const id = randomUUID()
-  const anchor = input.firstPaymentAt ? new Date(input.firstPaymentAt) : new Date()
 
   const { error } = await sb.from('apulia_contacts').insert({
     id,
@@ -130,7 +128,7 @@ export async function createAdmin(input: CreateAdminInput): Promise<{ id?: strin
     is_amministratore: true,
     is_switch_out: false,
     ghl_updated_at: null,
-    first_payment_at: anchor.toISOString(),
+    first_payment_at: null,
   })
   if (error) return { error: error.message }
 
@@ -208,6 +206,26 @@ export async function setCompensoPerPod(adminContactId: string, amount: number):
   revalidatePath('/designs/apulia-power/settings')
   revalidatePath('/designs/apulia-power/dashboard')
   return { total: newTotal }
+}
+
+/**
+ * Bulk-set compenso_per_pod on many admins. Each admin gets its
+ * commissione_totale recomputed and two set_field ops queued for GHL.
+ * Runs sequentially — the per-admin recompute can't be batched safely.
+ */
+export async function setCompensoPerPodBulk(adminContactIds: string[], amount: number): Promise<{ updated: number; failed: number; error?: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { updated: 0, failed: 0, error: guard.error }
+  if (!Number.isFinite(amount) || amount < 0) return { updated: 0, failed: 0, error: 'Importo non valido' }
+  if (adminContactIds.length === 0) return { updated: 0, failed: 0 }
+  let updated = 0
+  let failed = 0
+  for (const id of adminContactIds) {
+    const res = await setCompensoPerPod(id, amount)
+    if (res.error) failed++
+    else updated++
+  }
+  return { updated, failed }
 }
 
 /**

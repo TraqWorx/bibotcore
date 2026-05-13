@@ -100,23 +100,25 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
 
   return (
     <>
-      {payable && selected.size === 0 && (
+      {selected.size === 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderBottom: '1px solid var(--ap-line)', flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid var(--ap-line)', borderRadius: 8, padding: '4px 8px', background: 'var(--ap-surface, #fff)', flex: '0 0 auto' }}>
-            <span style={{ fontSize: 11, color: 'var(--ap-text-muted)', whiteSpace: 'nowrap' }}>Aggiunti</span>
+            <span style={{ fontSize: 11, color: 'var(--ap-text-muted)', whiteSpace: 'nowrap' }}>{payable ? 'Aggiunti' : 'Switch-out'}</span>
             <input type="date" value={addedFrom} onChange={(e) => setAddedFrom(e.target.value)} style={{ border: 'none', background: 'transparent', fontSize: 12, height: 24, outline: 'none', width: 130 }} />
             <span style={{ fontSize: 11, color: 'var(--ap-text-faint)' }}>→</span>
             <input type="date" value={addedTo} onChange={(e) => setAddedTo(e.target.value)} style={{ border: 'none', background: 'transparent', fontSize: 12, height: 24, outline: 'none', width: 130 }} />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-            style={{ height: 32, fontSize: 12, padding: '0 10px', border: '1px solid var(--ap-line-strong)', borderRadius: 8, background: 'var(--ap-surface, #fff)', color: 'var(--ap-text)', width: 'auto', flex: '0 0 auto', cursor: 'pointer' }}
-          >
-            <option value="all">Tutti gli stati</option>
-            <option value="due">Solo Da Pagare</option>
-            <option value="paid">Solo Pagati</option>
-          </select>
+          {payable && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              style={{ height: 32, fontSize: 12, padding: '0 10px', border: '1px solid var(--ap-line-strong)', borderRadius: 8, background: 'var(--ap-surface, #fff)', color: 'var(--ap-text)', width: 'auto', flex: '0 0 auto', cursor: 'pointer' }}
+            >
+              <option value="all">Tutti gli stati</option>
+              <option value="due">Solo Da Pagare</option>
+              <option value="paid">Solo Pagati</option>
+            </select>
+          )}
           {filtersActive && (
             <button type="button" className="ap-btn ap-btn-ghost" style={{ height: 32, fontSize: 12, flex: '0 0 auto' }} onClick={() => { setAddedFrom(''); setAddedTo(''); setStatusFilter('all') }}>
               Reset
@@ -125,7 +127,7 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
           <span style={{ fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums', flex: '0 0 auto' }}>
             {visiblePods.length} di {pods.length}
           </span>
-          {dueRows.length > 0 && (
+          {payable && dueRows.length > 0 && (
             <button type="button" onClick={selectAllDue} className="ap-btn ap-btn-ghost" style={{ marginLeft: 'auto', height: 32, fontSize: 12, color: 'var(--ap-blue)', fontWeight: 700, flex: '0 0 auto' }}>
               ☑ {filtersActive ? `Seleziona ${dueRows.length} filtrati` : `Seleziona tutti i ${dueRows.length} da pagare`}
             </button>
@@ -162,7 +164,7 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
                 <input type="checkbox" checked={allDueSelected} onChange={selectAllDue} aria-label="Seleziona tutti da pagare" disabled={dueRows.length === 0} />
               </th>
             )}
-            <th>Aggiunto il</th>
+            <th>{payable ? 'Aggiunto il' : 'Switch-out il'}</th>
             <th>POD/PDR</th>
             <th>Cliente</th>
             {payable && <th>Stato</th>}

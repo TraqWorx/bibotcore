@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { setPodFirstPaymentDate } from '../../condomini/[id]/_actions'
+import { setPodFirstPaymentDate, setPodsFirstPaymentDateBulk } from '../../condomini/[id]/_actions'
 
 export interface PodScheduleEntry {
   contactId: string
@@ -25,6 +25,13 @@ function fmtEur(n: number): string {
 export default function PodPaymentSchedule({ pods }: { pods: PodScheduleEntry[] }) {
   const [filter, setFilter] = useState<'all' | 'unset' | 'due'>('all')
   const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkDate, setBulkDate] = useState<string>('')
+  const [bulkPending, startBulkTransition] = useTransition()
+  const [bulkFlash, setBulkFlash] = useState<string | null>(null)
+  const [bulkError, setBulkError] = useState<string | null>(null)
+  const router = useRouter()
+
   const filtered = useMemo(() => {
     let out = pods
     if (filter === 'unset') out = out.filter((p) => !p.firstPaymentAt)
@@ -46,6 +53,52 @@ export default function PodPaymentSchedule({ pods }: { pods: PodScheduleEntry[] 
     due: pods.filter((p) => p.isDueNow).length,
   }), [pods])
 
+  const filteredIds = useMemo(() => filtered.map((p) => p.contactId), [filtered])
+  const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selected.has(id))
+  const someFilteredSelected = filteredIds.some((id) => selected.has(id)) && !allFilteredSelected
+
+  function toggleAll() {
+    if (allFilteredSelected) {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        for (const id of filteredIds) next.delete(id)
+        return next
+      })
+    } else {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        for (const id of filteredIds) next.add(id)
+        return next
+      })
+    }
+  }
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function applyBulk() {
+    if (!bulkDate || selected.size === 0) return
+    setBulkError(null)
+    setBulkFlash(null)
+    startBulkTransition(async () => {
+      const ids = Array.from(selected)
+      const res = await setPodsFirstPaymentDateBulk(ids, bulkDate)
+      if (res.error) setBulkError(res.error)
+      else {
+        setBulkFlash(`✓ Aggiornati ${res.updated} POD`)
+        setSelected(new Set())
+        setTimeout(() => setBulkFlash(null), 2500)
+        router.refresh()
+      }
+    })
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -63,10 +116,59 @@ export default function PodPaymentSchedule({ pods }: { pods: PodScheduleEntry[] 
           style={{ flex: '1 1 240px', minWidth: 200, height: 32, fontSize: 12 }}
         />
       </div>
+
+      {selected.size > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--ap-bg-muted, #f1f5f9)', border: '1px solid var(--ap-line)', borderRadius: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>
+            {selected.size} POD selezionati
+          </span>
+          <div style={{ flex: 1 }} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <span style={{ color: 'var(--ap-text-muted)' }}>Imposta 1° pagamento:</span>
+            <input
+              type="date"
+              value={bulkDate}
+              onChange={(e) => setBulkDate(e.target.value)}
+              className="ap-input"
+              style={{ height: 30, width: 150, fontSize: 12 }}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={applyBulk}
+            disabled={!bulkDate || bulkPending}
+            className="ap-btn ap-btn-primary"
+            style={{ height: 30, fontSize: 12 }}
+          >
+            {bulkPending ? 'Applico…' : 'Applica a selezionati'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="ap-btn ap-btn-ghost"
+            style={{ height: 30, fontSize: 12 }}
+          >
+            Annulla
+          </button>
+          {bulkFlash && <span style={{ color: 'var(--ap-success)', fontSize: 12, fontWeight: 600 }}>{bulkFlash}</span>}
+          {bulkError && <span style={{ color: 'var(--ap-danger)', fontSize: 12 }}>{bulkError}</span>}
+        </div>
+      )}
+
       <div style={{ overflowX: 'auto' }}>
         <table className="ap-table">
           <thead>
             <tr>
+              <th style={{ width: 32 }}>
+                <input
+                  type="checkbox"
+                  checked={allFilteredSelected}
+                  ref={(el) => { if (el) el.indeterminate = someFilteredSelected }}
+                  onChange={toggleAll}
+                  aria-label="Seleziona tutti"
+                  style={{ cursor: 'pointer' }}
+                />
+              </th>
               <th>POD/PDR</th>
               <th>Cliente</th>
               <th>Amministratore</th>
@@ -78,8 +180,10 @@ export default function PodPaymentSchedule({ pods }: { pods: PodScheduleEntry[] 
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun POD.</td></tr>}
-            {filtered.map((p) => <Row key={p.contactId} pod={p} />)}
+            {filtered.length === 0 && <tr><td colSpan={9} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun POD.</td></tr>}
+            {filtered.map((p) => (
+              <Row key={p.contactId} pod={p} selected={selected.has(p.contactId)} onToggle={() => toggleOne(p.contactId)} />
+            ))}
           </tbody>
         </table>
       </div>
@@ -87,7 +191,7 @@ export default function PodPaymentSchedule({ pods }: { pods: PodScheduleEntry[] 
   )
 }
 
-function Row({ pod }: { pod: PodScheduleEntry }) {
+function Row({ pod, selected, onToggle }: { pod: PodScheduleEntry; selected: boolean; onToggle: () => void }) {
   const [pending, startTransition] = useTransition()
   const [val, setVal] = useState<string>(pod.firstPaymentAt ? pod.firstPaymentAt.slice(0, 10) : '')
   const [savedFlash, setSavedFlash] = useState(false)
@@ -110,7 +214,10 @@ function Row({ pod }: { pod: PodScheduleEntry }) {
   }
 
   return (
-    <tr>
+    <tr style={selected ? { background: 'color-mix(in srgb, var(--ap-blue-soft, #dbeafe) 25%, transparent)' } : undefined}>
+      <td>
+        <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`Seleziona POD ${pod.pod}`} style={{ cursor: 'pointer' }} />
+      </td>
       <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
         <Link href={`/designs/apulia-power/condomini/${pod.contactId}`} style={{ color: 'var(--ap-text)', textDecoration: 'none', fontWeight: 600 }}>{pod.pod}</Link>
       </td>

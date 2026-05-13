@@ -9,6 +9,8 @@ export interface TagUsage {
   count: number
 }
 
+const PROTECTED_TAGS = new Set(['amministratore', 'switch-out'])
+
 export default function TagManager({ tags }: { tags: TagUsage[] }) {
   const [q, setQ] = useState('')
   const [pending, startTransition] = useTransition()
@@ -67,31 +69,41 @@ export default function TagManager({ tags }: { tags: TagUsage[] }) {
           </thead>
           <tbody>
             {filtered.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun tag.</td></tr>}
-            {filtered.map((t) => (
-              <tr key={t.tag}>
-                <td><span className="ap-pill" data-tone="blue">{t.tag}</span></td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{t.count.toLocaleString('it-IT')}</td>
-                <td style={{ textAlign: 'right' }}>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(t.tag, t.count)}
-                    disabled={pending}
-                    className="ap-btn"
-                    style={{
-                      background: 'transparent',
-                      color: 'var(--ap-danger, #dc2626)',
-                      border: '1px solid var(--ap-danger, #dc2626)',
-                      fontSize: 11,
-                      height: 28,
-                      padding: '0 12px',
-                      opacity: pending && busyTag === t.tag ? 0.6 : 1,
-                    }}
-                  >
-                    {busyTag === t.tag ? 'Rimuovo…' : 'Elimina'}
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {filtered.map((t) => {
+              const isProtected = PROTECTED_TAGS.has(t.tag.toLowerCase())
+              return (
+                <tr key={t.tag}>
+                  <td>
+                    <span className="ap-pill" data-tone={isProtected ? 'amber' : 'blue'}>{t.tag}</span>
+                    {isProtected && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--ap-text-muted)' }}>🔒 sistema</span>}
+                  </td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{t.count.toLocaleString('it-IT')}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    {isProtected ? (
+                      <span style={{ fontSize: 11, color: 'var(--ap-text-faint)', fontStyle: 'italic' }}>Tag protetto</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onDelete(t.tag, t.count)}
+                        disabled={pending}
+                        className="ap-btn"
+                        style={{
+                          background: 'transparent',
+                          color: 'var(--ap-danger, #dc2626)',
+                          border: '1px solid var(--ap-danger, #dc2626)',
+                          fontSize: 11,
+                          height: 28,
+                          padding: '0 12px',
+                          opacity: pending && busyTag === t.tag ? 0.6 : 1,
+                        }}
+                      >
+                        {busyTag === t.tag ? 'Rimuovo…' : 'Elimina'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

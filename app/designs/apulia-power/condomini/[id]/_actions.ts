@@ -76,6 +76,24 @@ export async function setPodFirstPaymentDate(contactId: string, isoDate: string)
   revalidatePath('/designs/apulia-power/settings')
 }
 
+/** Bulk-set first_payment_at on many PODs in one shot. */
+export async function setPodsFirstPaymentDateBulk(contactIds: string[], isoDate: string): Promise<{ updated: number; error?: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { updated: 0, error: guard.error }
+  const d = new Date(isoDate)
+  if (Number.isNaN(d.getTime())) return { updated: 0, error: 'Data non valida' }
+  if (contactIds.length === 0) return { updated: 0 }
+  const sb = createAdminClient()
+  const { error, count } = await sb.from('apulia_contacts')
+    .update({ first_payment_at: d.toISOString() }, { count: 'exact' })
+    .in('id', contactIds)
+  if (error) return { updated: 0, error: error.message }
+  revalidatePath('/designs/apulia-power/settings')
+  revalidatePath('/designs/apulia-power/dashboard')
+  revalidatePath('/designs/apulia-power/amministratori')
+  return { updated: count ?? contactIds.length }
+}
+
 /**
  * If the row never made it to GHL (ghl_id null — pending_create or
  * previously failed), re-queue a fresh 'create' op so the worker tries

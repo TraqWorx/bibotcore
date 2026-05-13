@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { setCompensoPerPod } from '../../amministratori/_actions'
+import { setCompensoPerPod, setCompensoPerPodBulk } from '../../amministratori/_actions'
 
 export interface CompensoEntry {
   contactId: string
@@ -17,16 +17,80 @@ function fmtEur(n: number): string {
   return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })
 }
 
+function parseAmount(raw: string): number | null {
+  const v = raw.trim()
+  if (v === '') return 0
+  const n = Number(v.replace(',', '.'))
+  if (!Number.isFinite(n) || n < 0) return null
+  return n
+}
+
 export default function CompensiTable({ admins }: { admins: CompensoEntry[] }) {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<'all' | 'unset'>('all')
-  const filtered = admins.filter((a) => {
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkVal, setBulkVal] = useState('')
+  const [bulkPending, startBulkTransition] = useTransition()
+  const [bulkFlash, setBulkFlash] = useState<string | null>(null)
+  const [bulkError, setBulkError] = useState<string | null>(null)
+  const router = useRouter()
+
+  const filtered = useMemo(() => admins.filter((a) => {
     if (filter === 'unset' && a.compensoPerPod > 0) return false
     if (q && !a.name.toLowerCase().includes(q.toLowerCase())) return false
     return true
-  })
+  }), [admins, q, filter])
+
   const totalPods = admins.reduce((s, a) => s + a.podsActive, 0)
   const avgCompenso = admins.filter((a) => a.compensoPerPod > 0).reduce((s, a, _, arr) => s + a.compensoPerPod / arr.length, 0)
+
+  const filteredIds = useMemo(() => filtered.map((a) => a.contactId), [filtered])
+  const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selected.has(id))
+  const someFilteredSelected = filteredIds.some((id) => selected.has(id)) && !allFilteredSelected
+
+  function toggleAll() {
+    if (allFilteredSelected) {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        for (const id of filteredIds) next.delete(id)
+        return next
+      })
+    } else {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        for (const id of filteredIds) next.add(id)
+        return next
+      })
+    }
+  }
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function applyBulk() {
+    const parsed = parseAmount(bulkVal)
+    if (parsed === null) { setBulkError('Importo non valido'); return }
+    if (selected.size === 0) return
+    setBulkError(null)
+    setBulkFlash(null)
+    startBulkTransition(async () => {
+      const ids = Array.from(selected)
+      const res = await setCompensoPerPodBulk(ids, parsed)
+      if (res.error) setBulkError(res.error)
+      else {
+        setBulkFlash(`✓ Aggiornati ${res.updated} amministratori${res.failed ? ` (${res.failed} errori)` : ''}`)
+        setSelected(new Set())
+        setTimeout(() => setBulkFlash(null), 2500)
+        router.refresh()
+      }
+    })
+  }
 
   return (
     <div>
@@ -55,10 +119,62 @@ export default function CompensiTable({ admins }: { admins: CompensoEntry[] }) {
         Modifica il compenso per POD: la commissione totale viene ricalcolata e sincronizzata con Bibot.
         Eventuali override sul singolo POD restano prioritari rispetto a questo valore.
       </p>
+
+      {selected.size > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--ap-bg-muted, #f1f5f9)', border: '1px solid var(--ap-line)', borderRadius: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>
+            {selected.size} amministratori selezionati
+          </span>
+          <div style={{ flex: 1 }} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <span style={{ color: 'var(--ap-text-muted)' }}>Imposta compenso:</span>
+            <span style={{ fontSize: 12, color: 'var(--ap-text-muted)' }}>€</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={bulkVal}
+              onChange={(e) => setBulkVal(e.target.value)}
+              placeholder="0,00"
+              className="ap-input"
+              style={{ height: 30, width: 90, fontSize: 12, fontFamily: 'monospace', textAlign: 'right' }}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={applyBulk}
+            disabled={bulkPending || bulkVal.trim() === ''}
+            className="ap-btn ap-btn-primary"
+            style={{ height: 30, fontSize: 12 }}
+          >
+            {bulkPending ? 'Applico…' : 'Applica a selezionati'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="ap-btn ap-btn-ghost"
+            style={{ height: 30, fontSize: 12 }}
+          >
+            Annulla
+          </button>
+          {bulkFlash && <span style={{ color: 'var(--ap-success)', fontSize: 12, fontWeight: 600 }}>{bulkFlash}</span>}
+          {bulkError && <span style={{ color: 'var(--ap-danger)', fontSize: 12 }}>{bulkError}</span>}
+        </div>
+      )}
+
       <div style={{ overflowX: 'auto' }}>
         <table className="ap-table">
           <thead>
             <tr>
+              <th style={{ width: 32 }}>
+                <input
+                  type="checkbox"
+                  checked={allFilteredSelected}
+                  ref={(el) => { if (el) el.indeterminate = someFilteredSelected }}
+                  onChange={toggleAll}
+                  aria-label="Seleziona tutti"
+                  style={{ cursor: 'pointer' }}
+                />
+              </th>
               <th>Amministratore</th>
               <th style={{ textAlign: 'right' }}>POD attivi</th>
               <th style={{ width: 160 }}>Compenso per POD</th>
@@ -68,13 +184,13 @@ export default function CompensiTable({ admins }: { admins: CompensoEntry[] }) {
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>
+                <td colSpan={5} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>
                   Nessun risultato.
                 </td>
               </tr>
             )}
             {filtered.map((a) => (
-              <Row key={a.contactId} admin={a} />
+              <Row key={a.contactId} admin={a} selected={selected.has(a.contactId)} onToggle={() => toggleOne(a.contactId)} />
             ))}
           </tbody>
         </table>
@@ -83,7 +199,7 @@ export default function CompensiTable({ admins }: { admins: CompensoEntry[] }) {
   )
 }
 
-function Row({ admin }: { admin: CompensoEntry }) {
+function Row({ admin, selected, onToggle }: { admin: CompensoEntry; selected: boolean; onToggle: () => void }) {
   const [pending, startTransition] = useTransition()
   const [val, setVal] = useState<string>(admin.compensoPerPod > 0 ? String(admin.compensoPerPod).replace('.', ',') : '')
   const [savedFlash, setSavedFlash] = useState(false)
@@ -112,7 +228,10 @@ function Row({ admin }: { admin: CompensoEntry }) {
   }
 
   return (
-    <tr>
+    <tr style={selected ? { background: 'color-mix(in srgb, var(--ap-blue-soft, #dbeafe) 25%, transparent)' } : undefined}>
+      <td>
+        <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`Seleziona ${admin.name}`} style={{ cursor: 'pointer' }} />
+      </td>
       <td>
         <Link
           href={`/designs/apulia-power/amministratori/${admin.contactId}`}

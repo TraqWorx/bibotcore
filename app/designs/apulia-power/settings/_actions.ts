@@ -260,11 +260,17 @@ export async function retryFailedOps(): Promise<{ retried: number; error?: strin
  * apulia_contacts.tags, marks rows pending_update, and enqueues one
  * remove_tag op per row for the worker.
  */
+/** Tags that drive business logic and must never be deletable from the UI. */
+const PROTECTED_TAGS = new Set(['amministratore', 'switch-out'])
+
 export async function deleteTagGlobally(tag: string): Promise<{ removed: number; failed: number; error?: string }> {
   const guard = await ensureOwner()
   if ('error' in guard) return { removed: 0, failed: 0, error: guard.error }
   const t = tag.trim()
   if (!t) return { removed: 0, failed: 0, error: 'Tag vuoto' }
+  if (PROTECTED_TAGS.has(t.toLowerCase())) {
+    return { removed: 0, failed: 0, error: `Il tag "${t}" è protetto e non può essere eliminato.` }
+  }
 
   const sb = createAdminClient()
   // Paginate — a popular tag could be on >1000 rows.

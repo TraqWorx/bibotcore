@@ -5,6 +5,7 @@ import { adminWithPods } from '@/lib/apulia/queries'
 import { createAdminClient } from '@/lib/supabase-server'
 import { fetchApuliaFieldGroups } from '@/lib/apulia/field-meta'
 import PodTable from './_components/PodTable'
+import PaymentRow from './_components/PaymentRow'
 import ImpersonateButton from './_components/ImpersonateButton'
 import AdminFullEditor from './_components/AdminFullEditor'
 import { listDistinctTags } from '@/lib/apulia/tags'
@@ -28,7 +29,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   const sb = createAdminClient()
   const [{ data: payments }, { data: contactRow }, fieldGroups, tagSuggestions] = await Promise.all([
-    sb.from('apulia_payments').select('id, period, amount_cents, paid_at, paid_by, note, pod_contact_id').eq('contact_id', id).order('paid_at', { ascending: false }),
+    sb.from('apulia_payments').select('id, period, amount_cents, paid_at, paid_by, note, pod_contact_id, proof_url, proof_name').eq('contact_id', id).order('paid_at', { ascending: false }),
     sb.from('apulia_contacts').select('first_name, last_name, email, phone, tags, custom_fields, sync_status, sync_error, ghl_id').eq('id', id).maybeSingle(),
     fetchApuliaFieldGroups(),
     listDistinctTags(),
@@ -165,23 +166,36 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 </header>
                 <table className="ap-table">
                   <thead>
-                    <tr><th>Pagato il</th><th>POD</th><th style={{ textAlign: 'right' }}>Importo</th><th>Da</th><th>Nota</th></tr>
+                    <tr>
+                      <th>Pagato il</th>
+                      <th>POD</th>
+                      <th style={{ textAlign: 'right' }}>Importo</th>
+                      <th>Da</th>
+                      <th>Nota</th>
+                      <th>Allegato</th>
+                    </tr>
                   </thead>
                   <tbody>
-                    {(payments ?? []).length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessun pagamento registrato.</td></tr>}
+                    {(payments ?? []).length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessun pagamento registrato.</td></tr>}
                     {(payments ?? []).map((p) => {
-                      const r = p as { id: string; period: string; amount_cents: number; paid_at: string; paid_by: string | null; note: string | null; pod_contact_id: string | null }
-                      const podLabel = r.pod_contact_id ? podLabelMap.get(r.pod_contact_id) : null
+                      const r = p as { id: string; period: string; amount_cents: number; paid_at: string; paid_by: string | null; note: string | null; pod_contact_id: string | null; proof_url: string | null; proof_name: string | null }
+                      const podLabel = r.pod_contact_id ? (podLabelMap.get(r.pod_contact_id) ?? null) : null
                       return (
-                      <tr key={r.id}>
-                        <td style={{ fontVariantNumeric: 'tabular-nums' }}>{new Date(r.paid_at).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                        <td style={{ fontFamily: r.pod_contact_id ? 'monospace' : undefined, fontSize: 12 }}>
-                          {podLabel ?? <span style={{ color: 'var(--ap-text-muted)', fontStyle: 'italic' }}>tutto l&apos;amministratore</span>}
-                        </td>
-                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmtEur(r.amount_cents / 100)}</td>
-                        <td style={{ color: 'var(--ap-text-muted)', fontSize: 12 }}>{r.paid_by ?? '—'}</td>
-                        <td style={{ color: 'var(--ap-text-muted)', fontSize: 12 }}>{r.note ?? ''}</td>
-                      </tr>
+                        <PaymentRow
+                          key={r.id}
+                          adminContactId={id}
+                          podLabel={podLabel}
+                          payment={{
+                            id: r.id,
+                            paid_at: r.paid_at,
+                            amount_cents: r.amount_cents,
+                            paid_by: r.paid_by,
+                            note: r.note,
+                            pod_contact_id: r.pod_contact_id,
+                            proof_url: r.proof_url,
+                            proof_name: r.proof_name,
+                          }}
+                        />
                       )
                     })}
                   </tbody>

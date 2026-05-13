@@ -158,6 +158,99 @@ export async function markPodsPaid(
 }
 
 /**
+ * Update a payment's `note` inline. Stamps note_edited_at so the UI
+ * can show "modificata il …". Trims and treats empty as NULL.
+ */
+export async function updatePaymentNote(paymentId: string, note: string, adminContactId: string): Promise<{ error: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+  const trimmed = note.trim()
+  const sb = createAdminClient()
+  const { error } = await sb
+    .from('apulia_payments')
+    .update({ note: trimmed || null, note_edited_at: new Date().toISOString() })
+    .eq('id', paymentId)
+  if (error) return { error: error.message }
+  revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
+  revalidatePath('/designs/apulia-power/pagamenti')
+}
+
+/**
+ * Attach a proof file to a payment. Uploads to the `apulia-payment-proofs`
+ * bucket and records the public URL on the row. Replaces any prior proof.
+ *
+ * Expects a base64-encoded file (data URL prefix optional) from the
+ * client — server actions can't take FormData with files reliably.
+ */
+export async function attachPaymentProof(
+  paymentId: string,
+  fileName: string,
+  base64: string,
+  contentType: string,
+  adminContactId: string,
+): Promise<{ url?: string; error?: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { error: guard.error }
+  if (!fileName || !base64) return { error: 'File mancante' }
+
+  // Strip data URL prefix if present and validate size (max 10MB).
+  const cleanBase64 = base64.replace(/^data:[^;]+;base64,/, '')
+  const bytes = Buffer.from(cleanBase64, 'base64')
+  if (bytes.length > 10 * 1024 * 1024) return { error: 'File troppo grande (max 10MB)' }
+
+  const sb = createAdminClient()
+  // Ensure the bucket exists (idempotent).
+  await sb.storage.createBucket('apulia-payment-proofs', { public: true }).catch(() => null)
+
+  const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `${paymentId}/${Date.now()}-${safeName}`
+  const { error: upErr } = await sb.storage
+    .from('apulia-payment-proofs')
+    .upload(path, bytes, { contentType, upsert: true })
+  if (upErr) return { error: `Upload fallito: ${upErr.message}` }
+
+  const { data: pub } = sb.storage.from('apulia-payment-proofs').getPublicUrl(path)
+  const publicUrl = pub.publicUrl
+
+  const { error: dbErr } = await sb
+    .from('apulia_payments')
+    .update({
+      proof_url: publicUrl,
+      proof_name: fileName,
+      proof_uploaded_at: new Date().toISOString(),
+    })
+    .eq('id', paymentId)
+  if (dbErr) return { error: dbErr.message, url: publicUrl }
+
+  revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
+  revalidatePath('/designs/apulia-power/pagamenti')
+  return { url: publicUrl }
+}
+
+/** Remove the proof attachment from a payment. Best-effort storage delete. */
+export async function removePaymentProof(paymentId: string, adminContactId: string): Promise<{ error: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+  const sb = createAdminClient()
+  const { data: row } = await sb.from('apulia_payments').select('proof_url').eq('id', paymentId).maybeSingle()
+  if (row?.proof_url) {
+    const u = row.proof_url as string
+    const i = u.indexOf('/apulia-payment-proofs/')
+    if (i >= 0) {
+      const objectPath = u.slice(i + '/apulia-payment-proofs/'.length).split('?')[0]
+      await sb.storage.from('apulia-payment-proofs').remove([objectPath]).catch(() => null)
+    }
+  }
+  const { error } = await sb
+    .from('apulia_payments')
+    .update({ proof_url: null, proof_name: null, proof_uploaded_at: null })
+    .eq('id', paymentId)
+  if (error) return { error: error.message }
+  revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
+  revalidatePath('/designs/apulia-power/pagamenti')
+}
+
+/**
  * Annulla l'ultimo pagamento di uno specifico POD (utile in caso di
  * errore). Cancella solo la riga più recente in apulia_payments per
  * quel POD; eventuali pagamenti più vecchi restano in archivio.

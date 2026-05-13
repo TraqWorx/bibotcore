@@ -39,7 +39,6 @@ function ManualForm({ onClose }: { onClose: () => void }) {
         city: (fd.get('city') as string) || undefined,
         province: (fd.get('province') as string) || undefined,
         compensoPerPod: compenso ? Number(compenso.replace(',', '.')) : undefined,
-        firstPaymentAt: (fd.get('firstPaymentAt') as string) || undefined,
       })
       if (res.error) setError(res.error)
       else { onClose(); router.refresh() }
@@ -63,8 +62,7 @@ function ManualForm({ onClose }: { onClose: () => void }) {
           <Field name="address" label="Indirizzo fatturazione" full />
           <Field name="city" label="Città" />
           <Field name="province" label="Provincia" />
-          <Field name="compensoPerPod" label="Compenso per POD (€)" type="text" inputMode="decimal" />
-          <Field name="firstPaymentAt" label="Data 1° pagamento" type="date" full />
+          <Field name="compensoPerPod" label="Compenso per POD (€)" type="text" inputMode="decimal" full />
         </div>
         {error && <div style={{ color: 'var(--ap-danger)', marginTop: 12, fontSize: 13 }}>{error}</div>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
