@@ -40,9 +40,15 @@ export async function parseSpreadsheet(file: File): Promise<ParsedSheet> {
   const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false, defval: '', blankrows: false })
   if (aoa.length === 0) return { headers: [], rows: [] }
 
-  const rawHeaders = aoa[0].map((h) => (h == null ? '' : String(h).trim()))
+  // Report exports (e.g. the client's daily switch-out file) prepend a
+  // title/timestamp/filter banner above the real header row. Skip it: the
+  // header is the first "wide" row — banner rows carry one or two cells,
+  // the header labels every column.
+  const headerIdx = detectHeaderRow(aoa)
+
+  const rawHeaders = aoa[headerIdx].map((h) => (h == null ? '' : String(h).trim()))
   const rows: Record<string, string>[] = []
-  for (let i = 1; i < aoa.length; i++) {
+  for (let i = headerIdx + 1; i < aoa.length; i++) {
     const cells = aoa[i]
     if (!cells || cells.every((c) => c == null || String(c).trim() === '')) continue
     const row: Record<string, string> = {}
@@ -54,4 +60,25 @@ export async function parseSpreadsheet(file: File): Promise<ParsedSheet> {
     rows.push(row)
   }
   return { headers: rawHeaders, rows }
+}
+
+/**
+ * Pick the header row, skipping any leading banner/preamble. Scans the top
+ * rows and returns the first one at least half as wide as the widest row —
+ * preamble rows are sparse (1–2 cells), the header fills most columns. Falls
+ * back to row 0 for narrow files (≤2 columns) and clean files where row 0 is
+ * already the header.
+ */
+function detectHeaderRow(aoa: unknown[][]): number {
+  const scan = Math.min(aoa.length, 25)
+  const widthOf = (row: unknown[]): number =>
+    (row ?? []).reduce((n: number, c) => (c != null && String(c).trim() !== '' ? n + 1 : n), 0)
+  let maxWidth = 0
+  for (let r = 0; r < scan; r++) maxWidth = Math.max(maxWidth, widthOf(aoa[r]))
+  if (maxWidth < 3) return 0
+  const threshold = Math.max(3, Math.ceil(maxWidth * 0.5))
+  for (let r = 0; r < scan; r++) {
+    if (widthOf(aoa[r]) >= threshold) return r
+  }
+  return 0
 }
