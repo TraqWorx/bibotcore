@@ -136,11 +136,21 @@ export async function* importPdp(rows: Record<string, string>[], headers: string
         .in('codice_amministratore', [...firstRowByCode.keys()])
       const existingByCode = new Map((existingAdmins ?? []).map((a) => [a.codice_amministratore, a]))
 
+      // POD-specific fields must not leak onto an admin contact that's
+      // auto-created from one of its POD rows.
+      const POD_ONLY_FIELDS = new Set<string>([
+        APULIA_FIELD.POD_PDR,
+        APULIA_FIELD.STATO,
+        APULIA_FIELD.POD_OVERRIDE,
+        APULIA_FIELD.CLIENTE,
+        APULIA_FIELD.COMMISSIONE_TOTALE,
+      ])
       for (const [code, row] of firstRowByCode) {
         if (existingByCode.has(code)) continue
         const adminName = (row[COL.AdminName] || '').trim() || `Amministratore ${code}`
         const cf: Record<string, string | number> = {}
         for (const [colName, fieldId] of colFieldMap) {
+          if (POD_ONLY_FIELDS.has(fieldId)) continue
           const v = row[colName]
           if (v == null || v === '') continue
           cf[fieldId] = v
