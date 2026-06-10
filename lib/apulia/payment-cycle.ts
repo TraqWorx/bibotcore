@@ -27,16 +27,16 @@ export function computeNextDue(
   const base = new Date(anchorIso)
   if (offsetDays) base.setDate(base.getDate() + offsetDays)
 
-  // Skip pre-onboarding cycles: advance to the latest boundary <= onboarded.
+  // Skip every cycle whose start is before onboarding — we don't bill the
+  // past, and since payment is in advance, a cycle that already started is a
+  // past payment. First owed cycle = the first boundary on/after onboarding.
   let cyclesToSkip = 0
   if (onboardedIso) {
     const onboarded = new Date(onboardedIso).getTime()
     const probe = new Date(base)
-    while (true) {
-      const next = new Date(probe)
-      next.setMonth(next.getMonth() + 6)
-      if (next.getTime() <= onboarded) { cyclesToSkip++; probe.setMonth(probe.getMonth() + 6) }
-      else break
+    while (probe.getTime() < onboarded) {
+      cyclesToSkip++
+      probe.setMonth(probe.getMonth() + 6)
     }
   }
 
