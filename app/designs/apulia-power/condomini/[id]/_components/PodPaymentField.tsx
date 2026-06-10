@@ -50,7 +50,7 @@ export default function PodPaymentField({
         <div>
           <h3 style={{ fontSize: 13, fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ap-text-muted)' }}>Pagamento</h3>
           <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: '4px 0 0', maxWidth: 540 }}>
-            La data del 1° pagamento è impostata all&apos;upload del POD. Modificala se serve: tutte le scadenze successive sono ogni 6 mesi da qui.
+            La data del 1° pagamento è la data di inizio fornitura del POD. Modificala se serve: tutte le scadenze successive sono ogni 6 mesi da qui.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>

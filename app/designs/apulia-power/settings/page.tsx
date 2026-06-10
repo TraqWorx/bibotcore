@@ -215,7 +215,7 @@ export default async function Page() {
                 <header style={{ padding: '16px 20px', borderBottom: '1px solid var(--ap-line)' }}>
                   <h2 style={{ fontSize: 16, fontWeight: 800 }}>Date di pagamento per POD</h2>
                   <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
-                    Ogni POD ha un proprio ciclo di 6 mesi. La prima data viene impostata automaticamente al primo upload PDP che lo include.
+                    Ogni POD ha un proprio ciclo di 6 mesi, ancorato alla data di inizio fornitura del file PDP.
                     Modificala manualmente se necessario; la prossima scadenza si aggiorna automaticamente (1° pagamento + N×6 mesi).
                   </p>
                 </header>

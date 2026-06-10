@@ -12,6 +12,24 @@ const COL = {
   Phone: 'Fornitura : Cliente : Numero di telefono',
   Mobile: 'Fornitura : Cliente : Numero di cellulare',
   Note: 'Fornitura : Opportunità : Note',
+  InizioFornitura: 'Inizio fornitura',
+}
+
+/** Parse an Italian DD/MM/YYYY[, HH:MM] date to a midday-UTC ISO string. */
+function parseItalianDate(raw: string | undefined): string | null {
+  if (!raw) return null
+  const dp = String(raw).trim().split(',')[0].trim()
+  if (!dp) return null
+  const m = dp.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/)
+  if (m) {
+    const day = Number(m[1]), mon = Number(m[2])
+    let y = Number(m[3]); if (y < 100) y += 2000
+    if (mon >= 1 && mon <= 12 && day >= 1 && day <= 31) {
+      return new Date(Date.UTC(y, mon - 1, day, 12, 0, 0)).toISOString()
+    }
+  }
+  const t = Date.parse(dp)
+  return Number.isNaN(t) ? null : new Date(t).toISOString()
 }
 
 const COMUNE_FIELD_ID = 'EXO9WD4aLV2aPiMYxXUU'
@@ -251,7 +269,9 @@ export async function processPdpChunk(
         is_amministratore: false,
         is_switch_out: false,
         ghl_updated_at: null,
-        first_payment_at: importNow,
+        // Commission cycle anchors on Inizio fornitura (supply start);
+        // fall back to the import date only when the file lacks it.
+        first_payment_at: parseItalianDate(row[COL.InizioFornitura]) ?? importNow,
       }
       inserts.push(inserted)
       ops.push({ contact_id: id, ghl_id: null, action: 'create' })
