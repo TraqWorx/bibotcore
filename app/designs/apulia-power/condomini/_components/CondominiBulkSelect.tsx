@@ -16,6 +16,7 @@ export interface CondominoRow {
   syncError?: string | null
   addedAt?: string
   switchedOutAt?: string
+  store?: string
 }
 
 interface Props {
@@ -173,12 +174,13 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
             <th>POD/PDR</th>
             <th>Cliente</th>
             <th>Amministratore</th>
+            <th>Store</th>
             <th>Comune</th>
             <th>Stato</th>
           </tr>
         </thead>
         <tbody>
-          {visibleRows.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td></tr>}
+          {visibleRows.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun condominio.</td></tr>}
           {visibleRows.map((p) => {
             const checked = selected.has(p.contactId)
             const isFailed = p.syncStatus === 'failed'
@@ -210,6 +212,7 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
                 </td>
                 <td>{cellLink(p.cliente ?? '—')}</td>
                 <td>{cellLink(p.amministratore ?? '—')}</td>
+                <td>{p.store ? <span className="ap-pill" data-tone="blue" style={{ textTransform: 'capitalize' }}>{p.store.replace(/-/g, ' ')}</span> : <span style={{ color: 'var(--ap-text-faint)' }}>—</span>}</td>
                 <td>{cellLink(p.comune ?? '—')}</td>
                 <td>
                   {p.switchedOut ? (

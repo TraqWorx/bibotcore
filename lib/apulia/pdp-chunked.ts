@@ -11,9 +11,45 @@ const COL = {
   Email: 'Fornitura : Dati di fatturazione : Email',
   Phone: 'Fornitura : Cliente : Numero di telefono',
   Mobile: 'Fornitura : Cliente : Numero di cellulare',
+  Note: 'Fornitura : Opportunità : Note',
 }
 
 const COMUNE_FIELD_ID = 'EXO9WD4aLV2aPiMYxXUU'
+
+// Field separation: admin-identity fields belong to the amministratore, not
+// the condominio. Buildings drop these; admins keep only the admin set.
+const ADMIN_IDENTITY_FIELDS = new Set<string>([
+  APULIA_FIELD.CODICE_FISCALE_AMMINISTRATORE,
+  APULIA_FIELD.PARTITA_IVA_AMMINISTRATORE,
+  APULIA_FIELD.TELEFONO_AMMINISTRATORE,
+  APULIA_FIELD.EMAIL_BILLING,
+  APULIA_FIELD.COMPENSO_PER_POD,
+])
+const ADMIN_FIELDS = new Set<string>([
+  APULIA_FIELD.CODICE_AMMINISTRATORE,
+  APULIA_FIELD.AMMINISTRATORE_CONDOMINIO,
+  ...ADMIN_IDENTITY_FIELDS,
+])
+
+interface StoreLite { slug: string; name: string | null; city: string | null }
+async function loadStores(sb: ReturnType<typeof createAdminClient>): Promise<StoreLite[]> {
+  const { data } = await sb.from('apulia_stores').select('slug, name, city')
+  return (data ?? []) as StoreLite[]
+}
+/** Normalize a PDP "Note" value to a store slug. Strips a "STORE " prefix
+ *  and matches against each store's name/city (case-insensitive). Non-store
+ *  noise (e.g. "ALTRA SOCIETA") returns null. */
+function normalizeStore(note: string | undefined, stores: StoreLite[]): string | null {
+  const s = String(note ?? '').trim().toUpperCase().replace(/^STORE\s+/, '')
+  if (!s) return null
+  for (const st of stores) {
+    for (const c of [st.name, st.city]) {
+      const cu = (c ?? '').toUpperCase().trim()
+      if (cu && (s === cu || s.includes(cu))) return st.slug
+    }
+  }
+  return null
+}
 
 /** Compact existing-row view kept for backwards compat with any older callers. */
 export interface CompactContact {
@@ -114,11 +150,12 @@ export async function processPdpChunk(
     if (pod) podsInSlice.push(pod)
   }
   const sb = createAdminClient()
+  const stores = await loadStores(sb)
   const existingMap = new Map<string, ExistingRow>()
   if (podsInSlice.length) {
     const { data } = await sb
       .from('apulia_contacts')
-      .select('id, ghl_id, first_name, tags, custom_fields, is_switch_out, pod_pdr')
+      .select('id, ghl_id, first_name, tags, custom_fields, is_switch_out, pod_pdr, store')
       .neq('sync_status', 'pending_delete')
       .in('pod_pdr', podsInSlice)
     for (const r of (data ?? []) as ExistingRow[]) {
@@ -137,18 +174,21 @@ export async function processPdpChunk(
     if (!pod) { counters.skipped++; processedCount++; continue }
 
     const cliente = (row[COL.Cliente] || '').trim()
+    // Building record: drop admin-identity fields (they live on the admin).
     const cf: Record<string, string> = {}
     for (const [colName, fieldId] of Object.entries(colFieldMap)) {
+      if (ADMIN_IDENTITY_FIELDS.has(fieldId)) continue
       const v = row[colName]
       if (v == null || v === '') continue
       cf[fieldId] = String(v)
     }
+    const store = normalizeStore(row[COL.Note], stores)
 
     // Cross-chunk dedupe: if a previous chunk already inserted this POD in
     // the same run, treat as existing and update via the row id we minted.
     const fromPrior = byPodView[pod]
     const existing = existingMap.get(pod) ?? (fromPrior
-      ? { id: fromPrior.id, ghl_id: null, first_name: fromPrior.firstName ?? null, tags: fromPrior.tags ?? [], custom_fields: {}, is_switch_out: false }
+      ? { id: fromPrior.id, ghl_id: null, first_name: fromPrior.firstName ?? null, tags: fromPrior.tags ?? [], custom_fields: {}, is_switch_out: false, store: null }
       : null)
 
     if (existing) {
@@ -167,6 +207,7 @@ export async function processPdpChunk(
         cliente: mergedCf[APULIA_FIELD.CLIENTE] ?? cliente ?? null,
         comune: mergedCf[COMUNE_FIELD_ID] ?? null,
         stato: mergedCf[APULIA_FIELD.STATO] ?? null,
+        store: store ?? existing.store ?? null,
         is_switch_out: false,
         sync_status: 'pending_update',
       })
@@ -203,6 +244,7 @@ export async function processPdpChunk(
         cliente: cliente || null,
         comune: cf[COMUNE_FIELD_ID] ?? null,
         stato: cf[APULIA_FIELD.STATO] ?? null,
+        store,
         compenso_per_pod: null,
         pod_override: num(cf[APULIA_FIELD.POD_OVERRIDE]),
         commissione_totale: null,
@@ -332,8 +374,10 @@ export async function finalizePdp(
     for (const [code, row] of firstRowByCode) {
       if (existingByCode.has(code)) continue
       const adminName = (row[COL_AdminName] || '').trim() || `Amministratore ${code}`
+      // Admin record: only admin fields — no building/supply columns.
       const cf: Record<string, string> = {}
       for (const [colName, fieldId] of Object.entries(colFieldMap)) {
+        if (!ADMIN_FIELDS.has(fieldId)) continue
         const v = row[colName]
         if (v == null || v === '') continue
         cf[fieldId] = String(v)
@@ -358,6 +402,7 @@ export async function finalizePdp(
         cliente: null,
         comune: null,
         stato: null,
+        store: null,
         compenso_per_pod: null,
         pod_override: null,
         commissione_totale: null,
@@ -409,6 +454,7 @@ interface ExistingRow {
   custom_fields: Record<string, string> | null
   is_switch_out: boolean
   pod_pdr: string | null
+  store: string | null
 }
 
 interface ExistingAdmin {
@@ -433,6 +479,7 @@ interface NewRow {
   cliente: string | null
   comune: string | null
   stato: string | null
+  store: string | null
   compenso_per_pod: number | null
   pod_override: number | null
   commissione_totale: number | null
@@ -454,6 +501,7 @@ interface UpdatedRow {
   cliente: string | null
   comune: string | null
   stato: string | null
+  store: string | null
   is_switch_out: boolean
   sync_status: 'pending_update'
 }

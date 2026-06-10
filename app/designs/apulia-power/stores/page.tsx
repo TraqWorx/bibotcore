@@ -28,13 +28,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   toEnd.setDate(toEnd.getDate() + 1)
   const toIso = toEnd.toISOString()
 
-  const [stores, ghlForms, ghlCalendars, { data: leadCountsRaw }] = await Promise.all([
+  const [stores, ghlForms, ghlCalendars, { data: leadCountsRaw }, { data: pdpCountsRaw }] = await Promise.all([
     listStores(),
     listGhlForms(),
     listGhlCalendars(),
     sb.rpc('apulia_lead_counts_per_store_range', { from_iso: fromIso, to_iso: toIso }),
+    sb.rpc('apulia_pdp_counts_per_store_range', { from_iso: fromIso, to_iso: toIso }),
   ])
   const counts = new Map((leadCountsRaw ?? []).map((r: { slug: string; range_count: number; total_count: number }) => [r.slug, r]))
+  const pdpCounts = new Map((pdpCountsRaw ?? []).map((r: { slug: string; range_count: number; total_count: number }) => [r.slug, r]))
   const formOptions = ghlForms.map((f) => ({ id: f.id, name: f.name }))
   const calendarOptions = ghlCalendars.map((c) => ({ id: c.id, name: c.name, slug: c.slug ?? null, widgetSlug: c.widgetSlug ?? null }))
 
@@ -54,6 +56,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           const leadUrl = leadFormUrlFor(s.form_id)
           const bookingUrl = bookingUrlFor(s.calendar_widget_slug)
           const c = counts.get(s.slug) as { range_count?: number; total_count?: number } | undefined
+          const p = pdpCounts.get(s.slug) as { range_count?: number; total_count?: number } | undefined
           return (
             <div key={s.id} className="ap-card ap-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
@@ -66,6 +69,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 
               <div style={{ display: 'flex', gap: 12 }}>
                 <div className="ap-stat" data-tone="accent" style={{ flex: 1 }}>
+                  <div className="ap-stat-label">PDP nel periodo</div>
+                  <div className="ap-stat-value">{p?.range_count ?? 0}</div>
+                </div>
+                <div className="ap-stat" data-tone="neutral" style={{ flex: 1 }}>
+                  <div className="ap-stat-label">PDP totali</div>
+                  <div className="ap-stat-value">{p?.total_count ?? 0}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div className="ap-stat" data-tone="neutral" style={{ flex: 1 }}>
                   <div className="ap-stat-label">Lead nel periodo</div>
                   <div className="ap-stat-value">{c?.range_count ?? 0}</div>
                 </div>
