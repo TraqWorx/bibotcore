@@ -22,10 +22,6 @@ function fmtEur(n: number): string {
 function offsetShort(days: number): string {
   return days === 30 ? '+30 giorni' : 'Inizio fornitura'
 }
-function ruleLabel(days: number | null, defaultOffset: number): string {
-  if (days == null) return `Default (${offsetShort(defaultOffset)})`
-  return offsetShort(days)
-}
 
 function parseAmount(raw: string): number | null {
   const v = raw.trim()
@@ -59,7 +55,7 @@ export default function CompensiTable({ admins, defaultOffset }: { admins: Compe
 
   function applyBulkRule() {
     if (selected.size === 0 || bulkRule === '') return
-    const days = bulkRule === 'default' ? null : Number(bulkRule)
+    const days = Number(bulkRule)
     setBulkError(null); setBulkFlash(null)
     startRuleTransition(async () => {
       const res = await setAdminsPaymentOffsetBulk(Array.from(selected), days)
@@ -200,7 +196,6 @@ export default function CompensiTable({ admins, defaultOffset }: { admins: Compe
             <span style={{ color: 'var(--ap-text-muted)' }}>Regola:</span>
             <select value={bulkRule} onChange={(e) => setBulkRule(e.target.value)} className="ap-input" style={{ height: 30, fontSize: 12, width: 'auto' }}>
               <option value="">—</option>
-              <option value="default">Default</option>
               <option value="0">Inizio fornitura</option>
               <option value="30">+30 giorni</option>
             </select>
@@ -272,16 +267,15 @@ function Row({ admin, defaultOffset, selected, onToggle }: { admin: CompensoEntr
   const [savedFlash, setSavedFlash] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [total, setTotal] = useState<number>(admin.total)
-  const [ruleVal, setRuleVal] = useState<string>(admin.paymentOffsetDays == null ? 'default' : String(admin.paymentOffsetDays))
+  const [ruleVal, setRuleVal] = useState<string>(String(admin.paymentOffsetDays ?? defaultOffset))
   const [rulePending, startRuleTransition] = useTransition()
   const [ruleSaved, setRuleSaved] = useState(false)
   const router = useRouter()
 
   function commitRule(next: string) {
     setRuleVal(next)
-    const days = next === 'default' ? null : Number(next)
     startRuleTransition(async () => {
-      const res = await setAdminPaymentOffset(admin.contactId, days)
+      const res = await setAdminPaymentOffset(admin.contactId, Number(next))
       if (!res?.error) { setRuleSaved(true); setTimeout(() => setRuleSaved(false), 1200); router.refresh() }
     })
   }
@@ -352,7 +346,6 @@ function Row({ admin, defaultOffset, selected, onToggle }: { admin: CompensoEntr
             style={{ height: 30, fontSize: 12, width: '100%' }}
             title="Regola di pagamento"
           >
-            <option value="default">{ruleLabel(null, defaultOffset)}</option>
             <option value="0">{offsetShort(0)}</option>
             <option value="30">{offsetShort(30)}</option>
           </select>

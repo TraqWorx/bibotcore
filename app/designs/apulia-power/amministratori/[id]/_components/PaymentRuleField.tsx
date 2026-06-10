@@ -18,7 +18,7 @@ export default function PaymentRuleField({
   defaultOffset: number
 }) {
   const [pending, startTransition] = useTransition()
-  const [val, setVal] = useState<string>(offsetDays == null ? 'default' : String(offsetDays))
+  const [val, setVal] = useState<string>(String(offsetDays ?? defaultOffset))
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -26,9 +26,8 @@ export default function PaymentRuleField({
   function commit(next: string) {
     setVal(next)
     setError(null)
-    const days = next === 'default' ? null : Number(next)
     startTransition(async () => {
-      const res = await setAdminPaymentOffset(contactId, days)
+      const res = await setAdminPaymentOffset(contactId, Number(next))
       if (res?.error) setError(res.error)
       else { setSaved(true); setTimeout(() => setSaved(false), 1500); router.refresh() }
     })
@@ -52,7 +51,6 @@ export default function PaymentRuleField({
             className="ap-input"
             style={{ height: 32, width: 240, fontSize: 12 }}
           >
-            <option value="default">{`Default (${offsetShort(defaultOffset)})`}</option>
             <option value="0">{offsetShort(0)}</option>
             <option value="30">{offsetShort(30)}</option>
           </select>

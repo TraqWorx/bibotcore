@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 
 /** Allowed payment-rule offsets (days after Inizio fornitura). */
 export const PAYMENT_OFFSET_VALUES = [0, 30] as const
-export const DEFAULT_PAYMENT_OFFSET = 0
+export const DEFAULT_PAYMENT_OFFSET = 30
 
 export function paymentRuleLabel(days: number): string {
   return days === 30 ? '+30 giorni dall’inizio fornitura' : 'Alla data di inizio fornitura'
