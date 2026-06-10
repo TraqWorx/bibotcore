@@ -39,7 +39,7 @@ export default function CompensiTable({ admins, defaultOffset }: { admins: Compe
   const [bulkPending, startBulkTransition] = useTransition()
   const [bulkFlash, setBulkFlash] = useState<string | null>(null)
   const [bulkError, setBulkError] = useState<string | null>(null)
-  const [bulkRule, setBulkRule] = useState('')
+  const [bulkRule, setBulkRule] = useState('30')
   const [rulePending, startRuleTransition] = useTransition()
   const [defPending, startDefTransition] = useTransition()
   const [defVal, setDefVal] = useState(String(defaultOffset))
@@ -54,7 +54,7 @@ export default function CompensiTable({ admins, defaultOffset }: { admins: Compe
   }
 
   function applyBulkRule() {
-    if (selected.size === 0 || bulkRule === '') return
+    if (selected.size === 0) return
     const days = Number(bulkRule)
     setBulkError(null); setBulkFlash(null)
     startRuleTransition(async () => {
@@ -195,7 +195,6 @@ export default function CompensiTable({ admins, defaultOffset }: { admins: Compe
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
             <span style={{ color: 'var(--ap-text-muted)' }}>Regola:</span>
             <select value={bulkRule} onChange={(e) => setBulkRule(e.target.value)} className="ap-input" style={{ height: 30, fontSize: 12, width: 'auto' }}>
-              <option value="">—</option>
               <option value="0">Inizio fornitura</option>
               <option value="30">+30 giorni</option>
             </select>
@@ -203,7 +202,7 @@ export default function CompensiTable({ admins, defaultOffset }: { admins: Compe
           <button
             type="button"
             onClick={applyBulkRule}
-            disabled={rulePending || bulkRule === ''}
+            disabled={rulePending}
             className="ap-btn ap-btn-primary"
             style={{ height: 30, fontSize: 12 }}
           >
