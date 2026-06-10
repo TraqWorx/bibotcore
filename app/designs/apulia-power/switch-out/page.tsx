@@ -14,6 +14,11 @@ interface SearchParams {
 
 const PAGE_SIZE = 50
 
+function fmtDate(iso?: string): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('it-IT')
+}
+
 export default async function Page({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const session = await getApuliaSession()
   if (session.role !== 'owner') redirect('/designs/apulia-power/dashboard')
@@ -80,6 +85,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
         <table className="ap-table">
           <thead>
             <tr>
+              <th>Switch-out il</th>
               <th>POD/PDR</th>
               <th>Cliente</th>
               <th>Amministratore</th>
@@ -87,9 +93,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun switch-out.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun switch-out.</td></tr>}
             {rows.map((p) => (
               <tr key={p.contactId}>
+                <td style={{ fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{fmtDate(p.switchedOutAt ?? p.addedAt)}</td>
                 <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.pod}</td>
                 <td>{p.cliente ?? '—'}</td>
                 <td>{p.amministratore ?? '—'}</td>

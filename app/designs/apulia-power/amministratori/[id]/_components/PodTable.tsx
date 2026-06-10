@@ -12,6 +12,7 @@ interface PodRow {
   override: number
   amount: number
   addedAt?: string
+  switchedOutAt?: string
   lastPaidAt?: string
   nextDueDate?: string
   paymentStatus?: 'paid' | 'due'
@@ -44,18 +45,21 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
   const [statusFilter, setStatusFilter] = useState<'all' | 'due' | 'paid'>('all')
 
   const visiblePods = useMemo(() => {
+    // Active tab filters on "added" (cached_at); switch-out tab on the real
+    // switch-out date, falling back to cached_at for legacy rows without one.
+    const dateOf = (p: PodRow) => (payable ? p.addedAt : (p.switchedOutAt ?? p.addedAt))
     let out = pods
     if (addedFrom) {
       const f = new Date(addedFrom + 'T00:00:00').getTime()
-      out = out.filter((p) => p.addedAt && new Date(p.addedAt).getTime() >= f)
+      out = out.filter((p) => { const d = dateOf(p); return d && new Date(d).getTime() >= f })
     }
     if (addedTo) {
       const t = new Date(addedTo + 'T23:59:59').getTime()
-      out = out.filter((p) => p.addedAt && new Date(p.addedAt).getTime() <= t)
+      out = out.filter((p) => { const d = dateOf(p); return d && new Date(d).getTime() <= t })
     }
     if (statusFilter !== 'all') out = out.filter((p) => p.paymentStatus === statusFilter)
     return out
-  }, [pods, addedFrom, addedTo, statusFilter])
+  }, [pods, addedFrom, addedTo, statusFilter, payable])
 
   const dueRows = useMemo(() => visiblePods.filter((p) => p.paymentStatus === 'due'), [visiblePods])
   const selectedRows = useMemo(() => pods.filter((p) => selected.has(p.contactId)), [pods, selected])
@@ -251,7 +255,7 @@ function Row({
         </td>
       )}
       <td style={{ fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-        {fmtDate(pod.addedAt)}
+        {fmtDate(payable ? pod.addedAt : (pod.switchedOutAt ?? pod.addedAt))}
       </td>
       <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{pod.pod}</td>
       <td>{pod.cliente ?? '—'}</td>

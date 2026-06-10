@@ -48,6 +48,8 @@ export interface PodRow {
   syncError?: string | null
   /** When this row was first cached in Bibot (cached_at, set on insert). */
   addedAt?: string
+  /** Real switch-out date (Data esecuzione attività). Null for active PODs. */
+  switchedOutAt?: string
   /** Editable per-POD payment anchor. Defaults to import date; user can change. */
   firstPaymentAt?: string
   /** Last time this POD was marked paid. */
@@ -376,6 +378,7 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
       override,
       amount: override > 0 ? override : compenso,
       addedAt: cachedAt,
+      switchedOutAt: (p as { switched_out_at?: string | null }).switched_out_at ?? undefined,
       firstPaymentAt: firstPaymentAt ?? undefined,
       lastPaidAt: pay?.lastPaidAt,
       nextDueDate,
@@ -485,7 +488,7 @@ export async function listCondomini(f: CondominiFilters): Promise<CondominiResul
   const comuni = [...new Set((comuniRaw ?? []).map((r) => r.comune as string).filter(Boolean))].sort((a, b) => a.localeCompare(b))
   const amministratori = [...new Set((ammRaw ?? []).map((r) => r.amministratore_name as string).filter(Boolean))].sort((a, b) => a.localeCompare(b))
 
-  const podRows: PodRow[] = ((rows ?? []) as Array<CachedContactRow & { sync_error?: string | null; cached_at?: string }>).map((r) => ({
+  const podRows: PodRow[] = ((rows ?? []) as Array<CachedContactRow & { sync_error?: string | null; cached_at?: string; switched_out_at?: string | null }>).map((r) => ({
     contactId: r.id,
     pod: r.pod_pdr ?? '—',
     cliente: [r.first_name, r.last_name].filter(Boolean).join(' ') || r.cliente || undefined,
@@ -498,6 +501,7 @@ export async function listCondomini(f: CondominiFilters): Promise<CondominiResul
     syncStatus: r.sync_status,
     syncError: r.sync_error ?? null,
     addedAt: r.cached_at,
+    switchedOutAt: r.switched_out_at ?? undefined,
   }))
 
   return { total: count ?? 0, rows: podRows, comuni, amministratori }
