@@ -10,6 +10,7 @@ import { listDistinctTags } from '@/lib/apulia/tags'
 import CondominoEditor from './_components/CondominoEditor'
 import PodPaymentField from './_components/PodPaymentField'
 import SwitchOutDateField from './_components/SwitchOutDateField'
+import SettingsTabs from '../../settings/_components/SettingsTabs'
 import DeleteContactButton from '../../_components/DeleteContactButton'
 import { deleteCondomino } from './_actions'
 
@@ -41,19 +42,33 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const codiceAmm = (cf[APULIA_FIELD.CODICE_AMMINISTRATORE] as string | undefined) ?? contact.codice_amministratore ?? ''
   const adminName = (cf[APULIA_FIELD.AMMINISTRATORE_CONDOMINIO] as string | undefined) ?? contact.amministratore_name ?? ''
 
-  // Find admin contact id by code (if any) so we can link to it, plus
-  // the admin's compenso for the payment widget amount column.
+  // Find the linked admin by code: id + compenso for the payment widget,
+  // plus the admin's own details to show in the "Amministratore" tab (these
+  // live on the admin record, not duplicated onto the building).
   let adminContactId: string | null = null
   let adminCompenso = 0
+  let adminInfo: { id: string; name: string; cf: string; piva: string; phone: string; email: string; compenso: number } | null = null
   if (codiceAmm) {
     const { data: a } = await sb
       .from('apulia_contacts')
-      .select('id, compenso_per_pod')
+      .select('id, first_name, last_name, email, phone, compenso_per_pod, custom_fields')
       .eq('is_amministratore', true)
       .eq('codice_amministratore', codiceAmm)
       .maybeSingle()
-    adminContactId = a?.id ?? null
-    adminCompenso = Number(a?.compenso_per_pod) || 0
+    if (a) {
+      adminContactId = a.id
+      adminCompenso = Number(a.compenso_per_pod) || 0
+      const acf = (a.custom_fields ?? {}) as Record<string, string>
+      adminInfo = {
+        id: a.id,
+        name: [a.first_name, a.last_name].filter(Boolean).join(' ') || adminName || '—',
+        cf: acf[APULIA_FIELD.CODICE_FISCALE_AMMINISTRATORE] ?? '',
+        piva: acf[APULIA_FIELD.PARTITA_IVA_AMMINISTRATORE] ?? '',
+        phone: acf[APULIA_FIELD.TELEFONO_AMMINISTRATORE] ?? a.phone ?? '',
+        email: a.email ?? acf[APULIA_FIELD.EMAIL_BILLING] ?? '',
+        compenso: Number(a.compenso_per_pod) || 0,
+      }
+    }
   }
 
   // Per-POD payment status: anchor on first_payment_at (else cached_at).
@@ -126,22 +141,78 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         />
       )}
 
-      <CondominoEditor
-        contactId={id}
-        core={{
-          firstName: contact.first_name ?? '',
-          lastName: contact.last_name ?? '',
-          email: contact.email ?? '',
-          phone: contact.phone ?? '',
-        }}
-        customFields={cf}
-        tags={tags}
-        tagSuggestions={tagSuggestions}
-        groups={fieldGroups}
-        adminOptions={adminOptions}
-        currentAdminCode={codiceAmm}
-        currentAdminName={adminName}
+      <SettingsTabs
+        tabs={[
+          {
+            id: 'condominio',
+            label: 'Condominio',
+            content: (
+              <CondominoEditor
+                contactId={id}
+                core={{
+                  firstName: contact.first_name ?? '',
+                  lastName: contact.last_name ?? '',
+                  email: contact.email ?? '',
+                  phone: contact.phone ?? '',
+                }}
+                customFields={cf}
+                tags={tags}
+                tagSuggestions={tagSuggestions}
+                groups={fieldGroups}
+                adminOptions={adminOptions}
+                currentAdminCode={codiceAmm}
+                currentAdminName={adminName}
+              />
+            ),
+          },
+          {
+            id: 'amministratore',
+            label: 'Amministratore',
+            content: <AdminInfoPanel info={adminInfo} />,
+          },
+        ]}
       />
     </div>
+  )
+}
+
+function AdminInfoPanel({ info }: { info: { id: string; name: string; cf: string; piva: string; phone: string; email: string; compenso: number } | null }) {
+  if (!info) {
+    return (
+      <section className="ap-card ap-card-pad">
+        <p style={{ fontSize: 13, color: 'var(--ap-text-faint)' }}>Nessun amministratore associato a questo condominio.</p>
+      </section>
+    )
+  }
+  const rows: Array<[string, string]> = [
+    ['Nome', info.name],
+    ['Codice fiscale', info.cf || '—'],
+    ['Partita IVA', info.piva || '—'],
+    ['Telefono', info.phone || '—'],
+    ['Email', info.email || '—'],
+    ['Compenso per POD', info.compenso > 0 ? info.compenso.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }) : '—'],
+  ]
+  return (
+    <section className="ap-card">
+      <header style={{ padding: '14px 20px', borderBottom: '1px solid var(--ap-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <h2 style={{ fontSize: 14, fontWeight: 800 }}>Dettagli amministratore</h2>
+        <Link href={`/designs/apulia-power/amministratori/${info.id}`} style={{ fontSize: 12, color: 'var(--ap-primary)', textDecoration: 'none', fontWeight: 700 }}>Apri scheda →</Link>
+      </header>
+      <div style={{ padding: '8px 20px' }}>
+        <table className="ap-table">
+          <tbody>
+            {rows.map(([label, value]) => (
+              <tr key={label}>
+                <td style={{ width: 200, color: 'var(--ap-text-muted)', fontSize: 12, fontWeight: 600 }}>{label}</td>
+                <td style={{ fontSize: 13 }}>{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p style={{ fontSize: 11, color: 'var(--ap-text-faint)', padding: '0 20px 14px', margin: 0 }}>
+        Questi dati appartengono all&apos;amministratore e si modificano dalla sua scheda — qui sono in sola lettura.
+      </p>
+    </section>
   )
 }

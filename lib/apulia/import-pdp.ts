@@ -28,6 +28,22 @@ const COL = {
   AdminProv: 'Fornitura : Dati di fatturazione : Indirizzo (Stato/Provincia)',
 }
 
+// Field separation: admin-identity fields belong to the amministratore, not
+// the condominio. Buildings drop these (shown on the building via the linked
+// admin instead); admins keep only the admin set below.
+const ADMIN_IDENTITY_FIELDS = new Set<string>([
+  APULIA_FIELD.CODICE_FISCALE_AMMINISTRATORE,
+  APULIA_FIELD.PARTITA_IVA_AMMINISTRATORE,
+  APULIA_FIELD.TELEFONO_AMMINISTRATORE,
+  APULIA_FIELD.EMAIL_BILLING,
+  APULIA_FIELD.COMPENSO_PER_POD,
+])
+const ADMIN_FIELDS = new Set<string>([
+  APULIA_FIELD.CODICE_AMMINISTRATORE,
+  APULIA_FIELD.AMMINISTRATORE_CONDOMINIO,
+  ...ADMIN_IDENTITY_FIELDS,
+])
+
 /**
  * Map every CSV column whose header equals a known custom-field name to
  * that custom field id. Built once per import.
@@ -72,8 +88,11 @@ export async function* importPdp(rows: Record<string, string>[], headers: string
       }
       const cliente = (row[COL.Cliente] || '').trim()
 
+      // Building record: everything except admin-identity fields (those
+      // live on the linked admin; the condominio page reads them from there).
       const cf: Record<string, string | number> = {}
       for (const [colName, fieldId] of colFieldMap) {
+        if (ADMIN_IDENTITY_FIELDS.has(fieldId)) continue
         const v = row[colName]
         if (v == null || v === '') continue
         cf[fieldId] = v
@@ -136,21 +155,14 @@ export async function* importPdp(rows: Record<string, string>[], headers: string
         .in('codice_amministratore', [...firstRowByCode.keys()])
       const existingByCode = new Map((existingAdmins ?? []).map((a) => [a.codice_amministratore, a]))
 
-      // POD-specific fields must not leak onto an admin contact that's
-      // auto-created from one of its POD rows.
-      const POD_ONLY_FIELDS = new Set<string>([
-        APULIA_FIELD.POD_PDR,
-        APULIA_FIELD.STATO,
-        APULIA_FIELD.POD_OVERRIDE,
-        APULIA_FIELD.CLIENTE,
-        APULIA_FIELD.COMMISSIONE_TOTALE,
-      ])
       for (const [code, row] of firstRowByCode) {
         if (existingByCode.has(code)) continue
         const adminName = (row[COL.AdminName] || '').trim() || `Amministratore ${code}`
+        // Admin record: only admin fields (codice, name, CF, P.IVA, telefono,
+        // email/billing, compenso). No building/supply fields.
         const cf: Record<string, string | number> = {}
         for (const [colName, fieldId] of colFieldMap) {
-          if (POD_ONLY_FIELDS.has(fieldId)) continue
+          if (!ADMIN_FIELDS.has(fieldId)) continue
           const v = row[colName]
           if (v == null || v === '') continue
           cf[fieldId] = v
