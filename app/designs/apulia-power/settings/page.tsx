@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getApuliaSession } from '@/lib/apulia/auth'
 import { createAdminClient } from '@/lib/supabase-server'
 import { listApuliaWorkflows } from '@/lib/apulia/workflows'
+import { computeNextDue, getDefaultPaymentOffset } from '@/lib/apulia/payment-cycle'
 import PodPaymentSchedule, { type PodScheduleEntry } from './_components/PodPaymentSchedule'
 import SwitchOutSchedule, { type SwitchOutEntry } from './_components/SwitchOutSchedule'
 import CompensiTable, { type CompensoEntry } from './_components/CompensiTable'
@@ -92,7 +93,7 @@ export default async function Page() {
     switchedPods,
   ] = await Promise.all([
     sb.from('apulia_contacts')
-      .select('id, first_name, last_name, codice_amministratore, compenso_per_pod, commissione_totale')
+      .select('id, first_name, last_name, codice_amministratore, compenso_per_pod, commissione_totale, payment_offset_days')
       .eq('is_amministratore', true)
       .order('first_name'),
     sb.rpc('apulia_admin_pod_counts'),
@@ -103,27 +104,26 @@ export default async function Page() {
 
   const podCountMap = new Map(((podCounts ?? []) as Array<{ codice_amministratore: string; active: number }>).map((r) => [r.codice_amministratore, Number(r.active)]))
   const compensoByCode = new Map<string, number>()
+  const offsetByCode = new Map<string, number | null>()
   const adminByCode = new Map<string, { id: string; name: string }>()
   for (const a of admins ?? []) {
     const name = [a.first_name, a.last_name].filter(Boolean).join(' ') || 'Senza nome'
     if (a.codice_amministratore) {
       compensoByCode.set(a.codice_amministratore, Number(a.compenso_per_pod) || 0)
+      offsetByCode.set(a.codice_amministratore, (a as { payment_offset_days?: number | null }).payment_offset_days ?? null)
       adminByCode.set(a.codice_amministratore, { id: a.id, name })
     }
   }
+  const defaultOffset = await getDefaultPaymentOffset(sb)
 
   const todayMs = Date.now()
   const podScheduleEntries: PodScheduleEntry[] = activePods.map((p) => {
     const paidCount = podPaymentCounts.get(p.id) ?? 0
     const anchorIso = p.first_payment_at ?? p.cached_at
-    let nextDue: string | null = null
-    let isDueNow = false
-    if (anchorIso) {
-      const nd = new Date(anchorIso)
-      nd.setMonth(nd.getMonth() + paidCount * 6)
-      nextDue = nd.toISOString()
-      isDueNow = nd.getTime() <= todayMs
-    }
+    const offset = offsetByCode.get(p.codice_amministratore ?? '') ?? defaultOffset
+    const nd = computeNextDue(anchorIso, offset, paidCount)
+    const nextDue: string | null = nd ? nd.toISOString() : null
+    const isDueNow = nd ? nd.getTime() <= todayMs : false
     const override = Number(p.pod_override) || 0
     const compenso = compensoByCode.get(p.codice_amministratore ?? '') ?? 0
     const cliente = [p.first_name, p.last_name].filter(Boolean).join(' ') || p.cliente || ''
@@ -149,6 +149,7 @@ export default async function Page() {
       podsActive: podCountMap.get(a.codice_amministratore ?? '') ?? 0,
       compensoPerPod: Number(a.compenso_per_pod) || 0,
       total: Number(a.commissione_totale) || 0,
+      paymentOffsetDays: (a as { payment_offset_days?: number | null }).payment_offset_days ?? null,
     }))
     .sort((a, b) => b.podsActive - a.podsActive)
 
@@ -239,7 +240,7 @@ export default async function Page() {
                   </p>
                 </header>
                 <div style={{ padding: '16px 20px' }}>
-                  <CompensiTable admins={compensiEntries} />
+                  <CompensiTable admins={compensiEntries} defaultOffset={defaultOffset} />
                 </div>
               </section>
             ),

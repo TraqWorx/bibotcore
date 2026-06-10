@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { setCompensoPerPod, setCompensoPerPodBulk } from '../../amministratori/_actions'
+import { setCompensoPerPod, setCompensoPerPodBulk, setAdminPaymentOffset, setAdminsPaymentOffsetBulk, setDefaultPaymentOffset } from '../../amministratori/_actions'
 
 export interface CompensoEntry {
   contactId: string
@@ -11,10 +11,20 @@ export interface CompensoEntry {
   podsActive: number
   compensoPerPod: number
   total: number
+  /** null = use the global default. */
+  paymentOffsetDays: number | null
 }
 
 function fmtEur(n: number): string {
   return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })
+}
+
+function offsetShort(days: number): string {
+  return days === 30 ? '+30 giorni' : 'Inizio fornitura'
+}
+function ruleLabel(days: number | null, defaultOffset: number): string {
+  if (days == null) return `Default (${offsetShort(defaultOffset)})`
+  return offsetShort(days)
 }
 
 function parseAmount(raw: string): number | null {
@@ -25,7 +35,7 @@ function parseAmount(raw: string): number | null {
   return n
 }
 
-export default function CompensiTable({ admins }: { admins: CompensoEntry[] }) {
+export default function CompensiTable({ admins, defaultOffset }: { admins: CompensoEntry[]; defaultOffset: number }) {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<'all' | 'unset'>('all')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -33,7 +43,35 @@ export default function CompensiTable({ admins }: { admins: CompensoEntry[] }) {
   const [bulkPending, startBulkTransition] = useTransition()
   const [bulkFlash, setBulkFlash] = useState<string | null>(null)
   const [bulkError, setBulkError] = useState<string | null>(null)
+  const [bulkRule, setBulkRule] = useState('')
+  const [rulePending, startRuleTransition] = useTransition()
+  const [defPending, startDefTransition] = useTransition()
+  const [defVal, setDefVal] = useState(String(defaultOffset))
   const router = useRouter()
+
+  function applyDefault(next: string) {
+    setDefVal(next)
+    startDefTransition(async () => {
+      await setDefaultPaymentOffset(Number(next))
+      router.refresh()
+    })
+  }
+
+  function applyBulkRule() {
+    if (selected.size === 0 || bulkRule === '') return
+    const days = bulkRule === 'default' ? null : Number(bulkRule)
+    setBulkError(null); setBulkFlash(null)
+    startRuleTransition(async () => {
+      const res = await setAdminsPaymentOffsetBulk(Array.from(selected), days)
+      if (res.error) setBulkError(res.error)
+      else {
+        setBulkFlash(`✓ Regola aggiornata su ${res.updated} amministratori`)
+        setSelected(new Set())
+        setTimeout(() => setBulkFlash(null), 2500)
+        router.refresh()
+      }
+    })
+  }
 
   const filtered = useMemo(() => admins.filter((a) => {
     if (filter === 'unset' && a.compensoPerPod > 0) return false
@@ -120,6 +158,16 @@ export default function CompensiTable({ admins }: { admins: CompensoEntry[] }) {
         Eventuali override sul singolo POD restano prioritari rispetto a questo valore.
       </p>
 
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--ap-bg-muted, #f1f5f9)', border: '1px solid var(--ap-line)', borderRadius: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>Regola di pagamento predefinita</span>
+        <select value={defVal} onChange={(e) => applyDefault(e.target.value)} disabled={defPending} className="ap-input" style={{ height: 30, fontSize: 12, width: 'auto' }}>
+          <option value="0">Alla data di inizio fornitura</option>
+          <option value="30">+30 giorni dall’inizio fornitura</option>
+        </select>
+        {defPending && <span style={{ fontSize: 11, color: 'var(--ap-text-faint)' }}>…</span>}
+        <span style={{ fontSize: 11, color: 'var(--ap-text-faint)' }}>Si applica agli amministratori senza regola personalizzata.</span>
+      </div>
+
       {selected.size > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--ap-bg-muted, #f1f5f9)', border: '1px solid var(--ap-line)', borderRadius: 10, marginBottom: 12, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, fontWeight: 700 }}>
@@ -147,6 +195,24 @@ export default function CompensiTable({ admins }: { admins: CompensoEntry[] }) {
             style={{ height: 30, fontSize: 12 }}
           >
             {bulkPending ? 'Applico…' : 'Applica a selezionati'}
+          </button>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <span style={{ color: 'var(--ap-text-muted)' }}>Regola:</span>
+            <select value={bulkRule} onChange={(e) => setBulkRule(e.target.value)} className="ap-input" style={{ height: 30, fontSize: 12, width: 'auto' }}>
+              <option value="">—</option>
+              <option value="default">Default</option>
+              <option value="0">Inizio fornitura</option>
+              <option value="30">+30 giorni</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={applyBulkRule}
+            disabled={rulePending || bulkRule === ''}
+            className="ap-btn ap-btn-primary"
+            style={{ height: 30, fontSize: 12 }}
+          >
+            {rulePending ? 'Applico…' : 'Applica regola'}
           </button>
           <button
             type="button"
@@ -178,19 +244,20 @@ export default function CompensiTable({ admins }: { admins: CompensoEntry[] }) {
               <th>Amministratore</th>
               <th style={{ textAlign: 'right' }}>POD attivi</th>
               <th style={{ width: 160 }}>Compenso per POD</th>
+              <th style={{ width: 200 }}>Regola pagamento</th>
               <th style={{ textAlign: 'right' }}>Commissione totale</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>
+                <td colSpan={6} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>
                   Nessun risultato.
                 </td>
               </tr>
             )}
             {filtered.map((a) => (
-              <Row key={a.contactId} admin={a} selected={selected.has(a.contactId)} onToggle={() => toggleOne(a.contactId)} />
+              <Row key={a.contactId} admin={a} defaultOffset={defaultOffset} selected={selected.has(a.contactId)} onToggle={() => toggleOne(a.contactId)} />
             ))}
           </tbody>
         </table>
@@ -199,13 +266,25 @@ export default function CompensiTable({ admins }: { admins: CompensoEntry[] }) {
   )
 }
 
-function Row({ admin, selected, onToggle }: { admin: CompensoEntry; selected: boolean; onToggle: () => void }) {
+function Row({ admin, defaultOffset, selected, onToggle }: { admin: CompensoEntry; defaultOffset: number; selected: boolean; onToggle: () => void }) {
   const [pending, startTransition] = useTransition()
   const [val, setVal] = useState<string>(admin.compensoPerPod > 0 ? String(admin.compensoPerPod).replace('.', ',') : '')
   const [savedFlash, setSavedFlash] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [total, setTotal] = useState<number>(admin.total)
+  const [ruleVal, setRuleVal] = useState<string>(admin.paymentOffsetDays == null ? 'default' : String(admin.paymentOffsetDays))
+  const [rulePending, startRuleTransition] = useTransition()
+  const [ruleSaved, setRuleSaved] = useState(false)
   const router = useRouter()
+
+  function commitRule(next: string) {
+    setRuleVal(next)
+    const days = next === 'default' ? null : Number(next)
+    startRuleTransition(async () => {
+      const res = await setAdminPaymentOffset(admin.contactId, days)
+      if (!res?.error) { setRuleSaved(true); setTimeout(() => setRuleSaved(false), 1200); router.refresh() }
+    })
+  }
 
   function commit() {
     const parsed = val.trim() === '' ? 0 : Number(val.replace(',', '.'))
@@ -262,6 +341,23 @@ function Row({ admin, selected, onToggle }: { admin: CompensoEntry; selected: bo
           {savedFlash && <span style={{ color: 'var(--ap-success)', fontSize: 11 }}>✓</span>}
         </div>
         {error && <div style={{ color: 'var(--ap-danger)', fontSize: 11, marginTop: 2 }}>{error}</div>}
+      </td>
+      <td>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <select
+            value={ruleVal}
+            onChange={(e) => commitRule(e.target.value)}
+            disabled={rulePending}
+            className="ap-input"
+            style={{ height: 30, fontSize: 12, width: '100%' }}
+            title="Regola di pagamento"
+          >
+            <option value="default">{ruleLabel(null, defaultOffset)}</option>
+            <option value="0">{offsetShort(0)}</option>
+            <option value="30">{offsetShort(30)}</option>
+          </select>
+          {ruleSaved && <span style={{ color: 'var(--ap-success)', fontSize: 11 }}>✓</span>}
+        </div>
       </td>
       <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
         {fmtEur(total)}

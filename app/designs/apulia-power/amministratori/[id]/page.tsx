@@ -8,7 +8,9 @@ import PodTable from './_components/PodTable'
 import PaymentRow from './_components/PaymentRow'
 import ImpersonateButton from './_components/ImpersonateButton'
 import AdminFullEditor from './_components/AdminFullEditor'
+import PaymentRuleField from './_components/PaymentRuleField'
 import { listDistinctTags } from '@/lib/apulia/tags'
+import { getDefaultPaymentOffset } from '@/lib/apulia/payment-cycle'
 import DeleteContactButton from '../../_components/DeleteContactButton'
 import SettingsTabs from '../../settings/_components/SettingsTabs'
 import { deleteAdmin } from './_actions'
@@ -34,6 +36,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     fetchApuliaFieldGroups(),
     listDistinctTags(),
   ])
+  const defaultOffset = await getDefaultPaymentOffset(sb)
   const customFields = (contactRow?.custom_fields ?? {}) as Record<string, string>
   const tags: string[] = (contactRow?.tags ?? []) as string[]
   const syncStatus = (contactRow as { sync_status?: string } | null)?.sync_status
@@ -124,6 +127,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           </div>
         </div>
       </div>
+
+      <PaymentRuleField contactId={id} offsetDays={admin.paymentOffsetDays ?? null} defaultOffset={defaultOffset} />
 
       <SettingsTabs
         tabs={[

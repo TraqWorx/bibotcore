@@ -8,6 +8,7 @@ import { normalizePod } from '@/lib/apulia/cache'
 import { listAdminPickerOptions } from '@/lib/apulia/queries-cached'
 import { listDistinctTags } from '@/lib/apulia/tags'
 import { listStores } from '@/lib/apulia/stores'
+import { computeNextDue, getDefaultPaymentOffset } from '@/lib/apulia/payment-cycle'
 import CondominoEditor from './_components/CondominoEditor'
 import PodPaymentField from './_components/PodPaymentField'
 import SwitchOutDateField from './_components/SwitchOutDateField'
@@ -51,17 +52,19 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   // live on the admin record, not duplicated onto the building).
   let adminContactId: string | null = null
   let adminCompenso = 0
+  let adminOffset: number | null = null
   let adminInfo: { id: string; name: string; cf: string; piva: string; phone: string; email: string; compenso: number } | null = null
   if (codiceAmm) {
     const { data: a } = await sb
       .from('apulia_contacts')
-      .select('id, first_name, last_name, email, phone, compenso_per_pod, custom_fields')
+      .select('id, first_name, last_name, email, phone, compenso_per_pod, custom_fields, payment_offset_days')
       .eq('is_amministratore', true)
       .eq('codice_amministratore', codiceAmm)
       .maybeSingle()
     if (a) {
       adminContactId = a.id
       adminCompenso = Number(a.compenso_per_pod) || 0
+      adminOffset = (a as { payment_offset_days?: number | null }).payment_offset_days ?? null
       const acf = (a.custom_fields ?? {}) as Record<string, string>
       adminInfo = {
         id: a.id,
@@ -81,14 +84,10 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const anchorIso = firstPaymentAt ?? cachedAt ?? null
   const { data: podPays } = await sb.from('apulia_payments').select('paid_at').eq('pod_contact_id', id)
   const paidCount = podPays?.length ?? 0
-  let nextDueDate: string | null = null
-  let isDueNow = false
-  if (anchorIso) {
-    const nd = new Date(anchorIso)
-    nd.setMonth(nd.getMonth() + paidCount * 6)
-    nextDueDate = nd.toISOString()
-    isDueNow = nd.getTime() <= Date.now()
-  }
+  const effectiveOffset = adminOffset ?? (await getDefaultPaymentOffset(sb))
+  const nd = computeNextDue(anchorIso, effectiveOffset, paidCount)
+  const nextDueDate: string | null = nd ? nd.toISOString() : null
+  const isDueNow = nd ? nd.getTime() <= Date.now() : false
   const override = Number(contact.pod_override) || 0
   const podAmount = override > 0 ? override : adminCompenso
 

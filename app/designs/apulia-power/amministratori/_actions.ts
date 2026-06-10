@@ -229,6 +229,61 @@ export async function setCompensoPerPodBulk(adminContactIds: string[], amount: n
 }
 
 /**
+ * Per-admin payment rule. days: 0 = pay on Inizio fornitura, 30 = +30 days,
+ * null = use the global default. Bibot-only column, no GHL sync.
+ */
+export async function setAdminPaymentOffset(adminContactId: string, days: number | null): Promise<{ error?: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { error: guard.error }
+  if (days != null && days !== 0 && days !== 30) return { error: 'Regola non valida' }
+  const sb = createAdminClient()
+  const { error } = await sb.from('apulia_contacts')
+    .update({ payment_offset_days: days })
+    .eq('id', adminContactId).eq('is_amministratore', true)
+  if (error) return { error: error.message }
+  revalidatePath('/designs/apulia-power/settings')
+  revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
+  revalidatePath('/designs/apulia-power/amministratori')
+  revalidatePath('/designs/apulia-power/dashboard')
+}
+
+/** Bulk-set the payment rule on many admins (Compensi per POD tab). */
+export async function setAdminsPaymentOffsetBulk(adminContactIds: string[], days: number | null): Promise<{ updated: number; error?: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { updated: 0, error: guard.error }
+  if (days != null && days !== 0 && days !== 30) return { updated: 0, error: 'Regola non valida' }
+  if (adminContactIds.length === 0) return { updated: 0 }
+  const sb = createAdminClient()
+  let updated = 0
+  for (let i = 0; i < adminContactIds.length; i += 500) {
+    const slice = adminContactIds.slice(i, i + 500)
+    const { error, count } = await sb.from('apulia_contacts')
+      .update({ payment_offset_days: days }, { count: 'exact' })
+      .in('id', slice).eq('is_amministratore', true)
+    if (error) return { updated, error: error.message }
+    updated += count ?? slice.length
+  }
+  revalidatePath('/designs/apulia-power/settings')
+  revalidatePath('/designs/apulia-power/amministratori')
+  revalidatePath('/designs/apulia-power/dashboard')
+  return { updated }
+}
+
+/** Global default payment rule (apulia_settings 'payment_offset_days'). */
+export async function setDefaultPaymentOffset(days: number): Promise<{ error?: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { error: guard.error }
+  if (days !== 0 && days !== 30) return { error: 'Regola non valida' }
+  const sb = createAdminClient()
+  const { error } = await sb.from('apulia_settings')
+    .upsert({ key: 'payment_offset_days', value: days, updated_at: new Date().toISOString(), updated_by: guard.email }, { onConflict: 'key' })
+  if (error) return { error: error.message }
+  revalidatePath('/designs/apulia-power/settings')
+  revalidatePath('/designs/apulia-power/amministratori')
+  revalidatePath('/designs/apulia-power/dashboard')
+}
+
+/**
  * Soft-delete admins in bulk. Linked POD condomini have their
  * codice_amministratore cleared so they remain in Bibot but unassigned.
  */

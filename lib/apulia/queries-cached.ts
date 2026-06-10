@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { currentPeriod } from './fields'
+import { computeNextDue, getDefaultPaymentOffset } from './payment-cycle'
 import type { CachedContactRow } from './cache'
 
 export interface AdminRow {
@@ -30,6 +31,8 @@ export interface AdminRow {
   syncError?: string | null
   /** When this admin row was first cached in Bibot. */
   addedAt?: string
+  /** Payment rule: 0 = on Inizio fornitura, 30 = +30 days, null = use default. */
+  paymentOffsetDays?: number | null
 }
 
 export interface PodRow {
@@ -131,15 +134,20 @@ async function computePodDueStats(sb: ReturnType<typeof createAdminClient>): Pro
   }
   const codes = Array.from(new Set(pods.map((p) => p.codice_amministratore).filter((x): x is string => !!x)))
   const compensoByCode = new Map<string, number>()
+  const offsetByCode = new Map<string, number | null>()
   if (codes.length > 0) {
     const { data } = await sb.from('apulia_contacts')
-      .select('codice_amministratore, compenso_per_pod')
+      .select('codice_amministratore, compenso_per_pod, payment_offset_days')
       .eq('is_amministratore', true).neq('sync_status', 'pending_delete')
       .in('codice_amministratore', codes)
-    for (const r of (data ?? []) as Array<{ codice_amministratore: string; compenso_per_pod: number | null }>) {
-      if (r.codice_amministratore) compensoByCode.set(r.codice_amministratore, Number(r.compenso_per_pod) || 0)
+    for (const r of (data ?? []) as Array<{ codice_amministratore: string; compenso_per_pod: number | null; payment_offset_days: number | null }>) {
+      if (r.codice_amministratore) {
+        compensoByCode.set(r.codice_amministratore, Number(r.compenso_per_pod) || 0)
+        offsetByCode.set(r.codice_amministratore, r.payment_offset_days)
+      }
     }
   }
+  const defaultOffset = await getDefaultPaymentOffset(sb)
   // Per-POD paid_count.
   const paidCountById = new Map<string, number>()
   for (let from = 0; ; from += 1000) {
@@ -155,9 +163,9 @@ async function computePodDueStats(sb: ReturnType<typeof createAdminClient>): Pro
     const anchorIso = p.first_payment_at ?? p.cached_at
     if (!anchorIso) continue
     const paidCount = paidCountById.get(p.id) ?? 0
-    const nd = new Date(anchorIso)
-    nd.setMonth(nd.getMonth() + paidCount * 6)
-    if (nd.getTime() <= todayMs) {
+    const offset = offsetByCode.get(p.codice_amministratore ?? '') ?? defaultOffset
+    const nd = computeNextDue(anchorIso, offset, paidCount)
+    if (nd && nd.getTime() <= todayMs) {
       podsDueNow += 1
       const amt = Number(p.pod_override) || compensoByCode.get(p.codice_amministratore ?? '') || 0
       dueAmount += amt
@@ -209,7 +217,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
   }
 
   const [{ data: admins }, { data: podCounts }, { data: latestPayments }, activePods, podPaymentMap] = await Promise.all([
-    sb.from('apulia_contacts').select('id, first_name, last_name, email, phone, codice_amministratore, compenso_per_pod, commissione_totale, sync_status, sync_error, cached_at').eq('is_amministratore', true).neq('sync_status', 'pending_delete'),
+    sb.from('apulia_contacts').select('id, first_name, last_name, email, phone, codice_amministratore, compenso_per_pod, commissione_totale, sync_status, sync_error, cached_at, payment_offset_days').eq('is_amministratore', true).neq('sync_status', 'pending_delete'),
     sb.rpc('apulia_admin_pod_counts'),
     sb.from('apulia_payments').select('contact_id, paid_at').order('paid_at', { ascending: false }),
     fetchActivePods(),
@@ -224,6 +232,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
   for (const p of latestPayments ?? []) {
     if (!latestPaidMap.has(p.contact_id)) latestPaidMap.set(p.contact_id, p.paid_at as string)
   }
+  const defaultOffset = await getDefaultPaymentOffset(sb)
 
   // Group active PODs by codice_amministratore for fast per-admin rollup.
   const podsByCode = new Map<string, typeof activePods>()
@@ -244,6 +253,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
     // Roll per-POD payment status up to the admin: same rule as the
     // detail page — nextDueDate = addedAt + paidCount * 6mo (calendar
     // months, anchored to addedAt forever, not paid_at).
+    const offset = (a as { payment_offset_days?: number | null }).payment_offset_days ?? defaultOffset
     let dueCount = 0
     let dueTotal = 0
     let nextDue: string | undefined
@@ -253,8 +263,8 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
         const paidCount = pay?.count ?? 0
         const amount = Number(p.pod_override) || compenso
         const anchorIso = p.first_payment_at ?? p.cached_at
-        const nd = new Date(anchorIso)
-        nd.setMonth(nd.getMonth() + paidCount * 6)
+        const nd = computeNextDue(anchorIso, offset, paidCount)
+        if (!nd) continue
         const isPaid = nd.getTime() > todayMs
         if (!isPaid) {
           dueCount += 1
@@ -286,6 +296,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
       syncStatus: (a as { sync_status?: string }).sync_status ?? undefined,
       syncError: (a as { sync_error?: string | null }).sync_error ?? null,
       addedAt: (a as { cached_at?: string }).cached_at,
+      paymentOffsetDays: (a as { payment_offset_days?: number | null }).payment_offset_days ?? null,
     }
   })
   rows.sort((a, b) => b.total - a.total)
@@ -298,6 +309,8 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
   if (!a) return { admin: null, activePods: [], switchedPods: [] }
   const code = a.codice_amministratore as string | null
   const compenso = Number(a.compenso_per_pod) || 0
+  const defaultOffset = await getDefaultPaymentOffset(sb)
+  const offset = (a as { payment_offset_days?: number | null }).payment_offset_days ?? defaultOffset
 
   let activePods: CachedContactRow[] = []
   let switchedPods: CachedContactRow[] = []
@@ -361,9 +374,8 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
     const anchorIso = firstPaymentAt ?? cachedAt
     let nextDueDate: string | undefined
     let paymentStatus: 'paid' | 'due' = 'due'
-    if (anchorIso) {
-      const nd = new Date(anchorIso)
-      nd.setMonth(nd.getMonth() + paidCount * 6)
+    const nd = computeNextDue(anchorIso, offset, paidCount)
+    if (nd) {
       nextDueDate = nd.toISOString()
       paymentStatus = nd.getTime() <= todayMs ? 'due' : 'paid'
     } else {
@@ -429,6 +441,7 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
     nextPeriodIdx: undefined,
     isDueNow: dueRows.length > 0,
     overdueCount: dueRows.length,
+    paymentOffsetDays: (a as { payment_offset_days?: number | null }).payment_offset_days ?? null,
   }
 
   return { admin: adminRow, activePods: activePodRows, switchedPods: switchedPodRows }
