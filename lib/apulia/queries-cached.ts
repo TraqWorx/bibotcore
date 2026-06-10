@@ -13,6 +13,8 @@ export interface AdminRow {
   podsActive: number
   podsSwitchedOut: number
   total: number
+  /** Amount due at the next scadenza (the earliest upcoming/overdue date). */
+  nextDueAmount?: number
   paidThisPeriod: boolean
   paidAt?: string
   /** Anchor date — set on first PDP import where this admin matched. */
@@ -244,6 +246,8 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
     let dueCount = 0
     let dueTotal = 0
     let nextDue: string | undefined
+    // Amount owed per due-date — the "next payment" is the sum on the earliest one.
+    const amountByDate = new Map<string, number>()
     if (code) {
       for (const p of podsByCode.get(code) ?? []) {
         const pay = podPaymentMap.get(p.id)
@@ -255,6 +259,8 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
         // Earliest unpaid due date across the admin's PODs — past (overdue)
         // or future. The UI colours it red when isDueNow.
         const iso = nd.toISOString()
+        const dateKey = iso.slice(0, 10)
+        amountByDate.set(dateKey, (amountByDate.get(dateKey) ?? 0) + amount)
         if (!nextDue || iso < nextDue) nextDue = iso
         if (nd.getTime() <= todayMs) {
           dueCount += 1
@@ -263,6 +269,8 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
       }
     }
     const isDueNow = dueCount > 0
+    // "Prossimo pagamento" = amount falling due on the earliest scadenza.
+    const nextDueAmount = nextDue ? (amountByDate.get(nextDue.slice(0, 10)) ?? 0) : 0
     return {
       contactId: a.id,
       name: [a.first_name, a.last_name].filter(Boolean).join(' ') || a.email || '—',
@@ -272,7 +280,8 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
       compensoPerPod: compenso,
       podsActive: counts.active,
       podsSwitchedOut: counts.switched,
-      total: dueTotal, // "Da pagare" — only currently-due PODs.
+      total: dueTotal, // currently-overdue amount (drives bulk-pay)
+      nextDueAmount, // "Prossimo pagamento" — amount on the earliest scadenza
       paidThisPeriod: !isDueNow && counts.active > 0,
       paidAt: latestPaidMap.get(a.id),
       firstPaymentAt: undefined,

@@ -14,6 +14,7 @@ interface AdminRow {
   podsActive: number
   podsSwitchedOut: number
   total: number
+  nextDueAmount?: number
   paidThisPeriod: boolean
   paidAt?: string
   firstPaymentAt?: string
@@ -182,7 +183,7 @@ export default function AdminsTable({ admins }: { admins: AdminRow[] }) {
             <th>Amministratore</th>
             <th>Cod. Amm.</th>
             <th style={{ textAlign: 'right' }}>POD attivi</th>
-            <th style={{ textAlign: 'right' }}>Da pagare</th>
+            <th style={{ textAlign: 'right' }}>Prossimo Pagamento</th>
             <th>Prossima scadenza</th>
             <th>Stato</th>
           </tr>
@@ -213,7 +214,7 @@ export default function AdminsTable({ admins }: { admins: AdminRow[] }) {
                 </td>
                 <td style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--ap-text-muted)' }}>{a.codiceAmministratore ?? '—'}</td>
                 <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{a.podsActive}{a.podsSwitchedOut > 0 && <span style={{ color: 'var(--ap-warning)', fontSize: 11, marginLeft: 4 }}>+{a.podsSwitchedOut} so</span>}</td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{fmtEur(a.total)}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: a.isDueNow ? 'var(--ap-danger)' : 'var(--ap-text)' }}>{fmtEur(a.nextDueAmount ?? 0)}</td>
                 <td style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12, color: a.isDueNow ? 'var(--ap-danger)' : a.firstPaymentAt ? 'var(--ap-text)' : 'var(--ap-text-faint)' }}>
                   {a.nextDueDate ? new Date(a.nextDueDate).toLocaleDateString('it-IT') : '—'}
                 </td>
@@ -221,7 +222,7 @@ export default function AdminsTable({ admins }: { admins: AdminRow[] }) {
                   {a.isDueNow
                     ? <span className="ap-pill" data-tone="red">Da Pagare{a.overdueCount && a.overdueCount > 0 ? ` · ${a.overdueCount} POD` : ''}</span>
                     : a.podsActive > 0
-                      ? <span className="ap-pill" data-tone="green">Pagato</span>
+                      ? <span className="ap-pill" data-tone="green">Programmato</span>
                       : <span className="ap-pill" data-tone="gray">Senza POD</span>}
                 </td>
               </tr>
