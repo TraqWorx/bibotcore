@@ -15,6 +15,7 @@ export interface CondominoRow {
   syncStatus?: string
   syncError?: string | null
   addedAt?: string
+  switchedOutAt?: string
 }
 
 interface Props {
@@ -210,7 +211,20 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
                 <td>{cellLink(p.cliente ?? '—')}</td>
                 <td>{cellLink(p.amministratore ?? '—')}</td>
                 <td>{cellLink(p.comune ?? '—')}</td>
-                <td>{p.switchedOut ? <span className="ap-pill" data-tone="amber">Switch-out</span> : <span className="ap-pill" data-tone="green">Attivo</span>}</td>
+                <td>
+                  {p.switchedOut ? (
+                    <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 2 }}>
+                      <span className="ap-pill" data-tone="amber" style={{ width: 'fit-content' }}>Switch-out</span>
+                      {p.switchedOutAt && (
+                        <span style={{ fontSize: 11, color: 'var(--ap-text-faint)', fontVariantNumeric: 'tabular-nums' }}>
+                          dal {new Date(p.switchedOutAt).toLocaleDateString('it-IT')}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="ap-pill" data-tone="green">Attivo</span>
+                  )}
+                </td>
               </tr>
             )
           })}
