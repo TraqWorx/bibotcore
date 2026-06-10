@@ -84,7 +84,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const anchorIso = firstPaymentAt ?? cachedAt ?? null
   const { data: podPays } = await sb.from('apulia_payments').select('paid_at').eq('pod_contact_id', id)
   const paidCount = podPays?.length ?? 0
-  const effectiveOffset = adminOffset ?? (await getDefaultPaymentOffset(sb))
+  const effectiveOffset = adminOffset ?? (await getDefaultPaymentOffset())
   const nd = computeNextDue(anchorIso, effectiveOffset, paidCount)
   const nextDueDate: string | null = nd ? nd.toISOString() : null
   const isDueNow = nd ? nd.getTime() <= Date.now() : false

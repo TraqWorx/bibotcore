@@ -36,7 +36,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     fetchApuliaFieldGroups(),
     listDistinctTags(),
   ])
-  const defaultOffset = await getDefaultPaymentOffset(sb)
+  const defaultOffset = await getDefaultPaymentOffset()
   const customFields = (contactRow?.custom_fields ?? {}) as Record<string, string>
   const tags: string[] = (contactRow?.tags ?? []) as string[]
   const syncStatus = (contactRow as { sync_status?: string } | null)?.sync_status

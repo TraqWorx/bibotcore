@@ -147,14 +147,12 @@ async function computePodDueStats(sb: ReturnType<typeof createAdminClient>): Pro
       }
     }
   }
-  const defaultOffset = await getDefaultPaymentOffset(sb)
-  // Per-POD paid_count.
+  const defaultOffset = await getDefaultPaymentOffset()
+  // Per-POD paid_count via one aggregate RPC (was a full-table pagination loop).
   const paidCountById = new Map<string, number>()
-  for (let from = 0; ; from += 1000) {
-    const { data } = await sb.from('apulia_payments').select('pod_contact_id').not('pod_contact_id', 'is', null).range(from, from + 999)
-    if (!data || data.length === 0) break
-    for (const r of data as Array<{ pod_contact_id: string }>) paidCountById.set(r.pod_contact_id, (paidCountById.get(r.pod_contact_id) ?? 0) + 1)
-    if (data.length < 1000) break
+  {
+    const { data } = await sb.rpc('apulia_pod_payment_stats')
+    for (const r of (data ?? []) as Array<{ pod_contact_id: string; paid_count: number }>) paidCountById.set(r.pod_contact_id, Number(r.paid_count))
   }
   const todayMs = Date.now()
   let podsDueNow = 0
@@ -198,20 +196,9 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
   }
   const fetchPodPayments = async (): Promise<Map<string, { lastPaidAt: string; count: number }>> => {
     const map = new Map<string, { lastPaidAt: string; count: number }>()
-    for (let from = 0; ; from += 1000) {
-      const { data } = await sb
-        .from('apulia_payments')
-        .select('pod_contact_id, paid_at')
-        .not('pod_contact_id', 'is', null)
-        .order('paid_at', { ascending: false })
-        .range(from, from + 999)
-      if (!data || data.length === 0) break
-      for (const r of data as Array<{ pod_contact_id: string; paid_at: string }>) {
-        const existing = map.get(r.pod_contact_id)
-        if (!existing) map.set(r.pod_contact_id, { lastPaidAt: r.paid_at, count: 1 })
-        else { existing.count += 1; if (r.paid_at > existing.lastPaidAt) existing.lastPaidAt = r.paid_at }
-      }
-      if (data.length < 1000) break
+    const { data } = await sb.rpc('apulia_pod_payment_stats')
+    for (const r of (data ?? []) as Array<{ pod_contact_id: string; paid_count: number; last_paid_at: string }>) {
+      map.set(r.pod_contact_id, { lastPaidAt: r.last_paid_at, count: Number(r.paid_count) })
     }
     return map
   }
@@ -232,7 +219,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
   for (const p of latestPayments ?? []) {
     if (!latestPaidMap.has(p.contact_id)) latestPaidMap.set(p.contact_id, p.paid_at as string)
   }
-  const defaultOffset = await getDefaultPaymentOffset(sb)
+  const defaultOffset = await getDefaultPaymentOffset()
 
   // Group active PODs by codice_amministratore for fast per-admin rollup.
   const podsByCode = new Map<string, typeof activePods>()
@@ -309,7 +296,7 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
   if (!a) return { admin: null, activePods: [], switchedPods: [] }
   const code = a.codice_amministratore as string | null
   const compenso = Number(a.compenso_per_pod) || 0
-  const defaultOffset = await getDefaultPaymentOffset(sb)
+  const defaultOffset = await getDefaultPaymentOffset()
   const offset = (a as { payment_offset_days?: number | null }).payment_offset_days ?? defaultOffset
 
   let activePods: CachedContactRow[] = []

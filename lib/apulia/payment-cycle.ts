@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { createAdminClient } from '@/lib/supabase-server'
 
 /** Allowed payment-rule offsets (days after Inizio fornitura). */
@@ -21,9 +22,14 @@ export function computeNextDue(anchorIso: string | null | undefined, offsetDays:
   return d
 }
 
-/** Global default offset (apulia_settings 'payment_offset_days'); 0 if unset. */
-export async function getDefaultPaymentOffset(sb: ReturnType<typeof createAdminClient>): Promise<number> {
+/**
+ * Global default offset (apulia_settings 'payment_offset_days'), defaulting to
+ * DEFAULT_PAYMENT_OFFSET when unset. Memoized per request (React cache) so the
+ * several due-calc paths on one page don't each re-query the setting.
+ */
+export const getDefaultPaymentOffset = cache(async (): Promise<number> => {
+  const sb = createAdminClient()
   const { data } = await sb.from('apulia_settings').select('value').eq('key', 'payment_offset_days').maybeSingle()
   const v = Number((data as { value?: unknown } | null)?.value)
   return Number.isFinite(v) ? v : DEFAULT_PAYMENT_OFFSET
-}
+})

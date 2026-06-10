@@ -41,18 +41,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Se
   const sb = createAdminClient()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const fetchPaidThisMonth = async (): Promise<number> => {
-    let total = 0
-    for (let from = 0; ; from += 1000) {
-      const { data } = await sb
-        .from('apulia_payments')
-        .select('amount_cents')
-        .gte('paid_at', monthStart.toISOString())
-        .range(from, from + 999)
-      if (!data || data.length === 0) break
-      for (const r of data as Array<{ amount_cents: number }>) total += Number(r.amount_cents) || 0
-      if (data.length < 1000) break
-    }
-    return total / 100
+    const { data } = await sb.rpc('apulia_paid_sum_since', { from_iso: monthStart.toISOString() })
+    return (Number(data) || 0) / 100
   }
   const [{ data: recent }, { data: leadsByStore }, todayAppts, paidThisMonthTotal] = await Promise.all([
     sb.from('apulia_imports').select('id, kind, filename, rows_total, created_at').order('created_at', { ascending: false }).limit(5),

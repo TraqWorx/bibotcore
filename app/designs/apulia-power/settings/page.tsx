@@ -51,12 +51,8 @@ export default async function Page() {
   }
   const fetchPodPaymentCounts = async (): Promise<Map<string, number>> => {
     const map = new Map<string, number>()
-    for (let from = 0; ; from += 1000) {
-      const { data } = await sb.from('apulia_payments').select('pod_contact_id').not('pod_contact_id', 'is', null).range(from, from + 999)
-      if (!data || data.length === 0) break
-      for (const r of data as Array<{ pod_contact_id: string }>) map.set(r.pod_contact_id, (map.get(r.pod_contact_id) ?? 0) + 1)
-      if (data.length < 1000) break
-    }
+    const { data } = await sb.rpc('apulia_pod_payment_stats')
+    for (const r of (data ?? []) as Array<{ pod_contact_id: string; paid_count: number }>) map.set(r.pod_contact_id, Number(r.paid_count))
     return map
   }
 
@@ -114,7 +110,7 @@ export default async function Page() {
       adminByCode.set(a.codice_amministratore, { id: a.id, name })
     }
   }
-  const defaultOffset = await getDefaultPaymentOffset(sb)
+  const defaultOffset = await getDefaultPaymentOffset()
 
   const todayMs = Date.now()
   const podScheduleEntries: PodScheduleEntry[] = activePods.map((p) => {
@@ -182,21 +178,10 @@ export default async function Page() {
   const syncImports = Array.isArray(syncImportsResult) ? syncImportsResult : []
   const queueBadge = queueStats.pending + queueStats.inProgress + queueStats.failed
 
-  // Tag usage across the cache. Paginate because PostgREST caps a single
-  // select at 1000 rows and apulia_contacts can be much larger.
-  const tagRows: Array<{ tags: string[] | null }> = []
-  for (let from = 0; ; from += 1000) {
-    const { data } = await sb.from('apulia_contacts').select('tags').range(from, from + 999)
-    if (!data || data.length === 0) break
-    tagRows.push(...(data as Array<{ tags: string[] | null }>))
-    if (data.length < 1000) break
-  }
-  const tagCountMap = new Map<string, number>()
-  for (const r of tagRows) {
-    for (const t of r.tags ?? []) tagCountMap.set(t, (tagCountMap.get(t) ?? 0) + 1)
-  }
-  const tagUsage = Array.from(tagCountMap.entries())
-    .map(([tag, count]) => ({ tag, count }))
+  // Tag usage across the cache — one aggregate RPC (was a full-table scan).
+  const { data: tagRows } = await sb.rpc('apulia_tag_counts')
+  const tagUsage = ((tagRows ?? []) as Array<{ tag: string; cnt: number }>)
+    .map((r) => ({ tag: r.tag, count: Number(r.cnt) }))
     .sort((a, b) => b.count - a.count)
 
   return (
