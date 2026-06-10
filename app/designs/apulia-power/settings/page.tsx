@@ -117,7 +117,7 @@ export default async function Page() {
     const paidCount = podPaymentCounts.get(p.id) ?? 0
     const anchorIso = p.first_payment_at ?? p.cached_at
     const offset = offsetByCode.get(p.codice_amministratore ?? '') ?? defaultOffset
-    const nd = computeNextDue(anchorIso, offset, paidCount)
+    const nd = computeNextDue(anchorIso, offset, paidCount, p.cached_at)
     const nextDue: string | null = nd ? nd.toISOString() : null
     const isDueNow = nd ? nd.getTime() <= todayMs : false
     const override = Number(p.pod_override) || 0

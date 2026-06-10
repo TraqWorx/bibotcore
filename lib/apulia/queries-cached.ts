@@ -162,7 +162,7 @@ async function computePodDueStats(sb: ReturnType<typeof createAdminClient>): Pro
     if (!anchorIso) continue
     const paidCount = paidCountById.get(p.id) ?? 0
     const offset = offsetByCode.get(p.codice_amministratore ?? '') ?? defaultOffset
-    const nd = computeNextDue(anchorIso, offset, paidCount)
+    const nd = computeNextDue(anchorIso, offset, paidCount, p.cached_at)
     if (nd && nd.getTime() <= todayMs) {
       podsDueNow += 1
       const amt = Number(p.pod_override) || compensoByCode.get(p.codice_amministratore ?? '') || 0
@@ -250,7 +250,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
         const paidCount = pay?.count ?? 0
         const amount = Number(p.pod_override) || compenso
         const anchorIso = p.first_payment_at ?? p.cached_at
-        const nd = computeNextDue(anchorIso, offset, paidCount)
+        const nd = computeNextDue(anchorIso, offset, paidCount, p.cached_at)
         if (!nd) continue
         // Earliest unpaid due date across the admin's PODs — past (overdue)
         // or future. The UI colours it red when isDueNow.
@@ -361,7 +361,7 @@ export async function adminWithPods(adminContactId: string): Promise<{ admin: Ad
     const anchorIso = firstPaymentAt ?? cachedAt
     let nextDueDate: string | undefined
     let paymentStatus: 'paid' | 'due' = 'due'
-    const nd = computeNextDue(anchorIso, offset, paidCount)
+    const nd = computeNextDue(anchorIso, offset, paidCount, cachedAt)
     if (nd) {
       nextDueDate = nd.toISOString()
       paymentStatus = nd.getTime() <= todayMs ? 'due' : 'paid'

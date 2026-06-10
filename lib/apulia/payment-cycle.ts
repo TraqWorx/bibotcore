@@ -10,15 +10,38 @@ export function paymentRuleLabel(days: number): string {
 }
 
 /**
- * Next commission due date for a POD: anchor (Inizio fornitura, else import
- * date) + offset days + paidCount × 6 months. Returns null when there's no
+ * Next commission due date for a POD. Cycle dates align to Inizio fornitura
+ * (anchor, else import date) + offset days, every 6 months. We do NOT bill the
+ * past: cycles that fully elapsed before the POD was onboarded (`onboardedIso`,
+ * the import date) are skipped, so the first owed cycle is the one current at
+ * onboarding. Next due = first-owed-cycle + paidCount × 6 months. Null if no
  * anchor.
  */
-export function computeNextDue(anchorIso: string | null | undefined, offsetDays: number, paidCount: number): Date | null {
+export function computeNextDue(
+  anchorIso: string | null | undefined,
+  offsetDays: number,
+  paidCount: number,
+  onboardedIso?: string | null,
+): Date | null {
   if (!anchorIso) return null
-  const d = new Date(anchorIso)
-  if (offsetDays) d.setDate(d.getDate() + offsetDays)
-  d.setMonth(d.getMonth() + paidCount * 6)
+  const base = new Date(anchorIso)
+  if (offsetDays) base.setDate(base.getDate() + offsetDays)
+
+  // Skip pre-onboarding cycles: advance to the latest boundary <= onboarded.
+  let cyclesToSkip = 0
+  if (onboardedIso) {
+    const onboarded = new Date(onboardedIso).getTime()
+    const probe = new Date(base)
+    while (true) {
+      const next = new Date(probe)
+      next.setMonth(next.getMonth() + 6)
+      if (next.getTime() <= onboarded) { cyclesToSkip++; probe.setMonth(probe.getMonth() + 6) }
+      else break
+    }
+  }
+
+  const d = new Date(base)
+  d.setMonth(d.getMonth() + (cyclesToSkip + paidCount) * 6)
   return d
 }
 
