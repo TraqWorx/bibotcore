@@ -3,6 +3,7 @@ import { getApuliaSession } from '@/lib/apulia/auth'
 import { createAdminClient } from '@/lib/supabase-server'
 import { listApuliaWorkflows } from '@/lib/apulia/workflows'
 import PodPaymentSchedule, { type PodScheduleEntry } from './_components/PodPaymentSchedule'
+import SwitchOutSchedule, { type SwitchOutEntry } from './_components/SwitchOutSchedule'
 import CompensiTable, { type CompensoEntry } from './_components/CompensiTable'
 import SettingsTabs from './_components/SettingsTabs'
 import SyncImportHistory from './_components/SyncImportHistory'
@@ -58,11 +59,37 @@ export default async function Page() {
     return map
   }
 
+  type SwitchedPodLite = {
+    id: string
+    pod_pdr: string | null
+    first_name: string | null
+    last_name: string | null
+    cliente: string | null
+    codice_amministratore: string | null
+    amministratore_name: string | null
+    switched_out_at: string | null
+  }
+  const fetchSwitchedPods = async (): Promise<SwitchedPodLite[]> => {
+    const out: SwitchedPodLite[] = []
+    for (let from = 0; ; from += 1000) {
+      const { data } = await sb.from('apulia_contacts')
+        .select('id, pod_pdr, first_name, last_name, cliente, codice_amministratore, amministratore_name, switched_out_at')
+        .eq('is_amministratore', false).eq('is_switch_out', true).neq('sync_status', 'pending_delete')
+        .order('switched_out_at', { ascending: false, nullsFirst: false })
+        .range(from, from + 999)
+      if (!data || data.length === 0) break
+      out.push(...(data as SwitchedPodLite[]))
+      if (data.length < 1000) break
+    }
+    return out
+  }
+
   const [
     { data: admins },
     { data: podCounts },
     activePods,
     podPaymentCounts,
+    switchedPods,
   ] = await Promise.all([
     sb.from('apulia_contacts')
       .select('id, first_name, last_name, codice_amministratore, compenso_per_pod, commissione_totale')
@@ -71,6 +98,7 @@ export default async function Page() {
     sb.rpc('apulia_admin_pod_counts'),
     fetchActivePods(),
     fetchPodPaymentCounts(),
+    fetchSwitchedPods(),
   ])
 
   const podCountMap = new Map(((podCounts ?? []) as Array<{ codice_amministratore: string; active: number }>).map((r) => [r.codice_amministratore, Number(r.active)]))
@@ -124,8 +152,21 @@ export default async function Page() {
     }))
     .sort((a, b) => b.podsActive - a.podsActive)
 
+  const switchOutEntries: SwitchOutEntry[] = switchedPods.map((p) => {
+    const adminRec = p.codice_amministratore ? adminByCode.get(p.codice_amministratore) : undefined
+    return {
+      contactId: p.id,
+      pod: p.pod_pdr ?? '—',
+      cliente: [p.first_name, p.last_name].filter(Boolean).join(' ') || p.cliente || '',
+      amministratore: adminRec?.name ?? p.amministratore_name ?? '',
+      amministratoreId: adminRec?.id,
+      switchedOutAt: p.switched_out_at,
+    }
+  })
+
   const dueNowCount = podScheduleEntries.filter((p) => p.isDueNow).length
   const noCompensoCount = compensiEntries.filter((a) => a.compensoPerPod === 0).length
+  const switchOutNoDateCount = switchOutEntries.filter((p) => !p.switchedOutAt).length
 
   const [queueStatsResult, syncImportsResult, workflowsResult] = await Promise.all([
     getSyncQueueStats(),
@@ -199,6 +240,25 @@ export default async function Page() {
                 </header>
                 <div style={{ padding: '16px 20px' }}>
                   <CompensiTable admins={compensiEntries} />
+                </div>
+              </section>
+            ),
+          },
+          {
+            id: 'switchout',
+            label: 'Switch-out',
+            badge: switchOutNoDateCount > 0 ? switchOutNoDateCount : undefined,
+            content: (
+              <section className="ap-card">
+                <header style={{ padding: '16px 20px', borderBottom: '1px solid var(--ap-line)' }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 800 }}>Date di switch-out</h2>
+                  <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
+                    Data reale di uscita dal contratto (Data esecuzione attività), impostata all&apos;import.
+                    Correggila qui per singolo POD o in blocco selezionando più righe. Non incide sulle commissioni (già escluse dallo switch-out).
+                  </p>
+                </header>
+                <div style={{ padding: '16px 20px' }}>
+                  <SwitchOutSchedule pods={switchOutEntries} />
                 </div>
               </section>
             ),

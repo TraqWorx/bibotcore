@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { setPodOverride, markPodsPaid, unmarkPodPaid } from '../_actions'
+import { setSwitchOutDate } from '../../../condomini/[id]/_actions'
 
 interface PodRow {
   contactId: string
@@ -222,6 +223,18 @@ function Row({
   const [pending, startTransition] = useTransition()
   const [savedFlash, setSavedFlash] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [soVal, setSoVal] = useState(pod.switchedOutAt ? pod.switchedOutAt.slice(0, 10) : '')
+  const [soPending, startSoTransition] = useTransition()
+  const [soSaved, setSoSaved] = useState(false)
+
+  function commitSwitchDate() {
+    const cur = pod.switchedOutAt ? pod.switchedOutAt.slice(0, 10) : ''
+    if (soVal === cur) return
+    startSoTransition(async () => {
+      const res = await setSwitchOutDate(pod.contactId, soVal)
+      if (!res?.error) { setSoSaved(true); setTimeout(() => setSoSaved(false), 1200) }
+    })
+  }
 
   function commit() {
     setError(null)
@@ -255,7 +268,23 @@ function Row({
         </td>
       )}
       <td style={{ fontSize: 12, color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-        {fmtDate(payable ? pod.addedAt : (pod.switchedOutAt ?? pod.addedAt))}
+        {payable ? (
+          fmtDate(pod.addedAt)
+        ) : (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="date"
+              value={soVal}
+              onChange={(e) => setSoVal(e.target.value)}
+              onBlur={commitSwitchDate}
+              disabled={soPending}
+              className="ap-input"
+              style={{ height: 28, width: 140, fontSize: 12 }}
+              title="Data reale di switch-out"
+            />
+            {soSaved && <span style={{ color: 'var(--ap-success)', fontSize: 11 }}>✓</span>}
+          </span>
+        )}
       </td>
       <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{pod.pod}</td>
       <td>{pod.cliente ?? '—'}</td>

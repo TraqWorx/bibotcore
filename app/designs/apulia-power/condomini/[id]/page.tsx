@@ -9,6 +9,7 @@ import { listAdminPickerOptions } from '@/lib/apulia/queries-cached'
 import { listDistinctTags } from '@/lib/apulia/tags'
 import CondominoEditor from './_components/CondominoEditor'
 import PodPaymentField from './_components/PodPaymentField'
+import SwitchOutDateField from './_components/SwitchOutDateField'
 import DeleteContactButton from '../../_components/DeleteContactButton'
 import { deleteCondomino } from './_actions'
 
@@ -109,7 +110,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         />
       </header>
 
-      {!contact.is_switch_out && (
+      {contact.is_switch_out ? (
+        <SwitchOutDateField
+          contactId={id}
+          switchedOutAt={(contact as { switched_out_at?: string | null }).switched_out_at ?? null}
+        />
+      ) : (
         <PodPaymentField
           contactId={id}
           firstPaymentAt={firstPaymentAt}

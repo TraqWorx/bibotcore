@@ -94,6 +94,52 @@ export async function setPodsFirstPaymentDateBulk(contactIds: string[], isoDate:
   return { updated: count ?? contactIds.length }
 }
 
+/** Normalize a YYYY-MM-DD (from <input type=date>) to a midday-UTC ISO
+ *  string, matching how the importer stores switch-out dates. '' → null. */
+function dateInputToIso(isoDate: string): string | null | { error: string } {
+  if (!isoDate) return null
+  const m = isoDate.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return { error: 'Data non valida' }
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0)).toISOString()
+}
+
+/**
+ * Manually set/correct a POD's real switch-out date (Data esecuzione
+ * attività). Bibot-only column — not pushed to GHL, doesn't touch the
+ * is_switch_out flag. Empty string clears it.
+ */
+export async function setSwitchOutDate(contactId: string, isoDate: string): Promise<{ error: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+  const iso = dateInputToIso(isoDate)
+  if (iso !== null && typeof iso === 'object') return iso
+  const sb = createAdminClient()
+  const { error } = await sb.from('apulia_contacts').update({ switched_out_at: iso }).eq('id', contactId)
+  if (error) return { error: error.message }
+  pathsToRevalidate(contactId)
+  revalidatePath('/designs/apulia-power/switch-out')
+  revalidatePath('/designs/apulia-power/amministratori')
+  revalidatePath('/designs/apulia-power/settings')
+}
+
+/** Bulk-set the switch-out date on many PODs at once (settings tab). */
+export async function setSwitchOutDatesBulk(contactIds: string[], isoDate: string): Promise<{ updated: number; error?: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { updated: 0, error: guard.error }
+  if (contactIds.length === 0) return { updated: 0 }
+  const iso = dateInputToIso(isoDate)
+  if (iso !== null && typeof iso === 'object') return { updated: 0, error: iso.error }
+  const sb = createAdminClient()
+  const { error, count } = await sb.from('apulia_contacts')
+    .update({ switched_out_at: iso }, { count: 'exact' })
+    .in('id', contactIds)
+  if (error) return { updated: 0, error: error.message }
+  revalidatePath('/designs/apulia-power/switch-out')
+  revalidatePath('/designs/apulia-power/settings')
+  revalidatePath('/designs/apulia-power/condomini')
+  return { updated: count ?? contactIds.length }
+}
+
 /**
  * If the row never made it to GHL (ghl_id null — pending_create or
  * previously failed), re-queue a fresh 'create' op so the worker tries
