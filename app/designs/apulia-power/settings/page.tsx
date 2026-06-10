@@ -311,6 +311,24 @@ export default async function Page() {
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, alignItems: 'start' }}>
                   <ImportColumnsCard
+                    title="Amministratori"
+                    requiredCols={[
+                      'Fornitura : Cliente : Amministratore condominio',
+                      'Fornitura : Cliente : Codice amministratore',
+                    ]}
+                    optionalCols={[
+                      'compenso per ciascun pod',
+                      'Fornitura : Cliente : Amministratore condominio : Codice fiscale Amministratore',
+                      'Fornitura : Cliente : Amministratore condominio : Partita IVA',
+                      'Fornitura : Dati di fatturazione : Indirizzo',
+                      'Fornitura : Dati di fatturazione : Indirizzo (Città)',
+                      'Fornitura : Dati di fatturazione : Indirizzo (Stato/Provincia)',
+                      'Fornitura : Cliente : Numero Telefono Amministratore',
+                      'Fornitura : Dati di fatturazione : Email',
+                    ]}
+                    note="Match per Codice amministratore. I nuovi vengono creati con tag amministratore e 1° pagamento = oggi."
+                  />
+                  <ImportColumnsCard
                     title="PDP ATTIVI"
                     requiredCols={[
                       'POD/PDR',
@@ -367,7 +385,7 @@ export default async function Page() {
                       'Fornitura : Opportunità : Promo Privacy',
                       'Opportunità',
                     ]}
-                    note="Match per POD/PDR. I nuovi POD vengono creati e collegati all'amministratore tramite Codice amministratore. Gli amministratori non ancora presenti vengono creati automaticamente da questo file (nome, CF, P.IVA, contatti dalle colonne amministratore) — non serve più un caricamento separato."
+                    note="Match per POD/PDR. I nuovi POD vengono creati e collegati all'amministratore tramite Codice amministratore."
                   />
                   <ImportColumnsCard
                     title="Switch-out"
