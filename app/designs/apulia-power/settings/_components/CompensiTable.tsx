@@ -269,13 +269,14 @@ function Row({ admin, defaultOffset, selected, onToggle }: { admin: CompensoEntr
   const [ruleVal, setRuleVal] = useState<string>(String(admin.paymentOffsetDays ?? defaultOffset))
   const [rulePending, startRuleTransition] = useTransition()
   const [ruleSaved, setRuleSaved] = useState(false)
-  const router = useRouter()
 
   function commitRule(next: string) {
     setRuleVal(next)
+    // Optimistic: the dropdown reflects the new value; no same-page derived
+    // field changes, so skip the full-page refresh.
     startRuleTransition(async () => {
       const res = await setAdminPaymentOffset(admin.contactId, Number(next))
-      if (!res?.error) { setRuleSaved(true); setTimeout(() => setRuleSaved(false), 1200); router.refresh() }
+      if (!res?.error) { setRuleSaved(true); setTimeout(() => setRuleSaved(false), 1200) }
     })
   }
 
@@ -291,10 +292,11 @@ function Row({ admin, defaultOffset, selected, onToggle }: { admin: CompensoEntr
       const res = await setCompensoPerPod(admin.contactId, parsed)
       if (res?.error) setError(res.error)
       else {
+        // Optimistic: action returns the recomputed total; update the row in
+        // place instead of refetching the whole (heavy) settings page.
         if (typeof res?.total === 'number') setTotal(res.total)
         setSavedFlash(true)
         setTimeout(() => setSavedFlash(false), 1500)
-        router.refresh()
       }
     })
   }

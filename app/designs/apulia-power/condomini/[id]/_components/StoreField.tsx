@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { setPodStore } from '../_actions'
 
 export default function StoreField({
@@ -17,7 +16,6 @@ export default function StoreField({
   const [val, setVal] = useState<string>(store ?? '')
   const [savedFlash, setSavedFlash] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
 
   function commit(next: string) {
     setVal(next)
@@ -29,7 +27,6 @@ export default function StoreField({
       else {
         setSavedFlash(true)
         setTimeout(() => setSavedFlash(false), 1500)
-        router.refresh()
       }
     })
   }

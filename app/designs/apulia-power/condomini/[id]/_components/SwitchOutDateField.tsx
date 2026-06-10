@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { setSwitchOutDate } from '../_actions'
 
 export default function SwitchOutDateField({
@@ -15,7 +14,6 @@ export default function SwitchOutDateField({
   const [val, setVal] = useState<string>(switchedOutAt ? switchedOutAt.slice(0, 10) : '')
   const [savedFlash, setSavedFlash] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
 
   function commit() {
     const cur = switchedOutAt ? switchedOutAt.slice(0, 10) : ''
@@ -27,7 +25,6 @@ export default function SwitchOutDateField({
       else {
         setSavedFlash(true)
         setTimeout(() => setSavedFlash(false), 1500)
-        router.refresh()
       }
     })
   }
