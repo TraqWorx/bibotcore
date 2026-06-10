@@ -122,6 +122,22 @@ export async function setSwitchOutDate(contactId: string, isoDate: string): Prom
   revalidatePath('/designs/apulia-power/settings')
 }
 
+/** Set/clear a single POD's store (Bibot-only, no GHL sync). '' clears it. */
+export async function setPodStore(contactId: string, store: string): Promise<{ error: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+  const sb = createAdminClient()
+  const slug = (store ?? '').trim()
+  if (slug) {
+    const { data: st } = await sb.from('apulia_stores').select('slug').eq('slug', slug).maybeSingle()
+    if (!st) return { error: `Store sconosciuto: ${slug}` }
+  }
+  const { error } = await sb.from('apulia_contacts').update({ store: slug || null }).eq('id', contactId)
+  if (error) return { error: error.message }
+  pathsToRevalidate(contactId)
+  revalidatePath('/designs/apulia-power/stores')
+}
+
 /** Bulk-set the switch-out date on many PODs at once (settings tab). */
 export async function setSwitchOutDatesBulk(contactIds: string[], isoDate: string): Promise<{ updated: number; error?: string }> {
   const guard = await ensureOwner()

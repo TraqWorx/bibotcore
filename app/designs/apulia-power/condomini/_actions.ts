@@ -186,3 +186,55 @@ export async function bulkDeleteCondomini(input: { ids?: string[]; filters?: Bul
   revalidatePath('/designs/apulia-power/dashboard')
   return { deleted: rows.length, failed: 0 }
 }
+
+/** Resolve a bulk selection (explicit ids, or all rows matching a filter). */
+async function resolveCondominoIds(sb: ReturnType<typeof createAdminClient>, input: { ids?: string[]; filters?: BulkDeleteFilters }): Promise<string[]> {
+  if (input.ids && input.ids.length > 0) return input.ids
+  if (!input.filters) return []
+  const f = input.filters
+  const ids: string[] = []
+  for (let from = 0; ; from += 1000) {
+    let q = sb.from('apulia_contacts').select('id').eq('is_amministratore', false).neq('sync_status', 'pending_delete')
+    if (f.stato === 'active') q = q.eq('is_switch_out', false)
+    else if (f.stato === 'switch_out') q = q.eq('is_switch_out', true)
+    if (f.comune) q = q.eq('comune', f.comune)
+    if (f.amministratore) q = q.eq('amministratore_name', f.amministratore)
+    if (f.q) {
+      const term = f.q.replace(/[%_]/g, (m) => `\\${m}`)
+      q = q.or(`pod_pdr.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,cliente.ilike.%${term}%,amministratore_name.ilike.%${term}%`)
+    }
+    const { data } = await q.range(from, from + 999)
+    if (!data || data.length === 0) break
+    ids.push(...data.map((r) => r.id as string))
+    if (data.length < 1000) break
+  }
+  return ids
+}
+
+/**
+ * Bulk-set (or clear) the store on many condomini. Bibot-only column — no
+ * GHL sync. `store` is a store slug, or '' to clear.
+ */
+export async function setCondominiStoreBulk(input: { ids?: string[]; filters?: BulkDeleteFilters }, store: string): Promise<{ updated: number; error?: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { updated: 0, error: guard.error }
+  const sb = createAdminClient()
+  const slug = (store ?? '').trim()
+  if (slug) {
+    const { data: st } = await sb.from('apulia_stores').select('slug').eq('slug', slug).maybeSingle()
+    if (!st) return { updated: 0, error: `Store sconosciuto: ${slug}` }
+  }
+  const ids = await resolveCondominoIds(sb, input)
+  if (ids.length === 0) return { updated: 0 }
+  const value = slug || null
+  let updated = 0
+  for (let i = 0; i < ids.length; i += 500) {
+    const slice = ids.slice(i, i + 500)
+    const { error, count } = await sb.from('apulia_contacts').update({ store: value }, { count: 'exact' }).in('id', slice)
+    if (error) return { updated, error: error.message }
+    updated += count ?? slice.length
+  }
+  revalidatePath('/designs/apulia-power/condomini')
+  revalidatePath('/designs/apulia-power/stores')
+  return { updated }
+}

@@ -7,9 +7,11 @@ import { APULIA_FIELD } from '@/lib/apulia/fields'
 import { normalizePod } from '@/lib/apulia/cache'
 import { listAdminPickerOptions } from '@/lib/apulia/queries-cached'
 import { listDistinctTags } from '@/lib/apulia/tags'
+import { listStores } from '@/lib/apulia/stores'
 import CondominoEditor from './_components/CondominoEditor'
 import PodPaymentField from './_components/PodPaymentField'
 import SwitchOutDateField from './_components/SwitchOutDateField'
+import StoreField from './_components/StoreField'
 import SettingsTabs from '../../settings/_components/SettingsTabs'
 import DeleteContactButton from '../../_components/DeleteContactButton'
 import { deleteCondomino } from './_actions'
@@ -22,12 +24,14 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const { id } = await params
 
   const sb = createAdminClient()
-  const [{ data: contact }, fieldGroups, adminOptions, tagSuggestions] = await Promise.all([
+  const [{ data: contact }, fieldGroups, adminOptions, tagSuggestions, storesList] = await Promise.all([
     sb.from('apulia_contacts').select('*').eq('id', id).maybeSingle(),
     fetchApuliaFieldGroups(),
     listAdminPickerOptions(),
     listDistinctTags(),
+    listStores(),
   ])
+  const storeOptions = storesList.map((s) => ({ slug: s.slug, name: s.name }))
   if (!contact || contact.is_amministratore) notFound()
   const syncStatus = (contact as { sync_status?: string }).sync_status
   const syncError = (contact as { sync_error?: string | null }).sync_error
@@ -140,6 +144,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           amount={podAmount}
         />
       )}
+
+      <StoreField contactId={id} store={(contact as { store?: string | null }).store ?? null} options={storeOptions} />
 
       <SettingsTabs
         tabs={[

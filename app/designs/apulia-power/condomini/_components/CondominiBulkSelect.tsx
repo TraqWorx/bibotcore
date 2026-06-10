@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { bulkDeleteCondomini, type BulkDeleteFilters } from '../_actions'
+import { bulkDeleteCondomini, setCondominiStoreBulk, type BulkDeleteFilters } from '../_actions'
 
 export interface CondominoRow {
   contactId: string
@@ -23,13 +23,16 @@ interface Props {
   rows: CondominoRow[]
   total: number
   filters: BulkDeleteFilters
+  storeOptions: { slug: string; name: string }[]
 }
 
-export default function CondominiBulkSelect({ rows, total, filters }: Props) {
+export default function CondominiBulkSelect({ rows, total, filters, storeOptions }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [allMatching, setAllMatching] = useState(false)
   const [hideFailed, setHideFailed] = useState(false)
   const [pending, startTransition] = useTransition()
+  const [storePending, startStoreTransition] = useTransition()
+  const [bulkStore, setBulkStore] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const router = useRouter()
@@ -65,6 +68,24 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
   function clearAll() {
     setAllMatching(false)
     setSelected(new Set())
+  }
+
+  function applyStore() {
+    const count = allMatching ? total : pageSelectedCount
+    if (count === 0 || storePending) return
+    const label = bulkStore ? (storeOptions.find((o) => o.slug === bulkStore)?.name ?? bulkStore) : 'Nessuno'
+    if (!window.confirm(`Impostare lo store "${label}" su ${count.toLocaleString('it-IT')} condomini?`)) return
+    setError(null); setFlash(null)
+    const ids = visibleRows.filter((r) => selected.has(r.contactId)).map((r) => r.contactId)
+    startStoreTransition(async () => {
+      const res = await setCondominiStoreBulk(allMatching ? { filters } : { ids }, bulkStore)
+      if (res.error) setError(res.error)
+      else {
+        setFlash(`Store aggiornato su ${res.updated} condomini.`)
+        clearAll()
+        router.refresh()
+      }
+    })
   }
 
   function bulkDelete() {
@@ -141,7 +162,20 @@ export default function CondominiBulkSelect({ rows, total, filters }: Props) {
             {error && <span style={{ color: 'var(--ap-danger)', marginLeft: 8 }}>{error}</span>}
           </div>
           {selectedCount > 0 && (
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <select
+                value={bulkStore}
+                onChange={(e) => setBulkStore(e.target.value)}
+                className="ap-input"
+                style={{ height: 32, fontSize: 12, width: 'auto' }}
+                aria-label="Store da applicare"
+              >
+                <option value="">Store: Nessuno</option>
+                {storeOptions.map((o) => <option key={o.slug} value={o.slug}>Store: {o.name}</option>)}
+              </select>
+              <button type="button" onClick={applyStore} className="ap-btn ap-btn-ghost" style={{ height: 32 }} disabled={storePending}>
+                {storePending ? 'Applico…' : 'Applica store'}
+              </button>
               <button type="button" onClick={clearAll} className="ap-btn ap-btn-ghost" style={{ height: 32 }} disabled={pending}>
                 Deseleziona
               </button>
