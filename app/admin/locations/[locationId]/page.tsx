@@ -101,7 +101,11 @@ export default async function LocationDetailPage({
   if (isBibot) {
     const [{ data: profileLocationRows }, { data: legacyProfiles }, { data: installRow }] = await Promise.all([
       supabase.from('profile_locations').select('user_id').eq('location_id', locationId),
-      supabase.from('profiles').select('id, email, role, created_at').eq('location_id', locationId),
+      // GHL team members live in profile_locations; the legacy
+      // profiles.location_id fallback must only surface dashboard users
+      // (admin/agency), never portal contacts ('client'/'user') — those are
+      // CRM contacts, not location users, and nothing prunes them on removal.
+      supabase.from('profiles').select('id, email, role, created_at').eq('location_id', locationId).in('role', ['admin', 'agency']),
       supabase.from('installs').select('design_slug, installed_at, configured').eq('location_id', locationId).maybeSingle(),
     ])
     install = installRow
