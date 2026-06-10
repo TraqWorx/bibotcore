@@ -215,7 +215,7 @@ export default function AdminsTable({ admins }: { admins: AdminRow[] }) {
                 <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{a.podsActive}{a.podsSwitchedOut > 0 && <span style={{ color: 'var(--ap-warning)', fontSize: 11, marginLeft: 4 }}>+{a.podsSwitchedOut} so</span>}</td>
                 <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{fmtEur(a.total)}</td>
                 <td style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12, color: a.isDueNow ? 'var(--ap-danger)' : a.firstPaymentAt ? 'var(--ap-text)' : 'var(--ap-text-faint)' }}>
-                  {a.nextDueDate ? new Date(a.nextDueDate).toLocaleDateString('it-IT') : 'Da configurare'}
+                  {a.nextDueDate ? new Date(a.nextDueDate).toLocaleDateString('it-IT') : '—'}
                 </td>
                 <td>
                   {a.isDueNow

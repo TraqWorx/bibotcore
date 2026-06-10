@@ -252,13 +252,13 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
         const anchorIso = p.first_payment_at ?? p.cached_at
         const nd = computeNextDue(anchorIso, offset, paidCount)
         if (!nd) continue
-        const isPaid = nd.getTime() > todayMs
-        if (!isPaid) {
+        // Earliest unpaid due date across the admin's PODs — past (overdue)
+        // or future. The UI colours it red when isDueNow.
+        const iso = nd.toISOString()
+        if (!nextDue || iso < nextDue) nextDue = iso
+        if (nd.getTime() <= todayMs) {
           dueCount += 1
           dueTotal += amount
-        } else {
-          const iso = nd.toISOString()
-          if (!nextDue || iso < nextDue) nextDue = iso
         }
       }
     }
