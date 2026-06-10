@@ -105,13 +105,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <div className="ap-stat-value">{admin.podsSwitchedOut}</div>
         </div>
         <div className="ap-stat" data-tone={admin.overdueCount && admin.overdueCount > 0 ? 'warn' : 'good'}>
-          <div className="ap-stat-label">Da pagare ora</div>
-          <div className="ap-stat-value">{fmtEur(admin.total)}</div>
+          <div className="ap-stat-label">Da Pagare</div>
+          <div className="ap-stat-value" style={{ color: admin.overdueCount && admin.overdueCount > 0 ? 'var(--ap-danger)' : undefined }}>{fmtEur(admin.total)}</div>
           <div className="ap-stat-foot">
             {admin.overdueCount && admin.overdueCount > 0
-              ? `${admin.overdueCount} POD da pagare · ciclo 6 mesi per POD`
+              ? `${admin.overdueCount} POD da pagare ora`
               : admin.podsActive > 0
-                ? 'Tutti i POD pagati'
+                ? 'Nessun pagamento dovuto ora'
                 : 'Nessun POD attivo'}
           </div>
         </div>
@@ -122,7 +122,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           </div>
           <div className="ap-stat-foot">
             {admin.nextDueDate
-              ? 'POD pagato più di recente — scade tra 6 mesi'
+              ? 'Prossimo pagamento programmato'
               : 'In attesa del primo pagamento'}
           </div>
         </div>

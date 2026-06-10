@@ -293,7 +293,9 @@ function Row({
           {isDue ? (
             <span className="ap-pill" data-tone="amber">Da Pagare</span>
           ) : isPaid ? (
-            <span className="ap-pill" data-tone="green">Pagato</span>
+            (pod.paidCount && pod.paidCount > 0)
+              ? <span className="ap-pill" data-tone="green">Pagato</span>
+              : <span className="ap-pill" data-tone="blue">Programmato</span>
           ) : (
             <span className="ap-pill" data-tone="gray">—</span>
           )}
