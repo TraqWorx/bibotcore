@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
+import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 
 const GHL = 'https://services.leadconnectorhq.com'
 const HEADERS = (token: string) => ({
@@ -15,6 +16,10 @@ export async function POST(req: NextRequest) {
     if (!locationId || !contactId || !message?.trim()) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
+
+    const access = await getLocationAccess(req, locationId)
+    if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const token = await getGhlTokenForLocation(locationId)
 

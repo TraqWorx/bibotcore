@@ -15,6 +15,14 @@ export async function POST(req: NextRequest) {
   if (profile?.role !== 'admin' && profile?.role !== 'super_admin') return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   if (!profile.agency_id) return NextResponse.json({ error: 'No agency' }, { status: 403 })
 
+  // Ownership: the location must belong to the caller's agency (super_admin bypasses).
+  if (profile.role !== 'super_admin') {
+    const { data: loc } = await sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+    if (!loc || loc.agency_id !== profile.agency_id) {
+      return NextResponse.json({ error: 'Location not in your agency' }, { status: 403 })
+    }
+  }
+
   await sb.from('agency_subscriptions').upsert({
     agency_id: profile.agency_id,
     location_id: locationId,

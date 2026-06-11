@@ -8,9 +8,13 @@ export async function GET(req: NextRequest) {
   const token_hash = searchParams.get('token_hash')
   const type       = searchParams.get('type') as EmailOtpType | null
 
-  // Build redirect response first so we can attach cookies to it
-  const redirectTo = searchParams.get('redirectTo')
-  const redirectUrl = new URL(redirectTo ?? '/redirect', req.url)
+  // Build redirect response first so we can attach cookies to it. Only allow
+  // same-origin relative paths to prevent an open redirect to external sites.
+  const rawRedirect = searchParams.get('redirectTo')
+  const safeRedirect = rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')
+    ? rawRedirect
+    : '/redirect'
+  const redirectUrl = new URL(safeRedirect, req.url)
   const response = NextResponse.redirect(redirectUrl)
 
   const supabase = createServerClient(
