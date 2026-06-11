@@ -14,7 +14,7 @@ for (const line of env.split('\n')) {
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 const { data: tok } = await sb.from('ghl_connections').select('access_token').eq('location_id', 'VtNhBfleEQDg0KX4eZqY').maybeSingle()
 
-let allGhl = []
+const allGhl = []
 let searchAfter = null
 while (true) {
   const body = { locationId: 'VtNhBfleEQDg0KX4eZqY', pageLimit: 500 }

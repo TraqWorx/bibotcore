@@ -9,7 +9,7 @@ const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABA
 const LOC = 'VtNhBfleEQDg0KX4eZqY'
 const { data: tok } = await sb.from('ghl_connections').select('access_token').eq('location_id', LOC).maybeSingle()
 
-let allGhl = []
+const allGhl = []
 let searchAfter = null
 while (true) {
   const body = { locationId: LOC, pageLimit: 500 }

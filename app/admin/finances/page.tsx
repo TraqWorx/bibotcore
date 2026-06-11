@@ -98,7 +98,7 @@ export default async function FinancesPage() {
   const years = [currentYear - 1, currentYear]
 
   // Fetch all Stripe charges for VAT calculation
-  let allCharges: { amount: number; created: number }[] = []
+  const allCharges: { amount: number; created: number }[] = []
   try {
     const Stripe = (await import('stripe')).default
     const ghlStripeKey = process.env.STRIPE_GHL_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY

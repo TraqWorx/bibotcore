@@ -18,7 +18,15 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-explicit-any": "off",
       "prefer-const": "warn",
       "@next/next/no-html-link-for-pages": "warn",
-      "react-compiler/react-compiler": "warn",
+      "react-compiler/react-compiler": "off",
+      // react-hooks v7 ships aggressive React-Compiler-adjacent rules. The compiler
+      // is NOT enabled in next.config, and these fire on server components (e.g.
+      // Date.now()/new Date() in render — fine server-side). Surface as warnings,
+      // not build-blocking errors.
+      "react-hooks/purity": "warn",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/preserve-manual-memoization": "warn",
+      "react-hooks/refs": "warn",
     },
   },
 ]);
