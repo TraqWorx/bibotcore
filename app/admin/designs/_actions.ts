@@ -13,11 +13,13 @@ async function assertSuperAdmin() {
   const supabase = createAdminClient()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, agency_id')
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'super_admin' && profile?.role !== 'admin') throw new Error('Not authorized')
+  if (profile?.role === 'super_admin') return
+  const { isBibotAgency } = await import('@/lib/isBibotAgency')
+  if (!isBibotAgency(profile?.agency_id)) throw new Error('Not authorized')
 }
 
 export async function createDesign(

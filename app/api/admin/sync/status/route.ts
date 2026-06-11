@@ -17,8 +17,10 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'super_admin' && profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { data: profile } = await sb.from('profiles').select('role, agency_id').eq('id', user.id).single()
+  // Global sync status — super_admin or Bibot only.
+  const { isBibotAgency } = await import('@/lib/isBibotAgency')
+  if (profile?.role !== 'super_admin' && !isBibotAgency(profile?.agency_id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Get all connected locations
   const { data: connections } = await sb

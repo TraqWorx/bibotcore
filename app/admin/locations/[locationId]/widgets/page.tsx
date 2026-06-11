@@ -48,15 +48,18 @@ export default async function WidgetEditorPage({
   if (!user) redirect('/login')
 
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
+  const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
   if (!profile?.agency_id) redirect('/login')
 
   const [{ data: subscription }, { data: config }, { data: location }, { data: agency }] = await Promise.all([
     sb.from('agency_subscriptions').select('plan, status').eq('agency_id', profile.agency_id).eq('location_id', locationId).maybeSingle(),
     sb.from('dashboard_configs').select('config, theme').eq('location_id', locationId).maybeSingle(),
-    sb.from('locations').select('name').eq('location_id', locationId).single(),
+    sb.from('locations').select('name, agency_id').eq('location_id', locationId).single(),
     sb.from('agencies').select('custom_templates').eq('id', profile.agency_id).single(),
   ])
+
+  // Ownership: location must be in the caller's agency (super_admin bypasses).
+  if (profile.role !== 'super_admin' && location?.agency_id !== profile.agency_id) redirect('/admin')
 
   const isBibot = isBibotAgency(profile.agency_id)
   const isSubscribed = isBibot || subscription?.status === 'active'

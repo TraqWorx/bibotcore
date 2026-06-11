@@ -23,12 +23,15 @@ async function getAuthenticatedAdmin() {
   const sb = createAdminClient()
   const { data: profile } = await sb
     .from('profiles')
-    .select('role')
+    .select('role, agency_id')
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'super_admin' && profile?.role !== 'admin') return null
-  return user
+  // Global connections list — super_admin or Bibot only (not every agency admin).
+  if (profile?.role === 'super_admin') return user
+  const { isBibotAgency } = await import('@/lib/isBibotAgency')
+  if (isBibotAgency(profile?.agency_id)) return user
+  return null
 }
 
 export async function GET() {
