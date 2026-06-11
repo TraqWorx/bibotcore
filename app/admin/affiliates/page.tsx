@@ -1,7 +1,6 @@
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { isBibotAgency } from '@/lib/isBibotAgency'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import AffiliatesTable from './_components/AffiliatesTable'
 import { ad } from '@/lib/admin/ui'
@@ -179,19 +178,22 @@ export default async function AffiliatesPage() {
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
-  if (!profile?.agency_id || !isBibotAgency(profile.agency_id)) redirect('/admin')
+  if (!profile?.agency_id) redirect('/admin')
 
-  // Fetch affiliates from all connected locations
+  // Fetch affiliates from the agency's OWN connected locations only.
   const companyId = process.env.GHL_COMPANY_ID ?? ''
+  const { data: locations } = await sb.from('locations').select('location_id, name, ghl_plan_id').eq('agency_id', profile.agency_id)
+  const nameMap = new Map((locations ?? []).map((l) => [l.location_id, l.name]))
+  const agencyLocIds = (locations ?? []).map((l) => l.location_id)
+
   const { data: connections } = await sb
     .from('ghl_connections')
     .select('location_id, access_token, refresh_token, expires_at, company_id')
+    .in('location_id', agencyLocIds)
     .not('refresh_token', 'is', null)
 
   const allAffiliates: AffiliateDisplay[] = []
   const issues: ConnectionIssue[] = []
-  const { data: locations } = await sb.from('locations').select('location_id, name, ghl_plan_id').eq('agency_id', profile.agency_id)
-  const nameMap = new Map((locations ?? []).map((l) => [l.location_id, l.name]))
 
   // Build plan lookup: email → { planName, planPrice }
   const { data: ghlPlans } = await sb.from('ghl_plans').select('ghl_plan_id, name, price_monthly')
@@ -215,12 +217,9 @@ export default async function AffiliatesPage() {
   }
   const planLookup = (email: string) => emailToPlan.get(email.toLowerCase()) ?? null
 
-  // Affiliates live only on the Bibot subaccount itself (name contains "bibot").
-  // Other connected sub-accounts may have their own affiliate-manager configurations,
-  // but those aren't ours to show on this page.
-  const bibotConnections = (connections ?? []).filter((c) => /bibot/i.test(nameMap.get(c.location_id) ?? ''))
-
-  for (const conn of bibotConnections) {
+  // Each agency sees the affiliate-manager data from its own connected
+  // locations (scoped above to agencyLocIds).
+  for (const conn of (connections ?? [])) {
     const token = await refreshIfNeeded(conn.location_id, conn)
     const cid = conn.company_id ?? companyId
     const { affiliates, issue } = await fetchAffiliates(conn.location_id, token, cid)

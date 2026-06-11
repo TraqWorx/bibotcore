@@ -34,12 +34,12 @@ const getAdminData = cache(async () => {
     { href: '/admin/locations', label: 'Locations', count: locationCount ?? 0 },
   ]
 
-  // Bibot-only nav items
+  // Affiliates — every agency sees its own connected-location affiliate data.
+  navLinks.push({ href: '/admin/affiliates', label: 'Affiliates' })
+
+  // Finances — Bibot-only (pulls the GHL Stripe account + bespoke Italian VAT).
   if (isBibotAgency(agencyId)) {
-    navLinks.push(
-      { href: '/admin/finances', label: 'Finances' },
-      { href: '/admin/affiliates', label: 'Affiliates' },
-    )
+    navLinks.push({ href: '/admin/finances', label: 'Finances' })
   }
 
   // Agencies with installed designs get Designs + Plan Mapping
