@@ -29,6 +29,15 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const { admin, activePods, switchedPods } = await adminWithPods(id)
   if (!admin) notFound()
 
+  // Header figures: total commission (overall "to pay") + the next single payment.
+  const totalCommission = activePods.reduce((s, p) => s + (p.amount || 0), 0)
+  const dueDates = activePods.map((p) => p.nextDueDate).filter((d): d is string => !!d).sort()
+  const nextPaymentDate = dueDates[0]
+  const nextPaymentAmount = nextPaymentDate
+    ? activePods.filter((p) => p.nextDueDate && p.nextDueDate.slice(0, 10) === nextPaymentDate.slice(0, 10)).reduce((s, p) => s + (p.amount || 0), 0)
+    : 0
+  const nextPaymentOverdue = nextPaymentDate ? new Date(nextPaymentDate).getTime() <= Date.now() : false
+
   const sb = createAdminClient()
   const [{ data: payments }, { data: contactRow }, fieldGroups, tagSuggestions] = await Promise.all([
     sb.from('apulia_payments').select('id, period, amount_cents, paid_at, paid_by, note, pod_contact_id, proof_url, proof_name').eq('contact_id', id).order('paid_at', { ascending: false }),
@@ -104,26 +113,16 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <div className="ap-stat-label">Switch-out</div>
           <div className="ap-stat-value">{admin.podsSwitchedOut}</div>
         </div>
-        <div className="ap-stat" data-tone={admin.overdueCount && admin.overdueCount > 0 ? 'warn' : 'good'}>
+        <div className="ap-stat" data-tone="accent">
           <div className="ap-stat-label">Da Pagare</div>
-          <div className="ap-stat-value" style={{ color: admin.overdueCount && admin.overdueCount > 0 ? 'var(--ap-danger)' : undefined }}>{fmtEur(admin.total)}</div>
-          <div className="ap-stat-foot">
-            {admin.overdueCount && admin.overdueCount > 0
-              ? `${admin.overdueCount} POD da pagare ora`
-              : admin.podsActive > 0
-                ? 'Nessun pagamento dovuto ora'
-                : 'Nessun POD attivo'}
-          </div>
+          <div className="ap-stat-value">{fmtEur(totalCommission)}</div>
+          <div className="ap-stat-foot">Totale commissione · {admin.podsActive} POD attivi</div>
         </div>
-        <div className="ap-stat" data-tone="neutral">
-          <div className="ap-stat-label">Prossima scadenza</div>
-          <div className="ap-stat-value" style={{ fontSize: 18 }}>
-            {admin.nextDueDate ? new Date(admin.nextDueDate).toLocaleDateString('it-IT') : '—'}
-          </div>
-          <div className="ap-stat-foot">
-            {admin.nextDueDate
-              ? 'Prossimo pagamento programmato'
-              : 'In attesa del primo pagamento'}
+        <div className="ap-stat" data-tone={nextPaymentOverdue ? 'warn' : 'neutral'}>
+          <div className="ap-stat-label">Prossimo Pagamento</div>
+          <div className="ap-stat-value" style={{ color: nextPaymentOverdue ? 'var(--ap-danger)' : undefined }}>{fmtEur(nextPaymentAmount)}</div>
+          <div className="ap-stat-foot" style={{ color: nextPaymentOverdue ? 'var(--ap-danger)' : undefined }}>
+            {nextPaymentDate ? new Date(nextPaymentDate).toLocaleDateString('it-IT') : '—'}
           </div>
         </div>
       </div>
