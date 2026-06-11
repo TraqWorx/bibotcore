@@ -21,8 +21,9 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const supabase = createAdminClient()
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'super_admin' && profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { data: profile } = await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
+  const { isBibotAgency } = await import('@/lib/isBibotAgency')
+  if (profile?.role !== 'super_admin' && !isBibotAgency(profile?.agency_id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const token = process.env.GHL_AGENCY_TOKEN!
   const companyId = process.env.GHL_COMPANY_ID!

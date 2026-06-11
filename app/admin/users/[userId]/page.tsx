@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createAdminClient } from '@/lib/supabase-server'
+import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 import { ad } from '@/lib/admin/ui'
 
 export default async function AdminUserDetailPage({
@@ -11,14 +11,22 @@ export default async function AdminUserDetailPage({
   const { userId } = await params
   const supabase = createAdminClient()
 
+  // Caller must be in the same agency as the target user (super_admin sees all).
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  const { data: caller } = user
+    ? await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
+    : { data: null }
+
   // Load profile
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, email, role, location_id, created_at')
+    .select('id, email, role, agency_id, location_id, created_at')
     .eq('id', userId)
     .single()
 
   if (!profile) notFound()
+  if (caller?.role !== 'super_admin' && profile.agency_id !== caller?.agency_id) notFound()
 
   // Load locations from junction table + legacy fallback
   const [{ data: profileLocs }, { data: installs }] = await Promise.all([
