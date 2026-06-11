@@ -5,7 +5,7 @@ import LandingHeroForm from './_components/LandingHeroForm'
 export const metadata = {
   title: 'GHL Custom Dash — Custom dashboards for GoHighLevel agencies',
   description:
-    'Build white-label, drag-and-drop dashboards for your GoHighLevel sub-accounts and share them with clients. £120/mo per sub-account.',
+    'Build white-label, drag-and-drop dashboards for your GoHighLevel sub-accounts and share them with clients.',
 }
 
 const FEATURES = [
@@ -15,6 +15,12 @@ const FEATURES = [
   { title: 'White-label & branded', body: 'Your colours, your logo, your domain. Clients never see anything but your brand.' },
   { title: 'Share with clients', body: 'One embeddable link per location — drop it into a GHL custom menu and you are done.' },
   { title: 'Full CRM, per agency', body: 'The complete toolkit, scoped to your agency: every sub-account, your data only.' },
+]
+
+const DESIGNS = [
+  { name: 'Apulia Power', logo: '/apulia-power-logo.webp', body: 'DB-first CRM for an energy & utilities reseller — POD management, commissions and switch-outs.' },
+  { name: 'Apulia Tourism', logo: '/brands/apulia-tourism-logo.png', body: 'Contacts, campaigns and messaging built for a tourism operator.' },
+  { name: 'Simfonia', logo: '/brands/simfonia-logo.png', body: 'Bespoke translation-agency CRM with a branded client portal.' },
 ]
 
 export default function Landing() {
@@ -58,14 +64,31 @@ export default function Landing() {
           ))}
         </section>
 
-        {/* Pricing */}
+        {/* Designs showcase */}
+        <section className="pb-20">
+          <div className="mb-8 text-center">
+            <h2 className="text-2xl font-black sm:text-3xl">Designs we&apos;ve built</h2>
+            <p className="mt-2 text-sm text-white/50">Real white-label CRMs and dashboards delivered for clients on the platform.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {DESIGNS.map((d) => (
+              <div key={d.name} className="rounded-2xl p-6 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                <div className="mx-auto flex h-20 items-center justify-center rounded-xl bg-white/90 px-5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={d.logo} alt={d.name} className="max-h-11 w-auto object-contain" />
+                </div>
+                <h3 className="mt-4 text-base font-bold">{d.name}</h3>
+                <p className="mt-1 text-sm text-white/50">{d.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* CTA */}
         <section className="flex justify-center pb-24">
           <div className="w-full max-w-md rounded-3xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,214,232,0.25)', boxShadow: '0 24px 80px rgba(91,43,255,0.25)' }}>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Simple pricing</p>
-            <div className="mt-3 flex items-end justify-center gap-1">
-              <span className="text-5xl font-black">£120</span>
-              <span className="mb-1 text-sm text-white/50">/mo per sub-account</span>
-            </div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Everything you need</p>
+            <h2 className="mt-3 text-2xl font-black">Launch client dashboards today</h2>
             <ul className="mx-auto mt-6 space-y-2 text-left text-sm text-white/65">
               {['Unlimited dashboards per location', 'AI builder + all widget types', 'Live GHL data sync', 'White-label embeddable share links', 'Full CRM, scoped to your agency'].map((i) => (
                 <li key={i} className="flex items-start gap-2"><span className="text-cyan-300">✓</span>{i}</li>
