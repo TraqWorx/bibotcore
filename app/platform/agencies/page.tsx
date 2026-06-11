@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import Link from 'next/link'
+import InvitePanel from './_components/InvitePanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,9 +30,12 @@ export default async function PlatformAgenciesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Agencies</h1>
-        <p className="mt-1 text-sm text-gray-500">{(agencies ?? []).length} agencies registered</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Agencies</h1>
+          <p className="mt-1 text-sm text-gray-500">{(agencies ?? []).length} agencies registered</p>
+        </div>
+        <InvitePanel />
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
