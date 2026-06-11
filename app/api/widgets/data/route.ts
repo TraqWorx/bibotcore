@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { createAdminClient } from '@/lib/supabase-server'
+import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import type { CustomDataSource } from '@/lib/widgets/types'
 
@@ -19,10 +20,9 @@ const ENDPOINT_MAP: Record<CustomDataSource, string> = {
 }
 
 export async function POST(req: NextRequest) {
-  const { locationId, dataSource, endpoint, filters } = await req.json() as {
+  const { locationId, dataSource, filters } = await req.json() as {
     locationId: string
     dataSource: CustomDataSource
-    endpoint?: string
     filters?: Record<string, string>
   }
 
@@ -30,10 +30,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'locationId and dataSource required' }, { status: 400 })
   }
 
-  // Auth check
-  const authClient = await createAuthClient()
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Auth: must have access to this location (was: any logged-in user, any location).
+  const access = await getLocationAccess(req, locationId)
+  if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Static/computed widgets don't need GHL
   if (dataSource === 'none') {
@@ -50,8 +50,8 @@ export async function POST(req: NextRequest) {
   const token = await refreshIfNeeded(locationId, conn)
   const companyId = conn.company_id ?? process.env.GHL_COMPANY_ID
 
-  // Build URL
-  let path = endpoint ?? ENDPOINT_MAP[dataSource] ?? ''
+  // Build URL — only from the fixed dataSource map (no caller-supplied endpoint).
+  let path = ENDPOINT_MAP[dataSource] ?? ''
   path = path.replace('{locationId}', locationId)
 
   const url = new URL(`${GHL_BASE}${path}`)

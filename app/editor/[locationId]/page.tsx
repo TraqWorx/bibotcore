@@ -38,18 +38,22 @@ export default async function EditorPage({ params }: { params: Promise<{ locatio
   if (!user) redirect('/login')
 
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
+  const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
   if (!profile?.agency_id) redirect('/login')
 
   const isBibot = isBibotAgency(profile.agency_id)
+  const isSuperAdmin = profile.role === 'super_admin'
   const [{ data: subscription }, { data: config }, { data: location }, { data: agency }] = await Promise.all([
     sb.from('agency_subscriptions').select('status').eq('agency_id', profile.agency_id).eq('location_id', locationId).eq('status', 'active').maybeSingle(),
     sb.from('dashboard_configs').select('config, theme').eq('location_id', locationId).maybeSingle(),
-    sb.from('locations').select('name').eq('location_id', locationId).single(),
+    sb.from('locations').select('name, agency_id').eq('location_id', locationId).single(),
     sb.from('agencies').select('custom_templates').eq('id', profile.agency_id).single(),
   ])
 
-  if (!isBibot && !subscription) redirect(`/admin/locations/${locationId}`)
+  // Ownership: the location must belong to the caller's agency (super_admin bypasses).
+  if (!isSuperAdmin && location?.agency_id !== profile.agency_id) redirect('/admin')
+  // Paywall: own location but no active subscription (Bibot is free).
+  if (!isBibot && !isSuperAdmin && !subscription) redirect(`/admin/locations/${locationId}`)
 
   const currentLayout = config?.config && Array.isArray(config.config) && config.config.length > 0
     ? { columns: 12, widgets: config.config } : null
