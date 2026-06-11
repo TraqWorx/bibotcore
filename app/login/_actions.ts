@@ -23,11 +23,17 @@ export async function requestMagicLink(
   const supabaseAdmin = createAdminClient()
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('role, agency_id')
+    .select('id, role, agency_id')
     .eq('email', emailLower)
     .single()
 
   if (profile) {
+    // Block deactivated accounts (their auth user is banned).
+    const { data: au } = await supabaseAdmin.auth.admin.getUserById(profile.id)
+    const bannedUntil = (au?.user as { banned_until?: string } | undefined)?.banned_until
+    if (bannedUntil && new Date(bannedUntil).getTime() > Date.now()) {
+      return { error: 'This account has been deactivated. Please contact your administrator.' }
+    }
     return sendMagicLink(email)
   }
 

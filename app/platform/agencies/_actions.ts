@@ -39,6 +39,29 @@ export async function inviteAdmin(email: string): Promise<{ error?: string; ok?:
 }
 
 /**
+ * Soft deactivate / reactivate an agency: bans (or unbans) every user account
+ * under it so they cannot log in. Nothing is deleted — fully reversible.
+ */
+export async function setAgencyActive(agencyId: string, active: boolean): Promise<{ error?: string; ok?: boolean }> {
+  try {
+    await requireSuperAdmin()
+    if (!agencyId) return { error: 'agencyId required' }
+    if (agencyId === BIBOT_AGENCY_ID) return { error: 'The Bibot agency cannot be deactivated.' }
+
+    const sb = createAdminClient()
+    const { data: profs } = await sb.from('profiles').select('id').eq('agency_id', agencyId)
+    const banDuration = active ? 'none' : '876000h' // ~100 years = until reactivated
+    for (const p of profs ?? []) {
+      await sb.auth.admin.updateUserById(p.id, { ban_duration: banDuration }).catch(() => {})
+    }
+    revalidatePath('/platform/agencies')
+    return { ok: true }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to update agency' }
+  }
+}
+
+/**
  * Permanently delete an agency and everything under it: locations, subscriptions,
  * costs, dashboard configs, GHL connections, installs, and all its user accounts
  * (profiles + auth). Hard, irreversible. The Bibot agency cannot be deleted.
