@@ -115,6 +115,7 @@ export interface BulkDeleteFilters {
   stato?: 'active' | 'switch_out'
   comune?: string
   amministratore?: string
+  store?: string
 }
 
 /**
@@ -137,6 +138,7 @@ export async function bulkDeleteCondomini(input: { ids?: string[]; filters?: Bul
       else if (f.stato === 'switch_out') q = q.eq('is_switch_out', true)
       if (f.comune) q = q.eq('comune', f.comune)
       if (f.amministratore) q = q.eq('amministratore_name', f.amministratore)
+      if (f.store) q = q.eq('store', f.store)
       if (f.q) {
         const term = f.q.replace(/[%_]/g, (m) => `\\${m}`)
         q = q.or(`pod_pdr.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,cliente.ilike.%${term}%,amministratore_name.ilike.%${term}%`)

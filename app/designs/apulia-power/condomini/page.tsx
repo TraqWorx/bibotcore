@@ -18,6 +18,7 @@ interface SearchParams {
   stato?: 'active' | 'switch_out'
   comune?: string
   amministratore?: string
+  store?: string
   page?: string
 }
 
@@ -36,6 +37,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
       stato: sp.stato,
       comune: sp.comune,
       amministratore: sp.amministratore,
+      store: sp.store,
       page,
       pageSize: PAGE_SIZE,
     }),
@@ -57,12 +59,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
     if (next.stato) u.set('stato', next.stato)
     if (next.comune) u.set('comune', next.comune)
     if (next.amministratore) u.set('amministratore', next.amministratore)
+    if (next.store) u.set('store', next.store)
     if (next.page && Number(next.page) > 1) u.set('page', String(next.page))
     const qs = u.toString()
     return '/designs/apulia-power/condomini' + (qs ? '?' + qs : '')
   }
 
-  const filtersActive = Boolean(sp.q || sp.stato || sp.comune || sp.amministratore)
+  const filtersActive = Boolean(sp.q || sp.stato || sp.comune || sp.amministratore || sp.store)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -96,6 +99,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           </div>
         </div>
         <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Store</label>
+          <select className="ap-input" name="store" defaultValue={sp.store ?? ''} style={{ marginTop: 4 }}>
+            <option value="">Tutti</option>
+            {storeOptions.map((s) => <option key={s.slug} value={s.slug}>{s.name}</option>)}
+          </select>
+        </div>
+        <div>
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Stato</label>
           <select className="ap-input" name="stato" defaultValue={sp.stato ?? ''} style={{ marginTop: 4 }}>
             <option value="">Tutti</option>
@@ -113,7 +123,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
         <CondominiBulkSelect
           rows={rows}
           total={total}
-          filters={{ q: sp.q, stato: sp.stato, comune: sp.comune, amministratore: sp.amministratore }}
+          filters={{ q: sp.q, stato: sp.stato, comune: sp.comune, amministratore: sp.amministratore, store: sp.store }}
           storeOptions={storeOptions}
         />
       </section>

@@ -448,6 +448,7 @@ export interface CondominiFilters {
   stato?: 'active' | 'switch_out'
   comune?: string
   amministratore?: string
+  store?: string
   page?: number
   pageSize?: number
 }
@@ -474,6 +475,7 @@ export async function listCondomini(f: CondominiFilters): Promise<CondominiResul
   else if (f.stato === 'switch_out') q = q.eq('is_switch_out', true)
   if (f.comune) q = q.ilike('comune', f.comune)
   if (f.amministratore) q = q.ilike('amministratore_name', `%${f.amministratore}%`)
+  if (f.store) q = q.eq('store', f.store)
   if (f.q) {
     const term = f.q.replace(/[%_]/g, ' ')
     q = q.or([
