@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     await sb.from('agencies').update({ stripe_customer_id: customerId }).eq('id', profile.agency_id)
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://core.bibotcrm.it'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://ghlcustomdash.com'
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,

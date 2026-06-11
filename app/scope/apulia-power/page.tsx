@@ -203,7 +203,7 @@ export default function Page() {
             <li>Frontend: <strong>Next.js 16</strong> (App Router, Turbopack), TypeScript.</li>
             <li>Backend: API serverless su <strong>Vercel</strong>, runtime Node.js.</li>
             <li>Database: <strong>Supabase</strong> (Postgres + auth + cron pg_cron + pg_net).</li>
-            <li>Hosting: <strong>core.bibotcrm.it</strong>, dominio dedicato, SSL automatico.</li>
+            <li>Hosting: <strong>ghlcustomdash.com</strong>, dominio dedicato, SSL automatico.</li>
           </ul>
         </Section>
 
@@ -232,7 +232,7 @@ export default function Page() {
         <footer className="sow-footer">
           <div>
             Bibot · soluzioni CRM personalizzate<br />
-            <a href="https://core.bibotcrm.it">core.bibotcrm.it</a> · info@bibotcrm.it
+            <a href="https://ghlcustomdash.com">ghlcustomdash.com</a> · info@bibotcrm.it
           </div>
           <div className="sow-footer-right">
             Documento generato il {new Date().toLocaleDateString('it-IT')}

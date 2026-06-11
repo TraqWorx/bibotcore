@@ -6,7 +6,7 @@
  * we never block on the response.
  */
 export async function triggerPdpContinue(importId: string): Promise<void> {
-  const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'https://core.bibotcrm.it'
+  const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'https://ghlcustomdash.com'
   const secret = process.env.CRON_SECRET ?? ''
   const url = `${base}/api/apulia/import/pdp/continue?id=${encodeURIComponent(importId)}`
   try {

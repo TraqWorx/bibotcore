@@ -194,7 +194,7 @@ export default async function SettingsPage({
       content: (
         <PortalSettingsForm
           locationId={locationId}
-          portalUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://core.bibotcrm.it'}/portal/${locationId}`}
+          portalUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://ghlcustomdash.com'}/portal/${locationId}`}
           initialIconUrl={(settingsRes.data as Record<string, unknown>)?.portal_icon_url as string ?? ''}
           initialWelcomeMessage={(settingsRes.data as Record<string, unknown>)?.portal_welcome_message as string ?? 'Benvenuto! Accedi al tuo portale clienti per visualizzare i tuoi dati.'}
           initialAutoInvite={(settingsRes.data as Record<string, unknown>)?.portal_auto_invite as boolean ?? false}

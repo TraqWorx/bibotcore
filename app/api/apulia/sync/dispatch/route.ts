@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ due: 0, drained: false })
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://core.bibotcrm.it'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ghlcustomdash.com'
   const drainUrl = `${baseUrl}/api/apulia/sync/drain`
 
   // Fire-and-forget: detach with a 5s timeout abort so this dispatcher
