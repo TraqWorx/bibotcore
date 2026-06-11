@@ -15,8 +15,16 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
+  const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
   if (!profile?.agency_id) return NextResponse.json({ error: 'No agency' }, { status: 403 })
+
+  // Ownership: only subscribe to a location in the caller's agency (super_admin bypasses).
+  if (profile.role !== 'super_admin') {
+    const { data: loc } = await sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+    if (!loc || loc.agency_id !== profile.agency_id) {
+      return NextResponse.json({ error: 'Location not in your agency' }, { status: 403 })
+    }
+  }
 
   const { data: agency } = await sb.from('agencies').select('stripe_customer_id, email, name').eq('id', profile.agency_id).single()
   if (!agency) return NextResponse.json({ error: 'Agency not found' }, { status: 404 })

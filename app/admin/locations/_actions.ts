@@ -6,19 +6,31 @@ import { runDesignInstaller } from '@/lib/designInstaller/runDesignInstaller'
 import { provisionLocation } from '@/lib/ghl/provisionLocation'
 import { syncSubscriptionsCore } from '@/lib/syncSubscriptions'
 
-async function assertSuperAdmin() {
+async function requireAuth(): Promise<{ role: string; agencyId: string | null }> {
   const authClient = await createAuthClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
-
   const supabase = createAdminClient()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
+  const { data: profile } = await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
   if (profile?.role !== 'super_admin' && profile?.role !== 'admin') throw new Error('Not authorized')
+  return { role: profile.role, agencyId: profile.agency_id }
+}
+
+/** Caller must own the location (location.agency_id == their agency). super_admin bypasses. */
+async function requireLocationOwner(locationId: string): Promise<void> {
+  const { role, agencyId } = await requireAuth()
+  if (role === 'super_admin') return
+  const supabase = createAdminClient()
+  const { data: loc } = await supabase.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+  if (!loc || loc.agency_id !== agencyId) throw new Error('Not authorized')
+}
+
+/** Platform-level ops that use the Bibot agency token: super_admin or Bibot only. */
+async function requirePlatform(): Promise<void> {
+  const { role, agencyId } = await requireAuth()
+  if (role === 'super_admin') return
+  const { isBibotAgency } = await import('@/lib/isBibotAgency')
+  if (!isBibotAgency(agencyId)) throw new Error('Not authorized')
 }
 
 export async function connectLocations(
@@ -26,7 +38,7 @@ export async function connectLocations(
   designSlug: string
 ): Promise<{ error: string } | undefined> {
   try {
-    await assertSuperAdmin()
+    await requirePlatform()
 
     if (!locationIds.length) return { error: 'Select at least one location' }
     if (!designSlug) return { error: 'Select a design' }
@@ -52,7 +64,7 @@ export async function disconnectLocation(
   locationId: string
 ): Promise<{ error: string } | undefined> {
   try {
-    await assertSuperAdmin()
+    await requireLocationOwner(locationId)
     const supabase = createAdminClient()
 
     // Delete all client users linked to this location
@@ -85,7 +97,7 @@ export async function disconnectLocation(
 export async function getGhlOAuthUrl(
   designSlug: string
 ): Promise<{ url: string } | { error: string }> {
-  await assertSuperAdmin()
+  await requirePlatform()
   const clientId = process.env.GHL_CLIENT_ID
   const redirectUri = process.env.GHL_REDIRECT_URI
   if (!clientId || !redirectUri) {
@@ -164,7 +176,7 @@ export async function getConnectLocationUrl(locationId: string): Promise<{ url: 
 
 export async function syncLocationSubscriptions(): Promise<{ synced: number; error?: string }> {
   try {
-    await assertSuperAdmin()
+    await requirePlatform()
     return await syncSubscriptionsCore()
   } catch (err) {
     return { synced: 0, error: err instanceof Error ? err.message : 'Failed to sync' }
@@ -176,7 +188,7 @@ export async function setLocationPlan(
   ghlPlanId: string | null
 ): Promise<{ error: string } | undefined> {
   try {
-    await assertSuperAdmin()
+    await requireLocationOwner(locationId)
     const supabase = createAdminClient()
     const now = new Date().toISOString()
     const upsertData: Record<string, unknown> = {
@@ -252,7 +264,7 @@ export async function installDesign(
   designSlug: string
 ): Promise<{ error: string } | undefined> {
   try {
-    await assertSuperAdmin()
+    await requireLocationOwner(locationId)
 
     const supabase = createAdminClient()
 
@@ -278,7 +290,7 @@ export async function installDesign(
 
 export async function removeDesign(locationId: string): Promise<{ error: string } | undefined> {
   try {
-    await assertSuperAdmin()
+    await requireLocationOwner(locationId)
     const supabase = createAdminClient()
     await supabase.from('installs').update({ design_slug: null, configured: false }).eq('location_id', locationId)
     revalidatePath('/admin/locations')

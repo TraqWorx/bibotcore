@@ -1,16 +1,16 @@
 export const PLAN = {
-  name: 'GHL Dashboard',
+  name: 'Bibot CRM',
   id: 'pro' as const,
   priceId: process.env.STRIPE_PRO_PRICE_ID ?? '',
-  priceCents: 1900,
-  priceLabel: '$19/mo',
+  currency: 'gbp' as const,
+  priceCents: 12000,
+  priceLabel: '£120/mo',
   features: [
-    'Visual drag-and-drop dashboard builder',
-    'AI dashboard designer — create any widget',
-    'GHL data sync (contacts, pipeline, calendar, team)',
+    'Full Bibot CRM (contacts, pipeline, calendar, conversations, team)',
+    'Dashboard builder module — create & share client dashboards',
+    'GHL data sync',
     'Custom widgets, colors, and branding',
     'Embeddable share link for clients',
-    'Unlimited widget types',
   ],
 }
 

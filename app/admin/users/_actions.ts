@@ -3,26 +3,40 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 
-async function assertSuperAdmin() {
+async function requireAuth(): Promise<{ role: string; agencyId: string | null }> {
   const authClient = await createAuthClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
-
   const supabase = createAdminClient()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
+  const { data: profile } = await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
   if (profile?.role !== 'super_admin' && profile?.role !== 'admin') throw new Error('Not authorized')
+  return { role: profile.role, agencyId: profile.agency_id }
+}
+
+/** Platform-level user ops (invite, full GHL user sync): super_admin or Bibot only. */
+async function requirePlatform(): Promise<void> {
+  const { role, agencyId } = await requireAuth()
+  if (role === 'super_admin') return
+  const { isBibotAgency } = await import('@/lib/isBibotAgency')
+  if (!isBibotAgency(agencyId)) throw new Error('Not authorized')
+}
+
+/** Target user must be in the caller's agency and not an admin/super_admin. super_admin bypasses. */
+async function requireUserInAgency(targetUserId: string): Promise<void> {
+  const { role, agencyId } = await requireAuth()
+  if (role === 'super_admin') return
+  const supabase = createAdminClient()
+  const { data: target } = await supabase.from('profiles').select('role, agency_id').eq('id', targetUserId).maybeSingle()
+  if (!target) throw new Error('Not authorized')
+  if (target.role === 'super_admin' || target.role === 'admin') throw new Error('Not authorized')
+  if (target.agency_id !== agencyId) throw new Error('Not authorized')
 }
 
 export async function inviteUser(
   email: string
 ): Promise<{ error: string } | undefined> {
   try {
-    await assertSuperAdmin()
+    await requirePlatform()
     if (!email) return { error: 'Email is required' }
     const supabase = createAdminClient()
     const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
@@ -38,7 +52,7 @@ export async function inviteUser(
 export async function syncGhlUsers(): Promise<{ synced: number; removed: number; debug: string[]; error?: string }> {
   const log: string[] = []
   try {
-    await assertSuperAdmin()
+    await requirePlatform()
     const supabase = createAdminClient()
     const agencyToken = process.env.GHL_AGENCY_TOKEN
     const companyId = process.env.GHL_COMPANY_ID
@@ -191,7 +205,7 @@ export async function generateLoginLink(
   userId: string
 ): Promise<{ url: string } | { error: string }> {
   try {
-    await assertSuperAdmin()
+    await requireUserInAgency(userId)
     const supabase = createAdminClient()
 
     const { data: profile } = await supabase
@@ -222,7 +236,7 @@ export async function deleteUser(
   userId: string
 ): Promise<{ error: string } | undefined> {
   try {
-    await assertSuperAdmin()
+    await requireUserInAgency(userId)
     const supabase = createAdminClient()
     const { error } = await supabase.auth.admin.deleteUser(userId)
     if (error) return { error: error.message }
