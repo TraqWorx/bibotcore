@@ -72,12 +72,27 @@ function formatValue(val: unknown, format?: string): string {
   return String(val)
 }
 
+/**
+ * Strip the obvious XSS vectors from user/AI-authored static HTML: dangerous
+ * elements, inline event handlers, and javascript: URLs. Defense-in-depth —
+ * for full coverage move to a DOMPurify pass when the dashboard module ships.
+ */
+function sanitizeStaticHtml(html: string): string {
+  return html
+    .replace(/<\s*(script|style|iframe|object|embed|link|meta|base|form|svg)\b[\s\S]*?(<\/\s*\1\s*>|>)/gi, '')
+    .replace(/<\s*\/?\s*(script|iframe|object|embed|link|meta|base|form|svg)\b[^>]*>/gi, '')
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
+    .replace(/\son\w+\s*=\s*[^\s>]+/gi, '')
+    .replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1=$2#$2')
+}
+
 // ── Static Widget ──
 function StaticDisplay({ config }: { config: CustomWidgetConfig }) {
   const sc = config.staticContent
   if (!sc) return null
 
-  if (sc.html) return <div className="p-5" dangerouslySetInnerHTML={{ __html: sc.html }} />
+  if (sc.html) return <div className="p-5" dangerouslySetInnerHTML={{ __html: sanitizeStaticHtml(sc.html) }} />
 
   return (
     <div className="p-5">

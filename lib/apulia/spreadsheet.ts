@@ -17,7 +17,13 @@ export interface ParsedSheet {
  * raw=false so SheetJS uses the cell's display string, preserving leading
  * zeros and avoiding scientific notation).
  */
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024 // 15 MB
+const MAX_ROWS = 100_000
+
 export async function parseSpreadsheet(file: File): Promise<ParsedSheet> {
+  if (typeof file.size === 'number' && file.size > MAX_UPLOAD_BYTES) {
+    throw new Error('File troppo grande (max 15 MB).')
+  }
   const name = (file.name ?? '').toLowerCase()
   const isXlsx = name.endsWith('.xlsx') || name.endsWith('.xlsm') || name.endsWith('.xlsb')
 
@@ -28,6 +34,7 @@ export async function parseSpreadsheet(file: File): Promise<ParsedSheet> {
     if (!isZip) {
       const text = await file.text()
       const parsed = parseCsv(text)
+      if (parsed.rows.length > MAX_ROWS) throw new Error(`Troppe righe (max ${MAX_ROWS.toLocaleString('it-IT')}).`)
       return { headers: parsed.headers, rows: parsed.rows }
     }
   }
@@ -39,6 +46,7 @@ export async function parseSpreadsheet(file: File): Promise<ParsedSheet> {
   const ws = wb.Sheets[sheetName]
   const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false, defval: '', blankrows: false })
   if (aoa.length === 0) return { headers: [], rows: [] }
+  if (aoa.length > MAX_ROWS) throw new Error(`Troppe righe (max ${MAX_ROWS.toLocaleString('it-IT')}).`)
 
   // Report exports (e.g. the client's daily switch-out file) prepend a
   // title/timestamp/filter banner above the real header row. Skip it: the
