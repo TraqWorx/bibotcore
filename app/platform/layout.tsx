@@ -28,6 +28,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
     { href: '/platform', label: 'Overview' },
     { href: '/platform/agencies', label: 'Agencies', count: data.agencyCount },
     { href: '/platform/revenue', label: 'Revenue' },
+    { href: '/platform/diagnostics', label: 'Diagnostics' },
   ]
 
   return (
