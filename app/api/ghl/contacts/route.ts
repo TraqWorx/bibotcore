@@ -1,26 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
-import { createServerClient } from '@supabase/ssr'
+import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 
 
 export async function GET(req: NextRequest) {
-  // ── Auth check: require super_admin ──────────────────────────
-  const authClient = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll() { return req.cookies.getAll() }, setAll() {} } },
-  )
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const supabase = createAdminClient()
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'super_admin' && profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
   const locationId = req.nextUrl.searchParams.get('locationId')
-
   if (!locationId) {
     return NextResponse.json({ error: 'Missing locationId' }, { status: 400 })
   }
+
+  const access = await getLocationAccess(req, locationId)
+  if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const supabase = createAdminClient()
   const { data: connection } = await supabase
     .from('ghl_connections')
     .select('access_token')

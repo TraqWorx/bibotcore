@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 import { runDesignInstaller } from '@/lib/designInstaller/runDesignInstaller'
 
-async function assertSuperAdmin() {
+/** Caller must own the location (location.agency_id == their agency). super_admin bypasses. */
+async function requireLocationOwner(locationId: string) {
   const authClient = await createAuthClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
@@ -12,18 +13,21 @@ async function assertSuperAdmin() {
   const supabase = createAdminClient()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, agency_id')
     .eq('id', user.id)
     .single()
 
   if (profile?.role !== 'super_admin' && profile?.role !== 'admin') throw new Error('Not authorized')
+  if (profile.role === 'super_admin') return
+  const { data: loc } = await supabase.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+  if (!loc || loc.agency_id !== profile.agency_id) throw new Error('Not authorized')
 }
 
 export async function retryInstall(
   locationId: string
 ): Promise<{ error: string } | undefined> {
   try {
-    await assertSuperAdmin()
+    await requireLocationOwner(locationId)
     const supabase = createAdminClient()
 
     const { data: install } = await supabase
@@ -56,7 +60,7 @@ export async function activateInstall(
   locationId: string
 ): Promise<{ error: string } | undefined> {
   try {
-    await assertSuperAdmin()
+    await requireLocationOwner(locationId)
     const supabase = createAdminClient()
 
     await Promise.all([

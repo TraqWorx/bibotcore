@@ -17,9 +17,9 @@ async function getAuthenticatedAdmin() {
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) return null
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await sb.from('profiles').select('role, agency_id').eq('id', user.id).single()
   if (profile?.role !== 'super_admin' && profile?.role !== 'admin') return null
-  return user
+  return { user, role: profile.role, agencyId: profile.agency_id }
 }
 
 export async function POST(request: Request) {
@@ -28,6 +28,21 @@ export async function POST(request: Request) {
 
   const body = await request.json()
   const locationId = body?.locationId as string | undefined
+
+  const sb = createAdminClient()
+  if (locationId) {
+    // Single location — must belong to caller's agency (super_admin bypasses).
+    if (admin.role !== 'super_admin' && admin.agencyId) {
+      const { data: loc } = await sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+      if (loc?.agency_id !== admin.agencyId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  } else {
+    // Sync ALL locations — platform only (super_admin or Bibot).
+    const { isBibotAgency } = await import('@/lib/isBibotAgency')
+    if (admin.role !== 'super_admin' && !isBibotAgency(admin.agencyId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  }
 
   try {
     const result = await syncAllLocationUsers(locationId)

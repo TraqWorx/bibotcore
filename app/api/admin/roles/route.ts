@@ -11,8 +11,8 @@ async function getAuthUser(req: NextRequest) {
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) return null
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
-  return { ...user, platformRole: profile?.role ?? 'user' }
+  const { data: profile } = await sb.from('profiles').select('role, agency_id').eq('id', user.id).single()
+  return { ...user, platformRole: profile?.role ?? 'user', agencyId: profile?.agency_id ?? null }
 }
 
 async function assertSuperAdmin(req: NextRequest) {
@@ -44,11 +44,32 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const sb = createAdminClient()
-  const [{ data: memberships }, { data: profiles }, { data: locations }] = await Promise.all([
-    sb.from('profile_locations').select('user_id, location_id, role'),
-    sb.from('profiles').select('id, email, role'),
-    sb.from('locations').select('location_id, name'),
-  ])
+
+  type Membership = { user_id: string; location_id: string; role: string }
+  type Profile = { id: string; email: string; role: string }
+  type Loc = { location_id: string; name: string | null }
+  let memberships: Membership[] | null
+  let profiles: Profile[] | null
+  let locations: Loc[] | null
+
+  if (user.platformRole === 'super_admin') {
+    const [m, p, l] = await Promise.all([
+      sb.from('profile_locations').select('user_id, location_id, role'),
+      sb.from('profiles').select('id, email, role'),
+      sb.from('locations').select('location_id, name'),
+    ])
+    memberships = m.data; profiles = p.data; locations = l.data
+  } else {
+    // Admins are scoped to their own agency's locations + users.
+    if (!user.agencyId) return NextResponse.json({ users: [], locations: [] })
+    const { data: agencyLocs } = await sb.from('locations').select('location_id, name').eq('agency_id', user.agencyId)
+    const locIds = (agencyLocs ?? []).map((l) => l.location_id)
+    const [m, p] = await Promise.all([
+      sb.from('profile_locations').select('user_id, location_id, role').in('location_id', locIds),
+      sb.from('profiles').select('id, email, role').eq('agency_id', user.agencyId),
+    ])
+    memberships = m.data; profiles = p.data; locations = agencyLocs
+  }
 
   const emailMap = new Map((profiles ?? []).map((p) => [p.id, p.email]))
   const nameMap = new Map((locations ?? []).map((l) => [l.location_id, l.name]))

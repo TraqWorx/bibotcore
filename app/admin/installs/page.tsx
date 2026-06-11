@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase-server'
+import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 import { activateInstall } from './_actions'
 import RetryButton from './_components/RetryButton'
 import { ad } from '@/lib/admin/ui'
@@ -6,11 +6,24 @@ import { ad } from '@/lib/admin/ui'
 export default async function InstallsPage() {
   const supabase = createAdminClient()
 
-  const { data: installs } = await supabase
+  // Scope installs to the caller's agency (super_admin sees all).
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  const { data: profile } = user
+    ? await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
+    : { data: null }
+
+  let query = supabase
     .from('installs')
     .select('id, location_id, user_id, package_slug, design_slug, configured, install_status, last_error, installed_at')
     .order('installed_at', { ascending: false })
 
+  if (profile?.role !== 'super_admin') {
+    const { data: locs } = await supabase.from('locations').select('location_id').eq('agency_id', profile?.agency_id ?? '')
+    query = query.in('location_id', (locs ?? []).map((l) => l.location_id))
+  }
+
+  const { data: installs } = await query
   const rows = installs ?? []
 
   // Resolve user emails via profiles

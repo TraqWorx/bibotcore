@@ -16,11 +16,12 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, agency_id')
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'super_admin' && profile?.role !== 'admin') {
+  const { isBibotAgency } = await import('@/lib/isBibotAgency')
+  if (profile?.role !== 'super_admin' && !isBibotAgency(profile?.agency_id)) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
