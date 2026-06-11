@@ -12,7 +12,7 @@ export default function LandingHeroForm() {
   const submit = async () => {
     if (!email) {
       setIsError(true)
-      setMessage('Enter your email to get started')
+      setMessage('Enter your email to log in')
       return
     }
     setLoading(true)
@@ -47,7 +47,7 @@ export default function LandingHeroForm() {
           className="h-12 shrink-0 rounded-xl px-6 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
           style={{ background: 'linear-gradient(90deg,#5B2BFF,#00D6E8)', boxShadow: '0 8px 28px rgba(91,43,255,0.45)' }}
         >
-          {loading ? 'Sending…' : 'Start free'}
+          {loading ? 'Sending…' : 'Log in'}
         </button>
       </div>
       {message && (
@@ -55,7 +55,7 @@ export default function LandingHeroForm() {
           {message}
         </p>
       )}
-      <p className="mt-3 text-xs text-white/35">No credit card to start · Sign-in by magic link</p>
+      <p className="mt-3 text-xs text-white/35">Invite-only · we&apos;ll email you a secure login link. Need access? <a href="mailto:info@espressotranslations.com" className="text-cyan-300 hover:underline">Contact us</a>.</p>
     </div>
   )
 }

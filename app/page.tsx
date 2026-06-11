@@ -18,9 +18,9 @@ const FEATURES = [
 ]
 
 const DESIGNS = [
-  { name: 'Apulia Power', logo: '/apulia-power-logo.webp', body: 'DB-first CRM for an energy & utilities reseller — POD management, commissions and switch-outs.' },
-  { name: 'Apulia Tourism', logo: '/brands/apulia-tourism-logo.png', body: 'Contacts, campaigns and messaging built for a tourism operator.' },
-  { name: 'Simfonia', logo: '/brands/simfonia-logo.png', body: 'Bespoke translation-agency CRM with a branded client portal.' },
+  { slug: 'apulia-power', name: 'Apulia Power', logo: '/apulia-power-logo.webp', body: 'DB-first CRM for an energy & utilities reseller — POD management, commissions and switch-outs.' },
+  { slug: 'apulia-tourism', name: 'Apulia Tourism', logo: '/brands/apulia-tourism-logo.png', body: 'Contacts, campaigns and messaging built for a tourism operator.' },
+  { slug: 'simfonia', name: 'Simfonia', logo: '/brands/simfonia-logo.png', body: 'Bespoke translation-agency CRM with a branded client portal.' },
 ]
 
 export default function Landing() {
@@ -65,21 +65,22 @@ export default function Landing() {
         </section>
 
         {/* Designs showcase */}
-        <section className="pb-20">
+        <section id="designs" className="scroll-mt-20 pb-20">
           <div className="mb-8 text-center">
             <h2 className="text-2xl font-black sm:text-3xl">Designs we&apos;ve built</h2>
             <p className="mt-2 text-sm text-white/50">Real white-label CRMs and dashboards delivered for clients on the platform.</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             {DESIGNS.map((d) => (
-              <div key={d.name} className="rounded-2xl p-6 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}>
+              <Link key={d.name} href={`/case-studies/${d.slug}`} className="group block rounded-2xl p-6 text-center transition hover:-translate-y-0.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}>
                 <div className="mx-auto flex h-20 items-center justify-center rounded-xl bg-white/90 px-5">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={d.logo} alt={d.name} className="max-h-11 w-auto object-contain" />
                 </div>
                 <h3 className="mt-4 text-base font-bold">{d.name}</h3>
                 <p className="mt-1 text-sm text-white/50">{d.body}</p>
-              </div>
+                <span className="mt-3 inline-block text-xs font-semibold text-cyan-300 group-hover:underline">View case study →</span>
+              </Link>
             ))}
           </div>
         </section>
@@ -118,7 +119,7 @@ function LandingCTA() {
       className="mt-7 block w-full rounded-xl py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
       style={{ background: 'linear-gradient(90deg,#5B2BFF,#00D6E8)', boxShadow: '0 8px 28px rgba(91,43,255,0.45)' }}
     >
-      Get started
+      Log in
     </Link>
   )
 }

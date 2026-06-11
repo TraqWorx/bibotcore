@@ -71,8 +71,10 @@ export async function requestMagicLink(
     } catch { continue }
   }
 
-  // New user — allow through, redirect page will auto-create their account
-  return sendMagicLink(email)
+  // Invite-only: unknown emails cannot self-register. Existing admins/agency
+  // members (matched above) still get a link; new agencies are onboarded via an
+  // invite (Users → Invite), after which their profile exists and they pass.
+  return { error: 'No account found for this email. GHL Custom Dash is invite-only — contact us to get set up.' }
 }
 
 async function sendMagicLink(email: string): Promise<{ error?: string }> {
