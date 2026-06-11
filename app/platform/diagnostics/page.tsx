@@ -15,6 +15,48 @@ async function safeCount(q: any): Promise<number> {
   }
 }
 
+async function getVercelHealth(): Promise<{ latestState: string; latestAt: number; recent: number; errors: number } | null> {
+  const token = process.env.VERCEL_TOKEN
+  if (!token) return null
+  try {
+    const res = await fetch(
+      'https://api.vercel.com/v6/deployments?app=bibotcore&slug=traqworxs-projects&limit=15&target=production',
+      { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' },
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const deps = (data.deployments ?? []) as { readyState?: string; state?: string; created?: number }[]
+    if (!deps.length) return null
+    const latest = deps[0]
+    const errors = deps.filter((d) => (d.readyState ?? d.state) === 'ERROR').length
+    return { latestState: latest.readyState ?? latest.state ?? '?', latestAt: latest.created ?? 0, recent: deps.length, errors }
+  } catch {
+    return null
+  }
+}
+
+async function getSupabaseUsage(): Promise<{ dbSize: string; dbBytes: number; users: number } | null> {
+  const token = process.env.SUPABASE_ACCESS_TOKEN
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!token || !url) return null
+  const ref = url.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1]
+  if (!ref) return null
+  try {
+    const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'select pg_size_pretty(pg_database_size(current_database())) as db_size, pg_database_size(current_database()) as db_bytes, (select count(*) from auth.users) as users' }),
+      cache: 'no-store',
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    const row = Array.isArray(data) ? data[0] : null
+    return row ? { dbSize: String(row.db_size), dbBytes: Number(row.db_bytes), users: Number(row.users) } : null
+  } catch {
+    return null
+  }
+}
+
 export default async function PlatformDiagnostics() {
   const sb = createAdminClient()
   const now = Date.now()
@@ -87,6 +129,7 @@ export default async function PlatformDiagnostics() {
     safeCount(sb.from('apulia_sync_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending')),
     safeCount(sb.from('ghl_webhook_events').select('*', { count: 'exact', head: true }).gte('created_at', new Date(now - 24 * HOUR).toISOString())),
   ])
+  const [vercel, supaUsage] = await Promise.all([getVercelHealth(), getSupabaseUsage()])
 
   const tone = (s: Row['status']) => s === 'error' ? 'bg-red-100 text-red-700' : s === 'warn' ? 'bg-amber-100 text-amber-700' : s === 'idle' ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'
   // worst first
@@ -148,30 +191,37 @@ export default async function PlatformDiagnostics() {
 
       {/* Infra & usage */}
       <div className="grid gap-4 md:grid-cols-2">
+        {/* Supabase */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-gray-700">Data volume (Supabase)</h2>
-          <p className="mt-1 text-xs text-gray-400">Row counts — a proxy for database size/usage.</p>
-          <dl className="mt-4 space-y-2 text-sm">
-            <div className="flex justify-between"><dt className="text-gray-500">cached_contacts</dt><dd className="font-semibold tabular-nums">{contacts.toLocaleString()}</dd></div>
-            <div className="flex justify-between"><dt className="text-gray-500">apulia_contacts</dt><dd className="font-semibold tabular-nums">{apuliaContacts.toLocaleString()}</dd></div>
-            <div className="flex justify-between"><dt className="text-gray-500">sync queue (pending)</dt><dd className={`font-semibold tabular-nums ${queuePending > 500 ? 'text-amber-600' : ''}`}>{queuePending.toLocaleString()}</dd></div>
-            <div className="flex justify-between"><dt className="text-gray-500">webhooks (24h)</dt><dd className={`font-semibold tabular-nums ${webhooks24h === 0 ? 'text-amber-600' : ''}`}>{webhooks24h.toLocaleString()}</dd></div>
+          <h2 className="text-sm font-semibold text-gray-700">Supabase <span className="text-xs font-normal text-gray-400">eu-north-1</span></h2>
+          {supaUsage ? (
+            <dl className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between"><dt className="text-gray-500">Database size</dt><dd className={`font-bold tabular-nums ${supaUsage.dbBytes > 7e9 ? 'text-amber-600' : 'text-gray-900'}`}>{supaUsage.dbSize}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">Auth users</dt><dd className="font-semibold tabular-nums">{supaUsage.users.toLocaleString()}</dd></div>
+            </dl>
+          ) : <p className="mt-2 text-xs text-amber-600">Live usage unavailable.</p>}
+          <p className="mt-4 text-xs text-gray-400">Row volume:</p>
+          <dl className="mt-1 space-y-1 text-xs">
+            <div className="flex justify-between"><dt className="text-gray-500">cached_contacts</dt><dd className="tabular-nums">{contacts.toLocaleString()}</dd></div>
+            <div className="flex justify-between"><dt className="text-gray-500">apulia_contacts</dt><dd className="tabular-nums">{apuliaContacts.toLocaleString()}</dd></div>
+            <div className="flex justify-between"><dt className="text-gray-500">sync queue (pending)</dt><dd className={`tabular-nums ${queuePending > 500 ? 'text-amber-600 font-semibold' : ''}`}>{queuePending.toLocaleString()}</dd></div>
+            <div className="flex justify-between"><dt className="text-gray-500">webhooks (24h)</dt><dd className={`tabular-nums ${webhooks24h === 0 ? 'text-amber-600 font-semibold' : ''}`}>{webhooks24h.toLocaleString()}</dd></div>
           </dl>
-          <a href={`https://supabase.com/dashboard/project/qhnmoietamwjooqtrhas/reports/database`} target="_blank" rel="noreferrer" className="mt-4 inline-block text-xs font-semibold text-brand hover:underline">Supabase usage dashboard →</a>
+          <a href="https://supabase.com/dashboard/project/qhnmoietamwjooqtrhas/settings/billing/usage" target="_blank" rel="noreferrer" className="mt-3 inline-block text-xs font-semibold text-brand hover:underline">Supabase usage/billing →</a>
         </div>
 
+        {/* Vercel */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-gray-700">Vercel & Supabase limits</h2>
-          <p className="mt-1 text-xs text-gray-400">Watch these against your plan limits:</p>
-          <ul className="mt-3 space-y-1.5 text-xs text-gray-600">
-            <li>• <strong>Vercel</strong>: bandwidth, function invocations + duration, build minutes</li>
-            <li>• <strong>Supabase</strong>: database size, egress/bandwidth, MAU, storage</li>
-          </ul>
-          <div className="mt-4 flex flex-col gap-1.5">
-            <a href="https://vercel.com/traqworxs-projects/bibotcore/usage" target="_blank" rel="noreferrer" className="text-xs font-semibold text-brand hover:underline">Vercel usage →</a>
-            <a href="https://supabase.com/dashboard/project/qhnmoietamwjooqtrhas/settings/billing/usage" target="_blank" rel="noreferrer" className="text-xs font-semibold text-brand hover:underline">Supabase usage/billing →</a>
-          </div>
-          <p className="mt-4 rounded-lg bg-gray-50 p-3 text-[11px] text-gray-500">Live limit tracking here needs a <code>VERCEL_TOKEN</code> + <code>SUPABASE_ACCESS_TOKEN</code> — add them and I&apos;ll pull real usage vs. limits into this card.</p>
+          <h2 className="text-sm font-semibold text-gray-700">Vercel</h2>
+          {vercel ? (
+            <dl className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between"><dt className="text-gray-500">Latest prod deploy</dt><dd className={`font-bold ${vercel.latestState === 'READY' ? 'text-emerald-600' : vercel.latestState === 'ERROR' ? 'text-red-600' : 'text-amber-600'}`}>{vercel.latestState}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">Last deploy</dt><dd className="tabular-nums text-gray-700">{vercel.latestAt ? `${Math.round((now - vercel.latestAt) / HOUR)}h ago` : '—'}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">Recent deploys</dt><dd className={`tabular-nums ${vercel.errors ? 'text-red-600 font-semibold' : 'text-gray-700'}`}>{vercel.recent} ({vercel.errors} failed)</dd></div>
+            </dl>
+          ) : <p className="mt-2 text-xs text-amber-600">Live deploy health unavailable.</p>}
+          <p className="mt-4 rounded-lg bg-gray-50 p-2.5 text-[11px] text-gray-500">Bandwidth &amp; function-invocation usage isn&apos;t exposed by Vercel&apos;s API — use the dashboard for those.</p>
+          <a href="https://vercel.com/traqworxs-projects/bibotcore/usage" target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-semibold text-brand hover:underline">Vercel usage →</a>
         </div>
       </div>
     </div>
