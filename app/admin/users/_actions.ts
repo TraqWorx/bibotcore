@@ -39,10 +39,14 @@ export async function inviteUser(
     await requirePlatform()
     if (!email) return { error: 'Email is required' }
     const supabase = createAdminClient()
-    const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
+    const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
       redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`,
     })
     if (error) return { error: error.message }
+    // Server-set invite marker so /redirect provisions their account on first login.
+    if (data?.user) {
+      await supabase.auth.admin.updateUserById(data.user.id, { app_metadata: { invited_admin: true } })
+    }
     revalidatePath('/admin/users')
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to invite user' }

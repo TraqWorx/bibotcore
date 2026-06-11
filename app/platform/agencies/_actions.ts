@@ -21,10 +21,15 @@ export async function inviteAdmin(email: string): Promise<{ error?: string; ok?:
     const e = (email || '').trim().toLowerCase()
     if (!e || !e.includes('@')) return { error: 'Valid email required' }
     const sb = createAdminClient()
-    const { error } = await sb.auth.admin.inviteUserByEmail(e, {
+    const { data, error } = await sb.auth.admin.inviteUserByEmail(e, {
       redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`,
     })
     if (error) return { error: error.message }
+    // Server-set marker (app_metadata, not user-forgeable) so /redirect provisions
+    // their agency + admin on first login. Without it, profile-less users are refused.
+    if (data?.user) {
+      await sb.auth.admin.updateUserById(data.user.id, { app_metadata: { invited_admin: true } })
+    }
     return { ok: true }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to invite' }

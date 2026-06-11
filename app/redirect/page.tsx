@@ -22,7 +22,16 @@ export default async function RedirectPage() {
     redirect('/agency')
   }
 
-  // New user — auto-create agency + profile with admin role
+  // No profile: invite-only. Only provision an agency + admin for users who were
+  // explicitly invited (server-set app_metadata, which the user cannot forge —
+  // user_metadata would be editable by the account holder). This blocks the
+  // portal-OTP → /redirect self-provisioning bypass.
+  const invited = (user.app_metadata as Record<string, unknown> | undefined)?.invited_admin === true
+  if (!invited) {
+    redirect('/login?message=' + encodeURIComponent('Access is invite-only — contact us to get set up.'))
+  }
+
+  // Invited user — auto-create agency + profile with admin role
   const email = user.email ?? ''
   const agencyName = email.split('@')[1]?.split('.')[0] ?? 'My Agency'
   const displayName = agencyName.charAt(0).toUpperCase() + agencyName.slice(1)
