@@ -35,26 +35,45 @@ async function getVercelHealth(): Promise<{ latestState: string; latestAt: numbe
   }
 }
 
-async function getSupabaseUsage(): Promise<{ dbSize: string; dbBytes: number; users: number } | null> {
+// Supabase Pro plan limits (the Management API doesn't expose plan/limits).
+// DB is already past the Free 500 MB cap, so we're on Pro. Adjust if the plan changes.
+const SUPA_LIMITS = { dbBytes: 8 * 1e9, storageBytes: 100 * 1e9, mau: 100_000 }
+
+async function getSupabaseUsage(): Promise<{ dbBytes: number; storageBytes: number; users: number; mau: number } | null> {
   const token = process.env.SUPABASE_ACCESS_TOKEN
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   if (!token || !url) return null
   const ref = url.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1]
   if (!ref) return null
+  const query = `select pg_database_size(current_database()) as db_bytes,
+    coalesce((select sum((metadata->>'size')::bigint) from storage.objects),0) as storage_bytes,
+    (select count(*) from auth.users) as users,
+    (select count(*) from auth.users where last_sign_in_at > now() - interval '30 days') as mau`
   try {
     const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: 'select pg_size_pretty(pg_database_size(current_database())) as db_size, pg_database_size(current_database()) as db_bytes, (select count(*) from auth.users) as users' }),
+      body: JSON.stringify({ query }),
       cache: 'no-store',
     })
     if (!res.ok) return null
     const data = await res.json()
     const row = Array.isArray(data) ? data[0] : null
-    return row ? { dbSize: String(row.db_size), dbBytes: Number(row.db_bytes), users: Number(row.users) } : null
+    return row ? { dbBytes: Number(row.db_bytes), storageBytes: Number(row.storage_bytes), users: Number(row.users), mau: Number(row.mau) } : null
   } catch {
     return null
   }
+}
+
+function fmtBytes(n: number): string {
+  if (n >= 1e9) return `${(n / 1e9).toFixed(2)} GB`
+  if (n >= 1e6) return `${(n / 1e6).toFixed(0)} MB`
+  if (n >= 1e3) return `${(n / 1e3).toFixed(0)} KB`
+  return `${n} B`
+}
+function usageTone(used: number, limit: number): string {
+  const p = used / limit
+  return p >= 0.95 ? 'text-red-600' : p >= 0.8 ? 'text-amber-600' : 'text-gray-900'
 }
 
 export default async function PlatformDiagnostics() {
@@ -195,10 +214,22 @@ export default async function PlatformDiagnostics() {
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-700">Supabase <span className="text-xs font-normal text-gray-400">eu-north-1</span></h2>
           {supaUsage ? (
-            <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between"><dt className="text-gray-500">Database size</dt><dd className={`font-bold tabular-nums ${supaUsage.dbBytes > 7e9 ? 'text-amber-600' : 'text-gray-900'}`}>{supaUsage.dbSize}</dd></div>
-              <div className="flex justify-between"><dt className="text-gray-500">Auth users</dt><dd className="font-semibold tabular-nums">{supaUsage.users.toLocaleString()}</dd></div>
-            </dl>
+            <div className="mt-3 space-y-3">
+              {[
+                { label: 'Database', used: supaUsage.dbBytes, limit: SUPA_LIMITS.dbBytes, fmt: fmtBytes },
+                { label: 'File storage', used: supaUsage.storageBytes, limit: SUPA_LIMITS.storageBytes, fmt: fmtBytes },
+                { label: 'Monthly active users', used: supaUsage.mau, limit: SUPA_LIMITS.mau, fmt: (n: number) => n.toLocaleString() },
+              ].map((m) => (
+                <div key={m.label}>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">{m.label}</span>
+                    <span className={`font-semibold tabular-nums ${usageTone(m.used, m.limit)}`}>{m.fmt(m.used)} / {m.fmt(m.limit)} ({Math.round((m.used / m.limit) * 100)}%)</span>
+                  </div>
+                  <div className="mt-1 h-1.5 rounded-full bg-gray-100"><div className={`h-1.5 rounded-full ${m.used / m.limit >= 0.95 ? 'bg-red-500' : m.used / m.limit >= 0.8 ? 'bg-amber-500' : 'bg-brand'}`} style={{ width: `${Math.min(100, Math.max(2, (m.used / m.limit) * 100))}%` }} /></div>
+                </div>
+              ))}
+              <p className="text-[11px] text-gray-400">Total auth users: {supaUsage.users.toLocaleString()} · Egress/bandwidth: not API-exposed — see dashboard. Limits assume Pro plan.</p>
+            </div>
           ) : <p className="mt-2 text-xs text-amber-600">Live usage unavailable.</p>}
           <p className="mt-4 text-xs text-gray-400">Row volume:</p>
           <dl className="mt-1 space-y-1 text-xs">
