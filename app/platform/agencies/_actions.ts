@@ -1,6 +1,8 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
+import { BIBOT_AGENCY_ID } from '@/lib/isBibotAgency'
 
 async function requireSuperAdmin() {
   const auth = await createAuthClient()
@@ -33,5 +35,56 @@ export async function inviteAdmin(email: string): Promise<{ error?: string; ok?:
     return { ok: true }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to invite' }
+  }
+}
+
+/**
+ * Permanently delete an agency and everything under it: locations, subscriptions,
+ * costs, dashboard configs, GHL connections, installs, and all its user accounts
+ * (profiles + auth). Hard, irreversible. The Bibot agency cannot be deleted.
+ */
+export async function deleteAgency(agencyId: string): Promise<{ error?: string; ok?: boolean }> {
+  try {
+    await requireSuperAdmin()
+    if (!agencyId) return { error: 'agencyId required' }
+    if (agencyId === BIBOT_AGENCY_ID) return { error: 'The Bibot agency cannot be deleted.' }
+
+    const sb = createAdminClient()
+    const [{ data: locs }, { data: profs }] = await Promise.all([
+      sb.from('locations').select('location_id').eq('agency_id', agencyId),
+      sb.from('profiles').select('id').eq('agency_id', agencyId),
+    ])
+    const locIds = (locs ?? []).map((l) => l.location_id)
+    const userIds = (profs ?? []).map((p) => p.id)
+
+    // 1. Children keyed by location
+    if (locIds.length) {
+      await sb.from('profile_locations').delete().in('location_id', locIds)
+      await sb.from('dashboard_configs').delete().in('location_id', locIds)
+      await sb.from('ghl_connections').delete().in('location_id', locIds)
+      await sb.from('installs').delete().in('location_id', locIds)
+      await sb.from('sync_status').delete().in('location_id', locIds)
+    }
+    // 2. Membership rows keyed by user
+    if (userIds.length) await sb.from('profile_locations').delete().in('user_id', userIds)
+    // 3. Rows keyed by agency
+    await sb.from('agency_subscriptions').delete().eq('agency_id', agencyId)
+    await sb.from('agency_costs').delete().eq('agency_id', agencyId)
+    await sb.from('vat_quarter_status').delete().eq('agency_id', agencyId)
+    await sb.from('dashboard_configs').delete().eq('agency_id', agencyId)
+    await sb.from('locations').delete().eq('agency_id', agencyId)
+    // 4. User accounts (profile + auth)
+    for (const id of userIds) {
+      await sb.from('profiles').delete().eq('id', id)
+      await sb.auth.admin.deleteUser(id).catch(() => {})
+    }
+    // 5. The agency itself
+    const { error } = await sb.from('agencies').delete().eq('id', agencyId)
+    if (error) return { error: error.message }
+
+    revalidatePath('/platform/agencies')
+    return { ok: true }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to delete agency' }
   }
 }

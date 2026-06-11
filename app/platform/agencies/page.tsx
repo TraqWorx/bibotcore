@@ -1,6 +1,8 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import InvitePanel from './_components/InvitePanel'
+import DeleteAgencyButton from './_components/DeleteAgencyButton'
+import { BIBOT_AGENCY_ID } from '@/lib/isBibotAgency'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +50,7 @@ export default async function PlatformAgenciesPage() {
               <th className="px-5 py-3 text-center">Active Subs</th>
               <th className="px-5 py-3 text-right">MRR</th>
               <th className="px-5 py-3">Joined</th>
+              <th className="px-5 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -67,6 +70,9 @@ export default async function PlatformAgenciesPage() {
                   <td className="px-5 py-3.5 text-right font-bold tabular-nums text-brand">${(stats.mrr / 100).toFixed(0)}</td>
                   <td className="px-5 py-3.5 text-gray-400">
                     {new Date(agency.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <DeleteAgencyButton agencyId={agency.id} agencyName={agency.name} disabled={agency.id === BIBOT_AGENCY_ID} />
                   </td>
                 </tr>
               )
