@@ -97,7 +97,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <div className="border-t border-gray-200/60 px-5 py-4">
                 <p className="truncate text-[11px] font-medium text-gray-500 mb-2">{data.email}</p>
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-gray-400">GHL Dash</p>
+                  <p className="text-[10px] text-gray-400">GHL Custom Dash</p>
                   <LogoutButton />
                 </div>
               </div>

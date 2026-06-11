@@ -20,7 +20,7 @@ export default async function PlatformOverviewPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">GHL Dash</h1>
+        <h1 className="text-2xl font-bold text-gray-900">GHL Custom Dash</h1>
         <p className="mt-1 text-sm text-gray-500">All agencies, subscriptions, and revenue at a glance.</p>
       </div>
 

@@ -7,7 +7,7 @@ export default function OnboardingPage() {
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-brand/10 text-2xl font-black text-brand">
           GD
         </div>
-        <h1 className="mt-6 text-2xl font-bold text-gray-900">GHL Dash</h1>
+        <h1 className="mt-6 text-2xl font-bold text-gray-900">GHL Custom Dash</h1>
         <p className="mt-2 text-sm text-gray-500">
           Create beautiful, embeddable dashboards for your GoHighLevel sub-accounts.
         </p>

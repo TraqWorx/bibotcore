@@ -84,15 +84,15 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="flex flex-col items-center gap-3">
             <Image
-              src="/bibot-logo.svg"
-              alt="Bibot Core"
+              src="/ghlcustomdash-mark.svg"
+              alt="GHL Custom Dash"
               width={64}
               height={64}
               className="h-16 w-16 rounded-2xl"
-              style={{ boxShadow: '0 0 32px rgba(42,0,204,0.5)' }}
+              style={{ boxShadow: '0 0 32px rgba(91,43,255,0.5)' }}
             />
             <div className="text-center">
-              <h1 className="text-lg font-bold text-white">Bibot Core</h1>
+              <h1 className="text-lg font-bold text-white">GHL Custom Dash</h1>
               <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
                 Sign in to your account
               </p>
@@ -150,7 +150,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>
-          © {new Date().getFullYear()} Bibot Core
+          © {new Date().getFullYear()} GHL Custom Dash
         </p>
       </div>
     </div>

@@ -39,7 +39,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
               GD
             </div>
             <div>
-              <p className="text-sm font-bold text-gray-900">GHL Dash</p>
+              <p className="text-sm font-bold text-gray-900">GHL Custom Dash</p>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Platform Admin</p>
             </div>
           </div>
