@@ -178,7 +178,7 @@ export default async function DiagnosticsPage() {
   // Run external integration pings in parallel — they all hit network.
   const [stripeSaas, stripeGhl, agencyTokenCheck] = await Promise.all([
     pingStripe('Stripe (SaaS)', process.env.STRIPE_SECRET_KEY),
-    pingStripe('Stripe (Bibot customers)', process.env.STRIPE_GHL_SECRET_KEY),
+    pingStripe('Stripe (GHL Custom Dash customers)', process.env.STRIPE_GHL_SECRET_KEY),
     pingAgencyToken(),
   ])
   const integrations = [stripeSaas, stripeGhl, agencyTokenCheck]
@@ -219,7 +219,7 @@ export default async function DiagnosticsPage() {
     const conn = connByLoc.get(loc.location_id)
     // We surface affiliate scope info for every connected location now —
     // the scope is granted by the marketplace app version, so any re-authorized
-    // location should have it. The Bibot subaccount is the only one that
+    // location should have it. The GHL Custom Dash subaccount is the only one that
     // actually exposes affiliate data, but visibility into scope state for
     // all locations helps spot drift.
     const isBibotLocation = /bibot/i.test(loc.name ?? '')
@@ -245,7 +245,7 @@ export default async function DiagnosticsPage() {
     const hasAffiliateScope = jwt.scopes.some((s) => s.toLowerCase().includes('affiliate'))
     const checks = await Promise.all([
       ping(`${GHL_BASE}/locations/${loc.location_id}`, conn.access_token),
-      // Only ping the affiliate-manager API for the Bibot subaccount; other
+      // Only ping the affiliate-manager API for the GHL Custom Dash subaccount; other
       // locations may not have an affiliate manager configured at all.
       isBibotLocation
         ? ping(`${GHL_BASE}/affiliate-manager/${loc.location_id}/affiliates`, conn.access_token)
@@ -279,7 +279,7 @@ export default async function DiagnosticsPage() {
       <div>
         <h1 className={ad.pageTitle}>Diagnostics</h1>
         <p className={ad.pageSubtitle}>
-          Every Bibot location and the health of its GHL connection. Cron <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">refresh-ghl-tokens</code> runs every 6 hours and rotates tokens before they can go stale.
+          Every GHL Custom Dash location and the health of its GHL connection. Cron <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">refresh-ghl-tokens</code> runs every 6 hours and rotates tokens before they can go stale.
         </p>
       </div>
 
@@ -297,7 +297,7 @@ export default async function DiagnosticsPage() {
           <p className="mt-2 text-3xl font-black text-rose-600">{totalDeadRefresh}</p>
         </div>
         <div className={ad.panel}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Bibot affiliate scope</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">GHL Custom Dash affiliate scope</p>
           <p className={`mt-2 text-3xl font-black ${affiliateScopeOk ? 'text-emerald-600' : 'text-amber-600'}`}>{affiliateScopeOk ? 'OK' : bibotRow ? 'Missing' : '—'}</p>
         </div>
       </div>
@@ -416,7 +416,7 @@ export default async function DiagnosticsPage() {
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-gray-700">{r.locationName}</span>
-                        {r.affiliateRelevant && badge('gray', 'Bibot')}
+                        {r.affiliateRelevant && badge('gray', 'GHL Custom Dash')}
                       </div>
                       <div className="mt-0.5 font-mono text-[10px] text-gray-400">{r.locationId}</div>
                     </td>
@@ -438,7 +438,7 @@ export default async function DiagnosticsPage() {
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-gray-900">{r.locationName}</span>
-                      {r.affiliateRelevant && badge('gray', 'Bibot')}
+                      {r.affiliateRelevant && badge('gray', 'GHL Custom Dash')}
                     </div>
                     <div className="mt-1 font-mono text-[10px] text-gray-400">{r.locationId}</div>
                     {r.jwt.versionId && (
@@ -525,7 +525,7 @@ export default async function DiagnosticsPage() {
         <ul className="space-y-1 text-xs text-gray-700">
           <li><strong>Auth class</strong>: <code>Location</code> = OAuth location-scoped, <code>Company</code> = needs locationToken exchange, <code>PIT</code> = Private Integration Token (40-char, no JWT).</li>
           <li><strong>Scopes</strong>: how many scopes the token grants. The OAuth app&apos;s <code>versionId</code> determines this — to add scopes, edit the marketplace app version then re-authorize.</li>
-          <li><strong>Affiliate</strong>: <em>In token</em> = `affiliate-manager.readonly` scope is on the JWT; <em>Missing</em> = needs re-authorization after the marketplace app version is updated. The API ping below the badge runs only for the Bibot subaccount (the only one with affiliate data).</li>
+          <li><strong>Affiliate</strong>: <em>In token</em> = `affiliate-manager.readonly` scope is on the JWT; <em>Missing</em> = needs re-authorization after the marketplace app version is updated. The API ping below the badge runs only for the GHL Custom Dash subaccount (the only one with affiliate data).</li>
           <li><strong>Health</strong>: live <code>GET /locations/&#123;id&#125;</code>. <em>OK</em> = token works; <em>Reconnect</em> = JWT rejected; <em>Not connected</em> = no OAuth install on this location yet.</li>
           <li><strong>Last refreshed</strong>: never older than ~2h once the cron has run after instrumentation.</li>
           <li><strong>Last webhook</strong>: timestamp of the most recent GHL event we received for this location. <em>never</em> or older than ~7 days suggests GHL dropped the webhook registration; reconnect to re-register.</li>

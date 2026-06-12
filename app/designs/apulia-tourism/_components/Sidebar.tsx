@@ -223,7 +223,7 @@ export default function Sidebar({
       {showBulkIndicator ? <BulkJobsIndicator locationId={locationId} /> : null}
 
       <div className="sf-sidebar-footer border-t border-white/[0.07] px-4 py-3.5">
-        <p className="text-center text-[10px] font-medium tracking-wide text-white/30">Bibot Core · 2026</p>
+        <p className="text-center text-[10px] font-medium tracking-wide text-white/30">GHL Custom Dash · 2026</p>
       </div>
     </aside>
   )

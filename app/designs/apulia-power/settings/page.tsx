@@ -221,7 +221,7 @@ export default async function Page() {
                   <h2 style={{ fontSize: 16, fontWeight: 800 }}>Compenso per POD per amministratore</h2>
                   <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
                     Modifica direttamente il compenso per POD di ciascun amministratore. La modifica viene scritta sul custom field
-                    in Bibot e la commissione totale viene ricalcolata su tutti i POD attivi.
+                    in GHL Custom Dash e la commissione totale viene ricalcolata su tutti i POD attivi.
                   </p>
                 </header>
                 <div style={{ padding: '16px 20px' }}>
@@ -258,7 +258,7 @@ export default async function Page() {
                 <header style={{ padding: '16px 20px', borderBottom: '1px solid var(--ap-line)' }}>
                   <h2 style={{ fontSize: 16, fontWeight: 800 }}>Coda di sincronizzazione</h2>
                   <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
-                    Operazioni in attesa di essere sincronizzate. Bibot è la fonte di verità;
+                    Operazioni in attesa di essere sincronizzate. GHL Custom Dash è la fonte di verità;
                     le modifiche sono già applicate in locale e vengono propagate in background.
                   </p>
                 </header>
@@ -278,7 +278,7 @@ export default async function Page() {
                 <header style={{ padding: '16px 20px', borderBottom: '1px solid var(--ap-line)' }}>
                   <h2 style={{ fontSize: 16, fontWeight: 800 }}>Gestione tag</h2>
                   <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
-                    Tutti i tag usati nei contatti Apulia (condomini + amministratori). Eliminandoli vengono rimossi anche da Bibot.
+                    Tutti i tag usati nei contatti Apulia (condomini + amministratori). Eliminandoli vengono rimossi anche da GHL Custom Dash.
                   </p>
                 </header>
                 <div style={{ padding: '16px 20px' }}>

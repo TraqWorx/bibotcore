@@ -21,7 +21,7 @@ export default async function AgencyLayout({ children }: { children: React.React
               Bi
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-gray-900 leading-none">Bibot Core Agency</p>
+              <p className="truncate text-sm font-bold text-gray-900 leading-none">GHL Custom Dash Agency</p>
               <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">Agency</p>
             </div>
           </Link>

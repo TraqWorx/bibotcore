@@ -56,7 +56,7 @@ export default function TagManager({ tags }: { tags: TagUsage[] }) {
       {flash && <div className="ap-pill" data-tone="green" style={{ marginBottom: 10 }}>✓ {flash}</div>}
       {error && <div style={{ color: 'var(--ap-danger)', fontSize: 13, marginBottom: 10 }}>{error}</div>}
       <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: '0 0 10px' }}>
-        Eliminare un tag lo rimuove da tutti i contatti su Bibot. Operazione non reversibile.
+        Eliminare un tag lo rimuove da tutti i contatti su GHL Custom Dash. Operazione non reversibile.
       </p>
       <div style={{ overflowX: 'auto' }}>
         <table className="ap-table">

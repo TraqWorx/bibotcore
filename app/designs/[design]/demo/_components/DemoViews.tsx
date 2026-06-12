@@ -134,7 +134,7 @@ export function DemoAutomationsView() {
 
       {demoWorkflows.length === 0 ? (
         <div className={`${sf.card} ${sf.cardPadding} text-center`}>
-          <p className="text-sm text-gray-500">Nessun workflow trovato. Crealo e pubblicalo da Bibot.</p>
+          <p className="text-sm text-gray-500">Nessun workflow trovato. Crealo e pubblicalo da GHL Custom Dash.</p>
         </div>
       ) : (
         <>
@@ -193,7 +193,7 @@ export function DemoAutomationsView() {
 
       <div className={`${sf.cardMuted} px-5 py-4`}>
         <p className="text-xs leading-relaxed text-gray-500">
-          Le automazioni si gestiscono in Bibot. Qui vedi solo uno snapshot dello stato.
+          Le automazioni si gestiscono in GHL Custom Dash. Qui vedi solo uno snapshot dello stato.
         </p>
       </div>
     </div>

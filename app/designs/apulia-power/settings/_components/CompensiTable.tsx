@@ -150,7 +150,7 @@ export default function CompensiTable({ admins, defaultOffset }: { admins: Compe
         </div>
       </div>
       <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: '0 0 10px' }}>
-        Modifica il compenso per POD: la commissione totale viene ricalcolata e sincronizzata con Bibot.
+        Modifica il compenso per POD: la commissione totale viene ricalcolata e sincronizzata con GHL Custom Dash.
         Eventuali override sul singolo POD restano prioritari rispetto a questo valore.
       </p>
 

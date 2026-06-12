@@ -334,7 +334,7 @@ export const demoContactNotesByContact: Record<string, {
   'c-2': [
     {
       id: 'n-2',
-      body: 'Ha chiesto confronto tra piano attuale e proposta Bibot.',
+      body: 'Ha chiesto confronto tra piano attuale e proposta GHL Custom Dash.',
       dateAdded: '2026-04-05T08:40:00+02:00',
       createdBy: 'u-2',
     },

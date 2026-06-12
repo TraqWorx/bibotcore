@@ -115,7 +115,7 @@ export default function CondominoEditor({ contactId, core, customFields, tags, t
           label="Codice · Amministratore"
         />
         <p style={{ fontSize: 11, color: 'var(--ap-text-faint)', margin: '6px 0 0' }}>
-          Cerca per codice o nome. Il codice e il nome vengono aggiornati insieme su Bibot.
+          Cerca per codice o nome. Il codice e il nome vengono aggiornati insieme su GHL Custom Dash.
         </p>
       </section>
 
