@@ -53,15 +53,21 @@ export const CASE_STUDIES: CaseStudy[] = [
     slug: 'simfonia',
     name: 'Simfonia',
     logo: '/brands/simfonia-logo.png',
-    tagline: 'Bespoke translation-agency CRM with a client portal',
+    tagline: 'White-label CRM for a telephony & energy reseller',
     intro:
-      'A white-label CRM design for a translation agency, with a branded shell and a token-based client portal.',
+      'A fully branded CRM for a telephony & energy services reseller — built around contacts segmented by service, a renewals/leads pipeline, conversations, calendar and automations.',
     did: [
-      'Custom shell theme that derives the full palette from the brand’s primary/secondary colours.',
-      'Token-based client portal where contacts view their appointments, invoices and messages — no login friction.',
-      'Dashboard with KPIs and trends over cached GoHighLevel data.',
+      'Custom-branded shell — the brand’s logo + primary/secondary colours drive the whole theme per location.',
+      'Contacts segmented by service category (telephony, energy, home connectivity, entertainment) with tags + filters.',
+      'Drag-and-drop sales pipeline for contract renewals and telephony/energy leads.',
+      'Conversations, calendar/appointments, automations, and a configurable client portal.',
     ],
-    shots: [],
+    shots: [
+      '/case-studies/simfonia/dashboard.png',
+      '/case-studies/simfonia/pipeline.png',
+      '/case-studies/simfonia/contatti.png',
+      '/case-studies/simfonia/impostazioni.png',
+    ],
   },
 ]
 
