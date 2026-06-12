@@ -1,27 +1,26 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import LandingHeroForm from './_components/LandingHeroForm'
 import RequestAccessModal from './_components/RequestAccessModal'
 
 export const metadata = {
-  title: 'GHL Custom Dash — Custom dashboards for GoHighLevel agencies',
+  title: 'GHL Custom Dash — Done-for-you custom CRMs on GoHighLevel',
   description:
-    'Build white-label, drag-and-drop dashboards for your GoHighLevel sub-accounts and share them with clients.',
+    'We design and build a fully bespoke, white-label CRM on top of GoHighLevel for your business — built for you, delivered ready to use.',
 }
 
 const FEATURES = [
-  { title: 'Drag-and-drop builder', body: 'Compose any dashboard from metrics, tables, charts and lists — no code, no developers.' },
-  { title: 'AI dashboard designer', body: 'Describe what you want and let AI build the widgets, pull the data and lay it out.' },
-  { title: 'Live GHL sync', body: 'Contacts, pipelines, calendars, conversations and team — straight from your sub-accounts.' },
-  { title: 'White-label & branded', body: 'Your colours, your logo, your domain. Clients never see anything but your brand.' },
-  { title: 'Share with clients', body: 'One embeddable link per location — drop it into a GHL custom menu and you are done.' },
-  { title: 'Full CRM, per agency', body: 'The complete toolkit, scoped to your agency: every sub-account, your data only.' },
+  { title: 'Built for you, not by you', body: 'We design and build the entire CRM around your business — you never touch code, config or templates.' },
+  { title: 'Fully bespoke', body: 'Custom modules for whatever you run: commissions, renewals, imports, client portals, reporting.' },
+  { title: 'White-label & branded', body: 'Your logo, your colours, your domain. It looks and feels like your own product.' },
+  { title: 'Deep GoHighLevel integration', body: 'Contacts, pipelines, calendars, conversations and team — wired straight to your sub-accounts.' },
+  { title: 'Delivered ready to use', body: 'We handle the build, data import and launch. You get a working CRM, not a toolkit.' },
+  { title: 'Maintained & evolved', body: 'We support it and grow it with your business — new features, changes and fixes as you scale.' },
 ]
 
 const DESIGNS = [
-  { slug: 'apulia-power', name: 'Apulia Power', logo: '/apulia-power-logo.webp', body: 'DB-first CRM for an energy & utilities reseller — POD management, commissions and switch-outs.' },
-  { slug: 'apulia-tourism', name: 'Apulia Tourism', logo: '/brands/apulia-tourism-logo.png', body: 'Contacts, campaigns and messaging built for a tourism operator.' },
-  { slug: 'simfonia', name: 'Simfonia', logo: '/brands/simfonia-logo.png', body: 'Bespoke translation-agency CRM with a branded client portal.' },
+  { slug: 'apulia-power', name: 'Apulia Power', logo: '/apulia-power-logo.webp', body: 'Energy & utilities reseller CRM — POD management, commissions and switch-outs.' },
+  { slug: 'apulia-tourism', name: 'Apulia Tourism', logo: '/brands/apulia-tourism-logo.png', body: 'Contacts, campaigns and messaging for a tourism operator.' },
+  { slug: 'simfonia', name: 'Simfonia', logo: '/brands/simfonia-logo.png', body: 'Telephony & energy reseller CRM — renewals pipeline + client portal.' },
 ]
 
 export default function Landing() {
@@ -47,15 +46,18 @@ export default function Landing() {
         {/* Hero */}
         <section className="flex flex-col items-center gap-7 pt-16 pb-20 text-center sm:pt-24">
           <span className="rounded-full px-3 py-1 text-xs font-semibold tracking-wide text-cyan-200" style={{ background: 'rgba(0,214,232,0.10)', border: '1px solid rgba(0,214,232,0.25)' }}>
-            For GoHighLevel agencies
+            Done-for-you · built on GoHighLevel
           </span>
           <h1 className="max-w-3xl text-4xl font-black leading-[1.08] tracking-tight sm:text-6xl">
-            Custom dashboards your<br className="hidden sm:block" /> GHL clients will actually love
+            We build your custom CRM.<br className="hidden sm:block" /> You run your business.
           </h1>
           <p className="max-w-xl text-base text-white/55 sm:text-lg">
-            Build white-label, drag-and-drop dashboards for every sub-account and share them with a single link. Live GoHighLevel data, your branding, in minutes.
+            A fully bespoke, white-label CRM built on top of GoHighLevel — designed around your exact workflow and delivered ready to use. No DIY builders, no templates. We build it for you.
           </p>
-          <LandingHeroForm />
+          <div className="flex flex-col items-center gap-3 sm:flex-row">
+            <RequestAccessModal large />
+            <Link href="#designs" className="text-sm font-semibold text-cyan-300 hover:underline">See what we&apos;ve built →</Link>
+          </div>
         </section>
 
         {/* Features */}
@@ -68,11 +70,11 @@ export default function Landing() {
           ))}
         </section>
 
-        {/* Designs showcase */}
+        {/* Work showcase */}
         <section id="designs" className="scroll-mt-20 pb-20">
           <div className="mb-8 text-center">
-            <h2 className="text-2xl font-black sm:text-3xl">Designs we&apos;ve built</h2>
-            <p className="mt-2 text-sm text-white/50">Real white-label CRMs and dashboards delivered for clients on the platform.</p>
+            <h2 className="text-2xl font-black sm:text-3xl">Custom CRMs we&apos;ve built</h2>
+            <p className="mt-2 text-sm text-white/50">Real, white-label CRMs we designed and built for clients on GoHighLevel.</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             {DESIGNS.map((d) => (
@@ -92,14 +94,16 @@ export default function Landing() {
         {/* CTA */}
         <section className="flex justify-center pb-24">
           <div className="w-full max-w-md rounded-3xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,214,232,0.25)', boxShadow: '0 24px 80px rgba(91,43,255,0.25)' }}>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Everything you need</p>
-            <h2 className="mt-3 text-2xl font-black">Launch client dashboards today</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Done for you</p>
+            <h2 className="mt-3 text-2xl font-black">Ready for your custom CRM?</h2>
             <ul className="mx-auto mt-6 space-y-2 text-left text-sm text-white/65">
-              {['Unlimited dashboards per location', 'AI builder + all widget types', 'Live GHL data sync', 'White-label embeddable share links', 'Full CRM, scoped to your agency'].map((i) => (
+              {['Designed around your workflow', 'White-label, on your domain', 'Full GoHighLevel integration', 'Built, launched & supported by us'].map((i) => (
                 <li key={i} className="flex items-start gap-2"><span className="text-cyan-300">✓</span>{i}</li>
               ))}
             </ul>
-            <LandingCTA />
+            <div className="mt-7 flex justify-center">
+              <RequestAccessModal large />
+            </div>
           </div>
         </section>
 
@@ -113,17 +117,5 @@ export default function Landing() {
         </footer>
       </div>
     </div>
-  )
-}
-
-function LandingCTA() {
-  return (
-    <Link
-      href="/login"
-      className="mt-7 block w-full rounded-xl py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-      style={{ background: 'linear-gradient(90deg,#5B2BFF,#00D6E8)', boxShadow: '0 8px 28px rgba(91,43,255,0.45)' }}
-    >
-      Log in
-    </Link>
   )
 }

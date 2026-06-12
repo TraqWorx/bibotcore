@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { submitAccessRequest } from '../_actions'
 
-export default function RequestAccessModal() {
+export default function RequestAccessModal({ large }: { large?: boolean }) {
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
@@ -26,8 +26,8 @@ export default function RequestAccessModal() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
-        style={{ background: 'linear-gradient(90deg,#5B2BFF,#00D6E8)' }}
+        className={`${large ? 'rounded-xl px-7 py-3.5 text-base' : 'rounded-lg px-4 py-2 text-sm'} font-semibold text-white transition hover:opacity-90`}
+        style={{ background: 'linear-gradient(90deg,#5B2BFF,#00D6E8)', boxShadow: large ? '0 8px 28px rgba(91,43,255,0.45)' : undefined }}
       >
         Request access
       </button>
