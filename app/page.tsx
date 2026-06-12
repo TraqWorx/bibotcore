@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import LandingHeroForm from './_components/LandingHeroForm'
+import RequestAccessModal from './_components/RequestAccessModal'
 
 export const metadata = {
   title: 'GHL Custom Dash — Custom dashboards for GoHighLevel agencies',
@@ -35,9 +36,12 @@ export default function Landing() {
             <Image src="/ghlcustomdash-mark.svg" alt="GHL Custom Dash" width={36} height={36} className="h-9 w-9 rounded-xl" />
             <span className="text-base font-bold tracking-tight">GHL Custom Dash</span>
           </div>
-          <Link href="/login" className="rounded-lg px-4 py-2 text-sm font-semibold text-white/80 transition hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.16)' }}>
-            Log in
-          </Link>
+          <div className="flex items-center gap-2">
+            <RequestAccessModal />
+            <Link href="/login" className="rounded-lg px-4 py-2 text-sm font-semibold text-white/80 transition hover:text-white" style={{ border: '1px solid rgba(255,255,255,0.16)' }}>
+              Log in
+            </Link>
+          </div>
         </header>
 
         {/* Hero */}

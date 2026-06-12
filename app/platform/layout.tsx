@@ -12,12 +12,13 @@ const getPlatformData = cache(async () => {
   const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') return null
 
-  const [{ count: agencyCount }, { count: locationCount }] = await Promise.all([
+  const [{ count: agencyCount }, { count: locationCount }, { count: requestCount }] = await Promise.all([
     sb.from('agencies').select('id', { count: 'exact', head: true }),
     sb.from('agency_subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+    sb.from('access_requests').select('id', { count: 'exact', head: true }).eq('status', 'new'),
   ])
 
-  return { agencyCount: agencyCount ?? 0, locationCount: locationCount ?? 0 }
+  return { agencyCount: agencyCount ?? 0, locationCount: locationCount ?? 0, requestCount: requestCount ?? 0 }
 })
 
 export default async function PlatformLayout({ children }: { children: React.ReactNode }) {
@@ -28,6 +29,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
     { href: '/platform', label: 'Overview' },
     { href: '/platform/agencies', label: 'Agencies', count: data.agencyCount },
     { href: '/platform/revenue', label: 'Revenue' },
+    { href: '/platform/requests', label: 'Requests', count: data.requestCount },
     { href: '/platform/diagnostics', label: 'Diagnostics' },
   ]
 
