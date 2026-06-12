@@ -70,14 +70,17 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
         <section className="pb-16">
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Screenshots</h2>
           {cs.shots.length > 0 ? (
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              {cs.shots.map((src, i) => (
-                <div key={i} className="overflow-hidden rounded-xl" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt={`${cs.name} screenshot ${i + 1}`} className="w-full" />
-                </div>
-              ))}
-            </div>
+            <>
+              <p className="mt-1 text-xs text-white/35">Real screens from the live build — data blurred for privacy.</p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {cs.shots.map((src, i) => (
+                  <div key={i} className="overflow-hidden rounded-xl" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt={`${cs.name} screenshot ${i + 1}`} className="w-full" style={{ filter: 'blur(3px)', transform: 'scale(1.05)' }} />
+                  </div>
+                ))}
+              </div>
+            </>
           ) : (
             <div className="mt-5 rounded-xl p-8 text-center text-sm text-white/40" style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.14)' }}>
               Screenshots coming soon.

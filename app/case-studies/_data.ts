@@ -25,7 +25,11 @@ export const CASE_STUDIES: CaseStudy[] = [
       'Stores module with per-store supply-point counts over any date range, plus a payments view (next payment, due/overdue, mark-paid).',
       'Performance pass: RPC-backed aggregates, partial indexes and optimistic inline editing.',
     ],
-    shots: [],
+    shots: [
+      '/case-studies/apulia-power/dashboard.png',
+      '/case-studies/apulia-power/opportunita.png',
+      '/case-studies/apulia-power/import.png',
+    ],
   },
   {
     slug: 'apulia-tourism',
@@ -39,7 +43,11 @@ export const CASE_STUDIES: CaseStudy[] = [
       'Bulk WhatsApp/SMS drip campaigns with media upload, scheduling and batch throttling.',
       'Template integration so the team sends on-brand messages in a couple of clicks.',
     ],
-    shots: [],
+    shots: [
+      '/case-studies/apulia-tourism/shot-1.png',
+      '/case-studies/apulia-tourism/shot-2.png',
+      '/case-studies/apulia-tourism/shot-3.png',
+    ],
   },
   {
     slug: 'simfonia',
