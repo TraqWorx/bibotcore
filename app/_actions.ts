@@ -12,12 +12,20 @@ export async function submitAccessRequest(email: string, message: string): Promi
   const { error } = await sb.from('access_requests').insert({ email: e, message: msg || null })
   if (error) return { error: 'Could not submit — please email info@traqworx.com.' }
 
-  // Notify (best-effort — never blocks/fails the request if SMTP isn't set).
+  // 1) Notify the team (reply-to the requester so a reply reaches them).
   await sendMail({
     to: process.env.ACCESS_REQUEST_TO || 'info@traqworx.com',
     replyTo: e,
     subject: `New access request — ${e}`,
     text: `New GHL Custom Dash access request\n\nFrom: ${e}\n\nMessage:\n${msg || '(none)'}`,
+  }).catch(() => {})
+
+  // 2) Confirmation to the requester (reply-to info@traqworx.com).
+  await sendMail({
+    to: e,
+    replyTo: 'info@traqworx.com',
+    subject: 'We received your request — GHL Custom Dash',
+    text: `Hi,\n\nThanks for your interest in GHL Custom Dash — we've received your request and will be in touch shortly.\n\nIf you need anything in the meantime, just reply to this email.\n\n— GHL Custom Dash`,
   }).catch(() => {})
 
   return { ok: true }
