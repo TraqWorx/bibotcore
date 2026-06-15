@@ -144,13 +144,27 @@ export default function DashboardEditor({ locationId, locationName, initialLayou
         const { reply, usage: u } = await res.json()
         if (u) setUsage(u)
         const dashRegex = /```dashboard\s*([\s\S]*?)```/g
+        const hadBlock = /```dashboard/.test(reply)
         let dashConfig: { widgets?: WidgetConfig[]; colors?: DashboardColors } | null = null
         let match
         while ((match = dashRegex.exec(reply)) !== null) {
-          try { dashConfig = JSON.parse(match[1]) } catch { /* skip */ }
+          try { dashConfig = JSON.parse(match[1].trim()) } catch { /* try fallback below */ }
         }
-        const cleanReply = reply.replace(/```dashboard\s*[\s\S]*?```/g, '').replace(/```widget\s*[\s\S]*?```/g, '').trim()
-        const assistantMsg: ChatMessage = { role: 'assistant', content: cleanReply, dashboardApplied: !!dashConfig?.widgets }
+        // Tolerate a missing closing fence — a long response can be cut off mid-block.
+        if (!dashConfig && hadBlock) {
+          const open = reply.indexOf('```dashboard') + '```dashboard'.length
+          const raw = reply.slice(open).replace(/```\s*$/, '').trim()
+          try { dashConfig = JSON.parse(raw) } catch { /* unparseable — surfaced below */ }
+        }
+        const cleanReply = reply.replace(/```dashboard\s*[\s\S]*?(```|$)/g, '').replace(/```widget\s*[\s\S]*?```/g, '').trim()
+        const applied = !!dashConfig?.widgets
+        // Never silently swallow a failed apply — tell the user why instead of looking frozen.
+        const content = applied
+          ? cleanReply
+          : hadBlock
+            ? (cleanReply ? cleanReply + '\n\n' : '') + '⚠️ That dashboard was too big to apply in one piece — ask me for fewer or simpler widgets, or build it one section at a time.'
+            : cleanReply
+        const assistantMsg: ChatMessage = { role: 'assistant', content, dashboardApplied: applied }
 
         if (dashConfig?.widgets) {
           const newWidgets = dashConfig.widgets.map((w) => ({ ...w, id: w.id || genId() }))

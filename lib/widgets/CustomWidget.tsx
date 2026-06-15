@@ -24,20 +24,27 @@ function useWidgetData(locationId: string, config: CustomWidgetConfig, globalFil
     if (filterUserId && (config.dataSource === 'contacts' || config.dataSource === 'opportunities')) {
       filters.assignedTo = filterUserId
     }
-    fetch('/api/widgets/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        locationId,
-        dataSource: config.dataSource,
-        endpoint: config.endpoint,
-        filters,
-      }),
-    })
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) { setData(d.data); setLoading(false) } })
-      .catch(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+    const load = () => {
+      fetch('/api/widgets/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          locationId,
+          dataSource: config.dataSource,
+          endpoint: config.endpoint,
+          filters,
+        }),
+      })
+        .then((r) => r.json())
+        .then((d) => { if (!cancelled) { setData(d.data); setLoading(false) } })
+        .catch(() => { if (!cancelled) setLoading(false) })
+    }
+    load()
+    // Live refresh — keep the dashboard current without a manual reload. The
+    // sandboxed iframe only reloads when the data actually changes (identical
+    // data → identical srcDoc string → React skips the DOM update).
+    const iv = setInterval(load, 60_000)
+    return () => { cancelled = true; clearInterval(iv) }
   }, [locationId, config.dataSource, config.endpoint, config.filters, filterUserId])
 
   return { data, loading }
