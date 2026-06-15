@@ -446,13 +446,15 @@ export default function CustomWidget({ title, options }: Props) {
   // Static (sandboxed HTML/CSS/JS) widget. If it binds a data source, wait for
   // the data so it can be injected into the sandbox as window.WIDGET_DATA.
   if (config.displayType === 'static') {
+    const isHtml = !!config.staticContent?.html
+    const spinner = <div className="flex items-center justify-center p-8"><div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200" style={{ borderTopColor: 'var(--brand)' }} /></div>
     if (config.dataSource && config.dataSource !== 'none' && loading) {
-      return (
-        <WidgetShell title={title}>
-          <div className="flex items-center justify-center p-8"><div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200" style={{ borderTopColor: 'var(--brand)' }} /></div>
-        </WidgetShell>
-      )
+      return isHtml ? spinner : <WidgetShell title={title}>{spinner}</WidgetShell>
     }
+    // Full-bleed HTML widgets carry their own complete card design — render them
+    // WITHOUT the outer shell/title so we don't stack a redundant heading on top
+    // of the AI-authored header.
+    if (isHtml) return <StaticDisplay config={config} items={items} />
     return <WidgetShell title={title}><StaticDisplay config={config} items={items} /></WidgetShell>
   }
   if (config.compute) {

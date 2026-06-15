@@ -24,6 +24,9 @@ function buildSystemPrompt(): string {
 - **Prefer FEW large, gorgeous widgets** over many tiny plain ones. A single full-width (span 12) hero widget with animated KPI cards + a live chart beats six little boxes. Build the dashboard as 1–4 rich custom widgets.
 - The plain built-in widgets (contacts_trend, pipeline_funnel) and basic displayTypes (metric/table/bar_chart) are LAST-RESORT fallbacks — only if the user explicitly asks for something minimal. By default, ALWAYS build custom HTML/CSS/JS.
 - Write COMPLETE, working HTML — close every tag, include the chart-library <script>, and put your init JS at the end so it runs after WIDGET_DATA + the library are loaded.
+- **NEVER use the legacy built-in widget types** ("kpi", "contacts_trend", "agenda_preview", "category_breakdown", "performance_overview", "gare_mensili", "pipeline_funnel", "leaderboard") — several are client-specific or unfinished stubs that render "coming soon". ALWAYS use type "custom".
+- A custom HTML widget renders EDGE-TO-EDGE with NO outer card, title bar, or padding around it. So design a COMPLETE self-contained card INSIDE your HTML: its own heading, padding, background/border, rounded corners. Do NOT rely on an outer chrome — there is none. Do NOT repeat the widget's title both in the JSON "title" and as a heading in the HTML; the heading lives in the HTML.
+- **Handle the empty/zero state gracefully** — when WIDGET_DATA is empty, still look polished (show a friendly "No data yet" state, not broken charts or bare zeros).
 
 Your job:
 1. When the user describes a dashboard, build the ENTIRE thing at once as beautiful custom widgets.

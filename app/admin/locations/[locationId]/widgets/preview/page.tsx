@@ -13,7 +13,11 @@ export default function DashboardPreviewPage() {
 
   const { widgets, colors, locationId } = useMemo(() => {
     try {
-      const parsed = JSON.parse(decodeURIComponent(raw ?? '{}'))
+      // Prefer the URL param (back-compat); fall back to localStorage, which the
+      // editor now uses so large HTML widgets don't overflow the URL.
+      let json = raw ? decodeURIComponent(raw) : null
+      if (!json && typeof window !== 'undefined') json = localStorage.getItem('gcd_preview')
+      const parsed = JSON.parse(json ?? '{}')
       return {
         widgets: (parsed.widgets ?? []) as WidgetConfig[],
         colors: (parsed.colors ?? {}) as DashboardColors,

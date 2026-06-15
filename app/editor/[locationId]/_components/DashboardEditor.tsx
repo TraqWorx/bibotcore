@@ -215,9 +215,10 @@ export default function DashboardEditor({ locationId, locationName, initialLayou
   }
 
   const handlePreview = () => {
-    const previewData = { widgets, colors, locationId }
-    const encoded = encodeURIComponent(JSON.stringify(previewData))
-    window.open(`/admin/locations/${locationId}/widgets/preview?data=${encoded}`, '_blank')
+    // Stash via localStorage (shared across same-origin tabs) instead of the URL —
+    // rich HTML widgets overflow the URL length limit and the preview fails to parse.
+    try { localStorage.setItem('gcd_preview', JSON.stringify({ widgets, colors, locationId })) } catch { /* ignore quota */ }
+    window.open(`/admin/locations/${locationId}/widgets/preview`, '_blank')
   }
 
   const handleWidgetClick = (id: string) => {
