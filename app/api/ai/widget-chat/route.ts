@@ -239,6 +239,23 @@ GHL contacts and opportunities can have custom fields. When the user mentions cu
 - Static HTML widgets are for display content only (text, numbers, labels). For data visualization, always prefer built-in widget types (contacts_trend, agenda_preview, pipeline_funnel) or custom widgets with proper data sources`
 }
 
+// Returns this location's AI usage / remaining quota for the current month.
+export async function GET(req: NextRequest) {
+  const locationId = req.nextUrl.searchParams.get('locationId')
+  if (!locationId) return NextResponse.json({ error: 'locationId required' }, { status: 400 })
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const sb = createAdminClient()
+  const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
+  const cap = Number(process.env.AI_MONTHLY_CAP || 300)
+  if (isBibotAgency(profile?.agency_id)) return NextResponse.json({ cap, used: 0, remaining: null, unlimited: true })
+  const period = new Date().toISOString().slice(0, 7)
+  const { data: usage } = await sb.from('ai_usage').select('count').eq('location_id', locationId).eq('period', period).maybeSingle()
+  const used = usage?.count ?? 0
+  return NextResponse.json({ cap, used, remaining: Math.max(0, cap - used), unlimited: false })
+}
+
 export async function POST(req: NextRequest) {
   const { messages, locationId } = await req.json() as {
     messages: { role: 'user' | 'assistant'; content: string }[]
@@ -330,10 +347,15 @@ export async function POST(req: NextRequest) {
     // Clean text (remove widget blocks for display)
     const cleanText = text.replace(/```widget\s*[\s\S]*?```/g, '').trim()
 
-    // Count this generation toward the monthly cap (best-effort, non-blocking).
-    sb.rpc('increment_ai_usage', { p_location: locationId, p_period: period }).then(() => {}, () => {})
+    // Count this generation + report remaining quota for the month.
+    const unlimited = isBibotAgency(profile.agency_id)
+    let remaining: number | null = null
+    if (!unlimited) {
+      const { data: newCount } = await sb.rpc('increment_ai_usage', { p_location: locationId, p_period: period })
+      remaining = Math.max(0, cap - (Number(newCount) || 0))
+    }
 
-    return NextResponse.json({ reply: cleanText, widgets: widgetBlocks })
+    return NextResponse.json({ reply: cleanText, widgets: widgetBlocks, usage: { cap, remaining, unlimited } })
   } catch (err) {
     console.error('[AI widget-chat]', err)
     return NextResponse.json({ error: 'AI generation failed' }, { status: 500 })

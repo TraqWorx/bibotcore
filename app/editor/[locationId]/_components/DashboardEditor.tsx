@@ -65,6 +65,7 @@ export default function DashboardEditor({ locationId, locationName, initialLayou
   }])
   const [input, setInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
+  const [usage, setUsage] = useState<{ remaining: number | null; cap: number; unlimited: boolean } | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -91,6 +92,13 @@ export default function DashboardEditor({ locationId, locationName, initialLayou
   } as React.CSSProperties), [theme, shell])
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, chatLoading])
+
+  useEffect(() => {
+    fetch(`/api/ai/widget-chat?locationId=${encodeURIComponent(locationId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setUsage({ remaining: d.remaining ?? null, cap: d.cap, unlimited: !!d.unlimited }) })
+      .catch(() => {})
+  }, [locationId])
 
   const handleLayoutChange = useCallback((newLayout: Layout) => {
     setGridLayouts((prev) => {
@@ -133,7 +141,8 @@ export default function DashboardEditor({ locationId, locationName, initialLayou
       })
 
       if (res.ok) {
-        const { reply } = await res.json()
+        const { reply, usage: u } = await res.json()
+        if (u) setUsage(u)
         const dashRegex = /```dashboard\s*([\s\S]*?)```/g
         let dashConfig: { widgets?: WidgetConfig[]; colors?: DashboardColors } | null = null
         let match
@@ -152,6 +161,7 @@ export default function DashboardEditor({ locationId, locationName, initialLayou
         setMessages([...newMessages, assistantMsg])
       } else {
         const data = await res.json().catch(() => ({}))
+        if (res.status === 429) setUsage((p) => (p ? { ...p, remaining: 0 } : p))
         setMessages([...newMessages, { role: 'assistant', content: data.error ?? 'Something went wrong.' }])
       }
     } catch {
@@ -270,6 +280,11 @@ export default function DashboardEditor({ locationId, locationName, initialLayou
 
         {/* Input */}
         <div className="border-t border-gray-100 px-3 py-3">
+          {usage && !usage.unlimited && (
+            <p className={`mb-2 text-center text-[11px] ${(usage.remaining ?? 1) <= 10 ? 'font-semibold text-amber-600' : 'text-gray-400'}`}>
+              {usage.remaining ?? usage.cap} of {usage.cap} AI messages left this month
+            </p>
+          )}
           <div className="flex gap-2">
             <input
               ref={inputRef}
