@@ -54,6 +54,7 @@ function extractItems(raw: unknown, dataSource: string): unknown[] {
   if (Array.isArray(obj.conversations)) return obj.conversations
   if (Array.isArray(obj.invoices)) return obj.invoices
   if (Array.isArray(obj.tags)) return obj.tags
+  if (Array.isArray(obj.forms)) return obj.forms
   if (Array.isArray(obj.data)) return obj.data
   if (Array.isArray(raw)) return raw
   return []

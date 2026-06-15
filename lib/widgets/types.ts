@@ -21,6 +21,7 @@ export type CustomDataSource =
   | 'conversations'
   | 'invoices'
   | 'tags'
+  | 'forms'
   | 'none' // for static/computed widgets like "working days"
 
 export interface CustomWidgetConfig {

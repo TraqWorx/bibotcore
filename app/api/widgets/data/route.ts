@@ -16,6 +16,7 @@ const ENDPOINT_MAP: Record<CustomDataSource, string> = {
   conversations: '/conversations/search',
   invoices: '/invoices/',
   tags: '/locations/{locationId}/tags',
+  forms: '/forms/',
   none: '',
 }
 
@@ -72,6 +73,9 @@ export async function POST(req: NextRequest) {
   } else if (dataSource === 'conversations') {
     url.searchParams.set('locationId', locationId)
   } else if (dataSource === 'invoices') {
+    url.searchParams.set('locationId', locationId)
+    url.searchParams.set('limit', '100')
+  } else if (dataSource === 'forms') {
     url.searchParams.set('locationId', locationId)
     url.searchParams.set('limit', '100')
   }

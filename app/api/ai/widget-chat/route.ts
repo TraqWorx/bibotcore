@@ -32,6 +32,7 @@ Your job is to help users create COMPLETE dashboards through conversation. You s
 - conversations: Messages/conversations (contactId, lastMessageDate, type)
 - invoices: Invoices (amount, status, dueDate, contactName)
 - tags: Available tags
+- forms: Forms defined in this location (name, id) — for showing/listing the account's forms
 - none: For static/computed widgets that don't need GHL data
 
 ## Display Types
@@ -105,17 +106,27 @@ For computed/static widgets:
 }
 \`\`\`
 
-For static content (text, images, custom HTML — no scripts allowed):
+### Custom HTML / CSS / JS widget (the powerful one — use it to make things BEAUTIFUL)
+Use displayType "static" with staticContent.html to render ANY HTML, CSS and JavaScript. It runs in a secure sandboxed iframe, so you have FULL creative freedom:
+- Write rich CSS — gradients, shadows, glassmorphism, grids, flexbox, animations, transitions, hover effects, keyframes.
+- Write JavaScript — interactivity, charts, counters, anything.
+- **Load any library from a CDN** with <script src="..."> / <link href="...">: e.g. **Chart.js** or **ApexCharts** (gorgeous charts), **GSAP** or **animate.css** (animations), **Tailwind via CDN**, etc. No install needed.
+- **Bind to live GHL data**: set "dataSource" to a real source (contacts, opportunities, pipelines, calendars, conversations, invoices, users, tags). The array of records is injected as the global **window.WIDGET_DATA** — read it in your JS to build cool, data-driven tables/charts/cards. (Use "none" only for purely decorative widgets.)
+- The iframe auto-sizes to your content. Keep backgrounds transparent or styled by you.
+
+Make these genuinely impressive — modern, animated, on-brand. Prefer a real chart library over plain divs when visualizing data.
+
+Example — animated stat cards from live contacts using Chart.js:
 \`\`\`widget
 {
   "type": "custom",
-  "title": "Welcome",
+  "title": "Contacts Overview",
   "span": 12,
   "options": {
     "displayType": "static",
-    "dataSource": "none",
+    "dataSource": "contacts",
     "staticContent": {
-      "html": "<div style='padding:20px'><h2 style='font-size:18px;font-weight:bold;color:#333'>Welcome to your Dashboard</h2><p style='color:#888;margin-top:8px'>Here's your daily overview.</p></div>"
+      "html": "<link href='https://cdn.jsdelivr.net/npm/animate.css@4/animate.min.css' rel='stylesheet'><div style='display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:20px'><div class='animate__animated animate__fadeInUp' style='border-radius:18px;padding:22px;background:linear-gradient(135deg,#6366f1,#22d3ee);color:#fff;box-shadow:0 12px 30px rgba(99,102,241,.35)'><div style='font-size:13px;opacity:.85'>Total contacts</div><div id='c' style='font-size:40px;font-weight:800'>0</div></div></div><canvas id='ch' height='90'></canvas><script src='https://cdn.jsdelivr.net/npm/chart.js@4'></script><script>var d=window.WIDGET_DATA||[];document.getElementById('c').textContent=d.length;new Chart(document.getElementById('ch'),{type:'line',data:{labels:d.slice(0,12).map(function(_,i){return i+1}),datasets:[{data:d.slice(0,12).map(function(){return Math.random()*100}),borderColor:'#6366f1',tension:.4,fill:true,backgroundColor:'rgba(99,102,241,.12)'}]},options:{plugins:{legend:{display:false}}}});</script>"
     }
   }
 }
@@ -260,6 +271,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // AI usage cap (cost guard) — Bibot/super_admin exempt. Configurable via AI_MONTHLY_CAP.
+  const period = new Date().toISOString().slice(0, 7)
+  const cap = Number(process.env.AI_MONTHLY_CAP || 300)
+  if (!isBibotAgency(profile.agency_id)) {
+    const { data: usage } = await sb.from('ai_usage').select('count').eq('location_id', locationId).eq('period', period).maybeSingle()
+    if ((usage?.count ?? 0) >= cap) {
+      return NextResponse.json({ error: `Monthly AI limit reached (${cap} messages for this location). It resets next month.` }, { status: 429 })
+    }
+  }
+
   try {
     // Fetch custom fields and tags for this location
     let customFieldsCtx = ''
@@ -308,6 +329,9 @@ export async function POST(req: NextRequest) {
 
     // Clean text (remove widget blocks for display)
     const cleanText = text.replace(/```widget\s*[\s\S]*?```/g, '').trim()
+
+    // Count this generation toward the monthly cap (best-effort, non-blocking).
+    sb.rpc('increment_ai_usage', { p_location: locationId, p_period: period }).then(() => {}, () => {})
 
     return NextResponse.json({ reply: cleanText, widgets: widgetBlocks })
   } catch (err) {
