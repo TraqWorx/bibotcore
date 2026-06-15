@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import DOMPurify from 'isomorphic-dompurify'
+import { useEffect, useRef, useState } from 'react'
 import type { CustomWidgetConfig, CustomDataSource } from './types'
 import { useDashboardFilters } from './DashboardFilterContext'
 import WidgetShell from './WidgetShell'
@@ -73,13 +72,55 @@ function formatValue(val: unknown, format?: string): string {
   return String(val)
 }
 
+// ── Sandboxed HTML/CSS/JS widget ──
+// Renders user/AI-authored HTML + CSS + JS inside a sandboxed iframe (scripts
+// allowed, NO same-origin) so it can pull in any CDN library and run freely
+// WITHOUT access to the parent page's cookies/session or other clients' data.
+// The widget's GHL data is injected as window.WIDGET_DATA; the iframe auto-sizes
+// to its content via postMessage.
+function buildSrcDoc(html: string, data: unknown): string {
+  const dataJson = JSON.stringify(data ?? null).replace(/</g, '\\u003c')
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<script>window.WIDGET_DATA=${dataJson};</script>
+<style>html,body{margin:0;padding:0;background:transparent;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#0f172a}</style>
+</head><body>
+${html}
+<script>(function(){function h(){var b=document.body,e=document.documentElement;parent.postMessage({__gcd_h:Math.max(b.scrollHeight,e.scrollHeight,b.offsetHeight)},'*')}window.addEventListener('load',h);setTimeout(h,150);setTimeout(h,700);setTimeout(h,1800);try{new ResizeObserver(h).observe(document.body)}catch(e){}})();</script>
+</body></html>`
+}
+
+function HtmlSandbox({ html, data }: { html: string; data?: unknown }) {
+  const ref = useRef<HTMLIFrameElement>(null)
+  const [height, setHeight] = useState(160)
+  useEffect(() => {
+    function onMsg(e: MessageEvent) {
+      if (ref.current && e.source === ref.current.contentWindow && e.data && typeof e.data.__gcd_h === 'number') {
+        setHeight(Math.min(3000, Math.max(40, e.data.__gcd_h)))
+      }
+    }
+    window.addEventListener('message', onMsg)
+    return () => window.removeEventListener('message', onMsg)
+  }, [])
+  return (
+    <iframe
+      ref={ref}
+      sandbox="allow-scripts allow-popups"
+      srcDoc={buildSrcDoc(html, data)}
+      style={{ width: '100%', height, border: 0, display: 'block' }}
+      title="widget"
+    />
+  )
+}
+
 // ── Static Widget ──
-function StaticDisplay({ config }: { config: CustomWidgetConfig }) {
+function StaticDisplay({ config, items }: { config: CustomWidgetConfig; items: unknown[] }) {
   const sc = config.staticContent
   if (!sc) return null
 
-  // Full XSS sanitization via DOMPurify (works SSR + client).
-  if (sc.html) return <div className="p-5" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(sc.html) }} />
+  if (sc.html) {
+    const hasData = config.dataSource && config.dataSource !== 'none'
+    return <HtmlSandbox html={sc.html} data={hasData ? items : undefined} />
+  }
 
   return (
     <div className="p-5">
@@ -394,9 +435,17 @@ export default function CustomWidget({ title, options }: Props) {
   const { data: rawData, loading } = useWidgetData(locationId, config, globalFilters)
   const items = extractItems(rawData, config.dataSource)
 
-  // Static and computed widgets don't need GHL data
+  // Static (sandboxed HTML/CSS/JS) widget. If it binds a data source, wait for
+  // the data so it can be injected into the sandbox as window.WIDGET_DATA.
   if (config.displayType === 'static') {
-    return <WidgetShell title={title}><StaticDisplay config={config} /></WidgetShell>
+    if (config.dataSource && config.dataSource !== 'none' && loading) {
+      return (
+        <WidgetShell title={title}>
+          <div className="flex items-center justify-center p-8"><div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200" style={{ borderTopColor: 'var(--brand)' }} /></div>
+        </WidgetShell>
+      )
+    }
+    return <WidgetShell title={title}><StaticDisplay config={config} items={items} /></WidgetShell>
   }
   if (config.compute) {
     return <WidgetShell title={title}><ComputedDisplay config={config} /></WidgetShell>
