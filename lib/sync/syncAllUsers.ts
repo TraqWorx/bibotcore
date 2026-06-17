@@ -6,6 +6,7 @@
 
 import { createAdminClient } from '@/lib/supabase-server'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
+import { normalizeMemberScope } from '@/lib/sync/normalizeMemberScope'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
@@ -158,6 +159,10 @@ export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
           { user_id: profileId, location_id: loc.location_id, role: defaultRole },
           { onConflict: 'user_id,location_id' },
         )
+        // Self-heal stale scope: a user who self-signed-up into a junk agency
+        // (their own + a Test Location) must be re-scoped to THIS location's
+        // agency so they land on the right sub-account, not their junk one.
+        await normalizeMemberScope(sb, profileId, loc.location_id)
         usersLinked++
       }
 

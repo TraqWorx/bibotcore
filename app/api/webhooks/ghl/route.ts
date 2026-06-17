@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
+import { normalizeMemberScope } from '@/lib/sync/normalizeMemberScope'
 import { runDesignInstaller } from '@/lib/designInstaller/runDesignInstaller'
 import { provisionLocation } from '@/lib/ghl/provisionLocation'
 import { processWebhookEvent } from '@/lib/sync/webhookProcessor'
@@ -122,16 +123,15 @@ export async function POST(req: Request) {
       }
 
       if (profileId && existing?.role !== 'super_admin') {
-        // Link to location + update agency
+        // Link to location
         await supabase.from('profile_locations').upsert(
           { user_id: profileId, location_id: locationId, role: 'team_member' },
           { onConflict: 'user_id,location_id' },
         )
-        // Set agency_id from location
-        const { data: loc } = await supabase.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
-        if (loc?.agency_id) {
-          await supabase.from('profiles').update({ agency_id: loc.agency_id }).eq('id', profileId)
-        }
+        // Scope the profile to THIS location's agency in real time, and demote
+        // a stray junk-agency 'admin' so the user lands on the right sub-account
+        // instead of their old self-signup agency / Test Location.
+        await normalizeMemberScope(supabase, profileId, locationId)
         console.log(`[ghl-webhook] UserCreate → added ${email} to ${locationId}`)
       }
     }
