@@ -33,6 +33,19 @@ export async function addCategoryMapping(formData: FormData): Promise<{ error?: 
   return {}
 }
 
+export async function saveSegmentsAction(
+  segments: { name: string; minOrders: number; color?: string }[]
+): Promise<{ error?: string }> {
+  const guard = await assertOwner()
+  if (guard.error) return guard
+  const { saveSegments } = await import('@/lib/farmacia/segments')
+  await saveSegments(segments)
+  revalidatePath('/designs/farmacia-cialdella/settings')
+  revalidatePath('/designs/farmacia-cialdella/clienti')
+  revalidatePath('/designs/farmacia-cialdella/dashboard')
+  return {}
+}
+
 export async function deleteCategoryMapping(id: string): Promise<{ error?: string }> {
   const guard = await assertOwner()
   if (guard.error) return guard

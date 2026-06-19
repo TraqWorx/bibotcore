@@ -1,5 +1,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
+import { getSegments } from '@/lib/farmacia/segments'
 import CategoryMapForm from './_components/CategoryMapForm'
+import SegmentsEditor from './_components/SegmentsEditor'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,10 +9,11 @@ interface CatRow { id: string; sku: string | null; ean: string | null; category:
 
 export default async function SettingsPage() {
   const sb = createAdminClient()
-  const [{ data: cats }, { count: pending }, { count: failed }] = await Promise.all([
+  const [{ data: cats }, { count: pending }, { count: failed }, segments] = await Promise.all([
     sb.from('farmacia_category_map').select('id, sku, ean, category').order('category').limit(500),
     sb.from('farmacia_sync_queue').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     sb.from('farmacia_sync_queue').select('id', { count: 'exact', head: true }).eq('status', 'failed'),
+    getSegments(),
   ])
   const rows = (cats ?? []) as CatRow[]
 
@@ -26,6 +29,14 @@ export default async function SettingsPage() {
           <div><div style={{ fontSize: 22, fontWeight: 800, color: (failed ?? 0) > 0 ? 'var(--fc-danger)' : undefined }}>{failed ?? 0}</div><div style={{ fontSize: 12, color: 'var(--fc-text-muted)' }}>Falliti</div></div>
           <div style={{ alignSelf: 'center', fontSize: 13, color: 'var(--fc-text-faint)' }}>La coda viene svuotata verso GHL ogni minuto.</div>
         </div>
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Livelli fedeltà (segmenti)</h2>
+        <p style={{ fontSize: 13, color: 'var(--fc-text-muted)' }}>
+          Definisci la soglia di ordini per ogni livello. Il livello di ogni cliente è calcolato in tempo reale: cambiando le soglie, i conteggi si aggiornano subito.
+        </p>
+        <SegmentsEditor initial={segments} />
       </section>
 
       <section>
