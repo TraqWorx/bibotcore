@@ -91,6 +91,17 @@ export async function POST(req: Request) {
     }
   }
 
+  // ── Handle app install: backfill all existing location users ──────────────
+  // GHL only fires UserCreate/UserUpdate for users changed AFTER install, so
+  // staff who already existed on the sub-account would never sync on their own.
+  // On INSTALL, pull the full user list once so they appear without a manual sync.
+  if (eventType === 'INSTALL') {
+    const { syncAllLocationUsers } = await import('@/lib/sync/syncAllUsers')
+    syncAllLocationUsers(locationId)
+      .then((r) => console.log(`[ghl-webhook] INSTALL → backfilled users for ${locationId}`, r))
+      .catch((err) => console.error('[ghl-webhook] INSTALL user backfill failed:', err))
+  }
+
   // ── Handle user added to / updated on location ─────────────────────────
   // GHL fires UserUpdate when an existing company user is assigned to a
   // location, gets a role change, etc. — treat it the same as a create:
