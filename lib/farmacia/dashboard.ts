@@ -12,6 +12,7 @@ export interface Overview {
   recurringCustomers: number
   amazonConversions: number
   ebayConversions: number
+  storeConversions: number
 }
 
 export interface TopCustomer {
@@ -52,6 +53,7 @@ export async function getOverview(from: Date, to: Date): Promise<Overview> {
     recurringCustomers: Number(o.recurring_customers ?? 0),
     amazonConversions: Number(c.amazon ?? 0),
     ebayConversions: Number(c.ebay ?? 0),
+    storeConversions: Number(c.store ?? 0),
   }
 }
 

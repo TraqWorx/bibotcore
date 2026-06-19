@@ -38,6 +38,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     { label: 'Clienti ricorrenti', value: String(overview.recurringCustomers) },
     { label: 'Conversioni Amazon', value: String(overview.amazonConversions) },
     { label: 'Conversioni eBay', value: String(overview.ebayConversions) },
+    { label: 'Conversioni Store', value: String(overview.storeConversions) },
   ]
 
   return (
