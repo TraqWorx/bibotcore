@@ -98,6 +98,31 @@ export async function setContactTags(id: string, tags: string[]): Promise<{ erro
   return {}
 }
 
+export async function addTagToContact(id: string, tag: string): Promise<{ error?: string }> {
+  const guard = await assertOwner(); if (guard.error) return guard
+  const t = tag.trim(); if (!t) return { error: 'Tag vuoto' }
+  const sb = createAdminClient()
+  const { data: c } = await sb.from('farmacia_contacts').select('tags, ghl_id').eq('id', id).maybeSingle()
+  const tags = [...new Set([...((c?.tags as string[] | null) ?? []), t])]
+  const { error } = await sb.from('farmacia_contacts').update({ tags }).eq('id', id)
+  if (error) return { error: error.message }
+  if (c?.ghl_id) await enqueueOps([{ contact_id: id, ghl_id: c.ghl_id, action: 'add_tag', payload: { tag: t } }])
+  revalidatePath('/designs/farmacia-cialdella/clienti')
+  return {}
+}
+
+export async function removeTagFromContact(id: string, tag: string): Promise<{ error?: string }> {
+  const guard = await assertOwner(); if (guard.error) return guard
+  const sb = createAdminClient()
+  const { data: c } = await sb.from('farmacia_contacts').select('tags, ghl_id').eq('id', id).maybeSingle()
+  const tags = ((c?.tags as string[] | null) ?? []).filter((x) => x !== tag)
+  const { error } = await sb.from('farmacia_contacts').update({ tags }).eq('id', id)
+  if (error) return { error: error.message }
+  if (c?.ghl_id) await enqueueOps([{ contact_id: id, ghl_id: c.ghl_id, action: 'remove_tag', payload: { tag } }])
+  revalidatePath('/designs/farmacia-cialdella/clienti')
+  return {}
+}
+
 export interface ContactOrder { id: string; order_ext_id: string; channel: string; order_date: string | null; total_cents: number | null; category: string | null }
 
 export async function getContactOrders(id: string): Promise<ContactOrder[]> {

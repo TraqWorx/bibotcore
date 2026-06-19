@@ -4,19 +4,19 @@ import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { computeTier, type SegmentConfig } from '@/lib/farmacia/segments'
 import { FARMACIA_LOCATION_ID } from '@/lib/farmacia/fields'
-import { createContact, updateContact, deleteContact, saveNotes, setContactTags, getContactOrders, type ContactOrder } from '../_actions'
+import { createContact, updateContact, deleteContact, saveNotes, addTagToContact, removeTagFromContact, getContactOrders, type ContactOrder } from '../_actions'
+import TagEditor from './TagEditor'
 import type { ClientiRow } from './ClientiView'
 
 type Tab = 'anagrafica' | 'ordini' | 'conversazioni' | 'note'
 function euros(c: number | null) { return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format((c ?? 0) / 100) }
 
-export default function ContactDrawer({ contact, adding, config, onClose }: { contact: ClientiRow | null; adding: boolean; config: SegmentConfig; onClose: () => void }) {
+export default function ContactDrawer({ contact, adding, config, suggestions, onClose }: { contact: ClientiRow | null; adding: boolean; config: SegmentConfig; suggestions: string[]; onClose: () => void }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('anagrafica')
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState('')
   const [orders, setOrders] = useState<ContactOrder[] | null>(null)
-  const [tagText, setTagText] = useState((contact?.tags ?? []).join(', '))
   const [notes, setNotes] = useState(contact?.notes ?? '')
 
   const tier = contact ? computeTier(contact.orders_count, contact.total_spent_cents, config) : null
@@ -111,9 +111,8 @@ export default function ContactDrawer({ contact, adding, config, onClose }: { co
         {!adding && tab === 'note' && contact && (
           <div style={{ display: 'grid', gap: 16 }}>
             <div>
-              <label style={lbl}>Tag (separati da virgola)</label>
-              <input value={tagText} onChange={(e) => setTagText(e.target.value)} style={inp} />
-              <button className="fc-btn-primary" style={{ marginTop: 8 }} disabled={pending} onClick={() => start(async () => { await setContactTags(contact.id, tagText.split(',')); setMsg('Tag salvati.'); refresh() })}>Salva tag</button>
+              <label style={lbl}>Tag</label>
+              <TagEditor contactId={contact.id} initial={contact.tags ?? []} suggestions={suggestions} add={addTagToContact} remove={removeTagFromContact} />
             </div>
             <div>
               <label style={lbl}>Note</label>

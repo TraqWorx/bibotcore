@@ -32,7 +32,7 @@ const ORIGINS: { key: string; label: string }[] = [
 function euros(c: number) { return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format((c ?? 0) / 100) }
 function name(r: ClientiRow) { return [r.first_name, r.last_name].filter(Boolean).join(' ') || r.phone_norm || r.email || '—' }
 
-export default function ClientiView({ contacts, config }: { contacts: ClientiRow[]; config: SegmentConfig }) {
+export default function ClientiView({ contacts, config, suggestions }: { contacts: ClientiRow[]; config: SegmentConfig; suggestions: string[] }) {
   const [q, setQ] = useState('')
   const [cluster, setCluster] = useState('')
   const [origin, setOrigin] = useState('')
@@ -100,6 +100,7 @@ export default function ClientiView({ contacts, config }: { contacts: ClientiRow
           contact={selected}
           adding={adding}
           config={config}
+          suggestions={suggestions}
           onClose={() => { setSelected(null); setAdding(false) }}
         />
       )}
