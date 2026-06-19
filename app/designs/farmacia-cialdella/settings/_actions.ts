@@ -50,6 +50,24 @@ export async function saveSegmentsAction(
   return { retagged: updated }
 }
 
+/** Remove a tag from every contact that has it, and from GHL. */
+export async function deleteTagEverywhere(tag: string): Promise<{ error?: string; removed?: number }> {
+  const guard = await assertOwner()
+  if (guard.error) return guard
+  const { enqueueOps } = await import('@/lib/farmacia/sync-queue')
+  const sb = createAdminClient()
+  const { data } = await sb.from('farmacia_contacts').select('id, tags, ghl_id').contains('tags', [tag]).limit(5000)
+  const ops = []
+  for (const c of data ?? []) {
+    const next = (c.tags ?? []).filter((t: string) => t !== tag)
+    await sb.from('farmacia_contacts').update({ tags: next }).eq('id', c.id)
+    if (c.ghl_id) ops.push({ contact_id: c.id, ghl_id: c.ghl_id, action: 'remove_tag' as const, payload: { tag } })
+  }
+  if (ops.length) await enqueueOps(ops)
+  revalidatePath('/designs/farmacia-cialdella/settings')
+  return { removed: (data ?? []).length }
+}
+
 export async function deleteCategoryMapping(id: string): Promise<{ error?: string }> {
   const guard = await assertOwner()
   if (guard.error) return guard
