@@ -67,6 +67,35 @@ export function averageOrderCents(totalSpentCents: number, ordersCount: number):
   return ordersCount > 0 ? Math.round(totalSpentCents / ordersCount) : 0
 }
 
+export interface TierStat {
+  name: string
+  color?: string
+  count: number
+  revenueCents: number
+  aovCents: number // scontrino medio = tier revenue / tier order count
+}
+
+/** Per-tier breakdown for the clusterization table/chart. Pure — tested. */
+export function tierBreakdown(
+  customers: { ordersCount: number; totalSpentCents: number }[],
+  config: SegmentConfig
+): TierStat[] {
+  const acc = new Map<string, { count: number; revenue: number; orders: number }>()
+  for (const s of config.segments) acc.set(s.name, { count: 0, revenue: 0, orders: 0 })
+  for (const c of customers) {
+    const t = computeTier(c.ordersCount, c.totalSpentCents, config)
+    if (!t) continue
+    const e = acc.get(t.name)!
+    e.count += 1
+    e.revenue += c.totalSpentCents
+    e.orders += c.ordersCount
+  }
+  return config.segments.map((s) => {
+    const e = acc.get(s.name)!
+    return { name: s.name, color: s.color, count: e.count, revenueCents: e.revenue, aovCents: e.orders > 0 ? Math.round(e.revenue / e.orders) : 0 }
+  })
+}
+
 /** GHL tag for a tier name, e.g. "Oro" → "livello-oro". Pure — tested. */
 export function tierTag(name: string): string {
   return 'livello-' + name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')

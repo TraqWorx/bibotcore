@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase-server'
 import { getSegmentConfig, computeTier, averageOrderCents } from '@/lib/farmacia/segments'
 
@@ -49,7 +50,11 @@ export default async function ClientiPage() {
               const tier = computeTier(r.orders_count, r.total_spent_cents, segmentConfig)
               return (
               <tr key={r.id}>
-                <td>{[r.first_name, r.last_name].filter(Boolean).join(' ') || '—'}</td>
+                <td>
+                  <Link href={`/designs/farmacia-cialdella/clienti/${r.id}`} style={{ color: 'var(--fc-blue)', textDecoration: 'none', fontWeight: 600 }}>
+                    {[r.first_name, r.last_name].filter(Boolean).join(' ') || '—'}
+                  </Link>
+                </td>
                 <td style={{ fontSize: 13 }}>{r.phone_norm ?? r.email ?? '—'}</td>
                 <td>{tier ? <span className="fc-pill" data-tone={tier.color ?? 'gray'}>{tier.name}</span> : '—'}</td>
                 <td style={{ fontSize: 12 }}>{(r.origin_tags ?? []).join(', ') || '—'}</td>

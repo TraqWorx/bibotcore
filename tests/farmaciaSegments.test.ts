@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  computeTier, countByTier, averageOrderCents, normalizeSegments, tierTag,
+  computeTier, countByTier, averageOrderCents, normalizeSegments, tierTag, tierBreakdown,
   DEFAULT_SEGMENTS, type SegmentConfig,
 } from '@/lib/farmacia/segments'
 
@@ -49,6 +49,24 @@ describe('averageOrderCents', () => {
   it('computes scontrino medio and guards divide-by-zero', () => {
     expect(averageOrderCents(10000, 4)).toBe(2500)
     expect(averageOrderCents(0, 0)).toBe(0)
+  })
+})
+
+describe('tierBreakdown', () => {
+  it('aggregates count, revenue and scontrino medio per tier', () => {
+    const customers = [
+      { ordersCount: 1, totalSpentCents: 1000 },  // Bronzo
+      { ordersCount: 6, totalSpentCents: 6000 },  // Argento
+      { ordersCount: 4, totalSpentCents: 4000 },  // Bronzo
+    ]
+    const out = tierBreakdown(customers, anyCfg())
+    const bronzo = out.find((t) => t.name === 'Bronzo')!
+    expect(bronzo.count).toBe(2)
+    expect(bronzo.revenueCents).toBe(5000)
+    expect(bronzo.aovCents).toBe(1000) // 5000 / (1+4) orders
+    const argento = out.find((t) => t.name === 'Argento')!
+    expect(argento.count).toBe(1)
+    expect(argento.aovCents).toBe(1000) // 6000 / 6
   })
 })
 
