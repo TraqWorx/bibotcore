@@ -1,7 +1,8 @@
 /** Read models for the Farmacia dashboard. RPCs do the grouped aggregations. */
 
 import { createAdminClient } from '@/lib/supabase-server'
-import { getSegmentConfig, tierBreakdown, type TierStat } from './segments'
+import { tierBreakdown, type TierStat } from './segments'
+import { getSegmentConfig } from './segments-store'
 
 export interface Overview {
   ordersCount: number

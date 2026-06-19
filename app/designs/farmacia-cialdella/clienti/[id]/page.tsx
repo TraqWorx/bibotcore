@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase-server'
-import { getSegmentConfig, computeTier, averageOrderCents } from '@/lib/farmacia/segments'
+import { computeTier, averageOrderCents } from '@/lib/farmacia/segments'
+import { getSegmentConfig } from '@/lib/farmacia/segments-store'
 
 export const dynamic = 'force-dynamic'
 

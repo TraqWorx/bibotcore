@@ -9,7 +9,8 @@
 
 import { createAdminClient } from '@/lib/supabase-server'
 import { enqueueOps, type QueueOpInput } from './sync-queue'
-import { computeTier, getSegmentConfig, tierTag, type SegmentConfig } from './segments'
+import { computeTier, tierTag, type SegmentConfig } from './segments'
+import { getSegmentConfig } from './segments-store'
 
 interface TierRow {
   id: string

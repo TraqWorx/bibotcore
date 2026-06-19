@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase-server'
-import { getSegmentConfig } from '@/lib/farmacia/segments'
+import { getSegmentConfig } from '@/lib/farmacia/segments-store'
 import CategoryMapForm from './_components/CategoryMapForm'
 import SegmentsEditor from './_components/SegmentsEditor'
 

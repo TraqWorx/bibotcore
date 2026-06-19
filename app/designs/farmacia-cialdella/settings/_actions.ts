@@ -39,7 +39,7 @@ export async function saveSegmentsAction(
 ): Promise<{ error?: string; retagged?: number }> {
   const guard = await assertOwner()
   if (guard.error) return guard
-  const { saveSegmentConfig } = await import('@/lib/farmacia/segments')
+  const { saveSegmentConfig } = await import('@/lib/farmacia/segments-store')
   await saveSegmentConfig({ segments, matchMode })
   // Re-tag everyone against the new thresholds (incremental via the sync queue).
   const { applyTierTags } = await import('@/lib/farmacia/tier-sync')

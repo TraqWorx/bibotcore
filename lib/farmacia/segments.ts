@@ -7,9 +7,10 @@
  * editing thresholds instantly re-buckets everyone.
  *
  * Config lives in farmacia_settings: key 'segments' (Segment[]) + 'segment_match'.
+ *
+ * This module is PURE (no server imports) so it's safe to import from client
+ * components. DB load/save lives in segments-store.ts.
  */
-
-import { createAdminClient } from '@/lib/supabase-server'
 
 export type MatchMode = 'any' | 'all'
 
@@ -113,22 +114,3 @@ export function normalizeSegments(input: Segment[]): Segment[] {
     }))
 }
 
-export async function getSegmentConfig(): Promise<SegmentConfig> {
-  const sb = createAdminClient()
-  const { data } = await sb.from('farmacia_settings').select('key, value').in('key', ['segments', 'segment_match'])
-  const segRow = data?.find((r) => r.key === 'segments')?.value as Segment[] | undefined
-  const modeRow = data?.find((r) => r.key === 'segment_match')?.value as MatchMode | undefined
-  const segments = Array.isArray(segRow) && segRow.length
-    ? segRow.map((s) => ({ ...s, minSpendCents: s.minSpendCents ?? 0 }))
-    : DEFAULT_SEGMENTS
-  return { segments, matchMode: modeRow === 'all' ? 'all' : DEFAULT_MATCH_MODE }
-}
-
-export async function saveSegmentConfig(config: SegmentConfig): Promise<void> {
-  const sb = createAdminClient()
-  const now = new Date().toISOString()
-  await sb.from('farmacia_settings').upsert([
-    { key: 'segments', value: normalizeSegments(config.segments), updated_at: now },
-    { key: 'segment_match', value: config.matchMode === 'all' ? 'all' : 'any', updated_at: now },
-  ], { onConflict: 'key' })
-}
