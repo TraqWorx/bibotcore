@@ -6,7 +6,7 @@
  */
 
 import { FARMACIA_ORIGIN, type FarmaciaOrigin } from './fields'
-import { isMarketplace, resolveCategory, type ParsedOrder } from './transform'
+import { isMarketplace, resolveCategory, type ParsedOrder, type Shipping } from './transform'
 
 export interface ContactRollup {
   ordersCount: number
@@ -90,6 +90,7 @@ export interface PlannedOrder {
   orderDate: string | null
   totalCents: number | null
   category: string | null
+  shipping?: Shipping
   items: PlannedItem[]
 }
 
@@ -123,6 +124,7 @@ export function buildImportPlan(
       orderDate: o.orderDate,
       totalCents: o.totalCents,
       category: o.category,
+      shipping: o.shipping,
       items: o.items.map((it) => ({
         sku: it.sku, ean: it.ean, description: it.description, qty: it.qty,
         unitPriceCents: it.unitPriceCents, lineTotalCents: it.lineTotalCents,

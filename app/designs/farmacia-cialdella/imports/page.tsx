@@ -18,7 +18,7 @@ interface ImportRow {
   created_at: string
 }
 
-const ORIGIN_LABEL: Record<string, string> = { amazon: 'Amazon', ebay: 'eBay', store: 'Store', sito: 'Sito' }
+const ORIGIN_LABEL: Record<string, string> = { market_rock: 'Market Rock', amazon: 'Amazon', ebay: 'eBay', store: 'Store', sito: 'Sito' }
 
 export default async function ImportsPage() {
   const sb = createAdminClient()
@@ -33,14 +33,12 @@ export default async function ImportsPage() {
     <div style={{ padding: 32, maxWidth: 1100 }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Importazioni</h1>
       <p style={{ color: 'var(--fc-text-muted)', marginBottom: 24 }}>
-        Carica un file per canale. Il box determina il tag applicato, che fa partire la sequenza di nurturing su GoHighLevel.
+        Carica il file unico Market Rock (tutti i canali). Crea ordini, clienti e conversioni, e applica i tag di canale
+        (amazon / ebay / store) che fanno partire le sequenze di nurturing su GoHighLevel.
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 16 }}>
-        <ImportBox label="Amazon" hint="Tag amazon → sequenza WhatsApp soft-push verso il sito" endpoint="/api/farmacia/import/contacts?box=amazon" tone="blue" />
-        <ImportBox label="eBay" hint="Tag ebay → sequenza WhatsApp dedicata eBay" endpoint="/api/farmacia/import/contacts?box=ebay" tone="blue" />
-        <ImportBox label="Store" hint="Tag store → sequenza SMS promo clienti store" endpoint="/api/farmacia/import/contacts?box=store" tone="blue" />
-        <ImportBox label="Sito — ordini" hint="Ordini del sito (ShippyPro/Market Rock): popola ordini e conversioni" endpoint="/api/farmacia/import/orders" tone="green" />
+      <div style={{ maxWidth: 420 }}>
+        <ImportBox label="File Market Rock" hint="CSV o Excel · un solo file con tutti i canali" endpoint="/api/farmacia/import/orders" tone="green" />
       </div>
 
       <h2 style={{ fontSize: 16, fontWeight: 700, margin: '28px 0 12px' }}>Storico import</h2>

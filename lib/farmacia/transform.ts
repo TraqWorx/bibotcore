@@ -24,6 +24,16 @@ export interface MappedRow {
   unitPriceCents: number | null
   lineTotalCents: number | null
   category: string | null
+  shipping?: Shipping
+}
+
+export interface Shipping {
+  name: string | null
+  address: string | null
+  city: string | null
+  zip: string | null
+  province: string | null
+  country: string | null
 }
 
 export interface ParsedItem {
@@ -46,7 +56,12 @@ export interface ParsedOrder {
   channel: FarmaciaOrigin
   totalCents: number | null
   category: string | null
+  shipping?: Shipping
   items: ParsedItem[]
+}
+
+function hasShipping(s?: Shipping): boolean {
+  return !!s && !!(s.name || s.address || s.city || s.zip || s.province || s.country)
 }
 
 /** Normalize a phone to +39… form for stable dedup. */
@@ -76,7 +91,9 @@ export function normalizeChannel(
   }
   if (s.includes('amazon')) return FARMACIA_ORIGIN.AMAZON
   if (s.includes('ebay')) return FARMACIA_ORIGIN.EBAY
-  if (s.includes('online') || s.includes('store') || s.includes('shop') || s.includes('web') || s.includes('woocommerce'))
+  if (s.includes('negozio') || s.includes('punto vendita') || s === 'store' || s.includes('fisic'))
+    return FARMACIA_ORIGIN.STORE
+  if (s.includes('online') || s.includes('store') || s.includes('shop') || s.includes('web') || s.includes('woocommerce') || s.includes('sito'))
     return FARMACIA_ORIGIN.ONLINE_STORE
   return FARMACIA_ORIGIN.OTHER
 }
@@ -163,6 +180,14 @@ export function mapRow(
     unitPriceCents: parseAmountToCents(pick(raw, map.unitPrice)),
     lineTotalCents: parseAmountToCents(pick(raw, map.lineTotal)),
     category: pick(raw, map.category),
+    shipping: {
+      name: pick(raw, map.shipName),
+      address: pick(raw, map.shipAddress),
+      city: pick(raw, map.shipCity),
+      zip: pick(raw, map.shipZip),
+      province: pick(raw, map.shipProvince),
+      country: pick(raw, map.shipCountry),
+    },
   }
 }
 
@@ -183,6 +208,7 @@ export function groupIntoOrders(rows: MappedRow[]): ParsedOrder[] {
         channel: r.channel,
         totalCents: r.orderTotalCents,
         category: r.category,
+        shipping: r.shipping,
         items: [],
       }
       byId.set(r.orderExtId, o)
@@ -195,6 +221,7 @@ export function groupIntoOrders(rows: MappedRow[]): ParsedOrder[] {
       o.lastName ??= r.lastName
       o.totalCents ??= r.orderTotalCents
       o.category ??= r.category
+      if (!hasShipping(o.shipping) && hasShipping(r.shipping)) o.shipping = r.shipping
       if (o.channel === FARMACIA_ORIGIN.OTHER && r.channel !== FARMACIA_ORIGIN.OTHER) o.channel = r.channel
     }
     // Only push a line item if the row carries product detail.

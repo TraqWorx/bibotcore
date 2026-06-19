@@ -9,7 +9,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { enqueueOps, type QueueOpInput } from './sync-queue'
 import { buildImportPlan, computeRollup, type RollupOrder } from './import-plan'
 import { type ParsedOrder } from './transform'
-import { FARMACIA_ORIGIN, FARMACIA_TAG, type FarmaciaOrigin } from './fields'
+import { FARMACIA_TAG, channelTag, type FarmaciaOrigin } from './fields'
 
 export interface ImportSummary {
   contactsCreated: number
@@ -30,13 +30,9 @@ function chunked<T>(arr: T[], size: number): T[][] {
   return out
 }
 
-function originTags(origins: FarmaciaOrigin[]): string[] {
-  const map: Partial<Record<FarmaciaOrigin, string>> = {
-    [FARMACIA_ORIGIN.AMAZON]: FARMACIA_TAG.ORIGIN_AMAZON,
-    [FARMACIA_ORIGIN.EBAY]: FARMACIA_TAG.ORIGIN_EBAY,
-    [FARMACIA_ORIGIN.ONLINE_STORE]: FARMACIA_TAG.ORIGIN_ONLINE_STORE,
-  }
-  return origins.map((o) => map[o]).filter((t): t is string => !!t)
+/** Channel tags that drive GHL nurturing automations (amazon/ebay/store/sito). */
+function channelTags(origins: FarmaciaOrigin[]): string[] {
+  return [...new Set(origins.map(channelTag).filter((t): t is string => !!t))]
 }
 
 export async function persistOrderImport(
@@ -53,21 +49,34 @@ export async function persistOrderImport(
 
   // 1. Resolve existing contacts by phone_norm and (phone-less) email.
   const keyToId = new Map<string, string>()
+  const existing = new Map<string, { tags: string[] | null; ghl_id: string | null }>() // key → existing row
   const phoneKeys = plan.contacts.map((c) => c.phoneNorm).filter((p): p is string => !!p)
   const emailKeys = plan.contacts.filter((c) => !c.phoneNorm && c.email).map((c) => c.email!.toLowerCase())
   for (const chunk of chunked(phoneKeys, 300)) {
-    const { data } = await sb.from('farmacia_contacts').select('id, phone_norm').in('phone_norm', chunk)
-    for (const r of data ?? []) if (r.phone_norm) keyToId.set(r.phone_norm, r.id)
+    const { data } = await sb.from('farmacia_contacts').select('id, phone_norm, tags, ghl_id').in('phone_norm', chunk)
+    for (const r of data ?? []) if (r.phone_norm) { keyToId.set(r.phone_norm, r.id); existing.set(r.phone_norm, { tags: r.tags, ghl_id: r.ghl_id }) }
   }
   for (const chunk of chunked(emailKeys, 300)) {
-    const { data } = await sb.from('farmacia_contacts').select('id, email').in('email', chunk)
-    for (const r of data ?? []) if (r.email) keyToId.set(`email:${r.email.toLowerCase()}`, r.id)
+    const { data } = await sb.from('farmacia_contacts').select('id, email, tags, ghl_id').in('email', chunk)
+    for (const r of data ?? []) if (r.email) { keyToId.set(`email:${r.email.toLowerCase()}`, r.id); existing.set(`email:${r.email.toLowerCase()}`, { tags: r.tags, ghl_id: r.ghl_id }) }
   }
 
-  // 2. Insert missing contacts; queue a create op for each.
-  const createOps: QueueOpInput[] = []
+  // 2. Insert missing contacts; tag existing ones by channel. The channel tag
+  // (amazon/ebay/store/sito) is what GHL nurturing automations watch.
+  const tagOps: QueueOpInput[] = []
   for (const c of plan.contacts) {
-    if (keyToId.has(c.key)) { summary.contactsUpdated++; continue }
+    const chTags = channelTags(c.origins)
+    const ex = existing.get(c.key)
+    if (ex) {
+      summary.contactsUpdated++
+      const current = ex.tags ?? []
+      const missing = chTags.filter((t) => !current.includes(t))
+      if (missing.length) {
+        await sb.from('farmacia_contacts').update({ tags: [...new Set([...current, ...missing])] }).eq('id', keyToId.get(c.key)!)
+        if (ex.ghl_id) for (const t of missing) tagOps.push({ contact_id: keyToId.get(c.key)!, ghl_id: ex.ghl_id, action: 'add_tag', payload: { tag: t }, import_id: importId })
+      }
+      continue
+    }
     const id = newId()
     keyToId.set(c.key, id)
     const { error } = await sb.from('farmacia_contacts').insert({
@@ -77,13 +86,15 @@ export async function persistOrderImport(
       email: c.email,
       first_name: c.firstName,
       last_name: c.lastName,
-      tags: [FARMACIA_TAG.CUSTOMER, ...originTags(c.origins)],
+      origin_tags: c.origins,
+      tags: [FARMACIA_TAG.CUSTOMER, ...chTags],
       sync_status: 'pending_create',
     })
     if (error) throw new Error(`contact insert: ${error.message}`)
     summary.contactsCreated++
-    createOps.push({ contact_id: id, action: 'create', import_id: importId })
+    tagOps.push({ contact_id: id, action: 'create', import_id: importId })
   }
+  const createOps = tagOps
 
   // 3. Upsert orders by external id.
   const orderIdByExt = new Map<string, string>()
@@ -101,6 +112,12 @@ export async function persistOrderImport(
           order_date: o.orderDate,
           total_cents: o.totalCents,
           category: o.category,
+          ship_name: o.shipping?.name ?? null,
+          ship_address: o.shipping?.address ?? null,
+          ship_city: o.shipping?.city ?? null,
+          ship_zip: o.shipping?.zip ?? null,
+          ship_province: o.shipping?.province ?? null,
+          ship_country: o.shipping?.country ?? null,
           import_id: importId,
         },
         { onConflict: 'order_ext_id' }
@@ -149,6 +166,7 @@ export async function persistOrderImport(
     }))
     const roll = computeRollup(rollupOrders)
     if (roll.isConversion) summary.conversions++
+    const origins = [...new Set((ords ?? []).map((r) => r.channel as string).filter(Boolean))]
     await sb.from('farmacia_contacts').update({
       orders_count: roll.ordersCount,
       total_spent_cents: roll.totalSpentCents,
@@ -158,6 +176,7 @@ export async function persistOrderImport(
       first_online_store_order_at: roll.firstOnlineStoreOrderAt,
       is_conversion: roll.isConversion,
       converted_at: roll.convertedAt,
+      origin_tags: origins,
     }).eq('id', cid)
   }
 

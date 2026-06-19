@@ -27,6 +27,12 @@ export interface ColumnMap {
   unitPrice: string[]
   lineTotal: string[]
   category: string[]     // Market Rock category if present
+  shipName: string[]
+  shipAddress: string[]
+  shipCity: string[]
+  shipZip: string[]
+  shipProvince: string[]
+  shipCountry: string[]
 }
 
 export const SHIPPYPRO_MAP: ColumnMap = {
@@ -46,6 +52,12 @@ export const SHIPPYPRO_MAP: ColumnMap = {
   unitPrice: ['Unit Price', 'Prezzo Unitario', 'Price'],
   lineTotal: ['Line Total', 'Totale Riga', 'Item Total'],
   category: ['Category', 'Categoria'],
+  shipName: ['Ship To', 'Destinatario', 'Shipping Name'],
+  shipAddress: ['Shipping Address', 'Indirizzo Spedizione', 'Address'],
+  shipCity: ['Shipping City', 'Città', 'City'],
+  shipZip: ['Shipping Zip', 'CAP', 'Zip', 'Postal Code'],
+  shipProvince: ['Shipping Province', 'Provincia', 'Province', 'State'],
+  shipCountry: ['Shipping Country', 'Paese', 'Country'],
 }
 
 /** Market Rock map — to fill in when that export format is known. */

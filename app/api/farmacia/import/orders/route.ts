@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
   const { data: imp } = await sb.from('farmacia_imports').insert({
     kind: 'orders',
-    origin: 'sito',
+    origin: 'market_rock',
     filename: file.name,
     rows_total: rows.length,
     progress_total: rows.length,
@@ -60,11 +60,21 @@ export async function POST(req: NextRequest) {
   }).select('id').single()
   const importId = imp?.id as string | undefined
 
+  // Store the original file for download (best-effort).
+  let fileUrl: string | null = null
+  try {
+    const buf = Buffer.from(await file.arrayBuffer())
+    const path = `${importId}/${file.name}`
+    const up = await sb.storage.from('farmacia-imports').upload(path, buf, { contentType: file.type || 'application/octet-stream', upsert: true })
+    if (!up.error) fileUrl = sb.storage.from('farmacia-imports').getPublicUrl(path).data.publicUrl
+  } catch { /* non-fatal */ }
+
   const started = Date.now()
   try {
     const summary = await persistOrderImport(orders, { skuMap, eanMap, importId: importId ?? null })
     await sb.from('farmacia_imports').update({
       status: 'completed',
+      file_url: fileUrl,
       created: summary.contactsCreated,
       updated: summary.contactsUpdated,
       orders_created: summary.ordersUpserted,

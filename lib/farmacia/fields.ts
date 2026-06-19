@@ -14,10 +14,22 @@ export const FARMACIA_ORIGIN = {
   AMAZON: 'amazon',
   EBAY: 'ebay',
   ONLINE_STORE: 'online_store',
+  STORE: 'store',
   OTHER: 'other',
 } as const
 
 export type FarmaciaOrigin = (typeof FARMACIA_ORIGIN)[keyof typeof FARMACIA_ORIGIN]
+
+/** GHL tag a channel maps to (drives nurturing automations). null = no tag. */
+export function channelTag(origin: FarmaciaOrigin): string | null {
+  switch (origin) {
+    case FARMACIA_ORIGIN.AMAZON: return 'amazon'
+    case FARMACIA_ORIGIN.EBAY: return 'ebay'
+    case FARMACIA_ORIGIN.STORE: return 'store'
+    case FARMACIA_ORIGIN.ONLINE_STORE: return 'sito'
+    default: return null
+  }
+}
 
 /** Tags written to GHL contacts. */
 export const FARMACIA_TAG = {
