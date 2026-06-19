@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Enforced gate: never push customdash without the full unit suite passing.
+# Bypass is intentionally awkward — only with an explicit reason: SKIP_TESTS=1 git push
+set -euo pipefail
+
+if [ "${SKIP_TESTS:-}" = "1" ]; then
+  echo "pre-push: SKIP_TESTS=1 set — skipping unit tests (you asked for this)." >&2
+  exit 0
+fi
+
+echo "pre-push: running full unit suite (vitest) before push…" >&2
+
+if ! npm test --silent; then
+  echo "" >&2
+  echo "pre-push: tests FAILED — push aborted. Fix them, or override with SKIP_TESTS=1 git push." >&2
+  exit 1
+fi
+
+echo "pre-push: all tests green — proceeding with push." >&2
