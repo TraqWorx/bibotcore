@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
 
   const { data: imp } = await sb.from('farmacia_imports').insert({
     kind: 'orders',
+    origin: 'sito',
     filename: file.name,
     rows_total: rows.length,
     progress_total: rows.length,
