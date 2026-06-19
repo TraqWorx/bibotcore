@@ -50,7 +50,26 @@ export async function saveSegmentsAction(
   return { retagged: updated }
 }
 
-/** Remove a tag from every contact that has it, and from GHL. */
+async function getCustomTags(sb: ReturnType<typeof createAdminClient>): Promise<string[]> {
+  const { data } = await sb.from('farmacia_settings').select('value').eq('key', 'custom_tags').maybeSingle()
+  return Array.isArray(data?.value) ? (data!.value as string[]) : []
+}
+
+/** Add a custom tag to the catalog (available to apply to contacts). */
+export async function addCustomTag(tag: string): Promise<{ error?: string }> {
+  const guard = await assertOwner()
+  if (guard.error) return guard
+  const t = tag.trim()
+  if (!t) return { error: 'Tag vuoto' }
+  const sb = createAdminClient()
+  const current = await getCustomTags(sb)
+  if (current.some((x) => x.toLowerCase() === t.toLowerCase())) return { error: 'Tag già esistente' }
+  await sb.from('farmacia_settings').upsert({ key: 'custom_tags', value: [...current, t], updated_at: new Date().toISOString() }, { onConflict: 'key' })
+  revalidatePath('/designs/farmacia-cialdella/settings')
+  return {}
+}
+
+/** Remove a tag from every contact that has it, from GHL, and from the catalog. */
 export async function deleteTagEverywhere(tag: string): Promise<{ error?: string; removed?: number }> {
   const guard = await assertOwner()
   if (guard.error) return guard
@@ -64,6 +83,10 @@ export async function deleteTagEverywhere(tag: string): Promise<{ error?: string
     if (c.ghl_id) ops.push({ contact_id: c.id, ghl_id: c.ghl_id, action: 'remove_tag' as const, payload: { tag } })
   }
   if (ops.length) await enqueueOps(ops)
+  const catalog = await getCustomTags(sb)
+  if (catalog.includes(tag)) {
+    await sb.from('farmacia_settings').upsert({ key: 'custom_tags', value: catalog.filter((t) => t !== tag), updated_at: new Date().toISOString() }, { onConflict: 'key' })
+  }
   revalidatePath('/designs/farmacia-cialdella/settings')
   return { removed: (data ?? []).length }
 }
