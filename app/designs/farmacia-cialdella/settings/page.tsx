@@ -5,12 +5,9 @@ import SettingsTabs from './_components/SettingsTabs'
 
 export const dynamic = 'force-dynamic'
 
-interface CatRow { id: string; sku: string | null; ean: string | null; category: string }
-
 export default async function SettingsPage() {
   const sb = createAdminClient()
-  const [{ data: cats }, { count: pending }, { count: failed }, segmentConfig, clusters, { data: tagRows }] = await Promise.all([
-    sb.from('farmacia_category_map').select('id, sku, ean, category').order('category').limit(500),
+  const [{ count: pending }, { count: failed }, segmentConfig, clusters, { data: tagRows }] = await Promise.all([
     sb.from('farmacia_sync_queue').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     sb.from('farmacia_sync_queue').select('id', { count: 'exact', head: true }).eq('status', 'failed'),
     getSegmentConfig(),
@@ -30,7 +27,6 @@ export default async function SettingsPage() {
       <SettingsTabs
         config={segmentConfig}
         clusters={clusters}
-        cats={(cats ?? []) as CatRow[]}
         tags={tags}
         pending={pending ?? 0}
         failed={failed ?? 0}

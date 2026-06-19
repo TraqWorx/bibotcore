@@ -2,19 +2,15 @@
 
 import { useState } from 'react'
 import SegmentsEditor from './SegmentsEditor'
-import CategoryMapForm from './CategoryMapForm'
 import TagManager from './TagManager'
 import type { SegmentConfig, TierStat } from '@/lib/farmacia/segments'
 
-type Tab = 'cluster' | 'tag' | 'categorie' | 'sync'
+type Tab = 'cluster' | 'tag' | 'sync'
 function euros(c: number) { return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(c / 100) }
 
-interface CatRow { id: string; sku: string | null; ean: string | null; category: string }
-
-export default function SettingsTabs({ config, clusters, cats, tags, pending, failed }: {
+export default function SettingsTabs({ config, clusters, tags, pending, failed }: {
   config: SegmentConfig
   clusters: TierStat[]
-  cats: CatRow[]
   tags: { tag: string; count: number }[]
   pending: number
   failed: number
@@ -23,7 +19,6 @@ export default function SettingsTabs({ config, clusters, cats, tags, pending, fa
   const tabs: { key: Tab; label: string }[] = [
     { key: 'cluster', label: 'Cluster' },
     { key: 'tag', label: 'Tag' },
-    { key: 'categorie', label: 'Categorie' },
     { key: 'sync', label: 'Sincronizzazione' },
   ]
 
@@ -58,22 +53,6 @@ export default function SettingsTabs({ config, clusters, cats, tags, pending, fa
       )}
 
       {tab === 'tag' && <TagManager tags={tags} />}
-
-      {tab === 'categorie' && (
-        <section>
-          <p style={{ fontSize: 13, color: 'var(--fc-text-muted)' }}>Categoria usata quando il file non la porta già (mappa SKU/EAN → categoria).</p>
-          <CategoryMapForm />
-          <div className="fc-card" style={{ padding: 0, overflow: 'hidden', marginTop: 16 }}>
-            <table className="fc-table" style={{ width: '100%' }}>
-              <thead><tr><th>SKU</th><th>EAN</th><th>Categoria</th></tr></thead>
-              <tbody>
-                {cats.length === 0 && <tr><td colSpan={3} style={{ padding: 16, color: 'var(--fc-text-muted)' }}>Nessuna mappatura.</td></tr>}
-                {cats.map((r) => <tr key={r.id}><td>{r.sku ?? '—'}</td><td>{r.ean ?? '—'}</td><td>{r.category}</td></tr>)}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
 
       {tab === 'sync' && (
         <section>

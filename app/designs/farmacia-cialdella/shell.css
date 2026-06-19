@@ -242,7 +242,7 @@
 .fc-pill[data-tone='red']     { background: color-mix(in srgb, var(--fc-danger) 12%, white); color: var(--fc-danger); border-color: color-mix(in srgb, var(--fc-danger) 22%, white); }
 .fc-pill[data-tone='gray']    { background: color-mix(in srgb, var(--fc-line) 60%, white); color: var(--fc-text-muted); border-color: var(--fc-line); }
 
-.fc-btn {
+.fc-btn, .fc-btn-primary, .fc-btn-ghost, .fc-btn-danger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
