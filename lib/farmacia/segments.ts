@@ -1,40 +1,62 @@
 /**
- * Customer loyalty segments (Bronzo/Argento/Oro/…). Tiers are defined by a
- * minimum order count and stored in farmacia_settings (key 'segments') so the
- * owner can edit thresholds in Settings. Tier is DERIVED from a contact's
- * orders_count at read time — never frozen — so changing a threshold instantly
- * re-buckets everyone.
+ * Customer loyalty segments (Bronzo/Argento/Oro/…). Each tier has an order-count
+ * threshold AND a spend threshold; a global match mode decides whether a
+ * customer must meet ANY specified threshold (default) or ALL of them. A
+ * threshold of 0 means "not required". Tiers are an ORDERED list (low → high);
+ * a customer's tier is the highest one they meet, derived at read time so
+ * editing thresholds instantly re-buckets everyone.
+ *
+ * Config lives in farmacia_settings: key 'segments' (Segment[]) + 'segment_match'.
  */
 
 import { createAdminClient } from '@/lib/supabase-server'
 
+export type MatchMode = 'any' | 'all'
+
 export interface Segment {
   name: string
   minOrders: number
+  minSpendCents: number
   color?: string
 }
 
-export const DEFAULT_SEGMENTS: Segment[] = [
-  { name: 'Bronzo', minOrders: 0, color: 'gray' },
-  { name: 'Argento', minOrders: 5, color: 'blue' },
-  { name: 'Oro', minOrders: 20, color: 'amber' },
-  { name: 'Platino', minOrders: 50, color: 'green' },
-]
+export interface SegmentConfig {
+  segments: Segment[]
+  matchMode: MatchMode
+}
 
-/** Highest segment whose threshold the order count meets. Pure — tested. */
-export function computeTier(ordersCount: number, segments: Segment[]): Segment | null {
-  const sorted = [...segments].sort((a, b) => a.minOrders - b.minOrders)
+export const DEFAULT_SEGMENTS: Segment[] = [
+  { name: 'Bronzo', minOrders: 0, minSpendCents: 0, color: 'gray' },
+  { name: 'Argento', minOrders: 5, minSpendCents: 0, color: 'blue' },
+  { name: 'Oro', minOrders: 20, minSpendCents: 0, color: 'amber' },
+  { name: 'Platino', minOrders: 50, minSpendCents: 0, color: 'green' },
+]
+export const DEFAULT_MATCH_MODE: MatchMode = 'any'
+
+/** Does a customer meet a tier's thresholds under the given match mode? Pure. */
+export function meetsTier(s: Segment, ordersCount: number, totalSpentCents: number, mode: MatchMode): boolean {
+  const orderReq = s.minOrders > 0
+  const spendReq = (s.minSpendCents ?? 0) > 0
+  if (!orderReq && !spendReq) return true // base tier — no requirements
+  const okOrders = ordersCount >= s.minOrders
+  const okSpend = totalSpentCents >= (s.minSpendCents ?? 0)
+  if (mode === 'all') return (!orderReq || okOrders) && (!spendReq || okSpend)
+  return (orderReq && okOrders) || (spendReq && okSpend) // any
+}
+
+/** Highest tier (by list order) the customer meets. Pure — tested. */
+export function computeTier(ordersCount: number, totalSpentCents: number, config: SegmentConfig): Segment | null {
   let tier: Segment | null = null
-  for (const s of sorted) if (ordersCount >= s.minOrders) tier = s
+  for (const s of config.segments) if (meetsTier(s, ordersCount, totalSpentCents, config.matchMode)) tier = s
   return tier
 }
 
-/** Count how many customers fall in each segment. Pure — tested. */
-export function countByTier(orderCounts: number[], segments: Segment[]): Record<string, number> {
+/** Count customers per tier. Pure — tested. */
+export function countByTier(customers: { ordersCount: number; totalSpentCents: number }[], config: SegmentConfig): Record<string, number> {
   const out: Record<string, number> = {}
-  for (const s of segments) out[s.name] = 0
-  for (const n of orderCounts) {
-    const t = computeTier(n, segments)
+  for (const s of config.segments) out[s.name] = 0
+  for (const c of customers) {
+    const t = computeTier(c.ordersCount, c.totalSpentCents, config)
     if (t) out[t.name] = (out[t.name] ?? 0) + 1
   }
   return out
@@ -45,25 +67,39 @@ export function averageOrderCents(totalSpentCents: number, ordersCount: number):
   return ordersCount > 0 ? Math.round(totalSpentCents / ordersCount) : 0
 }
 
-/** Validate + normalize an edited segment list (drop blanks, clamp, sort). */
+/** GHL tag for a tier name, e.g. "Oro" → "livello-oro". Pure — tested. */
+export function tierTag(name: string): string {
+  return 'livello-' + name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+/** Drop blanks and clamp negatives; preserve list order (order = tier rank). */
 export function normalizeSegments(input: Segment[]): Segment[] {
   return input
     .filter((s) => s.name && s.name.trim())
-    .map((s) => ({ name: s.name.trim(), minOrders: Math.max(0, Math.floor(s.minOrders || 0)), color: s.color }))
-    .sort((a, b) => a.minOrders - b.minOrders)
+    .map((s) => ({
+      name: s.name.trim(),
+      minOrders: Math.max(0, Math.floor(s.minOrders || 0)),
+      minSpendCents: Math.max(0, Math.floor(s.minSpendCents || 0)),
+      color: s.color,
+    }))
 }
 
-export async function getSegments(): Promise<Segment[]> {
+export async function getSegmentConfig(): Promise<SegmentConfig> {
   const sb = createAdminClient()
-  const { data } = await sb.from('farmacia_settings').select('value').eq('key', 'segments').maybeSingle()
-  const v = data?.value as Segment[] | undefined
-  return Array.isArray(v) && v.length ? v : DEFAULT_SEGMENTS
+  const { data } = await sb.from('farmacia_settings').select('key, value').in('key', ['segments', 'segment_match'])
+  const segRow = data?.find((r) => r.key === 'segments')?.value as Segment[] | undefined
+  const modeRow = data?.find((r) => r.key === 'segment_match')?.value as MatchMode | undefined
+  const segments = Array.isArray(segRow) && segRow.length
+    ? segRow.map((s) => ({ ...s, minSpendCents: s.minSpendCents ?? 0 }))
+    : DEFAULT_SEGMENTS
+  return { segments, matchMode: modeRow === 'all' ? 'all' : DEFAULT_MATCH_MODE }
 }
 
-export async function saveSegments(segments: Segment[]): Promise<void> {
+export async function saveSegmentConfig(config: SegmentConfig): Promise<void> {
   const sb = createAdminClient()
-  await sb.from('farmacia_settings').upsert(
-    { key: 'segments', value: normalizeSegments(segments), updated_at: new Date().toISOString() },
-    { onConflict: 'key' }
-  )
+  const now = new Date().toISOString()
+  await sb.from('farmacia_settings').upsert([
+    { key: 'segments', value: normalizeSegments(config.segments), updated_at: now },
+    { key: 'segment_match', value: config.matchMode === 'all' ? 'all' : 'any', updated_at: now },
+  ], { onConflict: 'key' })
 }

@@ -34,16 +34,20 @@ export async function addCategoryMapping(formData: FormData): Promise<{ error?: 
 }
 
 export async function saveSegmentsAction(
-  segments: { name: string; minOrders: number; color?: string }[]
-): Promise<{ error?: string }> {
+  segments: { name: string; minOrders: number; minSpendCents: number; color?: string }[],
+  matchMode: 'any' | 'all'
+): Promise<{ error?: string; retagged?: number }> {
   const guard = await assertOwner()
   if (guard.error) return guard
-  const { saveSegments } = await import('@/lib/farmacia/segments')
-  await saveSegments(segments)
+  const { saveSegmentConfig } = await import('@/lib/farmacia/segments')
+  await saveSegmentConfig({ segments, matchMode })
+  // Re-tag everyone against the new thresholds (incremental via the sync queue).
+  const { applyTierTags } = await import('@/lib/farmacia/tier-sync')
+  const { updated } = await applyTierTags()
   revalidatePath('/designs/farmacia-cialdella/settings')
   revalidatePath('/designs/farmacia-cialdella/clienti')
   revalidatePath('/designs/farmacia-cialdella/dashboard')
-  return {}
+  return { retagged: updated }
 }
 
 export async function deleteCategoryMapping(id: string): Promise<{ error?: string }> {

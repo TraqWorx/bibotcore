@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase-server'
-import { getSegments, computeTier, averageOrderCents } from '@/lib/farmacia/segments'
+import { getSegmentConfig, computeTier, averageOrderCents } from '@/lib/farmacia/segments'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,9 +28,10 @@ export default async function ClientiPage() {
       .select('id, first_name, last_name, phone_norm, email, origin_tags, orders_count, total_spent_cents, is_conversion, sync_status')
       .order('total_spent_cents', { ascending: false })
       .limit(200),
-    getSegments(),
+    getSegmentConfig(),
   ])
   const rows = (data ?? []) as Row[]
+  const segmentConfig = segments
 
   return (
     <div style={{ padding: 32, maxWidth: 1100 }}>
@@ -45,7 +46,7 @@ export default async function ClientiPage() {
           <tbody>
             {rows.length === 0 && <tr><td colSpan={9} style={{ padding: 16, color: 'var(--fc-text-muted)' }}>Nessun cliente ancora. Importa gli ordini.</td></tr>}
             {rows.map((r) => {
-              const tier = computeTier(r.orders_count, segments)
+              const tier = computeTier(r.orders_count, r.total_spent_cents, segmentConfig)
               return (
               <tr key={r.id}>
                 <td>{[r.first_name, r.last_name].filter(Boolean).join(' ') || '—'}</td>

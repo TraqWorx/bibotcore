@@ -164,5 +164,11 @@ export async function persistOrderImport(
   // 6. Queue create ops for new contacts.
   if (createOps.length) await enqueueOps(createOps, importId)
 
+  // 7. Recompute loyalty tiers for affected contacts and sync tier tags to GHL.
+  if (affected.length) {
+    const { applyTierTags } = await import('./tier-sync')
+    await applyTierTags(affected)
+  }
+
   return summary
 }

@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase-server'
-import { getSegments, countByTier } from '@/lib/farmacia/segments'
+import { getSegmentConfig, countByTier } from '@/lib/farmacia/segments'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,16 +9,19 @@ function euros(cents: number): string {
 
 export default async function DashboardPage() {
   const sb = createAdminClient()
-  const [{ count: customers }, { count: orders }, { count: conversions }, { data: spendRows }, { data: ocRows }, segments] = await Promise.all([
+  const [{ count: customers }, { count: orders }, { count: conversions }, { data: spendRows }, { data: ocRows }, segmentConfig] = await Promise.all([
     sb.from('farmacia_contacts').select('id', { count: 'exact', head: true }),
     sb.from('farmacia_orders').select('id', { count: 'exact', head: true }),
     sb.from('farmacia_contacts').select('id', { count: 'exact', head: true }).eq('is_conversion', true),
     sb.from('farmacia_orders').select('total_cents'),
-    sb.from('farmacia_contacts').select('orders_count'),
-    getSegments(),
+    sb.from('farmacia_contacts').select('orders_count, total_spent_cents'),
+    getSegmentConfig(),
   ])
   const revenue = (spendRows ?? []).reduce((s, r) => s + (r.total_cents ?? 0), 0)
-  const tierCounts = countByTier((ocRows ?? []).map((r) => r.orders_count ?? 0), segments)
+  const tierCounts = countByTier(
+    (ocRows ?? []).map((r) => ({ ordersCount: r.orders_count ?? 0, totalSpentCents: r.total_spent_cents ?? 0 })),
+    segmentConfig
+  )
 
   const stats = [
     { label: 'Clienti', value: String(customers ?? 0), tone: 'blue' },
@@ -43,7 +46,7 @@ export default async function DashboardPage() {
 
       <h2 style={{ fontSize: 16, fontWeight: 700, margin: '32px 0 12px' }}>Livelli fedeltà</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 16 }}>
-        {segments.map((s) => (
+        {segmentConfig.segments.map((s) => (
           <div key={s.name} className="fc-stat" data-tone={s.color ?? 'neutral'}>
             <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--fc-text)' }}>{tierCounts[s.name] ?? 0}</div>
             <div style={{ fontSize: 13, color: 'var(--fc-text-muted)', marginTop: 4 }}>{s.name} <span style={{ color: 'var(--fc-text-faint)' }}>· da {s.minOrders} ordini</span></div>
