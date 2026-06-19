@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { requestMagicLink } from '../login/_actions'
+import { createBrowserClient } from '@supabase/ssr'
+import { checkLoginAllowed } from '../login/_actions'
 
 export default function LandingHeroForm() {
   const [email, setEmail] = useState('')
@@ -17,11 +18,28 @@ export default function LandingHeroForm() {
     }
     setLoading(true)
     setMessage('')
-    const result = await requestMagicLink(email)
-    setLoading(false)
-    if (result?.error) {
+
+    const check = await checkLoginAllowed(email)
+    if ('error' in check) {
+      setLoading(false)
       setIsError(true)
-      setMessage(result.error)
+      setMessage(check.error)
+      return
+    }
+
+    // Send from the browser so the PKCE verifier cookie survives to the callback.
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    )
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+      options: { emailRedirectTo: `${window.location.origin}/api/auth/callback` },
+    })
+    setLoading(false)
+    if (error) {
+      setIsError(true)
+      setMessage(error.message)
     } else {
       setIsError(false)
       setMessage('Check your inbox — we sent you a magic link to sign in.')

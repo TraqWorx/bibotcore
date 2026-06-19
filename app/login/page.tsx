@@ -2,7 +2,8 @@
 
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
-import { requestMagicLink } from './_actions'
+import { createBrowserClient } from '@supabase/ssr'
+import { checkLoginAllowed } from './_actions'
 
 function getInitialUrlError() {
   if (typeof window === 'undefined') return null
@@ -46,11 +47,29 @@ export default function LoginPage() {
     setLoading(true)
     setMessage('')
     setUrlError(null)
-    const result = await requestMagicLink(email)
-    setLoading(false)
-    if (result.error) {
+
+    // Server checks the invite-only gate; the browser sends the link so the
+    // PKCE verifier cookie is set client-side and survives to the callback.
+    const check = await checkLoginAllowed(email)
+    if ('error' in check) {
+      setLoading(false)
       setIsError(true)
-      setMessage(result.error)
+      setMessage(check.error)
+      return
+    }
+
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    )
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+      options: { emailRedirectTo: `${window.location.origin}/api/auth/callback` },
+    })
+    setLoading(false)
+    if (error) {
+      setIsError(true)
+      setMessage(error.message)
     } else {
       setIsError(false)
       setMessage('Check your email for the login link')

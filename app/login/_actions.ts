@@ -1,31 +1,35 @@
 'use server'
 
-import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { createAdminClient } from '@/lib/supabase-server'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
-export async function requestMagicLink(
-  email: string
-): Promise<{ error?: string }> {
-  if (!email) return { error: 'Email is required' }
+export type LoginCheck = { allowed: true } | { error: string }
 
-  const token = process.env.GHL_AGENCY_TOKEN
-  const companyId = process.env.GHL_COMPANY_ID
+/**
+ * Invite-only gate. Returns whether an email is permitted to receive a login
+ * link — it does NOT send the link.
+ *
+ * The magic link is sent from the browser (see login/page.tsx) so the PKCE
+ * code_verifier cookie is written client-side and survives the round-trip to
+ * /api/auth/callback. Sending from a server action wrote the verifier on the
+ * action's response, where it was dropped before the callback ran — the cause
+ * of the "link expired on first click, works on second" bug.
+ */
+export async function checkLoginAllowed(email: string): Promise<LoginCheck> {
+  const emailLower = email?.trim().toLowerCase()
+  if (!emailLower) return { error: 'Email is required' }
 
-  if (!token || !companyId) {
-    return { error: 'Server configuration error' }
-  }
-
-  const headers = { Authorization: `Bearer ${token}`, Version: '2021-07-28' }
-  const emailLower = email.toLowerCase()
-
-  // Step 0: Allow known users through immediately (super_admin, admin, or agency members)
   const supabaseAdmin = createAdminClient()
-  const { data: profile } = await supabaseAdmin
+
+  // Step 0: known user (super_admin / admin / agency member). limit(1) instead
+  // of single() so a duplicate row never throws this into the invite-only path.
+  const { data: profiles } = await supabaseAdmin
     .from('profiles')
     .select('id, role, agency_id')
     .eq('email', emailLower)
-    .single()
+    .limit(1)
+  const profile = profiles?.[0]
 
   if (profile) {
     // Block deactivated accounts (their auth user is banned).
@@ -34,24 +38,30 @@ export async function requestMagicLink(
     if (bannedUntil && new Date(bannedUntil).getTime() > Date.now()) {
       return { error: 'This account has been deactivated. Please contact your administrator.' }
     }
-    return sendMagicLink(email)
+    return { allowed: true }
   }
 
-  // Step 1: Check if email exists as a GHL user (agency-level)
+  const token = process.env.GHL_AGENCY_TOKEN
+  const companyId = process.env.GHL_COMPANY_ID
+  if (!token || !companyId) return { error: 'Server configuration error' }
+
+  const headers = { Authorization: `Bearer ${token}`, Version: '2021-07-28' }
+
+  // Step 1: known GHL user at the agency (company) level.
   try {
     const res = await fetch(
-      `${GHL_BASE}/users/search?companyId=${companyId}&email=${encodeURIComponent(email)}&limit=1`,
+      `${GHL_BASE}/users/search?companyId=${companyId}&email=${encodeURIComponent(emailLower)}&limit=1`,
       { headers, cache: 'no-store' }
     )
     if (res.ok) {
       const data = await res.json()
       if (((data?.users ?? []) as unknown[]).length > 0) {
-        return sendMagicLink(email)
+        return { allowed: true }
       }
     }
   } catch { /* fall through */ }
 
-  // Step 2: Check per-location OAuth connections
+  // Step 2: known GHL user on a per-location OAuth connection.
   const { data: connections } = await supabaseAdmin
     .from('ghl_connections')
     .select('location_id, company_id, access_token, refresh_token')
@@ -72,25 +82,12 @@ export async function requestMagicLink(
       const data = await res.json()
       const users = (data?.users ?? []) as { email?: string }[]
       if (users.some((u) => u.email?.toLowerCase() === emailLower)) {
-        return sendMagicLink(email)
+        return { allowed: true }
       }
     } catch { continue }
   }
 
   // Invite-only: unknown emails cannot self-register. Existing admins/agency
-  // members (matched above) still get a link; new agencies are onboarded via an
-  // invite (Users → Invite), after which their profile exists and they pass.
+  // members (matched above) pass; new agencies are onboarded via an invite.
   return { error: 'No account found for this email. GHL Custom Dash is invite-only — contact us to get set up.' }
-}
-
-async function sendMagicLink(email: string): Promise<{ error?: string }> {
-  const supabase = await createAuthClient()
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`,
-    },
-  })
-  if (error) return { error: error.message }
-  return {}
 }

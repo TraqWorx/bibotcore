@@ -12,7 +12,7 @@ export default async function RedirectPage() {
     .from('profiles')
     .select('role, agency_id')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   // Existing user — route by role
   if (profile) {
@@ -20,6 +20,25 @@ export default async function RedirectPage() {
     if (profile.role === 'admin') redirect('/admin')
     if (profile.role === 'agency') redirect('/agency')
     redirect('/agency')
+  }
+
+  // No profile under this auth id, but a profile already exists for this email
+  // (id drifted from the auth user). This is a real account, not an uninvited
+  // one — never show the invite-only wall or auto-provision a second agency.
+  if (user.email) {
+    const { data: byEmail } = await supabase
+      .from('profiles')
+      .select('id, role')
+      .eq('email', user.email.toLowerCase())
+      .limit(1)
+    if (byEmail?.[0]) {
+      console.error(
+        `[redirect] profile id mismatch for ${user.email}: auth ${user.id} vs profile ${byEmail[0].id}`
+      )
+      redirect('/login?message=' + encodeURIComponent(
+        'We found your account but it needs to be re-linked. Please contact us to finish signing in.'
+      ))
+    }
   }
 
   // No profile: invite-only. Only provision an agency + admin for users who were
