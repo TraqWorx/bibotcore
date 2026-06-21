@@ -10,7 +10,7 @@ export default async function ClientiPage() {
     sb.from('farmacia_contacts')
       .select('id, first_name, last_name, phone_norm, email, origin_tags, tags, notes, orders_count, total_spent_cents, avg_order_cents, is_conversion, last_order_at, sync_status, ghl_id')
       .order('total_spent_cents', { ascending: false })
-      .limit(1000),
+      .limit(300),
     getSegmentConfig(),
     sb.from('farmacia_settings').select('value').eq('key', 'custom_tags').maybeSingle(),
   ])

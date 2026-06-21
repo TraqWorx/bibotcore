@@ -1,5 +1,6 @@
 /** Read models for the Farmacia dashboard. RPCs do the grouped aggregations. */
 
+import { cache } from 'react'
 import { createAdminClient } from '@/lib/supabase-server'
 import { tierBreakdown, type TierStat } from './segments'
 import { getSegmentConfig } from './segments-store'
@@ -85,7 +86,7 @@ export async function getTopCustomers(limit = 20): Promise<{ bySpend: TopCustome
   return { bySpend, byOrders, byAov }
 }
 
-export async function getClusterization(): Promise<TierStat[]> {
+export const getClusterization = cache(async (): Promise<TierStat[]> => {
   const sb = createAdminClient()
   const [{ data }, config] = await Promise.all([
     sb.from('farmacia_contacts').select('orders_count, total_spent_cents'),
@@ -93,7 +94,7 @@ export async function getClusterization(): Promise<TierStat[]> {
   ])
   const customers = (data ?? []).map((r) => ({ ordersCount: r.orders_count ?? 0, totalSpentCents: r.total_spent_cents ?? 0 }))
   return tierBreakdown(customers, config)
-}
+})
 
 export async function getCategoryStats(): Promise<CategoryStat[]> {
   const sb = createAdminClient()
