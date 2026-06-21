@@ -36,10 +36,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     { label: 'Scontrino medio', value: euros(overview.aovCents) },
     { label: 'Nuovi clienti', value: String(overview.newCustomers) },
     { label: 'Clienti ricorrenti', value: String(overview.recurringCustomers) },
-    { label: 'Conversioni Amazon', value: String(overview.amazonConversions) },
-    { label: 'Conversioni eBay', value: String(overview.ebayConversions) },
-    { label: 'Conversioni Store', value: String(overview.storeConversions) },
   ]
+
+  const conversions = [
+    { label: 'Amazon', value: overview.amazonConversions, tone: 'amber' },
+    { label: 'eBay', value: overview.ebayConversions, tone: 'blue' },
+    { label: 'Store', value: overview.storeConversions, tone: 'green' },
+  ]
+  const conversionsTotal = conversions.reduce((s, c) => s + c.value, 0)
 
   return (
     <div style={{ padding: 32, maxWidth: 1160 }}>
@@ -61,6 +65,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <div key={s.label} className="fc-stat" data-tone="neutral">
             <div style={{ fontSize: 24, fontWeight: 800 }}>{s.value}</div>
             <div style={{ fontSize: 12, color: 'var(--fc-text-muted)', marginTop: 4 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Conversioni dai marketplace al sito */}
+      <h2 style={sectionH}>Conversioni verso il sito</h2>
+      <p style={{ color: 'var(--fc-text-muted)', fontSize: 13, marginTop: -6, marginBottom: 12 }}>
+        Clienti arrivati da un canale esterno che hanno poi acquistato sul sito{conversionsTotal ? ` — ${conversionsTotal} in totale` : ''}.
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 16 }}>
+        {conversions.map((c) => (
+          <div key={c.label} className="fc-stat" data-tone={c.tone}>
+            <div style={{ fontSize: 28, fontWeight: 800 }}>{c.value}</div>
+            <div style={{ fontSize: 13, color: 'var(--fc-text-muted)', marginTop: 4 }}>da {c.label}</div>
           </div>
         ))}
       </div>
