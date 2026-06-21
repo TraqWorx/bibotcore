@@ -20,7 +20,7 @@ export default function SegmentsEditor({ initial, initialMode }: { initial: Segm
     start(async () => {
       setMsg('')
       const res = await saveSegmentsAction(rows, mode)
-      setMsg(res?.error ?? `Salvato${res?.retagged != null ? ` · ${res.retagged} clienti ri-etichettati su GHL` : ''}.`)
+      setMsg(res?.error ?? 'Salvato. I tag livello su GHL si aggiornano in background entro un minuto.')
     })
   }
 

@@ -23,6 +23,23 @@ interface TierRow {
 
 const COLS = 'id, ghl_id, tags, orders_count, total_spent_cents, tier'
 
+const RETAG_KEY = 'retag_pending'
+
+/** Flag that thresholds changed so the next drain re-tags everyone (background). */
+export async function markRetagPending(): Promise<void> {
+  const sb = createAdminClient()
+  await sb.from('farmacia_settings').upsert({ key: RETAG_KEY, value: true, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+}
+
+/** If a re-tag is pending, clear the flag and run the full tier-tag pass. */
+export async function runPendingRetag(): Promise<{ updated: number } | null> {
+  const sb = createAdminClient()
+  const { data } = await sb.from('farmacia_settings').select('value').eq('key', RETAG_KEY).maybeSingle()
+  if (data?.value !== true) return null
+  await sb.from('farmacia_settings').upsert({ key: RETAG_KEY, value: false, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+  return applyTierTags()
+}
+
 /** Recompute tiers and enqueue GHL tag changes for the contacts whose tier moved. */
 export async function applyTierTags(contactIds?: string[]): Promise<{ updated: number }> {
   const sb = createAdminClient()

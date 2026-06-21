@@ -36,18 +36,19 @@ export async function addCategoryMapping(formData: FormData): Promise<{ error?: 
 export async function saveSegmentsAction(
   segments: { name: string; minOrders: number; minSpendCents: number; color?: string }[],
   matchMode: 'any' | 'all'
-): Promise<{ error?: string; retagged?: number }> {
+): Promise<{ error?: string; queued?: boolean }> {
   const guard = await assertOwner()
   if (guard.error) return guard
   const { saveSegmentConfig } = await import('@/lib/farmacia/segments-store')
   await saveSegmentConfig({ segments, matchMode })
-  // Re-tag everyone against the new thresholds (incremental via the sync queue).
-  const { applyTierTags } = await import('@/lib/farmacia/tier-sync')
-  const { updated } = await applyTierTags()
+  // Tiers display live (computed), so just flag a background re-tag for GHL —
+  // the per-minute drain cron runs applyTierTags() and enqueues the tag changes.
+  const { markRetagPending } = await import('@/lib/farmacia/tier-sync')
+  await markRetagPending()
   revalidatePath('/designs/farmacia-cialdella/settings')
   revalidatePath('/designs/farmacia-cialdella/clienti')
   revalidatePath('/designs/farmacia-cialdella/dashboard')
-  return { retagged: updated }
+  return { queued: true }
 }
 
 async function getCustomTags(sb: ReturnType<typeof createAdminClient>): Promise<string[]> {

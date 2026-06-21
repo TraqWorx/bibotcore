@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { drainQueue, recoverStaleInProgress, countDuePending } from '@/lib/farmacia/sync-worker'
+import { runPendingRetag } from '@/lib/farmacia/tier-sync'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -15,6 +16,9 @@ export async function POST(req: NextRequest) {
   const startedAt = Date.now()
   const TIME_BUDGET_MS = 240_000
   const recovered = await recoverStaleInProgress()
+  // If cluster thresholds changed, recompute tiers + enqueue tag changes here
+  // (off the user's Settings click), then drain those ops below.
+  const retag = await runPendingRetag()
 
   let totalClaimed = 0
   let totalCompleted = 0
@@ -32,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   const stillDue = await countDuePending()
   return NextResponse.json({
-    recovered, claimed: totalClaimed, completed: totalCompleted,
+    recovered, retagged: retag?.updated ?? 0, claimed: totalClaimed, completed: totalCompleted,
     failed: totalFailed, rateLimited, stillDue, elapsedMs: Date.now() - startedAt,
   })
 }
