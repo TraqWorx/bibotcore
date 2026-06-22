@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { canWriteBibotDesign } from '@/lib/auth/designOwner'
+import { APULIA_LOCATION_ID } from '@/lib/apulia/fields'
 import { recomputeCommissions } from '@/lib/apulia/recompute'
 
 export const dynamic = 'force-dynamic'
@@ -14,8 +15,7 @@ export async function POST(req: NextRequest) {
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
-  if (!profile?.agency_id || !isBibotAgency(profile.agency_id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  if (profile.role !== 'admin' && profile.role !== 'super_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!(await canWriteBibotDesign(user.id, profile, APULIA_LOCATION_ID))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
     const result = await recomputeCommissions()

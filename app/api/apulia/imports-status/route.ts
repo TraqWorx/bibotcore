@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { canAccessBibotDesign } from '@/lib/auth/designOwner'
+import { APULIA_LOCATION_ID } from '@/lib/apulia/fields'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -12,10 +13,9 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
-  if (profile?.role !== 'super_admin') {
-    if (!profile?.agency_id || !isBibotAgency(profile.agency_id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    if (profile.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { data: profile } = await sb.from('profiles').select('agency_id, role, location_id').eq('id', user.id).single()
+  if (!(await canAccessBibotDesign(user.id, profile, APULIA_LOCATION_ID))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const { data: history } = await sb

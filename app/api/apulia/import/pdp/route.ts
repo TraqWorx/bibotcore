@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { canWriteBibotDesign } from '@/lib/auth/designOwner'
 import { parseSpreadsheet } from '@/lib/apulia/spreadsheet'
 import { ghlFetch } from '@/lib/apulia/ghl'
 import { APULIA_LOCATION_ID } from '@/lib/apulia/fields'
@@ -28,10 +28,7 @@ export async function POST(req: NextRequest) {
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
-  if (!profile?.agency_id || !isBibotAgency(profile.agency_id)) {
-    if (profile?.role !== 'super_admin') return new Response('Forbidden', { status: 403 })
-  }
-  if (profile.role !== 'admin' && profile.role !== 'super_admin') {
+  if (!(await canWriteBibotDesign(user.id, profile, APULIA_LOCATION_ID))) {
     return new Response('Forbidden', { status: 403 })
   }
 
