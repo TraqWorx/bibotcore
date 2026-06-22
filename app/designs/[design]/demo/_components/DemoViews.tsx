@@ -11,7 +11,6 @@ import TargetForm from '@/app/designs/simfonia/settings/_components/TargetForm'
 import GareForm from '@/app/designs/simfonia/settings/_components/GareForm'
 import ProvvigioniForm from '@/app/designs/simfonia/settings/_components/ProvvigioniForm'
 import AvailabilityForm from '@/app/designs/simfonia/settings/_components/AvailabilityForm'
-import TeamManager from '@/app/designs/simfonia/settings/_components/TeamManager'
 import PortalSettingsForm from '@/app/designs/simfonia/settings/_components/PortalSettingsForm'
 import { sf } from '@/lib/simfonia/ui'
 import {
@@ -321,11 +320,6 @@ export function DemoSettingsView() {
           demoMode
         />
       ),
-    },
-    {
-      id: 'team',
-      label: 'Team',
-      content: <TeamManager locationId="demo-simfonia" demoMode demoUsers={demoConversationUsers.map((user, index) => ({ userId: user.id, email: user.email, role: index === 0 ? 'location_admin' : 'team_member' }))} />,
     },
     {
       id: 'portale',

@@ -19,7 +19,6 @@ import CategoryTagsForm from './_components/CategoryTagsForm'
 import ThemeForm from './_components/ThemeForm'
 import ClosedDaysForm from './_components/ClosedDaysForm'
 import UniqueFieldsForm from './_components/UniqueFieldsForm'
-import TeamManager from './_components/TeamManager'
 import PortalSettingsForm from './_components/PortalSettingsForm'
 import AiReceptionistToggle from './_components/AiReceptionistToggle'
 import SimfoniaPageHeader from '../_components/SimfoniaPageHeader'
@@ -182,11 +181,6 @@ export default async function SettingsPage({
       content: (
         <AvailabilityForm locationId={locationId} users={ghlUsers.map((u) => ({ id: u.id, name: u.name }))} initialSlots={availabilitySlots} />
       ),
-    },
-    {
-      id: 'team',
-      label: 'Team',
-      content: <TeamManager locationId={locationId} />,
     },
     {
       id: 'portale',
