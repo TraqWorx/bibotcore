@@ -173,7 +173,7 @@ export async function processPdpChunk(
   if (podsInSlice.length) {
     const { data } = await sb
       .from('apulia_contacts')
-      .select('id, ghl_id, first_name, tags, custom_fields, is_switch_out, pod_pdr, store')
+      .select('id, ghl_id, first_name, tags, custom_fields, is_switch_out, switched_out_at, pod_pdr, store')
       .neq('sync_status', 'pending_delete')
       .in('pod_pdr', podsInSlice)
     for (const r of (data ?? []) as ExistingRow[]) {
@@ -206,13 +206,30 @@ export async function processPdpChunk(
     // the same run, treat as existing and update via the row id we minted.
     const fromPrior = byPodView[pod]
     const existing = existingMap.get(pod) ?? (fromPrior
-      ? { id: fromPrior.id, ghl_id: null, first_name: fromPrior.firstName ?? null, tags: fromPrior.tags ?? [], custom_fields: {}, is_switch_out: false, store: null }
+      ? { id: fromPrior.id, ghl_id: null, first_name: fromPrior.firstName ?? null, tags: fromPrior.tags ?? [], custom_fields: {}, is_switch_out: false, switched_out_at: null, store: null }
       : null)
 
     if (existing) {
       const mergedCf: Record<string, string> = { ...(existing.custom_fields ?? {}), ...cf }
-      const tags = (existing.tags ?? []).filter((t) => t !== APULIA_TAG.SWITCH_OUT)
       const wasSwitchedOut = existing.is_switch_out
+
+      // A PDP file is the "currently supplied" list, so a POD appearing in it
+      // would normally be reactivated. But re-importing a STALE PDP must NOT
+      // resurrect a POD that was switched out AFTER that file was produced.
+      // Only reactivate when this file's supply start is newer than the recorded
+      // switch-out date (or there's no recorded date — legacy rows).
+      const supplyStart = parseItalianDate(row[COL.InizioFornitura])
+      const reactivate = wasSwitchedOut && (
+        existing.switched_out_at == null ||
+        (supplyStart != null && new Date(supplyStart) > new Date(existing.switched_out_at))
+      )
+      const keepSwitchOut = wasSwitchedOut && !reactivate
+
+      // Preserve the SWITCH_OUT tag when keeping the POD switched out; otherwise
+      // strip it (and clear the date) so the POD returns to the active base.
+      const tags = keepSwitchOut
+        ? (existing.tags ?? [])
+        : (existing.tags ?? []).filter((t) => t !== APULIA_TAG.SWITCH_OUT)
 
       updates.push({
         id: existing.id,
@@ -226,7 +243,8 @@ export async function processPdpChunk(
         comune: mergedCf[COMUNE_FIELD_ID] ?? null,
         stato: mergedCf[APULIA_FIELD.STATO] ?? null,
         store: store ?? existing.store ?? null,
-        is_switch_out: false,
+        is_switch_out: keepSwitchOut,
+        switched_out_at: keepSwitchOut ? existing.switched_out_at : null,
         sync_status: 'pending_update',
       })
       ops.push({
@@ -234,7 +252,7 @@ export async function processPdpChunk(
         ghl_id: existing.ghl_id ?? null,
         action: 'update',
       })
-      if (wasSwitchedOut) {
+      if (reactivate) {
         ops.push({
           contact_id: existing.id,
           ghl_id: existing.ghl_id ?? null,
@@ -473,6 +491,7 @@ interface ExistingRow {
   tags: string[] | null
   custom_fields: Record<string, string> | null
   is_switch_out: boolean
+  switched_out_at: string | null
   pod_pdr: string | null
   store: string | null
 }
@@ -523,6 +542,7 @@ interface UpdatedRow {
   stato: string | null
   store: string | null
   is_switch_out: boolean
+  switched_out_at: string | null
   sync_status: 'pending_update'
 }
 

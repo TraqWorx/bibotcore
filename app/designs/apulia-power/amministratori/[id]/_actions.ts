@@ -144,8 +144,23 @@ export async function markPodsPaid(
     .in('id', podContactIds)
   const podMap = new Map((pods ?? []).map((p) => [p.id, p]))
 
+  // Idempotency guard against accidental double-submits (rapid double-click,
+  // client retry): skip any POD this admin already paid in the last 15s. A
+  // deliberate re-pay later is unaffected. Prevents duplicate payment rows and
+  // double-advancing the 6-month cycle.
+  const sinceIso = new Date(Date.now() - 15_000).toISOString()
+  const { data: recent } = await sb
+    .from('apulia_payments')
+    .select('pod_contact_id')
+    .eq('contact_id', adminContactId)
+    .gte('paid_at', sinceIso)
+    .in('pod_contact_id', podContactIds)
+  const recentlyPaid = new Set((recent ?? []).map((r) => r.pod_contact_id))
+  const toPay = podContactIds.filter((id) => !recentlyPaid.has(id))
+  if (toPay.length === 0) return { paid: 0 }
+
   const nowIso = new Date().toISOString()
-  const rows = podContactIds.map((podId) => {
+  const rows = toPay.map((podId) => {
     const pod = podMap.get(podId)
     const override = Number(pod?.pod_override) || 0
     const cents = customAmounts?.[podId] ?? Math.round(((override > 0 ? override : compenso) * 100))

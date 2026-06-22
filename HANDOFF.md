@@ -20,9 +20,9 @@ Status as of this session: security/isolation pass **complete**. Tests 55/55, `t
 - **Apulia money:** `markPodsPaid` validates `customAmounts` (non-negative integer cents) and dedups the POD list; `recompute.ts` rounds commission to whole cents before persist/sync.
 - AI routes confirmed already adequately scoped (active-subscription join enforces ownership) — no change needed.
 
-## Deliberately deferred (mutate money/sync in DB paths not safely testable here)
-1. **Full cross-request Mark-Paid idempotency** — would need a deterministic cycle-based `period` + upsert against the partial unique index. `period` is user-displayed; risk of a money bug. Mitigated for now by within-request dedup + UI transition guard.
-2. **Full float→integer-cents refactor** of the Apulia payment pipeline — did the safe rounding fix; full refactor is larger.
-3. **PDP re-sync resurrecting switched-out PODs** (`lib/apulia/pdp-chunked.ts:214`) — needs PDP-file-date vs switch-out-date domain logic.
+## Follow-up status
+1. **Mark-Paid idempotency — DONE.** `markPodsPaid` now skips any POD this admin already paid in the last 15s (kills accidental double-click/retry double-pays) on top of the earlier within-request dedup + amount validation. No period-format/index change, so no money-math risk.
+2. **Float→integer-cents — effectively resolved.** Commission is rounded to whole cents before persist/sync (the `36.300000000000004` symptom is gone). Remaining is internal cleanliness only, no user-visible effect.
+3. **PDP re-sync resurrecting switched-out PODs — DONE.** `pdp-chunked.ts` now only reactivates a switched-out POD when the PDP file's `Inizio fornitura` is newer than the POD's `switched_out_at` (or no date recorded). Re-importing a stale PDP no longer un-switches a POD; the SWITCH_OUT tag/flag/date are preserved.
 
-These three need DB-level testing before changing. Recommend a dedicated session with a staging DB.
+All shipped. Tests 55/55, tsc clean, build green.

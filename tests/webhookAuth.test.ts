@@ -64,7 +64,7 @@ describe('GHL webhook auth', () => {
   })
 
   it('fails closed in production when WEBHOOK_SECRET is missing', async () => {
-    process.env.NODE_ENV = 'production'
+    ;(process.env as { NODE_ENV?: string }).NODE_ENV = 'production'
     delete process.env.WEBHOOK_SECRET
 
     const { POST } = await import('@/app/api/webhooks/ghl/route')
@@ -78,7 +78,7 @@ describe('GHL webhook auth', () => {
   })
 
   it('rejects requests with the wrong webhook secret', async () => {
-    process.env.NODE_ENV = 'development'
+    ;(process.env as { NODE_ENV?: string }).NODE_ENV = 'development'
     process.env.WEBHOOK_SECRET = 'expected-secret'
 
     const { POST } = await import('@/app/api/webhooks/ghl/route')
@@ -95,7 +95,7 @@ describe('GHL webhook auth', () => {
   })
 
   it('rejects non-provisioning events for unknown locations even with valid auth', async () => {
-    process.env.NODE_ENV = 'development'
+    ;(process.env as { NODE_ENV?: string }).NODE_ENV = 'development'
     process.env.WEBHOOK_SECRET = 'expected-secret'
     mockMaybeSingle.mockResolvedValue({ data: null })
 
