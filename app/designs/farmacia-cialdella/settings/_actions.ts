@@ -2,15 +2,16 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotDesignOwner } from '@/lib/auth/designOwner'
+import { canAccessBibotDesign } from '@/lib/auth/designOwner'
+import { FARMACIA_LOCATION_ID } from '@/lib/farmacia/fields'
 
 async function assertOwner(): Promise<{ error?: string }> {
   const auth = await createAuthClient()
   const { data: { user } } = await auth.auth.getUser()
   if (!user) return { error: 'Non autenticato' }
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
-  return isBibotDesignOwner(profile) ? {} : { error: 'Non autorizzato' }
+  const { data: profile } = await sb.from('profiles').select('agency_id, role, location_id').eq('id', user.id).single()
+  return (await canAccessBibotDesign(user.id, profile, FARMACIA_LOCATION_ID)) ? {} : { error: 'Non autorizzato' }
 }
 
 export async function addCategoryMapping(formData: FormData): Promise<{ error?: string }> {

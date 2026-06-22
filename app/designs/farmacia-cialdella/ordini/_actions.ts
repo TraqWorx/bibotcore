@@ -1,7 +1,8 @@
 'use server'
 
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotDesignOwner } from '@/lib/auth/designOwner'
+import { canAccessBibotDesign } from '@/lib/auth/designOwner'
+import { FARMACIA_LOCATION_ID } from '@/lib/farmacia/fields'
 
 export interface OrderItem {
   id: string
@@ -15,13 +16,14 @@ export interface OrderItem {
 }
 
 export async function getOrderItems(orderId: string): Promise<OrderItem[]> {
-  // Pharmacy order line-items are private client data — only Bibot may read them.
+  // Pharmacy order line-items are private client data — only a Bibot admin or a
+  // user assigned to the Farmacia location may read them.
   const auth = await createAuthClient()
   const { data: { user } } = await auth.auth.getUser()
   if (!user) return []
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('role, agency_id').eq('id', user.id).single()
-  if (!isBibotDesignOwner(profile)) return []
+  const { data: profile } = await sb.from('profiles').select('role, agency_id, location_id').eq('id', user.id).single()
+  if (!(await canAccessBibotDesign(user.id, profile, FARMACIA_LOCATION_ID))) return []
 
   const { data } = await sb
     .from('farmacia_order_items')

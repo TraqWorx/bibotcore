@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotDesignOwner } from '@/lib/auth/designOwner'
+import { canAccessBibotDesign } from '@/lib/auth/designOwner'
+import { FARMACIA_LOCATION_ID } from '@/lib/farmacia/fields'
 
 export interface FarmaciaSession {
   email: string
@@ -21,10 +22,11 @@ export const getFarmaciaSession = cache(async (): Promise<FarmaciaSession> => {
   if (!user?.email) redirect(dest)
 
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('role, agency_id').eq('id', user.id).single()
-  // Owner = platform super_admin or a Bibot-agency member. A bare admin role is
-  // NOT enough — that would let any other agency's owner read pharmacy data.
-  if (!isBibotDesignOwner(profile)) redirect(dest)
+  const { data: profile } = await sb.from('profiles').select('role, agency_id, location_id').eq('id', user.id).single()
+  // Access = super_admin, a Bibot admin, or a user assigned to the Farmacia
+  // location. Other agencies' admins and Bibot members not assigned to this
+  // location must not see pharmacy data.
+  if (!(await canAccessBibotDesign(user.id, profile, FARMACIA_LOCATION_ID))) redirect(dest)
 
   return { email: user.email, userId: user.id, role: 'owner' }
 })

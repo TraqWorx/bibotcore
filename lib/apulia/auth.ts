@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotDesignOwner } from '@/lib/auth/designOwner'
+import { canAccessBibotDesign } from '@/lib/auth/designOwner'
 
 export const APULIA_IMPERSONATE_COOKIE = 'ap_impersonate'
 
@@ -41,14 +41,10 @@ export const getApuliaSession = cache(async (): Promise<ApuliaSession> => {
     .eq('id', user.id)
     .single()
 
-  // Owner detection — scoped to Bibot/Apulia only. A bare admin role is NOT
-  // enough (every paying agency owner is an 'admin'); owners must be the
-  // platform super_admin or a member of the Bibot agency. The explicit
-  // location/agency clauses preserve access for Apulia's own team members.
-  const isOwner =
-    isBibotDesignOwner(profile) ||
-    (profile?.location_id === APULIA_LOCATION_ID && profile?.role === 'agency') ||
-    profile?.agency_id === APULIA_AGENCY_ID
+  // Owner detection — super_admin, a Bibot admin, or a user assigned to the
+  // Apulia location. A bare admin role on another agency, or merely belonging to
+  // the Bibot agency without being assigned to Apulia's location, is NOT enough.
+  const isOwner = await canAccessBibotDesign(user.id, profile, APULIA_LOCATION_ID)
 
   if (isOwner) {
     // If owner has set the impersonation cookie, render the design as that
