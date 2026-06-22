@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
+import { isCronAuthorized } from '@/lib/auth/cronAuth'
 
 /**
  * Cron endpoint: processes active drip jobs.
  * Call this every minute via Vercel cron or external scheduler.
- * Protected by CRON_SECRET header.
+ * Protected by CRON_SECRET (Bearer header preferred).
  */
 export async function GET(req: NextRequest) {
-  const secret = req.headers.get('authorization')?.replace('Bearer ', '') ?? req.nextUrl.searchParams.get('secret')
-  if (secret !== process.env.CRON_SECRET && process.env.NODE_ENV === 'production') {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

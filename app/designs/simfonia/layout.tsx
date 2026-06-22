@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { DEFAULT_THEME, DEFAULT_MODULES, type DesignTheme, type DesignModules } from '@/lib/types/design'
 import { resolveSimfoniaShell } from '@/lib/simfonia/shellTheme'
+import { safeHexColor } from '@/lib/theme/sanitizeColor'
 import Sidebar from './_components/Sidebar'
 import LocationSwitcher from './_components/LocationSwitcher'
 import AiChat from './_components/AiChat'
@@ -63,7 +64,9 @@ const getLayoutData = cache(async () => {
       designByLocation[i.location_id] = i.design_slug
     }
 
-    const locationIdsWithDesign = locationIds.filter((id) => designByLocation[id])
+    // Only locations whose installed design is this one — a user connected to a
+    // different design must not see it rendered in the Simfonia shell.
+    const locationIdsWithDesign = locationIds.filter((id) => designByLocation[id] === 'simfonia')
     const nameById: Record<string, string> = {}
     for (const r of locationNames ?? []) nameById[r.location_id] = r.name
 
@@ -89,6 +92,9 @@ const getLayoutData = cache(async () => {
         ...(design?.theme as Partial<DesignTheme> ?? {}),
         ...(locationSettings?.theme_overrides as Partial<DesignTheme> ?? {}),
       }
+      // Colors are interpolated into a <style> block — validate to block injection.
+      finalTheme.primaryColor = safeHexColor(finalTheme.primaryColor, DEFAULT_THEME.primaryColor)
+      finalTheme.secondaryColor = safeHexColor(finalTheme.secondaryColor, DEFAULT_THEME.secondaryColor)
       finalModules = {
         ...DEFAULT_MODULES,
         ...(design?.modules as Partial<DesignModules> ?? {}),

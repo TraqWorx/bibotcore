@@ -181,13 +181,10 @@ export default async function AgencyPage({
 
   let monthlyRevenue: number | null = null
   let billedCount = 0
-  let totalRevenue = 0
   for (const row of rows) {
     if (row.planPrice != null) {
       monthlyRevenue = (monthlyRevenue ?? 0) + row.planPrice
       billedCount++
-      const months = row.dateAdded ? monthsSince(row.dateAdded) : 0
-      totalRevenue += row.planPrice * months
     }
   }
 
@@ -212,7 +209,7 @@ export default async function AgencyPage({
       </div>
 
       {/* Stats */}
-      <div className={`grid gap-4 ${hasDesigns ? 'grid-cols-4' : 'grid-cols-3'}`}>
+      <div className={`grid gap-4 ${hasDesigns ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {/* Total locations */}
         <div className={ad.panel}>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Location Totali</p>
@@ -261,24 +258,6 @@ export default async function AgencyPage({
             </>
           )}
         </div>
-
-        {/* Total revenue since added */}
-        <div className={ad.panel}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Totale Pagato</p>
-          {totalRevenue > 0 ? (
-            <>
-              <p className="mt-2 text-3xl font-bold text-emerald-600">
-                €{totalRevenue.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </p>
-              <p className="mt-1 text-xs text-gray-400">dalla data di attivazione</p>
-            </>
-          ) : (
-            <>
-              <p className="mt-2 text-2xl font-bold text-gray-300">—</p>
-              <p className="mt-1 text-xs text-gray-400">Nessuno storico pagamenti</p>
-            </>
-          )}
-        </div>
       </div>
 
       {/* Location list */}
@@ -299,7 +278,6 @@ export default async function AgencyPage({
                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Piano</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Prezzo</th>
                 <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Mesi</th>
-                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Totale Pagato</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
@@ -324,11 +302,6 @@ export default async function AgencyPage({
                   </td>
                   <td className="px-5 py-4 text-right text-xs tabular-nums text-gray-500">
                     {row.dateAdded ? `${monthsSince(row.dateAdded)} mo` : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-5 py-4 text-right text-xs font-bold tabular-nums text-emerald-600">
-                    {row.planPrice != null && row.dateAdded
-                      ? `€${(row.planPrice * monthsSince(row.dateAdded)).toLocaleString('it-IT')}`
-                      : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-5 py-4 text-right">
                     {row.designSlug && (

@@ -31,13 +31,17 @@ export async function markRetagPending(): Promise<void> {
   await sb.from('farmacia_settings').upsert({ key: RETAG_KEY, value: true, updated_at: new Date().toISOString() }, { onConflict: 'key' })
 }
 
-/** If a re-tag is pending, clear the flag and run the full tier-tag pass. */
+/** If a re-tag is pending, run the full tier-tag pass, then clear the flag. */
 export async function runPendingRetag(): Promise<{ updated: number } | null> {
   const sb = createAdminClient()
   const { data } = await sb.from('farmacia_settings').select('value').eq('key', RETAG_KEY).maybeSingle()
   if (data?.value !== true) return null
+  // Do the work BEFORE clearing the flag. applyTierTags is idempotent (it diffs
+  // each contact's tier and skips unchanged rows), so if it throws partway the
+  // flag stays set and the next drain retries — no silently lost re-tag.
+  const result = await applyTierTags()
   await sb.from('farmacia_settings').upsert({ key: RETAG_KEY, value: false, updated_at: new Date().toISOString() }, { onConflict: 'key' })
-  return applyTierTags()
+  return result
 }
 
 /** Recompute tiers and enqueue GHL tag changes for the contacts whose tier moved. */

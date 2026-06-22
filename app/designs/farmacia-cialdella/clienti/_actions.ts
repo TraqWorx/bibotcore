@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { isBibotDesignOwner } from '@/lib/auth/designOwner'
 import { enqueueOps, type QueueOpInput } from '@/lib/farmacia/sync-queue'
 import { sanitizePhone } from '@/lib/farmacia/transform'
 import { FARMACIA_TAG } from '@/lib/farmacia/fields'
@@ -13,8 +13,7 @@ async function assertOwner(): Promise<{ error?: string }> {
   if (!user) return { error: 'Non autenticato' }
   const sb = createAdminClient()
   const { data: p } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
-  const ok = p?.role === 'super_admin' || p?.role === 'admin' || (!!p?.agency_id && isBibotAgency(p.agency_id))
-  return ok ? {} : { error: 'Non autorizzato' }
+  return isBibotDesignOwner(p) ? {} : { error: 'Non autorizzato' }
 }
 
 function newId(): string { return globalThis.crypto.randomUUID() }

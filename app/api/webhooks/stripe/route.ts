@@ -105,17 +105,21 @@ export async function POST(req: NextRequest) {
           const invoice = await stripe.invoices.retrieve(invoiceId) as unknown as Record<string, unknown>
           const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null
           if (subscriptionId) {
-            // Record refund amount and cancel
+            // Only act if we actually track this subscription. charge.amount_refunded
+            // is the cumulative refunded total for the charge, so store it
+            // absolutely (not additively) — this makes duplicate webhook
+            // deliveries idempotent instead of inflating refunded_cents.
             const { data: sub } = await sb.from('agency_subscriptions')
-              .select('refunded_cents')
+              .select('stripe_subscription_id')
               .eq('stripe_subscription_id', subscriptionId)
-              .single()
-            const totalRefunded = (sub?.refunded_cents ?? 0) + amountRefunded
-            await stripe.subscriptions.cancel(subscriptionId)
-            await sb.from('agency_subscriptions')
-              .update({ status: 'canceled', refunded_cents: totalRefunded, updated_at: new Date().toISOString() })
-              .eq('stripe_subscription_id', subscriptionId)
-            console.log(`[Stripe webhook] Refund $${(amountRefunded / 100).toFixed(2)} → canceled subscription ${subscriptionId}`)
+              .maybeSingle()
+            if (sub) {
+              await stripe.subscriptions.cancel(subscriptionId)
+              await sb.from('agency_subscriptions')
+                .update({ status: 'canceled', refunded_cents: amountRefunded, updated_at: new Date().toISOString() })
+                .eq('stripe_subscription_id', subscriptionId)
+              console.log(`[Stripe webhook] Refund $${(amountRefunded / 100).toFixed(2)} → canceled subscription ${subscriptionId}`)
+            }
           }
         } catch (err) {
           console.error('[Stripe webhook] refund handling error:', err)

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { isBibotDesignOwner } from '@/lib/auth/designOwner'
 
 export const APULIA_IMPERSONATE_COOKIE = 'ap_impersonate'
 
@@ -40,13 +41,12 @@ export const getApuliaSession = cache(async (): Promise<ApuliaSession> => {
     .eq('id', user.id)
     .single()
 
-  // Owner detection — broad: anyone with platform-level access OR an
-  // explicit admin-like role on Apulia. Prevents false 403s for users
-  // whose agency_id is null (super_admin) or whose Bibot record stored
-  // them under a different agency.
+  // Owner detection — scoped to Bibot/Apulia only. A bare admin role is NOT
+  // enough (every paying agency owner is an 'admin'); owners must be the
+  // platform super_admin or a member of the Bibot agency. The explicit
+  // location/agency clauses preserve access for Apulia's own team members.
   const isOwner =
-    profile?.role === 'super_admin' ||
-    profile?.role === 'admin' ||
+    isBibotDesignOwner(profile) ||
     (profile?.location_id === APULIA_LOCATION_ID && profile?.role === 'agency') ||
     profile?.agency_id === APULIA_AGENCY_ID
 

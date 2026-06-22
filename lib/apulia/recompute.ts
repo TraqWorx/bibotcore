@@ -89,9 +89,12 @@ export async function recomputeCommissions(): Promise<RecomputeResult> {
     const current = Number(a.commissione_totale) || 0
     if (Math.round(current * 100) === Math.round(entry.total * 100)) continue
 
-    const newCf = { ...(a.custom_fields ?? {}), [APULIA_FIELD.COMMISSIONE_TOTALE]: String(entry.total) }
+    // Round to whole cents before persisting/syncing so accumulated binary-float
+    // error never leaks out as e.g. "36.300000000000004".
+    const roundedTotal = Math.round(entry.total * 100) / 100
+    const newCf = { ...(a.custom_fields ?? {}), [APULIA_FIELD.COMMISSIONE_TOTALE]: String(roundedTotal) }
     await sb.from('apulia_contacts').update({
-      commissione_totale: entry.total,
+      commissione_totale: roundedTotal,
       custom_fields: newCf,
       sync_status: 'pending_update',
     }).eq('id', a.id)

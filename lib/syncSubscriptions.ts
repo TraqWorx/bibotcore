@@ -9,7 +9,10 @@ export async function syncSubscriptionsCore(): Promise<{ synced: number; error?:
   const supabase = createAdminClient()
   const token = process.env.GHL_AGENCY_TOKEN
   const companyId = process.env.GHL_COMPANY_ID
-  const stripeKey = process.env.STRIPE_SECRET_KEY
+  // The subscriptionId below comes from GHL saasSettings — it lives in the
+  // GHL-connected Stripe account, so look it up with that account's key (fall
+  // back to the SaaS key only if the GHL key isn't configured).
+  const stripeKey = process.env.STRIPE_GHL_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY
   if (!token) return { synced: 0, error: 'GHL_AGENCY_TOKEN not set' }
 
   // Step 1: Sync plan prices from GHL into ghl_plans table

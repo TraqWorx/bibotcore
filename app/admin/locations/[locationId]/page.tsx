@@ -31,11 +31,26 @@ export default async function LocationDetailPage({
 
   // Get agency info
   let agencyId: string | null = null
+  let role: string | null = null
   let isBibot = false
   if (user) {
-    const { data: prof } = await supabase.from('profiles').select('agency_id').eq('id', user.id).single()
+    const { data: prof } = await supabase.from('profiles').select('agency_id, role').eq('id', user.id).single()
     agencyId = prof?.agency_id ?? null
+    role = prof?.role ?? null
     isBibot = isBibotAgency(agencyId)
+  }
+
+  // Ownership: a non-super_admin may only view locations in their own agency.
+  // (Bibot/super_admin see everything.) Prevents cross-agency disclosure of a
+  // foreign location's name, plan, connection status and widget count.
+  if (role !== 'super_admin' && !isBibot) {
+    const { data: owned } = await supabase
+      .from('locations')
+      .select('location_id')
+      .eq('location_id', locationId)
+      .eq('agency_id', agencyId ?? '')
+      .maybeSingle()
+    if (!owned) notFound()
   }
 
   // Check subscription

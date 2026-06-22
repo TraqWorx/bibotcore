@@ -35,9 +35,9 @@
   - `admin`: agency owner who buys subscription → `/admin`
   - `agency`: GHL team member assigned to locations → `/agency`
   - `user`: portal contact → `/portal`
-- **Single plan**: $19/mo per location. No Basic/Pro split.
+- **Single plan**: £120/mo per location (GBP). No Basic/Pro split.
 - **Two Stripe accounts**:
-  - SaaS Stripe (`STRIPE_SECRET_KEY`) — handles $19/mo dashboard subscriptions
+  - SaaS Stripe (`STRIPE_SECRET_KEY`) — handles £120/mo dashboard subscriptions
   - GHL Stripe (`STRIPE_GHL_SECRET_KEY`) — GHL-connected Stripe for customer payment history
 - **Company vs Location tokens**: GHL OAuth may return company-level tokens (for SaaS sub-accounts like Bibot). `refreshIfNeeded` auto-detects and exchanges for location tokens via `/oauth/locationToken`.
 - **OAuth URL**: Use v1 (`/oauth/chooselocation`) — v2 shows "Update" prompt for existing installs. New scopes (affiliate, etc.) are granted via `version_id`, not URL scope param.
@@ -95,7 +95,7 @@
 
 1. Sign up (magic link) → auto-create agency + profile with `admin` role
 2. Add location (enter GHL location ID)
-3. Subscribe ($19/mo via Stripe checkout)
+3. Subscribe (£120/mo via Stripe checkout)
 4. Connect GHL (OAuth — v1 URL)
 5. Build dashboard (full-screen editor at `/editor/{locationId}` — AI chat + drag-drop)
 6. Embed via `/embed/{locationId}` (GHL custom menu link from Account page)

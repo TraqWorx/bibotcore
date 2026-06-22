@@ -1,6 +1,7 @@
 import { resolveSimfoniaShell } from '@/lib/simfonia/shellTheme'
 import { DEFAULT_THEME, type DesignTheme } from '@/lib/types/design'
 import { createAdminClient } from '@/lib/supabase-server'
+import { safeHexColor } from '@/lib/theme/sanitizeColor'
 import '@/app/designs/simfonia/shell.css'
 
 export const metadata = {
@@ -25,10 +26,12 @@ export default async function EmbedLayout({
     .maybeSingle()
 
   const customTheme = config?.theme as { primaryColor?: string; secondaryColor?: string } | null
+  // Validate colors — they are interpolated into the <style> block below, so an
+  // unsanitized value would allow CSS/markup injection on this public page.
   const theme: DesignTheme = {
     ...DEFAULT_THEME,
-    ...(customTheme?.primaryColor && { primaryColor: customTheme.primaryColor }),
-    ...(customTheme?.secondaryColor && { secondaryColor: customTheme.secondaryColor }),
+    primaryColor: safeHexColor(customTheme?.primaryColor, DEFAULT_THEME.primaryColor),
+    secondaryColor: safeHexColor(customTheme?.secondaryColor, DEFAULT_THEME.secondaryColor),
   }
 
   const shell = resolveSimfoniaShell(theme)

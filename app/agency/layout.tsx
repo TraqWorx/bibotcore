@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { createAuthClient } from '@/lib/supabase-server'
+import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import AgencyNavClient from './_components/AgencyNavClient'
 import LogoutButton from '../admin/_components/LogoutButton'
 import { ad } from '@/lib/admin/ui'
@@ -9,6 +9,12 @@ export default async function AgencyLayout({ children }: { children: React.React
   const authClient = await createAuthClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) redirect('/login')
+
+  // Role guard: only agency team members and admins reach the agency view.
+  // Portal contacts (role 'user') must not — send them to their portal.
+  const sb = createAdminClient()
+  const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
+  if (!['agency', 'admin', 'super_admin'].includes(profile?.role ?? '')) redirect('/redirect')
 
   return (
     <div className="min-h-screen bg-[#f5f5f8]">

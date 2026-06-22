@@ -12,8 +12,16 @@ export async function POST(req: NextRequest) {
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('role, agency_id').eq('id', user.id).single()
-  if (profile?.role !== 'admin' && profile?.role !== 'super_admin') return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
-  if (!profile.agency_id) return NextResponse.json({ error: 'No agency' }, { status: 403 })
+  if (!profile?.agency_id) return NextResponse.json({ error: 'No agency' }, { status: 403 })
+
+  // This grants a free (price_cents:0) active subscription, which unlocks the
+  // paid editor/embed — so it is a manual-activation tool restricted to the
+  // platform owner or Bibot. A regular agency admin must NOT self-activate for
+  // free (that would bypass the £120/mo paywall).
+  const { isBibotAgency } = await import('@/lib/isBibotAgency')
+  if (profile.role !== 'super_admin' && !isBibotAgency(profile.agency_id)) {
+    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+  }
 
   // Ownership: the location must belong to the caller's agency (super_admin bypasses).
   if (profile.role !== 'super_admin') {

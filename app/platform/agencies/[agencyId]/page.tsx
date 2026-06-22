@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import { getStripe } from '@/lib/stripe/stripe'
 import { PLAN } from '@/lib/stripe/plans'
+import { requireSuperAdmin } from '@/lib/auth/requireSuperAdmin'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,6 +52,7 @@ export default async function PlatformAgencyDetailPage({
   // Server actions for admin controls
   async function activateLocation(formData: FormData) {
     'use server'
+    await requireSuperAdmin()
     const locationId = formData.get('locationId') as string
     const sb = createAdminClient()
     await sb.from('agency_subscriptions').upsert({
@@ -67,6 +69,7 @@ export default async function PlatformAgencyDetailPage({
 
   async function deactivateLocation(formData: FormData) {
     'use server'
+    await requireSuperAdmin()
     const locationId = formData.get('locationId') as string
     const sb = createAdminClient()
     // Cancel Stripe subscription if exists

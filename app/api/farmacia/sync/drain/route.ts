@@ -17,8 +17,14 @@ export async function POST(req: NextRequest) {
   const TIME_BUDGET_MS = 240_000
   const recovered = await recoverStaleInProgress()
   // If cluster thresholds changed, recompute tiers + enqueue tag changes here
-  // (off the user's Settings click), then drain those ops below.
-  const retag = await runPendingRetag()
+  // (off the user's Settings click), then drain those ops below. Guarded so a
+  // re-tag failure can't abort the whole queue drain.
+  let retag: { updated: number } | null = null
+  try {
+    retag = await runPendingRetag()
+  } catch (err) {
+    console.error('[farmacia/drain] runPendingRetag failed', err)
+  }
 
   let totalClaimed = 0
   let totalCompleted = 0

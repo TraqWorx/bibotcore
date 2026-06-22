@@ -24,20 +24,20 @@ const NAME_FROM_CUSTOM_FIELD: Record<string, string> = {
  * - all events: persisted to ghl_webhook_events
  */
 export async function POST(req: Request) {
-  // ── Authenticate webhook request (mandatory in production) ───────────────
+  // ── Authenticate webhook request (always mandatory, fail closed) ─────────
+  // This handler can create and DELETE platform users, so it must never be
+  // open. Reject unconditionally when WEBHOOK_SECRET is unset — no env bypass.
   const webhookSecret = process.env.WEBHOOK_SECRET
-  if (!webhookSecret && process.env.NODE_ENV === 'production') {
-    console.error('[ghl-webhook] WEBHOOK_SECRET not set in production')
+  if (!webhookSecret) {
+    console.error('[ghl-webhook] WEBHOOK_SECRET not set — rejecting')
     return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
   }
-  if (webhookSecret) {
-    // Check header first, then query param as fallback
-    const headerSecret = req.headers.get('x-webhook-secret')
-    const url = new URL(req.url)
-    const querySecret = url.searchParams.get('secret')
-    if (headerSecret !== webhookSecret && querySecret !== webhookSecret) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  // Check header first, then query param as fallback.
+  const headerSecret = req.headers.get('x-webhook-secret')
+  const url = new URL(req.url)
+  const querySecret = url.searchParams.get('secret')
+  if (headerSecret !== webhookSecret && querySecret !== webhookSecret) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   let body: Record<string, unknown>

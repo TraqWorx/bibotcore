@@ -38,10 +38,15 @@ async function assertCanManageRoles(req: NextRequest, locationId?: string) {
   return null
 }
 
-/** GET — list all users with roles (super_admin sees all, location_admin sees own location) */
+/** GET — list all users with roles (super_admin sees all, admin sees own agency) */
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Only platform/agency admins may read the user roster. A portal contact or
+  // plain agency member must not enumerate their agency's users.
+  if (user.platformRole !== 'super_admin' && user.platformRole !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const sb = createAdminClient()
 

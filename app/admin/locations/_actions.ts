@@ -129,9 +129,15 @@ export async function addLocation(locationId: string): Promise<{ error: string }
   const trimmed = locationId.trim()
   if (!trimmed) return { error: 'Location ID is required' }
 
-  // Check if already exists for this agency
-  const { data: existing } = await sb.from('locations').select('location_id').eq('location_id', trimmed).eq('agency_id', profile.agency_id).maybeSingle()
-  if (existing) return { error: 'This location is already in your list' }
+  // Global ownership check: the upsert below conflicts on the location_id PK,
+  // so without this an agency could "steal" another agency's location by adding
+  // its ID (reassigning agency_id). Look up the row unscoped first.
+  const { data: existing } = await sb.from('locations').select('agency_id').eq('location_id', trimmed).maybeSingle()
+  if (existing) {
+    if (existing.agency_id === profile.agency_id) return { error: 'This location is already in your list' }
+    // Belongs to another agency (super_admin may still claim/reassign).
+    if (profile.role !== 'super_admin') return { error: 'This location is already managed by another account' }
+  }
 
   const { error } = await sb.from('locations').upsert(
     { location_id: trimmed, name: trimmed, agency_id: profile.agency_id },

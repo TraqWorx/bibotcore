@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { refreshGhlToken } from '@/lib/ghl/refreshGhlToken'
+import { isCronAuthorized } from '@/lib/auth/cronAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,14 +53,8 @@ async function run(): Promise<{ results: RefreshResult[]; refreshed: number; fai
   return { results, refreshed, failed, skipped }
 }
 
-function authorized(req: NextRequest): boolean {
-  if (process.env.NODE_ENV !== 'production') return true
-  const secret = req.headers.get('authorization')?.replace('Bearer ', '') ?? req.nextUrl.searchParams.get('secret')
-  return Boolean(process.env.CRON_SECRET) && secret === process.env.CRON_SECRET
-}
-
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
     const summary = await run()
     return NextResponse.json(summary)

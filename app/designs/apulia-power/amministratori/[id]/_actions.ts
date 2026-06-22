@@ -114,7 +114,20 @@ export async function markPodsPaid(
 ): Promise<{ paid: number; error?: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return { paid: 0, error: guard.error }
+  // Dedup the POD list so the same POD can't be paid twice in one submission.
+  podContactIds = [...new Set(podContactIds)]
   if (podContactIds.length === 0) return { paid: 0 }
+
+  // Validate any custom amounts: must be non-negative integer cents. Reject
+  // negatives/NaN/fractions outright — a bad value would corrupt every
+  // downstream payment total and commission figure.
+  if (customAmounts) {
+    for (const [podId, value] of Object.entries(customAmounts)) {
+      if (!Number.isInteger(value) || value < 0) {
+        return { paid: 0, error: `Importo non valido per il POD ${podId}` }
+      }
+    }
+  }
 
   const sb = createAdminClient()
   const { data: admin } = await sb
