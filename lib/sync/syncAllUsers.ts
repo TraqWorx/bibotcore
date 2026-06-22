@@ -7,6 +7,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
 import { normalizeMemberScope } from '@/lib/sync/normalizeMemberScope'
+import { ghlRoleToLocationRole } from '@/lib/auth/designOwner'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
@@ -151,9 +152,8 @@ export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
           await sb.from('profiles').update({ location_id: loc.location_id }).eq('id', profileId)
         }
 
-        // Ensure profile_locations entry
-        const ghlRole = ghlUser.roles?.role
-        const defaultRole = ghlRole === 'admin' ? 'location_admin' : 'team_member'
+        // Ensure profile_locations entry — GHL is the source of truth for role.
+        const defaultRole = ghlRoleToLocationRole(ghlUser.roles?.role)
 
         await sb.from('profile_locations').upsert(
           { user_id: profileId, location_id: loc.location_id, role: defaultRole },

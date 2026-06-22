@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase-server'
+import { ghlRoleToLocationRole } from '@/lib/auth/designOwner'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
@@ -114,12 +115,15 @@ export async function syncLocationUsers(
     return
   }
   const data = await res.json()
-  const emails = ((data?.users ?? []) as { email?: string }[])
-    .map((u) => u.email?.toLowerCase()).filter(Boolean) as string[]
+  // Capture each GHL user's role so it flows through to our per-location RBAC
+  // (GHL is the source of truth): admin → location_admin, user → team_member.
+  const users = ((data?.users ?? []) as { email?: string; roles?: { role?: string } }[])
+    .map((u) => ({ email: u.email?.toLowerCase(), locRole: ghlRoleToLocationRole(u.roles?.role) }))
+    .filter((u): u is { email: string; locRole: 'location_admin' | 'team_member' } => !!u.email)
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
-  for (const email of emails) {
+  for (const { email, locRole } of users) {
     const { data: existing } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle()
     let profileId: string | null = existing?.id ?? null
     if (!profileId) {
@@ -150,9 +154,9 @@ export async function syncLocationUsers(
     await supabase.from('profiles').update({ location_id: locationId }).eq('id', profileId)
     await supabase.from('installs').update({ user_id: profileId }).eq('location_id', locationId)
 
-    // Ensure profile_locations entry exists (RBAC)
+    // Ensure profile_locations entry exists (RBAC) with the role from GHL.
     await supabase.from('profile_locations').upsert(
-      { user_id: profileId, location_id: locationId, role: 'team_member' },
+      { user_id: profileId, location_id: locationId, role: locRole },
       { onConflict: 'user_id,location_id' }
     )
 

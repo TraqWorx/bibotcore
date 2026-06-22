@@ -2,17 +2,16 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { canWriteBibotDesign } from '@/lib/auth/designOwner'
+import { APULIA_LOCATION_ID } from '@/lib/apulia/auth'
 
 async function ensureOwner(): Promise<{ ok: true } | { ok: false; error: string }> {
   const auth = await createAuthClient()
   const { data: { user } } = await auth.auth.getUser()
   if (!user) return { ok: false, error: 'Not signed in' }
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
-  if (profile?.role === 'super_admin') return { ok: true }
-  if (!profile?.agency_id || !isBibotAgency(profile.agency_id)) return { ok: false, error: 'Forbidden' }
-  if (profile.role !== 'admin') return { ok: false, error: 'Forbidden' }
+  const { data: profile } = await sb.from('profiles').select('agency_id, role, location_id').eq('id', user.id).single()
+  if (!(await canWriteBibotDesign(user.id, profile, APULIA_LOCATION_ID))) return { ok: false, error: 'Forbidden' }
   return { ok: true }
 }
 

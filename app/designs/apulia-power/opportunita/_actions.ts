@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { canWriteBibotDesign } from '@/lib/auth/designOwner'
+import { APULIA_LOCATION_ID } from '@/lib/apulia/auth'
 import { moveOpportunityStage, syncOpportunities } from '@/lib/apulia/opportunities'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
@@ -10,9 +11,8 @@ async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const { data: { user } } = await auth.auth.getUser()
   if (!user) return { error: 'Not signed in' }
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
-  if (!profile?.agency_id || !isBibotAgency(profile.agency_id)) return { error: 'Forbidden' }
-  if (profile.role !== 'admin' && profile.role !== 'super_admin') return { error: 'Forbidden' }
+  const { data: profile } = await sb.from('profiles').select('agency_id, role, location_id').eq('id', user.id).single()
+  if (!(await canWriteBibotDesign(user.id, profile, APULIA_LOCATION_ID))) return { error: 'Forbidden' }
   return { email: user.email ?? '' }
 }
 

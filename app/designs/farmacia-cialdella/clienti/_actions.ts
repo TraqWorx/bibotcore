@@ -2,12 +2,23 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { canAccessBibotDesign } from '@/lib/auth/designOwner'
+import { canAccessBibotDesign, canWriteBibotDesign } from '@/lib/auth/designOwner'
 import { enqueueOps, type QueueOpInput } from '@/lib/farmacia/sync-queue'
 import { sanitizePhone } from '@/lib/farmacia/transform'
 import { FARMACIA_TAG, FARMACIA_LOCATION_ID } from '@/lib/farmacia/fields'
 
+// Write guard: super_admin, Bibot admin, or a location_admin on the pharmacy.
 async function assertOwner(): Promise<{ error?: string }> {
+  const auth = await createAuthClient()
+  const { data: { user } } = await auth.auth.getUser()
+  if (!user) return { error: 'Non autenticato' }
+  const sb = createAdminClient()
+  const { data: p } = await sb.from('profiles').select('agency_id, role, location_id').eq('id', user.id).single()
+  return (await canWriteBibotDesign(user.id, p, FARMACIA_LOCATION_ID)) ? {} : { error: 'Non autorizzato' }
+}
+
+// View guard: anyone who may see the pharmacy (admins or any assigned user).
+async function assertViewer(): Promise<{ error?: string }> {
   const auth = await createAuthClient()
   const { data: { user } } = await auth.auth.getUser()
   if (!user) return { error: 'Non autenticato' }
@@ -125,7 +136,7 @@ export async function removeTagFromContact(id: string, tag: string): Promise<{ e
 export interface ContactOrder { id: string; order_ext_id: string; channel: string; order_date: string | null; total_cents: number | null; category: string | null }
 
 export async function getContactOrders(id: string): Promise<ContactOrder[]> {
-  const guard = await assertOwner(); if (guard.error) return []
+  const guard = await assertViewer(); if (guard.error) return []
   const sb = createAdminClient()
   const { data } = await sb.from('farmacia_orders')
     .select('id, order_ext_id, channel, order_date, total_cents, category')

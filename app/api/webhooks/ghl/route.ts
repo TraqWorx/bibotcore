@@ -5,6 +5,7 @@ import { runDesignInstaller } from '@/lib/designInstaller/runDesignInstaller'
 import { provisionLocation } from '@/lib/ghl/provisionLocation'
 import { processWebhookEvent } from '@/lib/sync/webhookProcessor'
 import { getGhlTokenForLocation } from '@/lib/ghl/getGhlTokenForLocation'
+import { ghlRoleToLocationRole } from '@/lib/auth/designOwner'
 
 // Per-location custom-field-to-contact-name auto-sync. When a CSV import
 // (or any other source) creates a contact with the configured custom field
@@ -134,11 +135,31 @@ export async function POST(req: Request) {
       }
 
       if (profileId && existing?.role !== 'super_admin') {
-        // Link to location
-        await supabase.from('profile_locations').upsert(
-          { user_id: profileId, location_id: locationId, role: 'team_member' },
-          { onConflict: 'user_id,location_id' },
+        // Derive the per-location role from GHL when the payload carries it
+        // (GHL is the source of truth). If it doesn't, ensure membership exists
+        // without clobbering an already-set role.
+        const ghlRole = (
+          (body.roleType as string | undefined) ??
+          ((body.roles as Record<string, unknown> | undefined)?.role as string | undefined) ??
+          (body.role as string | undefined) ??
+          ((body.data as Record<string, unknown> | undefined)?.role as string | undefined) ??
+          ((body.user as Record<string, unknown> | undefined)?.role as string | undefined)
         )
+        if (ghlRole != null) {
+          await supabase.from('profile_locations').upsert(
+            { user_id: profileId, location_id: locationId, role: ghlRoleToLocationRole(ghlRole) },
+            { onConflict: 'user_id,location_id' },
+          )
+        } else {
+          const { data: membership } = await supabase
+            .from('profile_locations').select('role')
+            .eq('user_id', profileId).eq('location_id', locationId).maybeSingle()
+          if (!membership) {
+            await supabase.from('profile_locations').insert(
+              { user_id: profileId, location_id: locationId, role: 'team_member' },
+            )
+          }
+        }
         // Scope the profile to THIS location's agency in real time, and demote
         // a stray junk-agency 'admin' so the user lands on the right sub-account
         // instead of their old self-signup agency / Test Location.

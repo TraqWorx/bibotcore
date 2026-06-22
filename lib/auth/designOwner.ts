@@ -39,3 +39,34 @@ export async function canAccessBibotDesign(
     .maybeSingle()
   return !!data
 }
+
+/**
+ * WRITE access to a Bibot design. Stricter than view: only super_admin, a Bibot
+ * admin, or a user who is `location_admin` on that design's location may modify
+ * data. `team_member` / `viewer` (i.e. a GHL "user") get view-only — their
+ * write actions are rejected.
+ */
+export async function canWriteBibotDesign(
+  userId: string,
+  profile: ProfileLite,
+  designLocationId: string,
+): Promise<boolean> {
+  if (isBibotAdmin(profile)) return true
+  const sb = createAdminClient()
+  const { data } = await sb
+    .from('profile_locations')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('location_id', designLocationId)
+    .maybeSingle()
+  return data?.role === 'location_admin'
+}
+
+/**
+ * Map a GHL sub-account user role to our per-location role. GHL only has
+ * "admin" and "user"; admin → location_admin (view+write), everything else →
+ * team_member (view-only). Used by sync/webhook so GHL is the source of truth.
+ */
+export function ghlRoleToLocationRole(ghlRole: string | null | undefined): 'location_admin' | 'team_member' {
+  return String(ghlRole).toLowerCase() === 'admin' ? 'location_admin' : 'team_member'
+}
