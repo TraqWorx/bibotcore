@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { APULIA_FIELD, APULIA_TAG } from './fields'
 import { normalizePod } from './cache'
 import { enqueueOps, type QueueOpInput } from './sync-queue'
+import { recordImportRows, type ImportRowEvent } from './importRows'
 
 const COL = {
   PodPdr: 'POD/PDR',
@@ -184,12 +185,19 @@ export async function processPdpChunk(
   const inserts: NewRow[] = []
   const updates: UpdatedRow[] = []
   const ops: QueueOpInput[] = []
+  const rowEvents: ImportRowEvent[] = []
+  const seenPods = new Set<string>()
   let processedCount = 0
   const importNow = new Date().toISOString()
 
   for (const row of rowsSlice) {
     const pod = normalizePod((row[COL.PodPdr] || '').toUpperCase().trim())
-    if (!pod) { counters.skipped++; processedCount++; continue }
+    if (!pod) {
+      rowEvents.push({ identifier: null, label: (row[COL.Cliente] || '').trim() || null, outcome: 'skipped', reason: 'no_pod' })
+      counters.skipped++; processedCount++; continue
+    }
+    const dupRow = seenPods.has(pod)
+    if (!dupRow) seenPods.add(pod)
 
     const cliente = (row[COL.Cliente] || '').trim()
     // Building record: drop admin-identity fields (they live on the admin).
@@ -261,6 +269,7 @@ export async function processPdpChunk(
         })
         counters.untagged++
       }
+      rowEvents.push({ identifier: pod, label: cliente || null, outcome: dupRow ? 'duplicate' : (reactivate ? 'reactivated' : 'updated'), contactId: existing.id })
       counters.updated++
     } else {
       const id = randomUUID()
@@ -294,6 +303,7 @@ export async function processPdpChunk(
       inserts.push(inserted)
       ops.push({ contact_id: id, ghl_id: null, action: 'create' })
       newCreated[pod] = { id, firstName: cliente || pod, tags: [] }
+      rowEvents.push({ identifier: pod, label: cliente || null, outcome: dupRow ? 'duplicate' : 'created', contactId: id })
       counters.created++
     }
     processedCount++
@@ -359,6 +369,7 @@ export async function processPdpChunk(
     }
   }
   await enqueueOps(ops, importId ?? null)
+  await recordImportRows(importId, rowEvents)
 
   return {
     counters,

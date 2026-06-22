@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { getSyncOpsForImport, type SyncOpDetail } from '../../settings/_actions'
+import { getSyncOpsForImport, getImportRows, type SyncOpDetail, type ImportRowsPage } from '../../settings/_actions'
 
 export interface ImportRow {
   id: string
@@ -178,8 +178,124 @@ function DetailPanel({ r }: { r: ImportRow }) {
   )
 }
 
-/** Per-row list of what this import touched, with each row's sync status. */
+/** Every file row + its import outcome (paginated). Falls back to sync ops for older imports. */
 function ImportRowsList({ importId }: { importId: string }) {
+  const [page, setPage] = useState<ImportRowsPage | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<string | null>(null)
+  const [offset, setOffset] = useState(0)
+  const PAGE = 200
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getImportRows(importId, { outcome: filter, offset, limit: PAGE })
+      .then((res) => { if (!cancelled) setPage('error' in res ? null : res) })
+      .catch(() => { if (!cancelled) setPage(null) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [importId, filter, offset])
+
+  // Imports recorded before per-row tracking have no rows → show sync ops instead.
+  if (!loading && page && page.total === 0) return <OpsFallbackList importId={importId} />
+  if (loading && !page) return <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', margin: 0 }}>Carico le righe…</p>
+
+  const counts = page?.counts ?? {}
+  const rows = page?.rows ?? []
+  const grandTotal = page?.total ?? 0
+  const shownTotal = filter ? (counts[filter] ?? 0) : grandTotal
+  const outcomes = Object.keys(counts).sort()
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginRight: 4 }}>Righe importate</span>
+        <Chip active={filter === null} tone="blue" onClick={() => { setFilter(null); setOffset(0) }}>Tutte ({grandTotal})</Chip>
+        {outcomes.map((o) => (
+          <Chip key={o} active={filter === o} tone={outcomeTone(o)} onClick={() => { setFilter(o); setOffset(0) }}>{outcomeLabel(o)} ({counts[o]})</Chip>
+        ))}
+      </div>
+      <table className="ap-table" style={{ fontSize: 12 }}>
+        <thead>
+          <tr><th style={{ width: 120 }}>Stato</th><th>Identificativo</th><th>Nome</th><th>Note</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id}>
+              <td><span className="ap-pill" data-tone={outcomeTone(r.outcome)}>{outcomeLabel(r.outcome)}</span></td>
+              <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{r.identifier ?? '—'}</td>
+              <td>{r.label ?? '—'}</td>
+              <td style={{ color: 'var(--ap-text-muted)', fontSize: 11 }}>{reasonLabel(r.reason)}</td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--ap-text-faint)', padding: '8px 14px' }}>Nessuna riga.</td></tr>
+          )}
+        </tbody>
+      </table>
+      {shownTotal > PAGE && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+          <button className="ap-btn" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))} style={{ height: 28, fontSize: 12 }}>← Prec.</button>
+          <span style={{ color: 'var(--ap-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{offset + 1}–{Math.min(offset + PAGE, shownTotal)} di {shownTotal}</span>
+          <button className="ap-btn" disabled={offset + PAGE >= shownTotal} onClick={() => setOffset(offset + PAGE)} style={{ height: 28, fontSize: 12 }}>Succ. →</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Chip({ active, tone, onClick, children }: { active: boolean; tone: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="ap-pill"
+      data-tone={active ? tone : undefined}
+      style={{ cursor: 'pointer', border: active ? undefined : '1px solid var(--ap-line)', background: active ? undefined : 'transparent', opacity: active ? 1 : 0.7, fontSize: 11 }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function outcomeLabel(o: string): string {
+  switch (o) {
+    case 'created': return 'Creato'
+    case 'updated': return 'Aggiornato'
+    case 'reactivated': return 'Riattivato'
+    case 'skipped': return 'Saltato'
+    case 'duplicate': return 'Duplicato'
+    case 'tagged': return 'Switch-out'
+    case 'already': return 'Già switch-out'
+    case 'unmatched': return 'Non trovato'
+    default: return o
+  }
+}
+
+function outcomeTone(o: string): string {
+  switch (o) {
+    case 'created':
+    case 'reactivated': return 'green'
+    case 'updated': return 'blue'
+    case 'skipped':
+    case 'duplicate':
+    case 'tagged': return 'amber'
+    case 'unmatched': return 'red'
+    default: return 'blue'
+  }
+}
+
+function reasonLabel(reason: string | null): string {
+  switch (reason) {
+    case 'no_pod': return 'Cella POD/PDR vuota'
+    case 'missing_name_or_code': return 'Nome o codice mancante'
+    case null: return '—'
+    default: return reason ?? '—'
+  }
+}
+
+/** Fallback for imports recorded before per-row tracking: the GHL sync ops. */
+function OpsFallbackList({ importId }: { importId: string }) {
   const [ops, setOps] = useState<SyncOpDetail[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'failed'>('all')

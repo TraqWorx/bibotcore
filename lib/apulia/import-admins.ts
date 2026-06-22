@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase-server'
 import { APULIA_FIELD, APULIA_TAG } from './fields'
 import { enqueueOps, type QueueOpInput } from './sync-queue'
+import { recordImportRows, type ImportRowEvent } from './importRows'
 
 export interface AdminImportSummary {
   /** Reasons rows were skipped, with counts. */
@@ -105,11 +106,18 @@ export async function* importAdmins(rows: Record<string, string>[], importId?: s
   const inserts: Record<string, unknown>[] = []
   const updates: Record<string, unknown>[] = []
   const ops: QueueOpInput[] = []
+  const rowEvents: ImportRowEvent[] = []
+  const seenCodes = new Set<string>()
 
   for (const row of rows) {
     const name = (row[COL.Name] || '').trim()
     const code = (row[COL.Code] || '').trim()
-    if (!name || !code) { skipped++; done++; continue }
+    if (!name || !code) {
+      rowEvents.push({ identifier: code || null, label: name || null, outcome: 'skipped', reason: 'missing_name_or_code' })
+      skipped++; done++; continue
+    }
+    const dupRow = seenCodes.has(code)
+    if (!dupRow) seenCodes.add(code)
 
     const cf: Record<string, string> = {
       [APULIA_FIELD.AMMINISTRATORE_CONDOMINIO]: name,
@@ -143,6 +151,7 @@ export async function* importAdmins(rows: Record<string, string>[], importId?: s
         sync_status: 'pending_update',
       })
       ops.push({ contact_id: existing.id, ghl_id: existing.ghl_id ?? null, action: 'update' })
+      rowEvents.push({ identifier: code, label: name, outcome: dupRow ? 'duplicate' : 'updated', contactId: existing.id })
       updated++
     } else {
       const id = randomUUID()
@@ -171,6 +180,7 @@ export async function* importAdmins(rows: Record<string, string>[], importId?: s
       })
       ops.push({ contact_id: id, ghl_id: null, action: 'create' })
       byCode.set(code, { id, ghl_id: null, codice_amministratore: code, custom_fields: cf, tags: [APULIA_TAG.AMMINISTRATORE] })
+      rowEvents.push({ identifier: code, label: name, outcome: dupRow ? 'duplicate' : 'created', contactId: id })
       created++
     }
     done++
@@ -229,6 +239,7 @@ export async function* importAdmins(rows: Record<string, string>[], importId?: s
     }
   }
   await enqueueOps(ops, importId ?? null)
+  await recordImportRows(importId, rowEvents)
   // Adjust the reported counter: collapsed dupes shouldn't count as creates.
   created -= droppedDupes.length
 

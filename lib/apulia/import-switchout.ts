@@ -3,6 +3,7 @@ import { APULIA_TAG } from './fields'
 import { normalizePod } from './cache'
 import { recomputeCommissions, type RecomputeResult } from './recompute'
 import { enqueueOps, type QueueOpInput } from './sync-queue'
+import { recordImportRows, type ImportRowEvent } from './importRows'
 
 export type SwitchOutEvent =
   | { type: 'preflight' }
@@ -98,13 +99,20 @@ export async function* importSwitchOut(rows: Record<string, string>[], importId?
   // id -> earliest switch-out date, for PODs already tagged but missing a date.
   const backfills = new Map<string, string>()
   const ops: QueueOpInput[] = []
+  const rowEvents: ImportRowEvent[] = []
 
   for (const row of rows) {
     const raw = podColumn ? (row[podColumn] || '').toUpperCase().trim() : ''
     const pod = normalizePod(raw)
-    if (!pod) { skipped++; done++; continue }
+    if (!pod) {
+      rowEvents.push({ identifier: null, label: null, outcome: 'skipped', reason: 'no_pod' })
+      skipped++; done++; continue
+    }
     const c = byPod.get(pod)
-    if (!c) { unmatched++; done++; continue }
+    if (!c) {
+      rowEvents.push({ identifier: pod, label: null, outcome: 'unmatched' })
+      unmatched++; done++; continue
+    }
     const switchDate = dateColumn ? parseSwitchOutDate(row[dateColumn]) : null
     if (c.is_switch_out || (c.tags ?? []).includes(APULIA_TAG.SWITCH_OUT)) {
       // Already a switch-out — only backfill the real date when we never
@@ -113,6 +121,7 @@ export async function* importSwitchOut(rows: Record<string, string>[], importId?
         const prev = backfills.get(c.id)
         if (!prev || switchDate < prev) backfills.set(c.id, switchDate)
       }
+      rowEvents.push({ identifier: pod, label: null, outcome: 'already', contactId: c.id })
       alreadyTagged++; done++; continue
     }
     const newTags = Array.from(new Set([...(c.tags ?? []), APULIA_TAG.SWITCH_OUT]))
@@ -123,6 +132,7 @@ export async function* importSwitchOut(rows: Record<string, string>[], importId?
       action: 'add_tag',
       payload: { tag: APULIA_TAG.SWITCH_OUT },
     })
+    rowEvents.push({ identifier: pod, label: null, outcome: 'tagged', contactId: c.id })
     tagged++
     done++
     if (done % 100 === 0) {
@@ -165,6 +175,7 @@ export async function* importSwitchOut(rows: Record<string, string>[], importId?
     }
   }
   await enqueueOps(ops, importId ?? null)
+  await recordImportRows(importId, rowEvents)
 
   yield { type: 'progress', done, total: rows.length, tagged, alreadyTagged, unmatched, skipped }
   yield { type: 'recompute' }

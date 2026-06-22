@@ -235,6 +235,74 @@ export async function getSyncOpsForImport(importId: string | null): Promise<Sync
   })
 }
 
+export interface ImportRowDetail {
+  id: string
+  identifier: string | null
+  label: string | null
+  outcome: string
+  reason: string | null
+  contactId: string | null
+}
+
+export interface ImportRowsPage {
+  rows: ImportRowDetail[]
+  total: number
+  counts: Record<string, number>
+}
+
+/**
+ * Per-row outcomes for one import (every file row + its status). Paginated, with
+ * per-outcome counts for the filter chips. Returns counts.__none__ = 0 marker
+ * when the import predates per-row recording (older imports have no rows).
+ */
+export async function getImportRows(
+  importId: string,
+  opts?: { outcome?: string | null; offset?: number; limit?: number },
+): Promise<ImportRowsPage | { error: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { error: guard.error }
+  const sb = createAdminClient()
+
+  // Tally counts per outcome across the whole import (one column, paginated).
+  const counts: Record<string, number> = {}
+  let total = 0
+  for (let from = 0; ; from += 1000) {
+    const { data } = await sb
+      .from('apulia_import_rows')
+      .select('outcome')
+      .eq('import_id', importId)
+      .range(from, from + 999)
+    if (!data || data.length === 0) break
+    for (const r of data as Array<{ outcome: string }>) {
+      counts[r.outcome] = (counts[r.outcome] ?? 0) + 1
+      total++
+    }
+    if (data.length < 1000) break
+  }
+
+  const offset = Math.max(0, opts?.offset ?? 0)
+  const limit = Math.min(500, Math.max(1, opts?.limit ?? 200))
+  let q = sb
+    .from('apulia_import_rows')
+    .select('id, identifier, label, outcome, reason, contact_id')
+    .eq('import_id', importId)
+    .order('created_at', { ascending: true })
+    .range(offset, offset + limit - 1)
+  if (opts?.outcome) q = q.eq('outcome', opts.outcome)
+
+  const { data: rows } = await q
+  const detail: ImportRowDetail[] = (rows ?? []).map((r) => ({
+    id: r.id as string,
+    identifier: (r.identifier as string | null) ?? null,
+    label: (r.label as string | null) ?? null,
+    outcome: r.outcome as string,
+    reason: (r.reason as string | null) ?? null,
+    contactId: (r.contact_id as string | null) ?? null,
+  }))
+
+  return { rows: detail, total, counts }
+}
+
 /** Reset all failed ops back to pending so the worker retries them. */
 export async function retryFailedOps(): Promise<{ retried: number; error?: string }> {
   const guard = await ensureOwner()
