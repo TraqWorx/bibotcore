@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { getSyncOpsForImport, type SyncOpDetail } from '../../settings/_actions'
 
 export interface ImportRow {
   id: string
@@ -172,16 +173,110 @@ function DetailPanel({ r }: { r: ImportRow }) {
       {r.kind === 'admins' && <AdminsDetails r={r} summary={summary as AdminsSummary | null} />}
       {r.kind === 'switch_out' && <SwitchOutDetails r={r} summary={summary as SwitchOutSummary | null} />}
 
-      {summary && (
-        <details style={{ fontSize: 11, color: 'var(--ap-text-muted)' }}>
-          <summary style={{ cursor: 'pointer' }}>Dati grezzi (debug)</summary>
-          <pre style={{ marginTop: 6, padding: 8, background: 'var(--ap-bg)', borderRadius: 6, overflowX: 'auto', fontSize: 11 }}>
-            {JSON.stringify(summary, null, 2)}
-          </pre>
-        </details>
+      <ImportRowsList importId={r.id} />
+    </div>
+  )
+}
+
+/** Per-row list of what this import touched, with each row's sync status. */
+function ImportRowsList({ importId }: { importId: string }) {
+  const [ops, setOps] = useState<SyncOpDetail[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'all' | 'failed'>('all')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getSyncOpsForImport(importId)
+      .then((res) => { if (!cancelled) setOps('error' in res ? [] : res) })
+      .catch(() => { if (!cancelled) setOps([]) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [importId])
+
+  const all = ops ?? []
+  const failedCount = all.filter((o) => o.status === 'failed').length
+  const visible = all.filter((o) => filter === 'all' || o.status === 'failed')
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ap-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          Righe importate {all.length > 0 && <span style={{ color: 'var(--ap-text-faint)' }}>({all.length})</span>}
+        </span>
+        {failedCount > 0 && (
+          <select value={filter} onChange={(e) => setFilter(e.target.value as 'all' | 'failed')} className="ap-input" style={{ height: 28, fontSize: 12, width: 'auto' }}>
+            <option value="all">Tutte</option>
+            <option value="failed">Solo fallite ({failedCount})</option>
+          </select>
+        )}
+      </div>
+
+      {loading ? (
+        <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', margin: 0 }}>Carico le righe…</p>
+      ) : all.length === 0 ? (
+        <p style={{ fontSize: 12, color: 'var(--ap-text-faint)', margin: 0 }}>Nessuna riga registrata per questo import.</p>
+      ) : (
+        <table className="ap-table" style={{ fontSize: 12 }}>
+          <thead>
+            <tr>
+              <th style={{ width: 90 }}>Stato</th>
+              <th>Contatto</th>
+              <th>Azione</th>
+              <th style={{ textAlign: 'center' }}>Tentativi</th>
+              <th>Errore</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.slice(0, 500).map((o) => <OpRow key={o.id} op={o} />)}
+            {visible.length > 500 && (
+              <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--ap-text-faint)', padding: '8px 14px' }}>+{visible.length - 500} altre…</td></tr>
+            )}
+          </tbody>
+        </table>
       )}
     </div>
   )
+}
+
+function OpRow({ op }: { op: SyncOpDetail }) {
+  const tone = op.status === 'completed' ? 'green' : op.status === 'failed' ? 'red' : op.status === 'in_progress' ? 'blue' : 'amber'
+  const label = op.contactName ?? '—'
+  const sub = op.contactCode ? `code ${op.contactCode}` : op.contactPod ? `POD ${op.contactPod}` : null
+  return (
+    <tr>
+      <td><span className="ap-pill" data-tone={tone}>{statoLabel(op.status)}</span></td>
+      <td>
+        {op.contactId ? (
+          <span>{label}{sub && <span style={{ color: 'var(--ap-text-faint)', fontSize: 11 }}> · {sub}</span>}</span>
+        ) : '—'}
+      </td>
+      <td>{actionLabel(op.action)}</td>
+      <td style={{ fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>{op.attempts}</td>
+      <td style={{ maxWidth: 360, fontSize: 11, color: 'var(--ap-text-muted)' }}>{op.lastError ?? '—'}</td>
+    </tr>
+  )
+}
+
+function statoLabel(s: string): string {
+  switch (s) {
+    case 'pending': return 'In attesa'
+    case 'in_progress': return 'In corso'
+    case 'completed': return 'OK'
+    case 'failed': return 'Fallita'
+    default: return s
+  }
+}
+
+function actionLabel(a: string): string {
+  switch (a) {
+    case 'create': return 'Creazione'
+    case 'update': return 'Aggiornamento'
+    case 'add_tag': return 'Tag aggiunto'
+    case 'remove_tag': return 'Tag rimosso'
+    case 'delete': return 'Eliminazione'
+    default: return a
+  }
 }
 
 interface PdpSummary {
