@@ -1,6 +1,7 @@
 import { getApuliaSession } from '@/lib/apulia/auth'
 import Sidebar from './_components/Sidebar'
 import ImpersonationBanner from './_components/ImpersonationBanner'
+import AutoRefresh from '@/app/_components/AutoRefresh'
 import './shell.css'
 
 export const dynamic = 'force-dynamic'
@@ -11,6 +12,7 @@ export default async function ApuliaPowerLayout({ children }: { children: React.
   const session = await getApuliaSession()
   return (
     <div className="ap-shell" style={{ display: 'flex' }}>
+      <AutoRefresh />
       <Sidebar role={session.role} email={session.email} />
       <main className="ap-main" style={{ paddingTop: session.impersonating ? 0 : undefined }}>
         {session.impersonating && <ImpersonationBanner email={session.email} />}

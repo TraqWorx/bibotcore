@@ -1,5 +1,6 @@
 import { getFarmaciaSession } from '@/lib/farmacia/auth'
 import Sidebar from './_components/Sidebar'
+import AutoRefresh from '@/app/_components/AutoRefresh'
 import './shell.css'
 
 export const dynamic = 'force-dynamic'
@@ -10,6 +11,7 @@ export default async function FarmaciaLayout({ children }: { children: React.Rea
   const session = await getFarmaciaSession()
   return (
     <div className="fc-shell" style={{ display: 'flex' }}>
+      <AutoRefresh />
       <Sidebar email={session.email} />
       <main className="fc-main">{children}</main>
     </div>
