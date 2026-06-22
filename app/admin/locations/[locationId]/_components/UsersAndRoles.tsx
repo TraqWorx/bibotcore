@@ -11,7 +11,11 @@ interface Profile {
   created_at: string | null
 }
 
-const CRM_ROLES = ['location_admin', 'team_member', 'viewer'] as const
+function roleBadgeClass(role: string): string {
+  return role === 'location_admin' ? 'border-purple-200 bg-purple-50 text-purple-700'
+    : role === 'viewer' ? 'border-gray-200 bg-gray-50 text-gray-600'
+    : 'border-blue-200 bg-blue-50 text-blue-700'
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -20,7 +24,6 @@ function formatDate(iso: string) {
 export default function UsersAndRoles({ locationId, profiles }: { locationId: string; profiles: Profile[] }) {
   const [roles, setRoles] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
-  const [updating, setUpdating] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
 
@@ -45,24 +48,6 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
     return () => clearTimeout(timer)
   }, [loadRoles])
 
-  async function handleRoleChange(userId: string, newRole: string) {
-    setUpdating(userId)
-    setMessage(null)
-    const res = await fetch('/api/admin/roles', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, locationId, role: newRole }),
-    })
-    if (res.ok) {
-      setRoles((prev) => new Map(prev).set(userId, newRole))
-      setMessage('Ruolo aggiornato')
-    } else {
-      setMessage('Errore')
-    }
-    setUpdating(null)
-    setTimeout(() => setMessage(null), 2000)
-  }
-
   return (
     <div className={ad.tableShell}>
       <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
@@ -73,7 +58,7 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
               {profiles.length}
             </span>
           </h2>
-          <p className="mt-0.5 text-[10px] text-gray-500">Sincronizzati da GHL. Ruoli CRM modificabili qui.</p>
+          <p className="mt-0.5 text-[10px] text-gray-500">Utenti e ruoli gestiti in GoHighLevel.</p>
         </div>
         <div className="flex items-center gap-3">
           {message && (
@@ -130,18 +115,9 @@ export default function UsersAndRoles({ locationId, profiles }: { locationId: st
                     {loading ? (
                       <span className="inline-block h-6 w-20 animate-pulse rounded-lg bg-gray-100" />
                     ) : crmRole ? (
-                      <select
-                        value={crmRole}
-                        onChange={(e) => handleRoleChange(p.id, e.target.value)}
-                        disabled={updating === p.id || p.role === 'super_admin'}
-                        className={`rounded-lg border px-2 py-1 text-[11px] font-semibold outline-none ${
-                          crmRole === 'location_admin' ? 'border-purple-200 bg-purple-50 text-purple-700' :
-                          crmRole === 'viewer' ? 'border-gray-200 bg-gray-50 text-gray-600' :
-                          'border-blue-200 bg-blue-50 text-blue-700'
-                        }`}
-                      >
-                        {CRM_ROLES.map((r) => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
-                      </select>
+                      <span className={`rounded-lg border px-2 py-1 text-[11px] font-semibold ${roleBadgeClass(crmRole)}`}>
+                        {crmRole.replace('_', ' ')}
+                      </span>
                     ) : (
                       <span className="text-xs text-gray-300">—</span>
                     )}

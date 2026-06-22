@@ -15,28 +15,14 @@ async function getAuthUser(req: NextRequest) {
   return { ...user, platformRole: profile?.role ?? 'user', agencyId: profile?.agency_id ?? null }
 }
 
-async function assertSuperAdmin(req: NextRequest) {
-  const user = await getAuthUser(req)
-  if (!user || user.platformRole !== 'super_admin') return null
-  return user
-}
-
-/** Check if user is super_admin OR location_admin for a specific location */
-async function assertCanManageRoles(req: NextRequest, locationId?: string) {
-  const user = await getAuthUser(req)
-  if (!user) return null
-  if (user.platformRole === 'super_admin') return user
-  if (!locationId) return null
-  const sb = createAdminClient()
-  const { data: membership } = await sb
-    .from('profile_locations')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('location_id', locationId)
-    .maybeSingle()
-  if (membership?.role === 'location_admin') return user
-  return null
-}
+// Users and per-location roles are managed in GoHighLevel and synced into the
+// app (hourly cron + webhooks). The app is read-only for users/roles — writing
+// here would just be overwritten on the next sync, so the mutating endpoints are
+// disabled to keep GHL the single source of truth.
+const MANAGED_IN_GHL = NextResponse.json(
+  { error: 'Users and roles are managed in GoHighLevel.' },
+  { status: 405 },
+)
 
 /** GET — list all users with roles (super_admin sees all, admin sees own agency) */
 export async function GET(req: NextRequest) {
@@ -91,75 +77,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ users, locations: locationList })
 }
 
-/** PUT — update a user's role (super_admin or location_admin) */
-export async function PUT(req: NextRequest) {
-  const body = await req.clone().json()
-  if (!await assertCanManageRoles(req, body?.locationId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const { userId, locationId, role } = await req.json()
-  if (!userId || !locationId || !role) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
-  if (!['location_admin', 'team_member', 'viewer'].includes(role)) {
-    return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
-  }
-
-  const sb = createAdminClient()
-  const { error } = await sb
-    .from('profile_locations')
-    .update({ role })
-    .eq('user_id', userId)
-    .eq('location_id', locationId)
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
-}
-
-/** POST — add a user to a location */
-export async function POST(req: NextRequest) {
-  if (!await assertSuperAdmin(req)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const { email, locationId, role } = await req.json()
-  if (!email || !locationId || !role) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
-
-  const sb = createAdminClient()
-
-  // Find or create the user
-  const { data: profile } = await sb.from('profiles').select('id').eq('email', email.toLowerCase()).maybeSingle()
-  let userId = profile?.id
-
-  if (!userId) {
-    // Create Supabase auth user
-    const { data: created, error: createErr } = await sb.auth.admin.createUser({
-      email: email.toLowerCase(),
-      email_confirm: true,
-    })
-    if (createErr) return NextResponse.json({ error: createErr.message }, { status: 400 })
-    userId = created?.user?.id
-    if (userId) {
-      await sb.from('profiles').upsert({ id: userId, email: email.toLowerCase(), role: 'agency' }, { onConflict: 'id' })
-    }
-  }
-
-  if (!userId) return NextResponse.json({ error: 'Utente non trovato' }, { status: 404 })
-
-  // Add to profile_locations
-  const { error } = await sb.from('profile_locations').upsert(
-    { user_id: userId, location_id: locationId, role },
-    { onConflict: 'user_id,location_id' },
-  )
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
-}
-
-/** DELETE — remove a user from a location */
-export async function DELETE(req: NextRequest) {
-  if (!await assertSuperAdmin(req)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const { userId, locationId } = await req.json()
-  if (!userId || !locationId) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
-
-  const sb = createAdminClient()
-  await sb.from('profile_locations').delete().eq('user_id', userId).eq('location_id', locationId)
-
-  return NextResponse.json({ ok: true })
-}
+/** PUT/POST/DELETE — disabled. Users & roles are managed in GoHighLevel. */
+export async function PUT() { return MANAGED_IN_GHL }
+export async function POST() { return MANAGED_IN_GHL }
+export async function DELETE() { return MANAGED_IN_GHL }

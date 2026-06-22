@@ -33,24 +33,11 @@ async function requireUserInAgency(targetUserId: string): Promise<void> {
 }
 
 export async function inviteUser(
-  email: string
+  _email: string
 ): Promise<{ error: string } | undefined> {
-  try {
-    await requirePlatform()
-    if (!email) return { error: 'Email is required' }
-    const supabase = createAdminClient()
-    const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`,
-    })
-    if (error) return { error: error.message }
-    // Server-set invite marker so /redirect provisions their account on first login.
-    if (data?.user) {
-      await supabase.auth.admin.updateUserById(data.user.id, { app_metadata: { invited_admin: true } })
-    }
-    revalidatePath('/admin/users')
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Failed to invite user' }
-  }
+  // Disabled: users are managed in GoHighLevel and synced in. Inviting here would
+  // create an account GHL doesn't know about (and the sync would fight it).
+  return { error: 'Gli utenti sono gestiti in GoHighLevel.' }
 }
 
 export async function syncGhlUsers(): Promise<{ synced: number; removed: number; debug: string[]; error?: string }> {
@@ -237,15 +224,9 @@ export async function generateLoginLink(
 }
 
 export async function deleteUser(
-  userId: string
+  _userId: string
 ): Promise<{ error: string } | undefined> {
-  try {
-    await requireUserInAgency(userId)
-    const supabase = createAdminClient()
-    const { error } = await supabase.auth.admin.deleteUser(userId)
-    if (error) return { error: error.message }
-    revalidatePath('/admin/users')
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Failed to delete user' }
-  }
+  // Disabled: users are managed in GoHighLevel. Deleting here would just be
+  // re-created on the next sync, so removals must happen in GHL.
+  return { error: 'Gli utenti sono gestiti in GoHighLevel.' }
 }
