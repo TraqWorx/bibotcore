@@ -70,11 +70,16 @@ function AppointmentPanel({ event, onClose, onAction }: { event: CalEvent; onClo
         </div>
         <div className="bs-panel-actions">
           {event.appointmentStatus !== 'showed' && (
-            <button className="bs-btn-primary" style={{ justifyContent: 'center' }} onClick={() => setStatus('showed')} disabled={loading}>Segna completato</button>
+            <button className="bs-btn-primary" style={{ justifyContent: 'center', width: '100%' }} onClick={() => setStatus('showed')} disabled={loading}>Segna completato</button>
           )}
-          {event.appointmentStatus !== 'cancelled' && (
-            <button className="bs-btn-danger" style={{ justifyContent: 'center' }} onClick={() => setStatus('cancelled')} disabled={loading}>Annulla</button>
-          )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {event.appointmentStatus !== 'cancelled' && (
+              <button className="bs-btn-danger" style={{ justifyContent: 'center' }} onClick={() => setStatus('cancelled')} disabled={loading}>Annulla</button>
+            )}
+            {event.appointmentStatus !== 'noshow' && event.appointmentStatus !== 'cancelled' && (
+              <button className="bs-btn-ghost" style={{ justifyContent: 'center' }} onClick={() => setStatus('noshow')} disabled={loading}>No-show</button>
+            )}
+          </div>
         </div>
       </div>
     </>
@@ -159,25 +164,24 @@ export default function CalendarioPage() {
           <button className="bs-btn-ghost" onClick={() => setAnchor(new Date())} style={{ fontSize: 12.5 }}>Oggi</button>
         </div>
 
-        {/* User filter */}
+        {/* User filter pills */}
         {users.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--bs-text-faint)" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            <select
-              value={selectedUserId}
-              onChange={e => setSelectedUserId(e.target.value)}
-              style={{
-                padding: '6px 12px', borderRadius: 8, border: '1.5px solid var(--bs-line)',
-                fontSize: 13, background: 'white', color: 'var(--bs-text)', cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              <option value="all">Tutto il team</option>
-              {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
+            {[{ id: 'all', name: 'Tutti' }, ...users].map(u => (
+              <button
+                key={u.id}
+                onClick={() => setSelectedUserId(u.id)}
+                style={{
+                  padding: '5px 14px', borderRadius: 100, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.15s',
+                  border: `1.5px solid ${selectedUserId === u.id ? 'var(--bs-black)' : 'var(--bs-line)'}`,
+                  background: selectedUserId === u.id ? 'var(--bs-black)' : 'white',
+                  color: selectedUserId === u.id ? 'white' : 'var(--bs-text-muted)',
+                  fontWeight: selectedUserId === u.id ? 700 : 400,
+                }}
+              >
+                {u.name}
+              </button>
+            ))}
           </div>
         )}
       </div>

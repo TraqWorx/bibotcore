@@ -24,6 +24,7 @@ const STATUS_CFG: Record<string, { cls: string; label: string }> = {
   new:        { cls: 'bs-badge-confirmed', label: 'CONFERMATO' },
   cancelled:  { cls: 'bs-badge-cancelled', label: 'ANNULLATO' },
   showed:     { cls: 'bs-badge-showed',    label: 'COMPLETATO' },
+  noshow:     { cls: 'bs-badge-cancelled', label: 'NO-SHOW' },
   'no-show':  { cls: 'bs-badge-cancelled', label: 'NO-SHOW' },
   pending:    { cls: 'bs-badge-pending',   label: 'IN ATTESA' },
 }
@@ -153,6 +154,11 @@ function AppointmentPanel({
             {appt.appointmentStatus !== 'cancelled' && (
               <button className="bs-btn-danger" style={{ justifyContent: 'center' }} onClick={() => setStatus('cancelled')} disabled={loading}>
                 Annulla
+              </button>
+            )}
+            {appt.appointmentStatus !== 'noshow' && appt.appointmentStatus !== 'cancelled' && (
+              <button className="bs-btn-ghost" style={{ justifyContent: 'center', gridColumn: appt.appointmentStatus === 'confirmed' ? 'span 2' : 'auto' }} onClick={() => setStatus('noshow')} disabled={loading}>
+                No-show
               </button>
             )}
           </div>

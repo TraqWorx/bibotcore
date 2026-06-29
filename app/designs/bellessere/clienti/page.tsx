@@ -29,23 +29,51 @@ function fullName(c: Contact) {
   return `${c.firstName} ${c.lastName}`.trim() || c.email || c.phone || '—'
 }
 
+interface Message { id: string; body: string; direction: string; dateAdded: string }
+
 function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; visitCount: number; onClose: () => void }) {
   const [events, setEvents] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [msgText, setMsgText] = useState('')
+  const [sending, setSending] = useState(false)
 
   useEffect(() => {
     const start = new Date(); start.setMonth(start.getMonth() - 6)
     const end = new Date(); end.setMonth(end.getMonth() + 2)
-    fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`)
-      .then(r => r.json())
-      .then(d => {
-        setEvents((d.events ?? [])
-          .filter((e: { contactId?: string }) => e.contactId === contact.id)
-          .map((e: Appointment) => ({ id: e.id, title: e.title, startTime: e.startTime, appointmentStatus: e.appointmentStatus })))
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    Promise.all([
+      fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`)
+        .then(r => r.json()),
+      fetch(`/api/bellessere/contact-conversation?contactId=${contact.id}`)
+        .then(r => r.json()),
+    ]).then(([apptData, convData]) => {
+      setEvents((apptData.events ?? [])
+        .filter((e: { contactId?: string }) => e.contactId === contact.id)
+        .map((e: Appointment) => ({ id: e.id, title: e.title, startTime: e.startTime, appointmentStatus: e.appointmentStatus })))
+      setConversationId(convData.conversationId ?? null)
+      setMessages(convData.messages ?? [])
+    })
+    .catch(() => {})
+    .finally(() => setLoading(false))
   }, [contact.id])
+
+  async function sendMessage(e: React.FormEvent) {
+    e.preventDefault()
+    if (!msgText.trim()) return
+    setSending(true)
+    try {
+      const res = await fetch('/api/bellessere/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId, contactId: contact.id, message: msgText.trim(), type: 'SMS' }),
+      })
+      if (res.ok) {
+        setMessages(prev => [...prev, { id: Date.now().toString(), body: msgText.trim(), direction: 'outbound', dateAdded: new Date().toISOString() }])
+        setMsgText('')
+      }
+    } catch { /* ignore */ } finally { setSending(false) }
+  }
 
   const memberSince = contact.dateAdded
     ? new Date(contact.dateAdded).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
@@ -168,19 +196,53 @@ function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; vis
           </div>
         </div>
 
+        {/* Inline messaging */}
+        <div style={{ borderTop: '1px solid var(--bs-line)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--bs-text-faint)', marginBottom: 2 }}>Messaggi</div>
+          {messages.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)', textAlign: 'center', padding: '12px 0' }}>
+              {loading ? 'Caricamento...' : 'Nessun messaggio con questo cliente.'}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
+              {messages.slice(-8).map(m => (
+                <div key={m.id} style={{ display: 'flex', justifyContent: m.direction === 'outbound' ? 'flex-end' : 'flex-start' }}>
+                  <div style={{
+                    maxWidth: '80%', padding: '7px 12px', borderRadius: 12, fontSize: 12.5, lineHeight: 1.4,
+                    background: m.direction === 'outbound' ? 'var(--bs-black)' : 'var(--bs-bg)',
+                    color: m.direction === 'outbound' ? 'white' : 'var(--bs-text)',
+                    borderBottomRightRadius: m.direction === 'outbound' ? 4 : 12,
+                    borderBottomLeftRadius: m.direction === 'inbound' ? 4 : 12,
+                  }}>
+                    {m.body}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <form onSubmit={sendMessage} style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="bs-input"
+              style={{ flex: 1, fontSize: 13 }}
+              placeholder="Scrivi un messaggio..."
+              value={msgText}
+              onChange={e => setMsgText(e.target.value)}
+              disabled={sending}
+            />
+            <button type="submit" className="bs-btn-primary" style={{ padding: '0 14px', flexShrink: 0 }} disabled={sending || !msgText.trim()}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </form>
+        </div>
+
         <div className="bs-panel-actions">
           <a href="/designs/bellessere/appuntamenti" className="bs-btn-primary" style={{ justifyContent: 'center', width: '100%' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
             Prenota appuntamento
-          </a>
-          <a href="/designs/bellessere/conversazioni" className="bs-btn-ghost" style={{ justifyContent: 'center', width: '100%' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-              <polyline points="22,6 12,13 2,6"/>
-            </svg>
-            Invia messaggio
           </a>
         </div>
       </div>
