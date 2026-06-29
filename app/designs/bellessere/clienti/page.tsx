@@ -137,7 +137,16 @@ function CustomerPanel({ contact, onClose }: { contact: Contact; onClose: () => 
         </div>
         <div className="bs-panel-actions">
           <a href="/designs/bellessere/appuntamenti" className="bs-btn-primary" style={{ justifyContent: 'center' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
             Prenota appuntamento
+          </a>
+          <a href="/designs/bellessere/conversazioni" className="bs-btn-ghost" style={{ justifyContent: 'center' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            Invia messaggio
           </a>
         </div>
       </div>

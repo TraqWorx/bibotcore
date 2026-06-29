@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import LogoutButton from '@/app/admin/_components/LogoutButton'
+import Image from 'next/image'
 
 const BASE = '/designs/bellessere'
 
@@ -53,11 +54,27 @@ const NAV = [
     ),
   },
   {
+    href: `${BASE}/conversazioni`,
+    label: 'Conversazioni',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="bs-nav-icon">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    ),
+  },
+  {
     href: `${BASE}/servizi`,
     label: 'Servizi',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="bs-nav-icon">
-        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        <path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5V5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v3.5c0 .83-.67 1.5-1.5 1.5z"/>
+        <path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+        <path d="M9.5 14c.83 0 1.5.67 1.5 1.5V19c0 .83-.67 1.5-1.5 1.5S8 19.83 8 19v-3.5c0-.83.67-1.5 1.5-1.5z"/>
+        <path d="M3.5 14H5v1.5c0 .83-.67 1.5-1.5 1.5S2 16.33 2 15.5 2.67 14 3.5 14z"/>
+        <path d="M14 14.5c0-.83.67-1.5 1.5-1.5H19c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-3.5c-.83 0-1.5-.67-1.5-1.5z"/>
+        <path d="M15.5 19H14v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"/>
+        <path d="M10 9.5C10 8.67 9.33 8 8.5 8H5c-.83 0-1.5.67-1.5 1.5S4.17 11 5 11h3.5c.83 0 1.5-.67 1.5-1.5z"/>
+        <path d="M8.5 5H10V3.5C10 2.67 9.33 2 8.5 2S7 2.67 7 3.5 7.67 5 8.5 5z"/>
       </svg>
     ),
   },
@@ -69,14 +86,17 @@ export default function Sidebar({ email }: { email: string }) {
   return (
     <aside className="bs-sidebar">
       <div className="bs-brand">
-        <div className="bs-brand-mark">B</div>
-        <div className="bs-brand-text">
-          Bellessere
-          <small>Barber CRM</small>
-        </div>
+        <Image
+          src="/bellessere-logo.png"
+          alt="Bellessere"
+          width={200}
+          height={72}
+          className="bs-brand-logo"
+          priority
+        />
       </div>
 
-      <div className="bs-nav">
+      <nav className="bs-nav">
         <div className="bs-nav-section">Menu</div>
         {NAV.map((item) => (
           <Link
@@ -89,16 +109,14 @@ export default function Sidebar({ email }: { email: string }) {
             <span>{item.label}</span>
           </Link>
         ))}
-      </div>
+      </nav>
 
       <div className="bs-nav-bottom">
-        <div style={{ padding: '8px 10px', fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
-          Connesso come<br />
-          <span style={{ color: 'white', fontWeight: 600, wordBreak: 'break-all' }}>{email}</span>
+        <div className="bs-user-info">
+          <div className="bs-user-label">Connesso come</div>
+          <div className="bs-user-email">{email}</div>
         </div>
-        <div style={{ padding: '4px 4px 0' }}>
-          <LogoutButton />
-        </div>
+        <LogoutButton />
       </div>
     </aside>
   )
