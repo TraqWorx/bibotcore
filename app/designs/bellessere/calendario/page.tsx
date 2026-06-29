@@ -90,7 +90,7 @@ export default function CalendarioPage() {
   const [anchor, setAnchor] = useState(() => new Date())
   const [events, setEvents] = useState<CalEvent[]>([])
   const [users, setUsers] = useState<GhlUser[]>([])
-  const [selectedUserId, setSelectedUserId] = useState<string>('all')
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<CalEvent | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -111,14 +111,29 @@ export default function CalendarioPage() {
     setLoading(true)
     const start = new Date(weekStart); start.setHours(0, 0, 0, 0)
     const end = new Date(weekEnd); end.setHours(23, 59, 59, 999)
-    const params = new URLSearchParams({ startTime: start.toISOString(), endTime: end.toISOString() })
-    if (selectedUserId !== 'all') params.set('userId', selectedUserId)
-    fetch(`/api/bellessere/appointments?${params}`)
-      .then(r => r.json())
-      .then(d => setEvents(d.events ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [weekStart.toISOString(), weekEnd.toISOString(), selectedUserId, refreshKey])
+    if (selectedUserIds.length === 0) {
+      // Fetch all groups (no filter)
+      fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`)
+        .then(r => r.json())
+        .then(d => setEvents(d.events ?? []))
+        .catch(() => {})
+        .finally(() => setLoading(false))
+    } else {
+      // Fetch for each selected user and merge
+      Promise.all(
+        selectedUserIds.map(uid =>
+          fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}&userId=${uid}`)
+            .then(r => r.json())
+            .then(d => d.events ?? [])
+            .catch(() => [])
+        )
+      ).then(results => {
+        const seen = new Set<string>()
+        const merged = results.flat().filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true })
+        setEvents(merged)
+      }).finally(() => setLoading(false))
+    }
+  }, [weekStart.toISOString(), weekEnd.toISOString(), selectedUserIds.join(','), refreshKey])
 
   function prevWeek() { const d = new Date(anchor); d.setDate(d.getDate() - 7); setAnchor(d) }
   function nextWeek() { const d = new Date(anchor); d.setDate(d.getDate() + 7); setAnchor(d) }
@@ -164,24 +179,41 @@ export default function CalendarioPage() {
           <button className="bs-btn-ghost" onClick={() => setAnchor(new Date())} style={{ fontSize: 12.5 }}>Oggi</button>
         </div>
 
-        {/* User filter pills */}
+        {/* User filter — multi-select pills */}
         {users.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
-            {[{ id: 'all', name: 'Tutti' }, ...users].map(u => (
-              <button
-                key={u.id}
-                onClick={() => setSelectedUserId(u.id)}
-                style={{
-                  padding: '5px 14px', borderRadius: 100, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.15s',
-                  border: `1.5px solid ${selectedUserId === u.id ? 'var(--bs-black)' : 'var(--bs-line)'}`,
-                  background: selectedUserId === u.id ? 'var(--bs-black)' : 'white',
-                  color: selectedUserId === u.id ? 'white' : 'var(--bs-text-muted)',
-                  fontWeight: selectedUserId === u.id ? 700 : 400,
-                }}
-              >
-                {u.name}
-              </button>
-            ))}
+            <button
+              onClick={() => setSelectedUserIds([])}
+              style={{
+                padding: '5px 14px', borderRadius: 100, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.15s',
+                border: `1.5px solid ${selectedUserIds.length === 0 ? 'var(--bs-black)' : 'var(--bs-line)'}`,
+                background: selectedUserIds.length === 0 ? 'var(--bs-black)' : 'white',
+                color: selectedUserIds.length === 0 ? 'white' : 'var(--bs-text-muted)',
+                fontWeight: selectedUserIds.length === 0 ? 700 : 400,
+              }}
+            >
+              Tutti
+            </button>
+            {users.map(u => {
+              const active = selectedUserIds.includes(u.id)
+              return (
+                <button
+                  key={u.id}
+                  onClick={() => setSelectedUserIds(prev =>
+                    prev.includes(u.id) ? prev.filter(id => id !== u.id) : [...prev, u.id]
+                  )}
+                  style={{
+                    padding: '5px 14px', borderRadius: 100, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.15s',
+                    border: `1.5px solid ${active ? 'var(--bs-gold)' : 'var(--bs-line)'}`,
+                    background: active ? 'var(--bs-gold-tint)' : 'white',
+                    color: active ? 'var(--bs-gold)' : 'var(--bs-text-muted)',
+                    fontWeight: active ? 700 : 400,
+                  }}
+                >
+                  {u.name}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>

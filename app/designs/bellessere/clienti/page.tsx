@@ -31,6 +31,71 @@ function fullName(c: Contact) {
 
 interface Message { id: string; body: string; direction: string; dateAdded: string }
 
+function TagEditor({ contactId, initialTags }: { contactId: string; initialTags: string[] }) {
+  const [tags, setTags] = useState<string[]>(initialTags)
+  const [input, setInput] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function saveTags(next: string[]) {
+    setSaving(true)
+    await fetch('/api/bellessere/contacts', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contactId, tags: next }),
+    }).catch(() => {})
+    setSaving(false)
+  }
+
+  async function addTag() {
+    const tag = input.trim()
+    if (!tag || tags.includes(tag)) { setInput(''); return }
+    const next = [...tags, tag]
+    setTags(next)
+    setInput('')
+    await saveTags(next)
+  }
+
+  async function removeTag(tag: string) {
+    const next = tags.filter(t => t !== tag)
+    setTags(next)
+    await saveTags(next)
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--bs-text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Tag</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+        {tags.map(t => (
+          <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 10px', background: 'var(--bs-gold-tint)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: 100, fontSize: 12 }}>
+            {t}
+            <button onClick={() => removeTag(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--bs-gold)', padding: 0, fontSize: 12, lineHeight: 1, opacity: saving ? 0.4 : 1 }} disabled={saving}>×</button>
+          </span>
+        ))}
+        {tags.length === 0 && <span style={{ fontSize: 12, color: 'var(--bs-text-faint)' }}>Nessun tag</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          className="bs-input"
+          style={{ fontSize: 12.5, height: 32 }}
+          placeholder="Aggiungi tag..."
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
+          disabled={saving}
+        />
+        <button
+          className="bs-btn-ghost"
+          style={{ padding: '0 12px', height: 32, fontSize: 12, flexShrink: 0 }}
+          onClick={addTag}
+          disabled={saving || !input.trim()}
+        >
+          Aggiungi
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; visitCount: number; onClose: () => void }) {
   const [events, setEvents] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
@@ -153,17 +218,8 @@ function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; vis
             ))}
           </div>
 
-          {/* Tags */}
-          {contact.tags.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--bs-text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Tag</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {contact.tags.map(t => (
-                  <span key={t} style={{ padding: '3px 10px', background: 'var(--bs-bg)', border: '1px solid var(--bs-line)', borderRadius: 100, fontSize: 12 }}>{t}</span>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Tags editor */}
+          <TagEditor contactId={contact.id} initialTags={contact.tags} />
 
           {/* Recent appointments */}
           <div>

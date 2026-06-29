@@ -20,6 +20,25 @@ async function getToken(): Promise<string> {
   return refreshIfNeeded(BELLESSERE_LOCATION_ID, conn)
 }
 
+// PUT — update contact fields (tags, name, etc.)
+export async function PUT(req: NextRequest) {
+  const access = await getLocationAccess(req, BELLESSERE_LOCATION_ID)
+  if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { contactId, ...fields } = await req.json()
+  if (!contactId) return NextResponse.json({ error: 'contactId required' }, { status: 400 })
+
+  const token = await getToken()
+  const res = await fetch(`${GHL}/contacts/${contactId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, Version: V, 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  })
+  const data = await res.json()
+  return NextResponse.json(data, { status: res.status })
+}
+
 // POST — create a contact in GHL
 export async function POST(req: NextRequest) {
   const access = await getLocationAccess(req, BELLESSERE_LOCATION_ID)
