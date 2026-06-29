@@ -1,0 +1,1 @@
+export const BELLESSERE_LOCATION_ID = '38lvVkcTVVRFDDcHqYd1'
