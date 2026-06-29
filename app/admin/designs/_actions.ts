@@ -5,6 +5,8 @@ import path from 'path'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 
+const DESIGN_SLUG_PATTERN = /^[a-z0-9-]+$/
+
 async function assertSuperAdmin() {
   const authClient = await createAuthClient()
   const { data: { user } } = await authClient.auth.getUser()
@@ -98,7 +100,7 @@ export async function duplicateDesign(
 
     const trimmedSlug = newSlug.trim()
     if (!trimmedSlug) return { error: 'New slug is required' }
-    if (!/^[a-z0-9-]+$/.test(trimmedSlug)) {
+    if (!DESIGN_SLUG_PATTERN.test(slug) || !DESIGN_SLUG_PATTERN.test(trimmedSlug)) {
       return { error: 'Slug must be lowercase letters, numbers, and hyphens only' }
     }
 
@@ -159,6 +161,9 @@ export async function deleteDesign(
 ): Promise<{ error: string } | undefined> {
   try {
     await assertSuperAdmin()
+    if (!DESIGN_SLUG_PATTERN.test(slug)) {
+      return { error: 'Slug must be lowercase letters, numbers, and hyphens only' }
+    }
     const supabase = createAdminClient()
     const { error } = await supabase.from('designs').delete().eq('slug', slug)
     if (error) return { error: error.message }

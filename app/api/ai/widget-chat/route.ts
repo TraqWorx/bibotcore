@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { createAdminClient } from '@/lib/supabase-server'
 import { isBibotAgency } from '@/lib/isBibotAgency'
+import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import type Anthropic from '@anthropic-ai/sdk'
 import { PRESET_WIDGETS } from '@/lib/widgets/registry'
 
@@ -254,13 +255,13 @@ GHL contacts and opportunities can have custom fields. When the user mentions cu
 export async function GET(req: NextRequest) {
   const locationId = req.nextUrl.searchParams.get('locationId')
   if (!locationId) return NextResponse.json({ error: 'locationId required' }, { status: 400 })
-  const authClient = await createAuthClient()
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const access = await getLocationAccess(req, locationId)
+  if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
+  const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', access.userId).single()
   const cap = Number(process.env.AI_MONTHLY_CAP || 300)
-  if (isBibotAgency(profile?.agency_id)) return NextResponse.json({ cap, used: 0, remaining: null, unlimited: true })
+  if (access.isSuperAdmin || isBibotAgency(profile?.agency_id)) return NextResponse.json({ cap, used: 0, remaining: null, unlimited: true })
   const period = new Date().toISOString().slice(0, 7)
   const { data: usage } = await sb.from('ai_usage').select('count').eq('location_id', locationId).eq('period', period).maybeSingle()
   const used = usage?.count ?? 0
@@ -277,20 +278,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'messages and locationId required' }, { status: 400 })
   }
 
-  const authClient = await createAuthClient()
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const access = await getLocationAccess(req, locationId)
+  if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
-  if (!profile?.agency_id) return NextResponse.json({ error: 'No agency' }, { status: 403 })
+  const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', access.userId).single()
+  const platformBypass = access.isSuperAdmin || isBibotAgency(profile?.agency_id)
+  const agencyId = profile?.agency_id
+  if (!platformBypass && !agencyId) return NextResponse.json({ error: 'No agency' }, { status: 403 })
 
   // Check subscription (Bibot bypasses)
-  if (!isBibotAgency(profile.agency_id)) {
+  if (!platformBypass) {
     const { data: sub } = await sb
       .from('agency_subscriptions')
       .select('status')
-      .eq('agency_id', profile.agency_id)
+      .eq('agency_id', agencyId)
       .eq('location_id', locationId)
       .eq('status', 'active')
       .maybeSingle()
@@ -302,7 +305,7 @@ export async function POST(req: NextRequest) {
   // AI usage cap (cost guard) — Bibot/super_admin exempt. Configurable via AI_MONTHLY_CAP.
   const period = new Date().toISOString().slice(0, 7)
   const cap = Number(process.env.AI_MONTHLY_CAP || 300)
-  if (!isBibotAgency(profile.agency_id)) {
+  if (!platformBypass) {
     const { data: usage } = await sb.from('ai_usage').select('count').eq('location_id', locationId).eq('period', period).maybeSingle()
     if ((usage?.count ?? 0) >= cap) {
       return NextResponse.json({ error: `Monthly AI limit reached (${cap} messages for this location). It resets next month.` }, { status: 429 })
@@ -359,7 +362,7 @@ export async function POST(req: NextRequest) {
     const cleanText = text.replace(/```widget\s*[\s\S]*?```/g, '').trim()
 
     // Count this generation + report remaining quota for the month.
-    const unlimited = isBibotAgency(profile.agency_id)
+    const unlimited = platformBypass
     let remaining: number | null = null
     if (!unlimited) {
       const { data: newCount } = await sb.rpc('increment_ai_usage', { p_location: locationId, p_period: period })

@@ -32,9 +32,10 @@ export async function POST(request: Request) {
   const sb = createAdminClient()
   if (locationId) {
     // Single location — must belong to caller's agency (super_admin bypasses).
-    if (admin.role !== 'super_admin' && admin.agencyId) {
+    if (admin.role !== 'super_admin') {
+      if (!admin.agencyId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       const { data: loc } = await sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
-      if (loc?.agency_id !== admin.agencyId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      if (!loc || loc.agency_id !== admin.agencyId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
   } else {
     // Sync ALL locations — platform only (super_admin or Bibot).

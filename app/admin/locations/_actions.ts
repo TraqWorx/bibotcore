@@ -156,6 +156,11 @@ export async function getConnectLocationUrl(locationId: string): Promise<{ url: 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('role, agency_id').eq('id', user.id).single()
   if (profile?.role !== 'admin' && profile?.role !== 'super_admin') return { error: 'Not authorized' }
+  if (profile.role !== 'super_admin') {
+    if (!profile.agency_id) return { error: 'No agency' }
+    const { data: loc } = await sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+    if (!loc || loc.agency_id !== profile.agency_id) return { error: 'Location not in your agency' }
+  }
 
   // Check subscription (Bibot bypasses)
   const { isBibotAgency } = await import('@/lib/isBibotAgency')

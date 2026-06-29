@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { createAdminClient } from '@/lib/supabase-server'
+import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 
 /**
  * POST /api/portal/test-access
@@ -10,20 +11,23 @@ export async function POST(req: NextRequest) {
   const { locationId } = await req.json()
   if (!locationId) return NextResponse.json({ error: 'locationId required' }, { status: 400 })
 
-  const authClient = await createAuthClient()
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  const access = await getLocationAccess(req, locationId)
+  if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const sb = createAdminClient()
 
-  // Verify user is admin
-  const { data: profile } = await sb
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const [{ data: profile }, { data: membership }] = await Promise.all([
+    sb.from('profiles').select('role').eq('id', access.userId).single(),
+    sb.from('profile_locations').select('role').eq('user_id', access.userId).eq('location_id', locationId).maybeSingle(),
+  ])
 
-  if (!profile || (profile.role !== 'super_admin' && profile.role !== 'location_admin')) {
+  const canPreview =
+    profile?.role === 'super_admin' ||
+    profile?.role === 'admin' ||
+    membership?.role === 'location_admin'
+
+  if (!canPreview) {
     return NextResponse.json({ error: 'Solo gli admin possono usare l\'anteprima' }, { status: 403 })
   }
 
@@ -31,7 +35,7 @@ export async function POST(req: NextRequest) {
   const { data: existing } = await sb
     .from('portal_users')
     .select('contact_ghl_id')
-    .eq('auth_user_id', user.id)
+    .eq('auth_user_id', access.userId)
     .eq('location_id', locationId)
     .maybeSingle()
 
@@ -55,7 +59,7 @@ export async function POST(req: NextRequest) {
   // Create the mapping
   const { error } = await sb.from('portal_users').upsert(
     {
-      auth_user_id: user.id,
+      auth_user_id: access.userId,
       location_id: locationId,
       contact_ghl_id: contact.ghl_id,
     },

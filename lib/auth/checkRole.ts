@@ -42,9 +42,10 @@ export async function getUserRoles(locationId: string): Promise<UserRoles | null
 
   const sb = createAdminClient()
 
-  const [{ data: profile }, { data: membership }] = await Promise.all([
-    sb.from('profiles').select('role').eq('id', user.id).single(),
+  const [{ data: profile }, { data: membership }, { data: location }] = await Promise.all([
+    sb.from('profiles').select('role, agency_id').eq('id', user.id).single(),
     sb.from('profile_locations').select('role').eq('user_id', user.id).eq('location_id', locationId).single(),
+    sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle(),
   ])
 
   const knownRoles: readonly string[] = ['super_admin', 'admin', 'agency']
@@ -53,7 +54,11 @@ export async function getUserRoles(locationId: string): Promise<UserRoles | null
     : 'user'
   const locationRole = (membership?.role as LocationRole) ?? null
 
-  const platformLevel = ROLE_LEVEL[platformRole] ?? 0
+  const platformLevel = platformRole === 'super_admin'
+    ? ROLE_LEVEL.super_admin
+    : platformRole === 'admin' && profile?.agency_id && location?.agency_id === profile.agency_id
+      ? ROLE_LEVEL.admin
+      : 0
   const locationLevel = locationRole ? (ROLE_LEVEL[locationRole] ?? 0) : 0
   const effectiveLevel = Math.max(platformLevel, locationLevel)
 

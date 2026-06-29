@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { createAdminClient } from '@/lib/supabase-server'
+import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import type Anthropic from '@anthropic-ai/sdk'
 import { buildDesignerPrompt } from '@/lib/widgets/ai-prompt'
 import { validateConfig } from '@/lib/widgets/validateConfig'
@@ -15,21 +16,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'prompt and locationId required' }, { status: 400 })
   }
 
-  const authClient = await createAuthClient()
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const access = await getLocationAccess(req, locationId)
+  if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
-  if (!profile?.agency_id) return NextResponse.json({ error: 'No agency' }, { status: 403 })
+  const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', access.userId).single()
 
   // Verify subscription
   const { isBibotAgency } = await import('@/lib/isBibotAgency')
-  if (!isBibotAgency(profile.agency_id)) {
+  const platformBypass = access.isSuperAdmin || isBibotAgency(profile?.agency_id)
+  const agencyId = profile?.agency_id
+  if (!platformBypass && !agencyId) return NextResponse.json({ error: 'No agency' }, { status: 403 })
+  if (!platformBypass) {
     const { data: subscription } = await sb
       .from('agency_subscriptions')
       .select('status')
-      .eq('agency_id', profile.agency_id)
+      .eq('agency_id', agencyId)
       .eq('location_id', locationId)
       .eq('status', 'active')
       .maybeSingle()

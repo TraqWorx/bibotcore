@@ -33,7 +33,7 @@ async function getAuthenticatedAdmin() {
 
   // Super admin or admin can sync
   if (profile?.role === 'super_admin' || profile?.role === 'admin') {
-    return { user, agencyId: profile.agency_id }
+    return { user, role: profile.role, agencyId: profile.agency_id }
   }
 
   return null
@@ -54,10 +54,11 @@ export async function POST(request: Request) {
 
   // Agency owners can only sync locations belonging to their agency
   const sb = createAdminClient()
-  if (auth.agencyId) {
+  if (auth.role !== 'super_admin') {
+    if (!auth.agencyId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     const { data: loc } = await sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
-    if (loc?.agency_id && loc.agency_id !== auth.agencyId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!loc || loc.agency_id !== auth.agencyId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
   }
 
@@ -100,6 +101,15 @@ export async function GET(request: Request) {
   const locationId = searchParams.get('locationId')
   if (!locationId) {
     return NextResponse.json({ error: 'locationId required' }, { status: 400 })
+  }
+
+  const sb = createAdminClient()
+  if (auth.role !== 'super_admin') {
+    if (!auth.agencyId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const { data: loc } = await sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+    if (!loc || loc.agency_id !== auth.agencyId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
   }
 
   const statuses = await getSyncStatus(locationId)

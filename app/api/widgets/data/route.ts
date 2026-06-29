@@ -20,6 +20,22 @@ const ENDPOINT_MAP: Record<CustomDataSource, string> = {
   none: '',
 }
 
+const RESERVED_FILTER_KEYS = new Set([
+  'locationId',
+  'location_id',
+  'companyId',
+  'company_id',
+  'access_token',
+  'refresh_token',
+  'token',
+  'authorization',
+  'Authorization',
+  'api_key',
+  'apiKey',
+  'limit',
+  'pageLimit',
+])
+
 export async function POST(req: NextRequest) {
   const { locationId, dataSource, filters } = await req.json() as {
     locationId: string
@@ -29,6 +45,9 @@ export async function POST(req: NextRequest) {
 
   if (!locationId || !dataSource) {
     return NextResponse.json({ error: 'locationId and dataSource required' }, { status: 400 })
+  }
+  if (!(dataSource in ENDPOINT_MAP)) {
+    return NextResponse.json({ error: 'Invalid dataSource' }, { status: 400 })
   }
 
   // Auth: must have access to this location (was: any logged-in user, any location).
@@ -81,7 +100,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Apply user filters
-  for (const [k, v] of Object.entries(filters ?? {})) {
+  const cleanFilters = filters && typeof filters === 'object' && !Array.isArray(filters) ? filters : {}
+  for (const [k, v] of Object.entries(cleanFilters)) {
+    if (RESERVED_FILTER_KEYS.has(k) || !/^[A-Za-z0-9_.-]{1,64}$/.test(k)) continue
+    if (typeof v !== 'string' || v.length > 1000) continue
     url.searchParams.set(k, v)
   }
 
