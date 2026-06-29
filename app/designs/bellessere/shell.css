@@ -180,31 +180,21 @@
   border-radius: var(--bs-radius);
   padding: 22px 24px 20px;
   box-shadow: var(--bs-shadow-sm);
-  position: relative;
-  overflow: hidden;
-}
-
-.bs-stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--bs-black) 0%, var(--bs-gold) 100%);
-  border-radius: var(--bs-radius) var(--bs-radius) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .bs-stat-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
   background: var(--bs-gold-tint);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 14px;
   color: var(--bs-gold);
+  flex-shrink: 0;
 }
 
 .bs-stat-value {
@@ -825,6 +815,88 @@
 
 .bs-icon-btn:hover { background: var(--bs-bg); color: var(--bs-text); }
 .bs-icon-btn.danger:hover { background: rgba(239,68,68,0.08); color: var(--bs-danger); border-color: rgba(239,68,68,0.3); }
+
+/* ─── Stat card header (icon + badge row) ────────────────── */
+
+.bs-stat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.bs-stat-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+
+.bs-stat-badge-warning { background: rgba(245,158,11,0.12); color: #B45309; }
+.bs-stat-badge-success { background: rgba(16,185,129,0.1); color: #059669; }
+
+/* ─── Appointment row card ────────────────────────────────── */
+
+.bs-appt-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: var(--bs-surface);
+  border: 1px solid var(--bs-line);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+  box-shadow: var(--bs-shadow-sm);
+}
+
+.bs-appt-row:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  border-color: var(--bs-line-strong);
+}
+
+.bs-appt-time {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bs-text-muted);
+  width: 58px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ─── Date group ──────────────────────────────────────────── */
+
+.bs-date-group { display: flex; flex-direction: column; gap: 10px; }
+
+.bs-date-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px;
+}
+
+.bs-date-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--bs-black);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ─── Performance ring ────────────────────────────────────── */
+
+.bs-perf-ring {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+}
 
 /* ─── Date header chip ────────────────────────────────────── */
 
