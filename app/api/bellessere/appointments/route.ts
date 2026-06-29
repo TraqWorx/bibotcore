@@ -9,6 +9,9 @@ export const dynamic = 'force-dynamic'
 const GHL = 'https://services.leadconnectorhq.com'
 const V = '2021-04-15'
 
+// GHL calendar group IDs for Bellessere
+const GROUP_IDS = ['8YNX4fRu7gQ6kuZwgAWc', 'SXfbdyfcj0AaoKoNkBRZ', '28DeCKllPCELAeGEPdan']
+
 async function getToken(): Promise<string> {
   const sb = createAdminClient()
   const { data: conn } = await sb
@@ -35,15 +38,32 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
   const startTime = sp.get('startTime')
   const endTime = sp.get('endTime')
+  const userId = sp.get('userId') // optional: filter by staff member
   if (!startTime || !endTime) return NextResponse.json({ error: 'startTime and endTime required' }, { status: 400 })
 
   const token = await getToken()
-  const params = new URLSearchParams({ locationId: BELLESSERE_LOCATION_ID, startTime, endTime })
-  const res = await fetch(`${GHL}/calendars/events?${params}`, {
-    headers: { Authorization: `Bearer ${token}`, Version: V },
-  })
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+
+  if (userId) {
+    // Filter by specific staff member
+    const params = new URLSearchParams({ locationId: BELLESSERE_LOCATION_ID, startTime, endTime, userId })
+    const res = await fetch(`${GHL}/calendars/events?${params}`, {
+      headers: { Authorization: `Bearer ${token}`, Version: V },
+    })
+    const data = await res.json()
+    return NextResponse.json(data, { status: res.status })
+  }
+
+  // Fetch all groups in parallel (GHL requires userId/calendarId/groupId)
+  const results = await Promise.all(
+    GROUP_IDS.map(groupId => {
+      const params = new URLSearchParams({ locationId: BELLESSERE_LOCATION_ID, startTime, endTime, groupId })
+      return fetch(`${GHL}/calendars/events?${params}`, {
+        headers: { Authorization: `Bearer ${token}`, Version: V },
+      }).then(r => r.json())
+    })
+  )
+  const events = results.flatMap(r => r.events ?? [])
+  return NextResponse.json({ events })
 }
 
 // POST — create appointment

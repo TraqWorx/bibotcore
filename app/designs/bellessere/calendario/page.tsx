@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 
 interface CalEvent {
   id: string
@@ -10,7 +10,10 @@ interface CalEvent {
   appointmentStatus?: string
   contactId?: string
   contactName?: string
+  userId?: string
 }
+
+interface GhlUser { id: string; name: string }
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 8) // 8am–8pm
 const DAYS = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab']
@@ -57,12 +60,8 @@ function AppointmentPanel({ event, onClose, onAction }: { event: CalEvent; onClo
           <button className="bs-panel-close" onClick={onClose}>✕</button>
         </div>
         <div className="bs-panel-body">
-          {event.contactName && (
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{event.contactName}</div>
-          )}
-          {event.title && (
-            <div style={{ fontSize: 13.5, color: 'var(--bs-text-muted)' }}>{event.title}</div>
-          )}
+          {event.contactName && <div style={{ fontWeight: 700, fontSize: 16 }}>{event.contactName}</div>}
+          {event.title && <div style={{ fontSize: 13.5, color: 'var(--bs-text-muted)' }}>{event.title}</div>}
           {dt && (
             <div style={{ fontSize: 13.5 }}>
               {dt.toLocaleString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
@@ -85,9 +84,19 @@ function AppointmentPanel({ event, onClose, onAction }: { event: CalEvent; onClo
 export default function CalendarioPage() {
   const [anchor, setAnchor] = useState(() => new Date())
   const [events, setEvents] = useState<CalEvent[]>([])
+  const [users, setUsers] = useState<GhlUser[]>([])
+  const [selectedUserId, setSelectedUserId] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<CalEvent | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+
+  // Load users once
+  useEffect(() => {
+    fetch('/api/bellessere/services')
+      .then(r => r.json())
+      .then(d => setUsers((d.users ?? []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name }))))
+      .catch(() => {})
+  }, [])
 
   const weekDates = getWeekDates(anchor)
   const weekStart = weekDates[0]
@@ -97,17 +106,14 @@ export default function CalendarioPage() {
     setLoading(true)
     const start = new Date(weekStart); start.setHours(0, 0, 0, 0)
     const end = new Date(weekEnd); end.setHours(23, 59, 59, 999)
-    fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`)
+    const params = new URLSearchParams({ startTime: start.toISOString(), endTime: end.toISOString() })
+    if (selectedUserId !== 'all') params.set('userId', selectedUserId)
+    fetch(`/api/bellessere/appointments?${params}`)
       .then(r => r.json())
-      .then(d => {
-        setEvents((d.events ?? []).map((e: {
-          id: string; title?: string; startTime?: string; endTime?: string;
-          appointmentStatus?: string; contactId?: string; contactName?: string;
-        }) => e))
-      })
+      .then(d => setEvents(d.events ?? []))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [weekStart.toISOString(), weekEnd.toISOString(), refreshKey])
+  }, [weekStart.toISOString(), weekEnd.toISOString(), selectedUserId, refreshKey])
 
   function prevWeek() { const d = new Date(anchor); d.setDate(d.getDate() - 7); setAnchor(d) }
   function nextWeek() { const d = new Date(anchor); d.setDate(d.getDate() + 7); setAnchor(d) }
@@ -128,7 +134,6 @@ export default function CalendarioPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <div className="bs-page-eyebrow">Agenda</div>
@@ -142,17 +147,39 @@ export default function CalendarioPage() {
         </button>
       </div>
 
-      {/* Calendar nav */}
-      <div className="bs-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* Calendar nav + user filter */}
+      <div className="bs-card" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button className="bs-btn-ghost" onClick={prevWeek} style={{ padding: '7px 12px' }}>‹</button>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, textTransform: 'capitalize' }}>{monthLabel}</div>
-            <div style={{ fontSize: 12, color: 'var(--bs-text-faint)' }}>{dateRange}</div>
+            <div style={{ fontWeight: 700, fontSize: 15, textTransform: 'capitalize' }}>{monthLabel}</div>
+            <div style={{ fontSize: 11.5, color: 'var(--bs-text-faint)' }}>{dateRange}</div>
           </div>
           <button className="bs-btn-ghost" onClick={nextWeek} style={{ padding: '7px 12px' }}>›</button>
+          <button className="bs-btn-ghost" onClick={() => setAnchor(new Date())} style={{ fontSize: 12.5 }}>Oggi</button>
         </div>
-        <button className="bs-btn-ghost" onClick={() => setAnchor(new Date())}>Oggi</button>
+
+        {/* User filter */}
+        {users.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--bs-text-faint)" strokeWidth="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <select
+              value={selectedUserId}
+              onChange={e => setSelectedUserId(e.target.value)}
+              style={{
+                padding: '6px 12px', borderRadius: 8, border: '1.5px solid var(--bs-line)',
+                fontSize: 13, background: 'white', color: 'var(--bs-text)', cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              <option value="all">Tutto il team</option>
+              {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Grid */}
@@ -161,14 +188,22 @@ export default function CalendarioPage() {
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--bs-text-faint)' }}>Caricamento...</div>
         ) : (
           <div className="bs-cal-grid">
-            {/* Header row */}
+            {/* Header */}
             <div className="bs-cal-header-cell" style={{ borderBottom: '1px solid var(--bs-line)' }} />
             {weekDates.map((d, i) => {
               const isToday = d.toISOString().slice(0, 10) === todayStr
               return (
                 <div key={i} className={`bs-cal-header-cell ${isToday ? 'today' : ''}`}>
-                  <div style={{ fontSize: 11, textTransform: 'uppercase' }}>{DAYS[i]}</div>
-                  <div style={{ fontSize: 18, fontWeight: isToday ? 800 : 600, marginTop: 2 }}>{d.getDate()}</div>
+                  <div style={{ fontSize: 11, textTransform: 'uppercase', color: isToday ? 'var(--bs-gold)' : 'var(--bs-text-faint)' }}>{DAYS[i]}</div>
+                  <div style={{
+                    fontSize: 18, fontWeight: 800, marginTop: 2,
+                    width: 32, height: 32, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: isToday ? 'var(--bs-black)' : 'transparent',
+                    color: isToday ? 'white' : 'var(--bs-text)',
+                  }}>
+                    {d.getDate()}
+                  </div>
                 </div>
               )
             })}
@@ -176,9 +211,7 @@ export default function CalendarioPage() {
             {/* Hour rows */}
             {HOURS.map(hour => (
               <React.Fragment key={hour}>
-                <div className="bs-cal-time-cell">
-                  {hour}:00
-                </div>
+                <div className="bs-cal-time-cell">{hour}:00</div>
                 {weekDates.map((d, di) => {
                   const slotEvents = eventsForSlot(d, hour)
                   return (
@@ -226,6 +259,3 @@ export default function CalendarioPage() {
     </div>
   )
 }
-
-// React Fragment needs import
-import React from 'react'

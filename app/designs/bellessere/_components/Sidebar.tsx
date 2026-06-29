@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import LogoutButton from '@/app/admin/_components/LogoutButton'
 
@@ -85,29 +86,14 @@ export default function Sidebar({ email }: { email: string }) {
   return (
     <aside className="bs-sidebar">
       <div className="bs-brand">
-        <div style={{ padding: '8px 4px 4px' }}>
-          <div style={{
-            color: 'white',
-            fontSize: 26,
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontStyle: 'italic',
-            fontWeight: 400,
-            letterSpacing: '0.04em',
-            lineHeight: 1.1,
-          }}>
-            Bellessere
-          </div>
-          <div style={{
-            fontSize: 9,
-            color: 'rgba(201,168,76,0.7)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.22em',
-            marginTop: 5,
-            fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
-            fontStyle: 'normal',
-          }}>
-            hair &amp; beauty
-          </div>
+        <div style={{ position: 'relative', width: '100%', height: 88, overflow: 'hidden' }}>
+          <Image
+            src="/bellessere-logo.png"
+            alt="Bellessere"
+            fill
+            style={{ objectFit: 'cover', objectPosition: 'center 42%' }}
+            priority
+          />
         </div>
       </div>
 

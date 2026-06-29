@@ -43,8 +43,11 @@ export async function GET(req: NextRequest) {
     }),
   ])
 
-  const [cals, users] = await Promise.all([calsRes.json(), usersRes.json()])
-  return NextResponse.json({ calendars: cals.calendars ?? [], users: users.users ?? [] })
+  const groupsRes = await fetch(`${GHL}/calendars/groups?locationId=${BELLESSERE_LOCATION_ID}`, {
+    headers: { Authorization: `Bearer ${token}`, Version: CAL_V },
+  })
+  const [cals, users, groups] = await Promise.all([calsRes.json(), usersRes.json(), groupsRes.json()])
+  return NextResponse.json({ calendars: cals.calendars ?? [], users: users.users ?? [], groups: groups.groups ?? [] })
 }
 
 // POST — create a calendar (service)
@@ -53,11 +56,11 @@ export async function POST(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
-  const { name, description, duration, price, teamMembers = [], color = '#1B2E4A' } = await req.json()
+  const { name, description, duration, price, teamMembers = [], color = '#1B2E4A', groupId } = await req.json()
   if (!name || !duration) return NextResponse.json({ error: 'name and duration required' }, { status: 400 })
 
   const token = await getToken()
-  const payload = {
+  const payload: Record<string, unknown> = {
     locationId: BELLESSERE_LOCATION_ID,
     name,
     description: description ?? '',
@@ -69,6 +72,7 @@ export async function POST(req: NextRequest) {
     teamMembers: teamMembers.map((id: string) => ({ userId: id, priority: 0, meetingLocationType: 'default' })),
     calendarType: 'service',
   }
+  if (groupId) payload.groupId = groupId
 
   const res = await fetch(`${GHL}/calendars/`, {
     method: 'POST',
@@ -84,7 +88,7 @@ export async function PUT(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
-  const { calendarId, name, description, duration, price, teamMembers, color } = await req.json()
+  const { calendarId, name, description, duration, price, teamMembers, color, groupId } = await req.json()
   if (!calendarId) return NextResponse.json({ error: 'calendarId required' }, { status: 400 })
 
   const token = await getToken()
@@ -94,6 +98,7 @@ export async function PUT(req: NextRequest) {
   if (duration !== undefined) { payload.slotDuration = Number(duration); payload.slotInterval = Number(duration) }
   if (price !== undefined) payload.price = Number(price)
   if (color !== undefined) payload.eventColor = color
+  if (groupId !== undefined) payload.groupId = groupId
   if (teamMembers !== undefined) {
     payload.teamMembers = teamMembers.map((id: string) => ({ userId: id, priority: 0, meetingLocationType: 'default' }))
   }
