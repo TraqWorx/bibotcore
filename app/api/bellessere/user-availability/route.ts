@@ -27,19 +27,27 @@ async function authCheck(req: NextRequest) {
   return null
 }
 
-// GET — debug: fetch Mauro's personal calendar in full to find where availability is stored
+// GET — debug: probe schedule endpoints with Mauro's personal calendar ID as the schedule ID
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
   const token = await getToken()
-  // Mauro's Personal Calendar
   const mauroCalId = 'qTevrg8wOe3lv2nAPavV'
-  const res = await fetch(`${GHL}/calendars/${mauroCalId}`, {
-    headers: { Authorization: `Bearer ${token}`, Version: V },
-  })
-  const data = await res.json()
-  return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } })
+  const mauroUserId = 'CQtzhB8DHj5yGvYcOx4d'
+
+  const tries = await Promise.all([
+    // Calendar ID as schedule ID, v3
+    fetch(`${GHL}/calendars/schedules/${mauroCalId}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()).then(d => ({ path: `schedules/${mauroCalId} v3`, d })),
+    // No params (hoping token scopes the location)
+    fetch(`${GHL}/calendars/schedules`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()).then(d => ({ path: 'schedules (no params) v3', d })),
+    // userId as query param (not path)
+    fetch(`${GHL}/calendars/schedules?userId=${mauroUserId}&locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()).then(d => ({ path: `schedules?userId v3`, d })),
+    // Different base — maybe /schedule not /schedules
+    fetch(`${GHL}/calendars/schedule?locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()).then(d => ({ path: 'schedule (singular) v3', d })),
+  ])
+
+  return NextResponse.json({ tries }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 // PUT — update a personal calendar's openHours
