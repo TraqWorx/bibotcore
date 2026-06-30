@@ -27,37 +27,19 @@ async function authCheck(req: NextRequest) {
   return null
 }
 
-// GET — return personal calendars matched to users (openHours = staff availability)
+// GET — debug: fetch Mauro's personal calendar in full to find where availability is stored
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
   const token = await getToken()
-  const res = await fetch(`${GHL}/calendars/?locationId=${BELLESSERE_LOCATION_ID}`, {
+  // Mauro's Personal Calendar
+  const mauroCalId = 'qTevrg8wOe3lv2nAPavV'
+  const res = await fetch(`${GHL}/calendars/${mauroCalId}`, {
     headers: { Authorization: `Bearer ${token}`, Version: V },
   })
   const data = await res.json()
-  const calendars: Record<string, unknown>[] = data.calendars ?? []
-
-  // Personal calendars are the source of truth for staff availability
-  // teamMembers[0].userId links the calendar to a GHL user
-  const personal = calendars
-    .filter(c => c.calendarType === 'personal')
-    .map(c => {
-      const members = (c.teamMembers as { userId: string }[]) ?? []
-      return {
-        calendarId: c.id as string,
-        name: c.name as string,
-        userId: members[0]?.userId ?? null,
-        openHours: c.openHours ?? {},
-        slotDuration: c.slotDuration as number ?? 30,
-        timezone: c.timezone as string ?? 'Europe/Rome',
-      }
-    })
-
-  return NextResponse.json({ personal }, {
-    headers: { 'Cache-Control': 'private, max-age=60' },
-  })
+  return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 // PUT — update a personal calendar's openHours
