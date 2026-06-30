@@ -27,7 +27,7 @@ async function authCheck(req: NextRequest) {
   return null
 }
 
-// GET — list events for a date range
+// GET — read from cached_calendar_events (fast, real-time via webhook push)
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
@@ -35,44 +35,54 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
   const startTime = sp.get('startTime')
   const endTime = sp.get('endTime')
-  const userId = sp.get('userId') // optional: filter by staff member
+  const userId = sp.get('userId')
   if (!startTime || !endTime) return NextResponse.json({ error: 'startTime and endTime required' }, { status: 400 })
 
-  const token = await getToken()
+  const sb = createAdminClient()
 
-  // Discover all active service calendars for this location
-  const calsRes = await fetch(`${GHL}/calendars/?locationId=${BELLESSERE_LOCATION_ID}`, {
-    headers: { Authorization: `Bearer ${token}`, Version: V },
-  })
-  const calsData = await calsRes.json()
-  const calendarIds: string[] = (calsData.calendars ?? [])
-    .filter((c: { calendarType?: string; isActive?: boolean }) => c.calendarType === 'service' && c.isActive !== false)
-    .map((c: { id: string }) => c.id)
+  let query = sb
+    .from('cached_calendar_events')
+    .select('ghl_id, calendar_id, contact_ghl_id, user_id, title, start_time, end_time, appointment_status')
+    .eq('location_id', BELLESSERE_LOCATION_ID)
+    .gte('start_time', startTime)
+    .lte('start_time', endTime)
+    .order('start_time', { ascending: true })
 
-  // GHL /calendars/events requires calendarId, userId, or groupId — query per-calendar
-  const fetchParams = userId
-    ? [new URLSearchParams({ locationId: BELLESSERE_LOCATION_ID, startTime, endTime, userId })]
-    : calendarIds.map(id => new URLSearchParams({ locationId: BELLESSERE_LOCATION_ID, startTime, endTime, calendarId: id }))
+  if (userId) query = query.eq('user_id', userId)
 
-  const results = await Promise.all(
-    fetchParams.map(params =>
-      fetch(`${GHL}/calendars/events?${params}`, {
-        headers: { Authorization: `Bearer ${token}`, Version: V },
-      }).then(r => r.json())
-    )
-  )
+  const { data: rows, error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Deduplicate by event id (calendarId queries can overlap)
-  const seen = new Set<string>()
-  const events = results.flatMap(r => r.events ?? []).filter((e: { id: string }) => {
-    if (seen.has(e.id)) return false
-    seen.add(e.id); return true
-  })
+  // Join contact names from cache
+  const contactIds = [...new Set((rows ?? []).map(r => r.contact_ghl_id).filter(Boolean))]
+  let contactMap: Record<string, string> = {}
+  if (contactIds.length > 0) {
+    const { data: contacts } = await sb
+      .from('cached_contacts')
+      .select('ghl_id, first_name, last_name')
+      .eq('location_id', BELLESSERE_LOCATION_ID)
+      .in('ghl_id', contactIds as string[])
+    for (const c of contacts ?? []) {
+      contactMap[c.ghl_id] = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() || c.ghl_id
+    }
+  }
+
+  const events = (rows ?? []).map(r => ({
+    id: r.ghl_id,
+    calendarId: r.calendar_id,
+    contactId: r.contact_ghl_id,
+    userId: r.user_id,
+    title: r.title,
+    startTime: r.start_time,
+    endTime: r.end_time,
+    appointmentStatus: r.appointment_status,
+    contactName: r.contact_ghl_id ? (contactMap[r.contact_ghl_id] ?? undefined) : undefined,
+  }))
 
   return NextResponse.json({ events })
 }
 
-// POST — create appointment
+// POST — create appointment in GHL + write to cache immediately (no waiting for webhook)
 export async function POST(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
@@ -85,10 +95,28 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify({ ...body, locationId: BELLESSERE_LOCATION_ID }),
   })
   const data = await res.json()
+
+  // Write to cache immediately so the booking appears before the webhook fires
+  if (res.ok && data.id) {
+    const sb = createAdminClient()
+    await sb.from('cached_calendar_events').upsert({
+      ghl_id: data.id,
+      location_id: BELLESSERE_LOCATION_ID,
+      calendar_id: body.calendarId ?? null,
+      contact_ghl_id: body.contactId ?? null,
+      user_id: data.userId ?? body.userId ?? null,
+      title: body.title ?? null,
+      start_time: body.startTime ?? null,
+      end_time: body.endTime ?? null,
+      appointment_status: body.appointmentStatus ?? 'confirmed',
+      synced_at: new Date().toISOString(),
+    }, { onConflict: 'location_id,ghl_id' })
+  }
+
   return NextResponse.json(data, { status: res.status })
 }
 
-// PUT — update appointment (status, reschedule)
+// PUT — update appointment status in GHL + update cache immediately
 export async function PUT(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
@@ -104,5 +132,15 @@ export async function PUT(req: NextRequest) {
     body: JSON.stringify(payload),
   })
   const data = await res.json()
+
+  // Mirror the status change to cache immediately
+  if (res.ok && payload.appointmentStatus) {
+    const sb = createAdminClient()
+    await sb.from('cached_calendar_events')
+      .update({ appointment_status: payload.appointmentStatus, synced_at: new Date().toISOString() })
+      .eq('location_id', BELLESSERE_LOCATION_ID)
+      .eq('ghl_id', eventId)
+  }
+
   return NextResponse.json(data, { status: res.status })
 }

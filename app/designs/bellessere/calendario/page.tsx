@@ -1,6 +1,13 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { createClient } from '@supabase/supabase-js'
+import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 interface CalEvent {
   id: string
@@ -110,33 +117,42 @@ export default function CalendarioPage() {
   const weekStart = weekDates[0]
   const weekEnd = weekDates[6]
 
+  const fetchWeekEvents = useCallback((wStart: Date, wEnd: Date, userIds: string[]) => {
+    const start = new Date(wStart); start.setHours(0, 0, 0, 0)
+    const end = new Date(wEnd); end.setHours(23, 59, 59, 999)
+    if (userIds.length === 0) {
+      return fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`)
+        .then(r => r.json()).then(d => setEvents(d.events ?? [])).catch(() => {})
+    }
+    return Promise.all(
+      userIds.map(uid =>
+        fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}&userId=${uid}`)
+          .then(r => r.json()).then(d => d.events ?? []).catch(() => [])
+      )
+    ).then(results => {
+      const seen = new Set<string>()
+      setEvents(results.flat().filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true }))
+    })
+  }, [])
+
   useEffect(() => {
     setLoading(true)
-    const start = new Date(weekStart); start.setHours(0, 0, 0, 0)
-    const end = new Date(weekEnd); end.setHours(23, 59, 59, 999)
-    if (selectedUserIds.length === 0) {
-      // Fetch all groups (no filter)
-      fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`)
-        .then(r => r.json())
-        .then(d => setEvents(d.events ?? []))
-        .catch(() => {})
-        .finally(() => setLoading(false))
-    } else {
-      // Fetch for each selected user and merge
-      Promise.all(
-        selectedUserIds.map(uid =>
-          fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}&userId=${uid}`)
-            .then(r => r.json())
-            .then(d => d.events ?? [])
-            .catch(() => [])
-        )
-      ).then(results => {
-        const seen = new Set<string>()
-        const merged = results.flat().filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true })
-        setEvents(merged)
-      }).finally(() => setLoading(false))
-    }
-  }, [weekStart.toISOString(), weekEnd.toISOString(), selectedUserIds.join(','), refreshKey])
+    fetchWeekEvents(weekStart, weekEnd, selectedUserIds).finally(() => setLoading(false))
+  }, [weekStart.toISOString(), weekEnd.toISOString(), selectedUserIds.join(','), refreshKey, fetchWeekEvents])
+
+  // Real-time: re-fetch current week whenever cached_calendar_events changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('bellessere-calendario')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'cached_calendar_events',
+        filter: `location_id=eq.${BELLESSERE_LOCATION_ID}`,
+      }, () => { fetchWeekEvents(weekStart, weekEnd, selectedUserIds) })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [weekStart.toISOString(), weekEnd.toISOString(), selectedUserIds.join(','), fetchWeekEvents])
 
   function prevWeek() { const d = new Date(anchor); d.setDate(d.getDate() - 7); setAnchor(d) }
   function nextWeek() { const d = new Date(anchor); d.setDate(d.getDate() + 7); setAnchor(d) }

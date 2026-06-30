@@ -10,6 +10,10 @@ const GHL = 'https://services.leadconnectorhq.com'
 const CAL_V = '2021-04-15'
 const USR_V = '2021-07-28'
 
+// In-memory cache: services list changes rarely during a session (60s TTL)
+let servicesCache: { data: unknown; ts: number } | null = null
+const SERVICES_TTL = 60_000
+
 async function getToken(): Promise<string> {
   const sb = createAdminClient()
   const { data: conn } = await sb
@@ -29,25 +33,37 @@ async function authCheck(req: NextRequest) {
 }
 
 // GET — list all calendars (= services) + location users
+// Cached in-process for 60s; also sets browser Cache-Control so navigating away and back is instant
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
+  // Skip cache when caller explicitly wants fresh data (e.g. after create/update/delete)
+  const bust = req.nextUrl.searchParams.get('bust')
+  if (!bust && servicesCache && Date.now() - servicesCache.ts < SERVICES_TTL) {
+    return NextResponse.json(servicesCache.data, {
+      headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
+    })
+  }
+
   const token = await getToken()
-  const [calsRes, usersRes] = await Promise.all([
+  const [calsRes, usersRes, groupsRes] = await Promise.all([
     fetch(`${GHL}/calendars/?locationId=${BELLESSERE_LOCATION_ID}`, {
       headers: { Authorization: `Bearer ${token}`, Version: CAL_V },
     }),
     fetch(`${GHL}/users/?locationId=${BELLESSERE_LOCATION_ID}`, {
       headers: { Authorization: `Bearer ${token}`, Version: USR_V },
     }),
+    fetch(`${GHL}/calendars/groups?locationId=${BELLESSERE_LOCATION_ID}`, {
+      headers: { Authorization: `Bearer ${token}`, Version: CAL_V },
+    }),
   ])
-
-  const groupsRes = await fetch(`${GHL}/calendars/groups?locationId=${BELLESSERE_LOCATION_ID}`, {
-    headers: { Authorization: `Bearer ${token}`, Version: CAL_V },
-  })
   const [cals, users, groups] = await Promise.all([calsRes.json(), usersRes.json(), groupsRes.json()])
-  return NextResponse.json({ calendars: cals.calendars ?? [], users: users.users ?? [], groups: groups.groups ?? [] })
+  const payload = { calendars: cals.calendars ?? [], users: users.users ?? [], groups: groups.groups ?? [] }
+  servicesCache = { data: payload, ts: Date.now() }
+  return NextResponse.json(payload, {
+    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
+  })
 }
 
 // POST — create a calendar (service)
@@ -81,6 +97,7 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify(payload),
   })
   const data = await res.json()
+  if (res.ok) servicesCache = null // force fresh fetch next GET
   return NextResponse.json(data, { status: res.status })
 }
 
@@ -114,6 +131,7 @@ export async function PUT(req: NextRequest) {
     body: JSON.stringify(payload),
   })
   const data = await res.json()
+  if (res.ok) servicesCache = null
   return NextResponse.json(data, { status: res.status })
 }
 
@@ -130,5 +148,6 @@ export async function DELETE(req: NextRequest) {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}`, Version: CAL_V },
   })
+  if (res.ok) servicesCache = null
   return NextResponse.json({ ok: res.ok }, { status: res.status })
 }

@@ -378,7 +378,7 @@ export default function ClientiPage() {
     const start = new Date(); start.setMonth(start.getMonth() - 12)
     const end = new Date(); end.setMonth(end.getMonth() + 2)
     Promise.all([
-      fetch(`/api/contacts?locationId=${BELLESSERE_LOCATION_ID}&pageSize=200`).then(r => r.json()),
+      fetch('/api/bellessere/contacts').then(r => r.json()),
       fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`).then(r => r.json()),
     ]).then(([ct, appts]) => {
       setContacts(ct.contacts ?? [])

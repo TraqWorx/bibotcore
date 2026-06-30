@@ -294,6 +294,7 @@ async function processAppointmentEvent(locationId: string, eventType: string, da
       location_id: locationId,
       calendar_id: (data.calendarId ?? data.calendar_id) as string ?? null,
       contact_ghl_id: (data.contactId ?? data.contact_id) as string ?? null,
+      user_id: (data.userId ?? data.user_id ?? data.assignedUserId) as string ?? null,
       title: (data.title as string) ?? null,
       start_time: (data.startTime ?? data.start_time) as string ?? null,
       end_time: (data.endTime ?? data.end_time) as string ?? null,

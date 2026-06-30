@@ -345,6 +345,7 @@ async function syncCalendarEvents(locationId: string, _token: string) {
       location_id: locationId,
       calendar_id: (e.calendarId as string) ?? null,
       contact_ghl_id: (e.contactId as string) ?? null,
+      user_id: (e.userId as string) ?? null,
       title: (e.title as string) ?? null,
       start_time: (e.startTime as string) ?? null,
       end_time: (e.endTime as string) ?? null,

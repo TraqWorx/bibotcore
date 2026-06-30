@@ -1,7 +1,13 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { createClient } from '@supabase/supabase-js'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 interface Appointment {
   id: string
@@ -15,7 +21,8 @@ interface Appointment {
 }
 
 interface Contact { id: string; firstName: string; lastName: string; email: string; phone: string }
-interface Calendar { id: string; name: string; slotDuration?: number; price?: number; isActive?: boolean }
+interface CalTeamMember { userId: string }
+interface Calendar { id: string; name: string; slotDuration?: number; price?: number; isActive?: boolean; teamMembers?: CalTeamMember[] }
 
 type StatusFilter = 'all' | 'confirmed' | 'pending' | 'cancelled'
 
@@ -171,26 +178,39 @@ function AppointmentPanel({
   )
 }
 
-function AddAppointmentModal({ onClose, onAdded, contacts, calendars }: {
+function AddAppointmentModal({ onClose, onAdded, contacts, calendars, users }: {
   onClose: () => void; onAdded: () => void; contacts: Contact[]; calendars: Calendar[]
+  users: { id: string; name: string }[]
 }) {
-  const [form, setForm] = useState({ contactId: '', calendarId: '', date: '', slot: '', appointmentStatus: 'confirmed' })
+  const [form, setForm] = useState({ contactId: '', calendarId: '', userId: '', date: '', slot: '', appointmentStatus: 'confirmed' })
   const [slots, setSlots] = useState<string[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // Fetch available slots whenever calendar + date both set
+  const selectedCal = calendars.find(c => c.id === form.calendarId)
+  // Team members that belong to the selected calendar
+  const calTeamIds = new Set((selectedCal?.teamMembers ?? []).map(m => m.userId))
+  const calUsers = users.filter(u => calTeamIds.has(u.id))
+
+  // Reset userId when calendar changes
+  useEffect(() => {
+    setForm(p => ({ ...p, userId: '', slot: '' }))
+  }, [form.calendarId])
+
+  // Fetch available slots whenever calendar + date + (optional) userId change
   useEffect(() => {
     if (!form.calendarId || !form.date) { setSlots([]); return }
     setLoadingSlots(true)
     setForm(p => ({ ...p, slot: '' }))
-    fetch(`/api/bellessere/free-slots?calendarId=${form.calendarId}&date=${form.date}`)
+    const params = new URLSearchParams({ calendarId: form.calendarId, date: form.date })
+    if (form.userId) params.set('userId', form.userId)
+    fetch(`/api/bellessere/free-slots?${params}`)
       .then(r => r.json())
       .then(d => setSlots(d.slots ?? []))
       .catch(() => setSlots([]))
       .finally(() => setLoadingSlots(false))
-  }, [form.calendarId, form.date])
+  }, [form.calendarId, form.date, form.userId])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -210,10 +230,12 @@ function AddAppointmentModal({ onClose, onAdded, contacts, calendars }: {
         body: JSON.stringify({
           calendarId: form.calendarId,
           contactId: form.contactId || undefined,
+          userId: form.userId || undefined,
           startTime: start.toISOString(),
           endTime: end.toISOString(),
           appointmentStatus: form.appointmentStatus,
           title: cal?.name ?? 'Appuntamento',
+          selectedTimezone: 'Europe/Rome',
         }),
       })
       if (!res.ok) { const d = await res.json(); setError(d.message ?? d.error ?? 'Errore'); return }
@@ -244,6 +266,15 @@ function AddAppointmentModal({ onClose, onAdded, contacts, calendars }: {
                 ))}
               </select>
             </div>
+            {calUsers.length > 0 && (
+              <div>
+                <label className="bs-field-label">Professionista</label>
+                <select className="bs-select" value={form.userId} onChange={e => setForm(p => ({ ...p, userId: e.target.value, slot: '' }))}>
+                  <option value="">Qualsiasi disponibile</option>
+                  {calUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+            )}
             <div>
               <label className="bs-field-label">Cliente</label>
               <select className="bs-select" value={form.contactId} onChange={e => setForm(p => ({ ...p, contactId: e.target.value }))}>
@@ -307,6 +338,7 @@ export default function AppuntamentiPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
   const [calendars, setCalendars] = useState<Calendar[]>([])
+  const [users, setUsers] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<StatusFilter>('all')
   const [search, setSearch] = useState('')
@@ -314,25 +346,47 @@ export default function AppuntamentiPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
+  const fetchAppointments = useCallback(() => {
+    const start = new Date(); start.setMonth(start.getMonth() - 1)
+    const end = new Date(); end.setMonth(end.getMonth() + 3)
+    // contacts + services only needed on first load; appointments refresh on every call
+    return fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`)
+      .then(r => r.json())
+      .then(evtsData => {
+        setAppointments(evtsData.events ?? [])
+      })
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     const start = new Date(); start.setMonth(start.getMonth() - 1)
     const end = new Date(); end.setMonth(end.getMonth() + 3)
     setLoading(true)
     Promise.all([
       fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`).then(r => r.json()),
-      fetch(`/api/contacts?locationId=${BELLESSERE_LOCATION_ID}&pageSize=200`).then(r => r.json()),
+      fetch('/api/bellessere/contacts').then(r => r.json()),
       fetch('/api/bellessere/services').then(r => r.json()),
     ]).then(([evtsData, ctData, svcData]) => {
-      const contactMap = new Map((ctData.contacts ?? []).map((c: Contact) => [c.id, `${c.firstName} ${c.lastName}`.trim() || c.email]))
-      const appts: Appointment[] = (evtsData.events ?? []).map((e: Omit<Appointment, 'contactName'>) => ({
-        ...e,
-        contactName: e.contactId ? (contactMap.get(e.contactId) ?? undefined) : undefined,
-      }))
-      setAppointments(appts)
+      setAppointments(evtsData.events ?? [])
       setContacts(ctData.contacts ?? [])
       setCalendars(svcData.calendars ?? [])
+      setUsers((svcData.users ?? []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })))
     }).catch(() => {}).finally(() => setLoading(false))
   }, [refreshKey])
+
+  // Real-time: re-fetch appointments whenever cached_calendar_events changes for this location
+  useEffect(() => {
+    const channel = supabase
+      .channel('bellessere-appointments')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'cached_calendar_events',
+        filter: `location_id=eq.${BELLESSERE_LOCATION_ID}`,
+      }, () => { fetchAppointments() })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [fetchAppointments])
 
   const filtered = useMemo(() => {
     let list = appointments
@@ -483,6 +537,7 @@ export default function AppuntamentiPage() {
           onAdded={() => setRefreshKey(k => k + 1)}
           contacts={contacts}
           calendars={calendars}
+          users={users}
         />
       )}
     </div>

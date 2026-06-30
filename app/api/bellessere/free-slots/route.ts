@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
   const calendarId = sp.get('calendarId')
   const date = sp.get('date') // YYYY-MM-DD
+  const userId = sp.get('userId') // optional: filter slots by team member
 
   if (!calendarId || !date) return NextResponse.json({ error: 'calendarId and date required' }, { status: 400 })
 
@@ -33,7 +34,13 @@ export async function GET(req: NextRequest) {
   if (!conn) return NextResponse.json({ error: 'No GHL connection' }, { status: 500 })
   const token = await refreshIfNeeded(BELLESSERE_LOCATION_ID, conn)
 
-  const url = `${GHL}/calendars/${calendarId}/free-slots?startDate=${startDate}&endDate=${endDate}&timezone=Europe%2FRome`
+  const params = new URLSearchParams({
+    startDate: String(startDate),
+    endDate: String(endDate),
+    timezone: 'Europe/Rome',
+  })
+  if (userId) params.set('userId', userId)
+  const url = `${GHL}/calendars/${calendarId}/free-slots?${params}`
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Version: '2021-04-15' } })
   const data = await res.json()
 

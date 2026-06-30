@@ -20,6 +20,52 @@ async function getToken(): Promise<string> {
   return refreshIfNeeded(BELLESSERE_LOCATION_ID, conn)
 }
 
+async function authCheck(req: NextRequest) {
+  const access = await getLocationAccess(req, BELLESSERE_LOCATION_ID)
+  if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  return null
+}
+
+// GET — list contacts from cache (fast Supabase query, updated by webhooks in real-time)
+export async function GET(req: NextRequest) {
+  const err = await authCheck(req)
+  if (err) return err
+
+  const sp = req.nextUrl.searchParams
+  const search = sp.get('search')?.toLowerCase() ?? ''
+  const limit = Math.min(parseInt(sp.get('limit') ?? '500', 10), 500)
+
+  const sb = createAdminClient()
+  let query = sb
+    .from('cached_contacts')
+    .select('ghl_id, first_name, last_name, email, phone, tags')
+    .eq('location_id', BELLESSERE_LOCATION_ID)
+    .order('last_name', { ascending: true })
+    .limit(limit)
+
+  if (search) {
+    query = query.or(
+      `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
+    )
+  }
+
+  const { data, error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  const contacts = (data ?? []).map(c => ({
+    id: c.ghl_id,
+    firstName: c.first_name ?? '',
+    lastName: c.last_name ?? '',
+    email: c.email ?? '',
+    phone: c.phone ?? '',
+    tags: c.tags ?? [],
+  }))
+  return NextResponse.json({ contacts }, {
+    headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=120' },
+  })
+}
+
 // PUT — update contact fields (tags, name, etc.)
 export async function PUT(req: NextRequest) {
   const access = await getLocationAccess(req, BELLESSERE_LOCATION_ID)
