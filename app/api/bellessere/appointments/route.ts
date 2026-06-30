@@ -9,9 +9,6 @@ export const dynamic = 'force-dynamic'
 const GHL = 'https://services.leadconnectorhq.com'
 const V = '2021-04-15'
 
-// GHL calendar group IDs for Bellessere
-const GROUP_IDS = ['8YNX4fRu7gQ6kuZwgAWc', 'SXfbdyfcj0AaoKoNkBRZ', '28DeCKllPCELAeGEPdan']
-
 async function getToken(): Promise<string> {
   const sb = createAdminClient()
   const { data: conn } = await sb
@@ -43,26 +40,35 @@ export async function GET(req: NextRequest) {
 
   const token = await getToken()
 
-  if (userId) {
-    // Filter by specific staff member
-    const params = new URLSearchParams({ locationId: BELLESSERE_LOCATION_ID, startTime, endTime, userId })
-    const res = await fetch(`${GHL}/calendars/events?${params}`, {
-      headers: { Authorization: `Bearer ${token}`, Version: V },
-    })
-    const data = await res.json()
-    return NextResponse.json(data, { status: res.status })
-  }
+  // Discover all active service calendars for this location
+  const calsRes = await fetch(`${GHL}/calendars/?locationId=${BELLESSERE_LOCATION_ID}`, {
+    headers: { Authorization: `Bearer ${token}`, Version: V },
+  })
+  const calsData = await calsRes.json()
+  const calendarIds: string[] = (calsData.calendars ?? [])
+    .filter((c: { calendarType?: string; isActive?: boolean }) => c.calendarType === 'service' && c.isActive !== false)
+    .map((c: { id: string }) => c.id)
 
-  // Fetch all groups in parallel (GHL requires userId/calendarId/groupId)
+  // GHL /calendars/events requires calendarId, userId, or groupId — query per-calendar
+  const fetchParams = userId
+    ? [new URLSearchParams({ locationId: BELLESSERE_LOCATION_ID, startTime, endTime, userId })]
+    : calendarIds.map(id => new URLSearchParams({ locationId: BELLESSERE_LOCATION_ID, startTime, endTime, calendarId: id }))
+
   const results = await Promise.all(
-    GROUP_IDS.map(groupId => {
-      const params = new URLSearchParams({ locationId: BELLESSERE_LOCATION_ID, startTime, endTime, groupId })
-      return fetch(`${GHL}/calendars/events?${params}`, {
+    fetchParams.map(params =>
+      fetch(`${GHL}/calendars/events?${params}`, {
         headers: { Authorization: `Bearer ${token}`, Version: V },
       }).then(r => r.json())
-    })
+    )
   )
-  const events = results.flatMap(r => r.events ?? [])
+
+  // Deduplicate by event id (calendarId queries can overlap)
+  const seen = new Set<string>()
+  const events = results.flatMap(r => r.events ?? []).filter((e: { id: string }) => {
+    if (seen.has(e.id)) return false
+    seen.add(e.id); return true
+  })
+
   return NextResponse.json({ events })
 }
 
