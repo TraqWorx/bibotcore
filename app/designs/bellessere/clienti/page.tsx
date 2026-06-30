@@ -100,6 +100,7 @@ function TagEditor({ contactId, initialTags }: { contactId: string; initialTags:
 }
 
 function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; visitCount: number; onClose: () => void }) {
+  const [tab, setTab] = useState<'appuntamenti' | 'messaggi'>('appuntamenti')
   const [events, setEvents] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [conversationId, setConversationId] = useState<string | null>(null)
@@ -108,22 +109,19 @@ function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; vis
   const [sending, setSending] = useState(false)
 
   useEffect(() => {
+    setLoading(true)
     const start = new Date(); start.setMonth(start.getMonth() - 6)
     const end = new Date(); end.setMonth(end.getMonth() + 2)
     Promise.all([
-      fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`)
-        .then(r => r.json()),
-      fetch(`/api/bellessere/contact-conversation?contactId=${contact.id}`)
-        .then(r => r.json()),
+      fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`).then(r => r.json()),
+      fetch(`/api/bellessere/contact-conversation?contactId=${contact.id}`).then(r => r.json()),
     ]).then(([apptData, convData]) => {
       setEvents((apptData.events ?? [])
         .filter((e: { contactId?: string }) => e.contactId === contact.id)
         .map((e: Appointment) => ({ id: e.id, title: e.title, startTime: e.startTime, appointmentStatus: e.appointmentStatus })))
       setConversationId(convData.conversationId ?? null)
       setMessages(convData.messages ?? [])
-    })
-    .catch(() => {})
-    .finally(() => setLoading(false))
+    }).catch(() => {}).finally(() => setLoading(false))
   }, [contact.id])
 
   async function sendMessage(e: React.FormEvent) {
@@ -158,13 +156,15 @@ function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; vis
   return (
     <>
       <div className="bs-overlay" onClick={onClose} />
-      <div className="bs-panel">
+      <div className="bs-panel" style={{ display: 'flex', flexDirection: 'column' }}>
+        {/* Header */}
         <div className="bs-panel-header">
           <span className="bs-panel-title">Dettagli cliente</span>
           <button className="bs-panel-close" onClick={onClose}>✕</button>
         </div>
-        <div className="bs-panel-body">
-          {/* Avatar + name */}
+
+        {/* Scrollable top section: avatar, contact info, stats, tags */}
+        <div className="bs-panel-body" style={{ flex: '0 0 auto' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, paddingBottom: 4 }}>
             <div className="bs-avatar" style={{ width: 60, height: 60, fontSize: 20 }}>{initials(contact)}</div>
             <div style={{ textAlign: 'center' }}>
@@ -173,15 +173,11 @@ function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; vis
             </div>
           </div>
 
-          {/* Contact info */}
           <div className="bs-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {contact.email && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bs-gold-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--bs-gold)" strokeWidth="2">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                    <polyline points="22,6 12,13 2,6"/>
-                  </svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--bs-gold)" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                 </div>
                 <div>
                   <div style={{ fontSize: 10.5, color: 'var(--bs-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 1 }}>Email</div>
@@ -192,9 +188,7 @@ function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; vis
             {contact.phone && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bs-gold-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--bs-gold)" strokeWidth="2">
-                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 10a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.37h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8 9a16 16 0 0 0 6 6l.86-.86a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.73 16c.06.44.06.89 0 1.33z"/>
-                  </svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--bs-gold)" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 10a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.37h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8 9a16 16 0 0 0 6 6l.86-.86a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.73 16c.06.44.06.89 0 1.33z"/></svg>
                 </div>
                 <div>
                   <div style={{ fontSize: 10.5, color: 'var(--bs-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 1 }}>Telefono</div>
@@ -204,111 +198,119 @@ function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; vis
             )}
           </div>
 
-          {/* Stats row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--bs-line)' }}>
             {[
               { value: visitCount, label: 'Visite' },
               { value: events.filter(e => e.appointmentStatus === 'showed').length, label: 'Completati' },
               { value: events.filter(e => e.appointmentStatus === 'cancelled').length, label: 'Annullati' },
             ].map((s, i) => (
-              <div key={s.label} style={{
-                padding: '14px 10px', textAlign: 'center', background: 'white',
-                borderRight: i < 2 ? '1px solid var(--bs-line)' : 'none',
-              }}>
+              <div key={s.label} style={{ padding: '14px 10px', textAlign: 'center', background: 'white', borderRight: i < 2 ? '1px solid var(--bs-line)' : 'none' }}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--bs-text)', letterSpacing: '-0.02em' }}>{s.value}</div>
                 <div style={{ fontSize: 11.5, color: 'var(--bs-text-muted)', marginTop: 2 }}>{s.label}</div>
               </div>
             ))}
           </div>
 
-          {/* Tags editor */}
           <TagEditor contactId={contact.id} initialTags={contact.tags} />
+        </div>
 
-          {/* Recent appointments */}
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Appuntamenti recenti</div>
-            {loading ? (
-              <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Caricamento...</div>
-            ) : events.length === 0 ? (
-              <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Nessun appuntamento trovato.</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {events.slice(0, 5).map(ev => {
-                  const cls = STATUS_CLS[ev.appointmentStatus ?? 'new'] ?? 'bs-badge-pending'
-                  const lbl = STATUS_LBL[ev.appointmentStatus ?? 'new'] ?? 'In attesa'
-                  return (
-                    <div key={ev.id} style={{ padding: '10px 14px', background: 'var(--bs-bg)', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{ev.title || 'Appuntamento'}</div>
-                        {ev.startTime && (
-                          <div style={{ fontSize: 11.5, color: 'var(--bs-text-muted)' }}>
-                            {new Date(ev.startTime).toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' })}
-                          </div>
-                        )}
-                      </div>
-                      <span className={`bs-badge ${cls}`}>{lbl}</span>
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderTop: '1px solid var(--bs-line)', borderBottom: '1px solid var(--bs-line)', flexShrink: 0 }}>
+          {(['appuntamenti', 'messaggi'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{
+              flex: 1, padding: '12px 0', background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: tab === t ? 700 : 500,
+              color: tab === t ? 'var(--bs-text)' : 'var(--bs-text-faint)',
+              borderBottom: tab === t ? '2px solid var(--bs-black)' : '2px solid transparent',
+              textTransform: 'capitalize', transition: 'all 0.15s',
+            }}>
+              {t === 'appuntamenti' ? 'Appuntamenti' : 'Messaggi'}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content — scrollable */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {tab === 'appuntamenti' && (
+            <>
+              {loading ? (
+                <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Caricamento...</div>
+              ) : events.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Nessun appuntamento trovato.</div>
+              ) : events.map(ev => {
+                const cls = STATUS_CLS[ev.appointmentStatus ?? 'new'] ?? 'bs-badge-pending'
+                const lbl = STATUS_LBL[ev.appointmentStatus ?? 'new'] ?? 'In attesa'
+                return (
+                  <div key={ev.id} style={{ padding: '10px 14px', background: 'var(--bs-bg)', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{ev.title || 'Appuntamento'}</div>
+                      {ev.startTime && (
+                        <div style={{ fontSize: 11.5, color: 'var(--bs-text-muted)' }}>
+                          {new Date(ev.startTime).toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' })}
+                        </div>
+                      )}
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Inline messaging */}
-        <div style={{ borderTop: '1px solid var(--bs-line)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--bs-text-faint)', marginBottom: 2 }}>Messaggi</div>
-          {!conversationId && !loading ? (
-            <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)', textAlign: 'center', padding: '12px 0' }}>
-              Nessuna conversazione GHL con questo cliente.
-            </div>
-          ) : messages.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)', textAlign: 'center', padding: '12px 0' }}>
-              {loading ? 'Caricamento...' : 'Nessun messaggio con questo cliente.'}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
-              {messages.slice(-8).map(m => (
-                <div key={m.id} style={{ display: 'flex', justifyContent: m.direction === 'outbound' ? 'flex-end' : 'flex-start' }}>
-                  <div style={{
-                    maxWidth: '80%', padding: '7px 12px', borderRadius: 12, fontSize: 12.5, lineHeight: 1.4,
-                    background: m.direction === 'outbound' ? 'var(--bs-black)' : 'var(--bs-bg)',
-                    color: m.direction === 'outbound' ? 'white' : 'var(--bs-text)',
-                    borderBottomRightRadius: m.direction === 'outbound' ? 4 : 12,
-                    borderBottomLeftRadius: m.direction === 'inbound' ? 4 : 12,
-                  }}>
-                    {m.body}
+                    <span className={`bs-badge ${cls}`}>{lbl}</span>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {conversationId && (
-            <form onSubmit={sendMessage} style={{ display: 'flex', gap: 8 }}>
-              <input
-                className="bs-input"
-                style={{ flex: 1, fontSize: 13 }}
-                placeholder="Scrivi un messaggio..."
-                value={msgText}
-                onChange={e => setMsgText(e.target.value)}
-                disabled={sending}
-              />
-              <button type="submit" className="bs-btn-primary" style={{ padding: '0 14px', flexShrink: 0 }} disabled={sending || !msgText.trim()}>
+                )
+              })}
+              <a href="/designs/bellessere/appuntamenti" className="bs-btn-primary" style={{ justifyContent: 'center', marginTop: 4 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-              </button>
-            </form>
+                Prenota appuntamento
+              </a>
+            </>
           )}
-        </div>
 
-        <div className="bs-panel-actions">
-          <a href="/designs/bellessere/appuntamenti" className="bs-btn-primary" style={{ justifyContent: 'center', width: '100%' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Prenota appuntamento
-          </a>
+          {tab === 'messaggi' && (
+            <>
+              {!conversationId && !loading ? (
+                <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)', textAlign: 'center', padding: '20px 0' }}>
+                  Nessuna conversazione con questo cliente.
+                </div>
+              ) : loading ? (
+                <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Caricamento...</div>
+              ) : messages.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)', textAlign: 'center', padding: '20px 0' }}>
+                  Nessun messaggio con questo cliente.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {messages.map(m => (
+                    <div key={m.id} style={{ display: 'flex', justifyContent: m.direction === 'outbound' ? 'flex-end' : 'flex-start' }}>
+                      <div style={{
+                        maxWidth: '80%', padding: '7px 12px', borderRadius: 12, fontSize: 12.5, lineHeight: 1.4,
+                        background: m.direction === 'outbound' ? 'var(--bs-black)' : 'var(--bs-bg)',
+                        color: m.direction === 'outbound' ? 'white' : 'var(--bs-text)',
+                        borderBottomRightRadius: m.direction === 'outbound' ? 4 : 12,
+                        borderBottomLeftRadius: m.direction === 'inbound' ? 4 : 12,
+                      }}>
+                        {m.body}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {conversationId && (
+                <form onSubmit={sendMessage} style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 8 }}>
+                  <input
+                    className="bs-input"
+                    style={{ flex: 1, fontSize: 13 }}
+                    placeholder="Scrivi un messaggio..."
+                    value={msgText}
+                    onChange={e => setMsgText(e.target.value)}
+                    disabled={sending}
+                  />
+                  <button type="submit" className="bs-btn-primary" style={{ padding: '0 14px', flexShrink: 0 }} disabled={sending || !msgText.trim()}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                    </svg>
+                  </button>
+                </form>
+              )}
+            </>
+          )}
         </div>
       </div>
     </>
