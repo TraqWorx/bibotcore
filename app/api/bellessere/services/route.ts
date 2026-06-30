@@ -8,12 +8,6 @@ export const dynamic = 'force-dynamic'
 
 const GHL = 'https://services.leadconnectorhq.com'
 const CAL_V = '2021-04-15'
-const USR_V = '2021-07-28'
-const SERVICES_TTL = 5 * 60 * 1000  // 5 minutes
-const CACHE_KEY = '_servicesCache'
-
-// L1: in-memory (warm within same instance, zero latency)
-let memCache: { data: unknown; ts: number } | null = null
 
 async function getToken(): Promise<string> {
   const sb = createAdminClient()
@@ -33,91 +27,42 @@ async function authCheck(req: NextRequest) {
   return null
 }
 
-function cacheHeaders() {
-  return { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' }
-}
-
-async function readDbCache(sb: ReturnType<typeof createAdminClient>) {
-  const { data } = await sb
-    .from('dashboard_configs')
-    .select('theme')
-    .eq('location_id', BELLESSERE_LOCATION_ID)
-    .maybeSingle()
-  const theme = (data?.theme as Record<string, unknown>) ?? {}
-  return { theme, entry: theme[CACHE_KEY] as { ts: number; data: unknown } | undefined }
-}
-
-async function writeDbCache(sb: ReturnType<typeof createAdminClient>, theme: Record<string, unknown>, payload: unknown) {
-  const newTheme = { ...theme, [CACHE_KEY]: { ts: Date.now(), data: payload } }
-  await sb.from('dashboard_configs').upsert(
-    { location_id: BELLESSERE_LOCATION_ID, theme: newTheme },
-    { onConflict: 'location_id' }
-  )
-}
-
-// GET — list all calendars (= services) + location users + groups
+// GET — read from DB tables (instant, no GHL dependency)
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
-  const bust = req.nextUrl.searchParams.get('bust')
-
-  // L1: in-memory
-  if (!bust && memCache && Date.now() - memCache.ts < SERVICES_TTL) {
-    return NextResponse.json(memCache.data, { headers: cacheHeaders() })
-  }
-
   const sb = createAdminClient()
-
-  // L2: Supabase DB (survives across Vercel instances)
-  if (!bust) {
-    const { theme, entry } = await readDbCache(sb)
-    if (entry && Date.now() - entry.ts < SERVICES_TTL) {
-      memCache = { data: entry.data, ts: entry.ts }
-      return NextResponse.json(entry.data, { headers: cacheHeaders() })
-    }
-    // Cache miss — fetch from GHL and store
-    const payload = await fetchFromGhl()
-    memCache = { data: payload, ts: Date.now() }
-    writeDbCache(sb, theme, payload).catch(() => {}) // async, don't block response
-    return NextResponse.json(payload, { headers: cacheHeaders() })
-  }
-
-  // bust=1: skip cache entirely
-  const payload = await fetchFromGhl()
-  memCache = { data: payload, ts: Date.now() }
-  const { theme } = await readDbCache(sb)
-  writeDbCache(sb, theme, payload).catch(() => {})
-  return NextResponse.json(payload, { headers: cacheHeaders() })
-}
-
-async function fetchFromGhl() {
-  const token = await getToken()
-  const [calsRes, usersRes, groupsRes] = await Promise.all([
-    fetch(`${GHL}/calendars/?locationId=${BELLESSERE_LOCATION_ID}`, {
-      headers: { Authorization: `Bearer ${token}`, Version: CAL_V },
-    }),
-    fetch(`${GHL}/users/?locationId=${BELLESSERE_LOCATION_ID}`, {
-      headers: { Authorization: `Bearer ${token}`, Version: USR_V },
-    }),
-    fetch(`${GHL}/calendars/groups?locationId=${BELLESSERE_LOCATION_ID}`, {
-      headers: { Authorization: `Bearer ${token}`, Version: CAL_V },
-    }),
+  const [svcRes, usersRes, groupsRes] = await Promise.all([
+    sb.from('bellessere_services').select('*').eq('location_id', BELLESSERE_LOCATION_ID).eq('is_active', true).order('name'),
+    sb.from('bellessere_users').select('*').eq('location_id', BELLESSERE_LOCATION_ID).order('name'),
+    sb.from('bellessere_groups').select('*').eq('location_id', BELLESSERE_LOCATION_ID).order('name'),
   ])
-  const [cals, users, groups] = await Promise.all([calsRes.json(), usersRes.json(), groupsRes.json()])
-  return { calendars: cals.calendars ?? [], users: users.users ?? [], groups: groups.groups ?? [] }
+
+  // Shape to match the GHL response format the UI already expects
+  const calendars = (svcRes.data ?? []).map(s => ({
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    slotDuration: s.slot_duration,
+    slotInterval: s.slot_interval,
+    slotBuffer: s.slot_buffer,
+    preBuffer: s.pre_buffer,
+    price: s.price,
+    groupId: s.group_id,
+    teamMembers: s.team_members ?? [],
+    isActive: s.is_active,
+  }))
+
+  const users = (usersRes.data ?? []).map(u => ({ id: u.id, name: u.name, email: u.email }))
+  const groups = (groupsRes.data ?? []).map(g => ({ id: g.id, name: g.name }))
+
+  return NextResponse.json({ calendars, users, groups }, {
+    headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' },
+  })
 }
 
-function bustCache(sb: ReturnType<typeof createAdminClient>) {
-  memCache = null
-  readDbCache(sb).then(({ theme }) => {
-    const newTheme = { ...theme }
-    delete newTheme[CACHE_KEY]
-    void sb.from('dashboard_configs').upsert({ location_id: BELLESSERE_LOCATION_ID, theme: newTheme }, { onConflict: 'location_id' })
-  }).catch(() => {})
-}
-
-// POST — create a calendar (service)
+// POST — create on GHL + insert into DB
 export async function POST(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
@@ -126,7 +71,7 @@ export async function POST(req: NextRequest) {
   if (!name || !duration) return NextResponse.json({ error: 'name and duration required' }, { status: 400 })
 
   const token = await getToken()
-  const payload: Record<string, unknown> = {
+  const ghlPayload: Record<string, unknown> = {
     locationId: BELLESSERE_LOCATION_ID,
     name,
     description: description ?? '',
@@ -138,21 +83,41 @@ export async function POST(req: NextRequest) {
     teamMembers: teamMembers.map((id: string) => ({ userId: id, priority: 0, meetingLocationType: 'default' })),
     calendarType: 'service',
   }
-  if (groupId) payload.groupId = groupId
-  if (slotBuffer != null) payload.slotBuffer = Number(slotBuffer)
-  if (preBuffer != null) payload.preBuffer = Number(preBuffer)
+  if (groupId) ghlPayload.groupId = groupId
+  if (slotBuffer != null) ghlPayload.slotBuffer = Number(slotBuffer)
+  if (preBuffer != null) ghlPayload.preBuffer = Number(preBuffer)
 
   const res = await fetch(`${GHL}/calendars/`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, Version: CAL_V, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(ghlPayload),
   })
   const data = await res.json()
-  if (res.ok) bustCache(createAdminClient())
+
+  if (res.ok) {
+    const cal = data.calendar ?? data
+    const sb = createAdminClient()
+    await sb.from('bellessere_services').upsert({
+      id: cal.id,
+      location_id: BELLESSERE_LOCATION_ID,
+      name,
+      description: description ?? null,
+      slot_duration: Number(duration),
+      slot_interval: slotInterval != null ? Number(slotInterval) : Number(duration),
+      slot_buffer: slotBuffer != null ? Number(slotBuffer) : null,
+      pre_buffer: preBuffer != null ? Number(preBuffer) : null,
+      price: price ? Number(price) : null,
+      group_id: groupId ?? null,
+      team_members: teamMembers.map((id: string) => ({ userId: id })),
+      is_active: true,
+      synced_at: new Date().toISOString(),
+    }, { onConflict: 'id' })
+  }
+
   return NextResponse.json(data, { status: res.status })
 }
 
-// PUT — update a calendar
+// PUT — update on GHL + patch DB row
 export async function PUT(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
@@ -161,32 +126,48 @@ export async function PUT(req: NextRequest) {
   if (!calendarId) return NextResponse.json({ error: 'calendarId required' }, { status: 400 })
 
   const token = await getToken()
-  const payload: Record<string, unknown> = {}
-  if (name !== undefined) payload.name = name
-  if (description !== undefined) payload.description = description
-  if (duration !== undefined) payload.slotDuration = Number(duration)
-  if (slotInterval !== undefined) payload.slotInterval = Number(slotInterval)
-  else if (duration !== undefined) payload.slotInterval = Number(duration)
-  if (slotBuffer !== undefined) payload.slotBuffer = Number(slotBuffer)
-  if (preBuffer !== undefined) payload.preBuffer = Number(preBuffer)
-  if (price !== undefined) payload.price = Number(price)
-  if (color !== undefined) payload.eventColor = color
-  if (groupId !== undefined) payload.groupId = groupId
+  const ghlPayload: Record<string, unknown> = {}
+  if (name !== undefined) ghlPayload.name = name
+  if (description !== undefined) ghlPayload.description = description
+  if (duration !== undefined) ghlPayload.slotDuration = Number(duration)
+  if (slotInterval !== undefined) ghlPayload.slotInterval = Number(slotInterval)
+  else if (duration !== undefined) ghlPayload.slotInterval = Number(duration)
+  if (slotBuffer !== undefined) ghlPayload.slotBuffer = Number(slotBuffer)
+  if (preBuffer !== undefined) ghlPayload.preBuffer = Number(preBuffer)
+  if (price !== undefined) ghlPayload.price = Number(price)
+  if (color !== undefined) ghlPayload.eventColor = color
+  if (groupId !== undefined) ghlPayload.groupId = groupId
   if (teamMembers !== undefined) {
-    payload.teamMembers = teamMembers.map((id: string) => ({ userId: id, priority: 0, meetingLocationType: 'default' }))
+    ghlPayload.teamMembers = teamMembers.map((id: string) => ({ userId: id, priority: 0, meetingLocationType: 'default' }))
   }
 
   const res = await fetch(`${GHL}/calendars/${calendarId}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, Version: CAL_V, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(ghlPayload),
   })
   const data = await res.json()
-  if (res.ok) bustCache(createAdminClient())
+
+  if (res.ok) {
+    const sb = createAdminClient()
+    const dbPatch: Record<string, unknown> = { synced_at: new Date().toISOString() }
+    if (name !== undefined) dbPatch.name = name
+    if (description !== undefined) dbPatch.description = description
+    if (duration !== undefined) dbPatch.slot_duration = Number(duration)
+    if (slotInterval !== undefined) dbPatch.slot_interval = Number(slotInterval)
+    else if (duration !== undefined) dbPatch.slot_interval = Number(duration)
+    if (slotBuffer !== undefined) dbPatch.slot_buffer = Number(slotBuffer)
+    if (preBuffer !== undefined) dbPatch.pre_buffer = Number(preBuffer)
+    if (price !== undefined) dbPatch.price = Number(price)
+    if (groupId !== undefined) dbPatch.group_id = groupId
+    if (teamMembers !== undefined) dbPatch.team_members = teamMembers.map((id: string) => ({ userId: id }))
+    await sb.from('bellessere_services').update(dbPatch).eq('id', calendarId)
+  }
+
   return NextResponse.json(data, { status: res.status })
 }
 
-// DELETE — delete a calendar
+// DELETE — delete on GHL + remove from DB
 export async function DELETE(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
@@ -199,6 +180,11 @@ export async function DELETE(req: NextRequest) {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}`, Version: CAL_V },
   })
-  if (res.ok) bustCache(createAdminClient())
+
+  if (res.ok) {
+    const sb = createAdminClient()
+    await sb.from('bellessere_services').delete().eq('id', calendarId)
+  }
+
   return NextResponse.json({ ok: res.ok }, { status: res.status })
 }
