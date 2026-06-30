@@ -9,6 +9,9 @@ interface CalendarService {
   name: string
   description?: string
   slotDuration?: number
+  slotInterval?: number
+  slotBuffer?: number
+  preBuffer?: number
   isActive?: boolean
   price?: number
   groupId?: string
@@ -35,6 +38,9 @@ function ServiceModal({
     description: stripHtml(service?.description),
     duration: String(service?.slotDuration ?? 30),
     price: service?.price != null ? String(service.price) : '',
+    slotInterval: String(service?.slotInterval ?? 15),
+    slotBuffer: String(service?.slotBuffer ?? 0),
+    preBuffer: String(service?.preBuffer ?? 0),
     teamMembers: (service?.teamMembers ?? []).map(m => m.userId),
   })
   const [saving, setSaving] = useState(false)
@@ -50,6 +56,9 @@ function ServiceModal({
         groupId: form.groupId || undefined,
         duration: Number(form.duration),
         price: form.price ? Number(form.price) : undefined,
+        slotInterval: Number(form.slotInterval) || undefined,
+        slotBuffer: Number(form.slotBuffer) || undefined,
+        preBuffer: Number(form.preBuffer) || undefined,
         teamMembers: form.teamMembers,
         ...(isEdit ? { calendarId: service!.id } : {}),
       }
@@ -116,6 +125,20 @@ function ServiceModal({
               <div>
                 <label className="bs-field-label">Prezzo (€)</label>
                 <input className="bs-input" type="number" min="0" step="0.01" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="25.00" />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              <div>
+                <label className="bs-field-label">Intervallo slot (min)</label>
+                <input className="bs-input" type="number" min="5" max="480" value={form.slotInterval} onChange={e => setForm(p => ({ ...p, slotInterval: e.target.value }))} placeholder="15" />
+              </div>
+              <div>
+                <label className="bs-field-label">Buffer post (min)</label>
+                <input className="bs-input" type="number" min="0" max="480" value={form.slotBuffer} onChange={e => setForm(p => ({ ...p, slotBuffer: e.target.value }))} placeholder="0" />
+              </div>
+              <div>
+                <label className="bs-field-label">Buffer pre (min)</label>
+                <input className="bs-input" type="number" min="0" max="480" value={form.preBuffer} onChange={e => setForm(p => ({ ...p, preBuffer: e.target.value }))} placeholder="0" />
               </div>
             </div>
             {users.length > 0 && (

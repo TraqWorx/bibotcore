@@ -122,19 +122,16 @@ export default function ImpostazioniPage() {
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
-  async function save(syncToGhl: boolean) {
+  async function save() {
     setSaving(true); setSavedMsg('')
     const res = await fetch('/api/bellessere/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamSchedule, syncToGhl }),
+      body: JSON.stringify({ teamSchedule }),
     })
-    const data = await res.json()
     setSaving(false)
     if (res.ok) {
-      setSavedMsg(syncToGhl
-        ? `Salvato e sincronizzato con ${data.calendarsSynced ?? 0} calendari GHL`
-        : 'Salvato')
+      setSavedMsg('Salvato')
       setTimeout(() => setSavedMsg(''), 3000)
     }
   }
@@ -159,15 +156,8 @@ export default function ImpostazioniPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {savedMsg && <span style={{ fontSize: 12.5, color: '#16a34a' }}>{savedMsg}</span>}
-            <button className="bs-btn-ghost" onClick={() => save(false)} disabled={saving} style={{ fontSize: 13 }}>
+            <button className="bs-btn-primary" onClick={save} disabled={saving} style={{ fontSize: 13 }}>
               {saving ? 'Salvataggio...' : 'Salva'}
-            </button>
-            <button className="bs-btn-primary" onClick={() => save(true)} disabled={saving} style={{ fontSize: 13 }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-              </svg>
-              Salva e sincronizza GHL
             </button>
           </div>
         </div>
@@ -188,14 +178,6 @@ export default function ImpostazioniPage() {
           </div>
         )}
 
-        <div style={{ marginTop: 14, padding: '12px 16px', background: 'var(--bs-bg)', borderRadius: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--bs-gold)" strokeWidth="2" style={{ marginTop: 1, flexShrink: 0 }}>
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <div style={{ fontSize: 12.5, color: 'var(--bs-text-muted)', lineHeight: 1.5 }}>
-            <strong>Sincronizzazione GHL</strong> — aggiorna gli <em>openHours</em> di tutti i calendari di servizio con l&apos;unione degli orari del team. GHL non espone un API per la disponibilità per-utente, quindi gli orari individuali sono gestiti da Bibot e usati come fascia oraria globale per le prenotazioni online.
-          </div>
-        </div>
       </div>
 
       {/* Team list */}
