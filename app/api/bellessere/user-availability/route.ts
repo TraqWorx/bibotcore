@@ -39,25 +39,20 @@ export async function GET(req: NextRequest) {
     userIds = (usersData.users ?? []).map((u: { id: string }) => u.id)
   }
 
-  // Fetch availability for each user in parallel
+  // Fetch availability for each user in parallel — return raw response for debugging
   const results = await Promise.all(
     userIds.map(async (userId) => {
       try {
         const res = await fetch(`${GHL}/users/${userId}/availability`, {
           headers: { Authorization: `Bearer ${token}`, Version: V },
         })
-        if (!res.ok) return { userId, availability: [] }
         const data = await res.json()
-        // GHL returns { availability: [...] } or the array directly
-        const availability = data.availability ?? data ?? []
-        return { userId, availability }
-      } catch {
-        return { userId, availability: [] }
+        return { userId, _raw: data, ok: res.ok, status: res.status }
+      } catch (e) {
+        return { userId, _raw: null, ok: false, status: 0, error: String(e) }
       }
     })
   )
 
-  return NextResponse.json({ schedules: results }, {
-    headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' },
-  })
+  return NextResponse.json({ results }, { headers: { 'Cache-Control': 'no-store' } })
 }
