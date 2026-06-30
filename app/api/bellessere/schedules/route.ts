@@ -34,14 +34,23 @@ export async function GET(req: NextRequest) {
   if (err) return err
 
   const token = await getToken()
-  const res = await fetch(`${GHL}/calendars/schedules?locationId=${BELLESSERE_LOCATION_ID}`, {
+
+  // Try v3 first, fall back to 2021-04-15 if it fails
+  let res = await fetch(`${GHL}/calendars/schedules?locationId=${BELLESSERE_LOCATION_ID}`, {
     headers: { Authorization: `Bearer ${token}`, Version: V },
   })
+  if (!res.ok) {
+    res = await fetch(`${GHL}/calendars/schedules?locationId=${BELLESSERE_LOCATION_ID}`, {
+      headers: { Authorization: `Bearer ${token}`, Version: '2021-04-15' },
+    })
+  }
+
   const data = await res.json()
-  // GHL returns { schedules: [...] } — each item has id, userId, name, rules, timezone
-  const schedules = data.schedules ?? data.data ?? []
-  return NextResponse.json({ schedules }, {
-    headers: { 'Cache-Control': 'private, max-age=60' },
+
+  // Return raw GHL response alongside parsed schedules so we can debug structure issues
+  const schedules = data.schedules ?? data.data ?? (Array.isArray(data) ? data : [])
+  return NextResponse.json({ schedules, _raw: data }, {
+    headers: { 'Cache-Control': 'no-store' },
   })
 }
 
