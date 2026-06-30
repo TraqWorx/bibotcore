@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
         fetch(`${GHL}/calendars/groups?locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: CAL_V } }),
       ])
       const [cals, usersGhl, groups] = await Promise.all([calsRes.json(), usersGhlRes.json(), groupsGhlRes.json()])
-      const payload = { calendars: (cals.calendars ?? []).filter((c: Record<string, unknown>) => c.calendarType === 'service'), users: usersGhl.users ?? [], groups: groups.groups ?? [] }
+      const payload = { calendars: (cals.calendars ?? []).filter((c: Record<string, unknown>) => c.calendarType !== 'personal'), users: usersGhl.users ?? [], groups: groups.groups ?? [] }
       // Populate DB in background for next time
       import('@/lib/bellessere/sync').then(m => m.syncBellessere('all')).catch(() => {})
       return NextResponse.json(payload, { headers: { 'Cache-Control': 'private, max-age=60' } })

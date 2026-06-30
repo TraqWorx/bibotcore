@@ -32,7 +32,7 @@ export async function syncBellessere(scope: 'all' | 'users' = 'all') {
 
     const users: { id: string; name: string; email: string; phone?: string }[] = usersData.users ?? []
     const groups: { id: string; name: string }[] = groupsData.groups ?? []
-    const services = ((calsData.calendars ?? []) as Record<string, unknown>[]).filter(c => c.calendarType === 'service')
+    const services = ((calsData.calendars ?? []) as Record<string, unknown>[]).filter(c => c.calendarType !== 'personal')
 
     const schedules: { id: string; userId: string; name: string; rules: unknown[]; timezone: string }[] = []
     await Promise.all(users.map(async (u) => {
