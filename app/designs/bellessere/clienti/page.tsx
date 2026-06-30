@@ -35,15 +35,17 @@ function TagEditor({ contactId, initialTags }: { contactId: string; initialTags:
   const [tags, setTags] = useState<string[]>(initialTags)
   const [input, setInput] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   async function saveTags(next: string[]) {
-    setSaving(true)
-    await fetch('/api/bellessere/contacts', {
+    setSaving(true); setSaveError('')
+    const res = await fetch('/api/bellessere/contacts', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contactId, tags: next }),
-    }).catch(() => {})
+    }).catch(() => null)
     setSaving(false)
+    if (!res?.ok) setSaveError('Errore nel salvataggio tag')
   }
 
   async function addTag() {
@@ -73,6 +75,7 @@ function TagEditor({ contactId, initialTags }: { contactId: string; initialTags:
         ))}
         {tags.length === 0 && <span style={{ fontSize: 12, color: 'var(--bs-text-faint)' }}>Nessun tag</span>}
       </div>
+      {saveError && <div style={{ fontSize: 11.5, color: '#DC2626', marginBottom: 4 }}>{saveError}</div>}
       <div style={{ display: 'flex', gap: 6 }}>
         <input
           className="bs-input"
@@ -255,7 +258,11 @@ function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; vis
         {/* Inline messaging */}
         <div style={{ borderTop: '1px solid var(--bs-line)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--bs-text-faint)', marginBottom: 2 }}>Messaggi</div>
-          {messages.length === 0 ? (
+          {!conversationId && !loading ? (
+            <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)', textAlign: 'center', padding: '12px 0' }}>
+              Nessuna conversazione GHL con questo cliente.
+            </div>
+          ) : messages.length === 0 ? (
             <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)', textAlign: 'center', padding: '12px 0' }}>
               {loading ? 'Caricamento...' : 'Nessun messaggio con questo cliente.'}
             </div>
@@ -276,21 +283,23 @@ function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; vis
               ))}
             </div>
           )}
-          <form onSubmit={sendMessage} style={{ display: 'flex', gap: 8 }}>
-            <input
-              className="bs-input"
-              style={{ flex: 1, fontSize: 13 }}
-              placeholder="Scrivi un messaggio..."
-              value={msgText}
-              onChange={e => setMsgText(e.target.value)}
-              disabled={sending}
-            />
-            <button type="submit" className="bs-btn-primary" style={{ padding: '0 14px', flexShrink: 0 }} disabled={sending || !msgText.trim()}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-              </svg>
-            </button>
-          </form>
+          {conversationId && (
+            <form onSubmit={sendMessage} style={{ display: 'flex', gap: 8 }}>
+              <input
+                className="bs-input"
+                style={{ flex: 1, fontSize: 13 }}
+                placeholder="Scrivi un messaggio..."
+                value={msgText}
+                onChange={e => setMsgText(e.target.value)}
+                disabled={sending}
+              />
+              <button type="submit" className="bs-btn-primary" style={{ padding: '0 14px', flexShrink: 0 }} disabled={sending || !msgText.trim()}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+              </button>
+            </form>
+          )}
         </div>
 
         <div className="bs-panel-actions">

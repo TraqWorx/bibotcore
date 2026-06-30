@@ -44,19 +44,21 @@ function AppointmentPanel({
   appt: Appointment; calendars: Calendar[]; onClose: () => void; onAction: () => void
 }) {
   const [loading, setLoading] = useState(false)
+  const [actionError, setActionError] = useState('')
   const calendar = calendars.find(c => c.id === appt.calendarId)
   const dt = appt.startTime ? new Date(appt.startTime) : null
   const dtEnd = appt.endTime ? new Date(appt.endTime) : null
   const duration = dt && dtEnd ? Math.round((dtEnd.getTime() - dt.getTime()) / 60000) : calendar?.slotDuration ?? null
 
   async function setStatus(status: string) {
-    setLoading(true)
-    await fetch('/api/bellessere/appointments', {
+    setLoading(true); setActionError('')
+    const res = await fetch('/api/bellessere/appointments', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId: appt.id, appointmentStatus: status }),
     })
     setLoading(false)
+    if (!res.ok) { const d = await res.json().catch(() => ({})); setActionError(d.message ?? 'Errore aggiornamento'); return }
     onAction()
     onClose()
   }
@@ -135,6 +137,7 @@ function AppointmentPanel({
         </div>
 
         <div className="bs-panel-actions">
+          {actionError && <div style={{ padding: '8px 12px', background: '#FEF2F2', color: '#DC2626', borderRadius: 8, fontSize: 12.5 }}>{actionError}</div>}
           {appt.appointmentStatus !== 'showed' && (
             <button
               className="bs-btn-primary"
@@ -162,13 +165,6 @@ function AppointmentPanel({
               </button>
             )}
           </div>
-          <button className="bs-btn-ghost" style={{ justifyContent: 'center', width: '100%' }} onClick={onClose}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-              <polyline points="22,6 12,13 2,6"/>
-            </svg>
-            Invia promemoria
-          </button>
         </div>
       </div>
     </>
@@ -202,7 +198,11 @@ function AddAppointmentModal({ onClose, onAdded, contacts, calendars }: {
     setSaving(true); setError('')
     try {
       const cal = calendars.find(c => c.id === form.calendarId)
-      const start = new Date(`${form.date}T${form.slot}:00`)
+      // Compute Rome's UTC offset dynamically to handle CET/CEST correctly
+      const romeOffsetStr = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Rome', timeZoneName: 'shortOffset' })
+        .formatToParts(new Date(`${form.date}T12:00:00Z`))
+        .find(p => p.type === 'timeZoneName')?.value?.replace('GMT', '') ?? '+02:00'
+      const start = new Date(`${form.date}T${form.slot}:00${romeOffsetStr}`)
       const end = new Date(start.getTime() + (cal?.slotDuration ?? 30) * 60000)
       const res = await fetch('/api/bellessere/appointments', {
         method: 'POST',

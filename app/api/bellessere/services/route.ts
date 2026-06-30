@@ -51,12 +51,11 @@ export async function GET(req: NextRequest) {
 }
 
 // POST — create a calendar (service)
-// body: { name, description, duration, price, teamMembers: string[], color }
 export async function POST(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
-  const { name, description, duration, price, teamMembers = [], color = '#1B2E4A', groupId } = await req.json()
+  const { name, description, duration, price, teamMembers = [], color = '#1B2E4A', groupId, slotInterval, slotBuffer, preBuffer } = await req.json()
   if (!name || !duration) return NextResponse.json({ error: 'name and duration required' }, { status: 400 })
 
   const token = await getToken()
@@ -65,7 +64,7 @@ export async function POST(req: NextRequest) {
     name,
     description: description ?? '',
     slotDuration: Number(duration),
-    slotInterval: Number(duration),
+    slotInterval: slotInterval != null ? Number(slotInterval) : Number(duration),
     eventColor: color,
     isActive: true,
     price: price ? Number(price) : undefined,
@@ -73,6 +72,8 @@ export async function POST(req: NextRequest) {
     calendarType: 'service',
   }
   if (groupId) payload.groupId = groupId
+  if (slotBuffer != null) payload.slotBuffer = Number(slotBuffer)
+  if (preBuffer != null) payload.preBuffer = Number(preBuffer)
 
   const res = await fetch(`${GHL}/calendars/`, {
     method: 'POST',
@@ -88,14 +89,18 @@ export async function PUT(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
-  const { calendarId, name, description, duration, price, teamMembers, color, groupId } = await req.json()
+  const { calendarId, name, description, duration, price, teamMembers, color, groupId, slotInterval, slotBuffer, preBuffer } = await req.json()
   if (!calendarId) return NextResponse.json({ error: 'calendarId required' }, { status: 400 })
 
   const token = await getToken()
   const payload: Record<string, unknown> = {}
   if (name !== undefined) payload.name = name
   if (description !== undefined) payload.description = description
-  if (duration !== undefined) { payload.slotDuration = Number(duration); payload.slotInterval = Number(duration) }
+  if (duration !== undefined) payload.slotDuration = Number(duration)
+  if (slotInterval !== undefined) payload.slotInterval = Number(slotInterval)
+  else if (duration !== undefined) payload.slotInterval = Number(duration)
+  if (slotBuffer !== undefined) payload.slotBuffer = Number(slotBuffer)
+  if (preBuffer !== undefined) payload.preBuffer = Number(preBuffer)
   if (price !== undefined) payload.price = Number(price)
   if (color !== undefined) payload.eventColor = color
   if (groupId !== undefined) payload.groupId = groupId

@@ -197,11 +197,12 @@ export default function ServiziPage() {
 
   async function deleteService(id: string) {
     if (!confirm('Eliminare questo servizio?')) return
-    await fetch('/api/bellessere/services', {
+    const res = await fetch('/api/bellessere/services', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ calendarId: id }),
     })
+    if (!res.ok) { alert('Errore durante l\'eliminazione del servizio'); return }
     setRefreshKey(k => k + 1)
   }
 

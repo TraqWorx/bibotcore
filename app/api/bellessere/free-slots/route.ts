@@ -19,9 +19,10 @@ export async function GET(req: NextRequest) {
 
   if (!calendarId || !date) return NextResponse.json({ error: 'calendarId and date required' }, { status: 400 })
 
-  // Europe/Rome: UTC+2 in summer, UTC+1 in winter. Use explicit offset so there's no browser dependency.
-  const startDate = new Date(`${date}T00:00:00+02:00`).getTime()
-  const endDate = new Date(`${date}T23:59:59+02:00`).getTime()
+  // Use UTC midnight window. GHL receives timezone=Europe/Rome and knows which slots belong to the day.
+  // UTC midnight → UTC 23:59:59 safely covers all Rome business hours (07:00-20:00) in both CET and CEST.
+  const startDate = new Date(`${date}T00:00:00Z`).getTime()
+  const endDate = new Date(`${date}T23:59:59Z`).getTime()
 
   const sb = createAdminClient()
   const { data: conn } = await sb

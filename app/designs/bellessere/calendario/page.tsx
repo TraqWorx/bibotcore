@@ -36,15 +36,17 @@ function eventClass(status: string) {
 
 function AppointmentPanel({ event, onClose, onAction }: { event: CalEvent; onClose: () => void; onAction: () => void }) {
   const [loading, setLoading] = useState(false)
+  const [actionError, setActionError] = useState('')
 
   async function setStatus(status: string) {
-    setLoading(true)
-    await fetch('/api/bellessere/appointments', {
+    setLoading(true); setActionError('')
+    const res = await fetch('/api/bellessere/appointments', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId: event.id, appointmentStatus: status }),
     })
     setLoading(false)
+    if (!res.ok) { const d = await res.json().catch(() => ({})); setActionError(d.message ?? 'Errore aggiornamento'); return }
     onAction()
     onClose()
   }
@@ -69,6 +71,7 @@ function AppointmentPanel({ event, onClose, onAction }: { event: CalEvent; onClo
           )}
         </div>
         <div className="bs-panel-actions">
+          {actionError && <div style={{ padding: '8px 12px', background: '#FEF2F2', color: '#DC2626', borderRadius: 8, fontSize: 12.5 }}>{actionError}</div>}
           {event.appointmentStatus !== 'showed' && (
             <button className="bs-btn-primary" style={{ justifyContent: 'center', width: '100%' }} onClick={() => setStatus('showed')} disabled={loading}>Segna completato</button>
           )}
@@ -140,12 +143,15 @@ export default function CalendarioPage() {
 
   const todayStr = new Date().toISOString().slice(0, 10)
 
+  const romeDateFmt = new Intl.DateTimeFormat('sv', { timeZone: 'Europe/Rome' }) // YYYY-MM-DD
+  const romeHourFmt = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Rome', hour: 'numeric', hour12: false })
+
   function eventsForSlot(dayDate: Date, hour: number) {
-    const dateStr = dayDate.toISOString().slice(0, 10)
+    const dateStr = romeDateFmt.format(dayDate)
     return events.filter(e => {
       if (!e.startTime) return false
       const d = new Date(e.startTime)
-      return d.toISOString().slice(0, 10) === dateStr && d.getHours() === hour
+      return romeDateFmt.format(d) === dateStr && parseInt(romeHourFmt.format(d), 10) === hour
     })
   }
 

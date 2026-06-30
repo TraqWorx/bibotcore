@@ -41,8 +41,7 @@ export async function POST(req: NextRequest) {
 
   await sb
     .from('dashboard_configs')
-    .update({ theme })
-    .eq('location_id', BELLESSERE_LOCATION_ID)
+    .upsert({ location_id: BELLESSERE_LOCATION_ID, theme }, { onConflict: 'location_id' })
 
   return NextResponse.json({ ok: true })
 }
