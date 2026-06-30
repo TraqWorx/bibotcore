@@ -4,24 +4,23 @@ import { useState, useEffect } from 'react'
 
 interface GhlUser { id: string; name: string; email: string }
 
-// GHL v3 schedule rule format
-interface GhlInterval { from: string; to: string }
-interface GhlRule {
-  type: 'wday' | 'date'
-  day?: string   // "monday", "tuesday", etc. (for wday rules)
-  date?: string  // "YYYY-MM-DD" (for date-specific overrides — we ignore these)
-  intervals: GhlInterval[]
+interface PersonalCalendar {
+  calendarId: string
+  name: string
+  userId: string | null
+  openHours: OpenHoursEntry[] | Record<string, unknown>
+  timezone: string
 }
 
-interface GhlSchedule {
-  id: string
-  userId?: string
-  name?: string
-  timezone?: string
-  rules?: GhlRule[]
+// GHL openHours format: array of { daysOfTheWeek: number[], hours: [{ openHour, openMinute, closeHour, closeMinute }] }
+// daysOfTheWeek: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+interface OpenHoursEntry {
+  daysOfTheWeek: number[]
+  hours: { openHour: number; openMinute: number; closeHour: number; closeMinute: number }[]
 }
 
 const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+const DAY_IDX: Record<string, number> = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 }
 const DAY_LABELS_IT: Record<string, string> = {
   sunday: 'Dom', monday: 'Lun', tuesday: 'Mar',
   wednesday: 'Mer', thursday: 'Gio', friday: 'Ven', saturday: 'Sab',
@@ -30,34 +29,49 @@ const DAY_LABELS_IT: Record<string, string> = {
 type EditDay = { open: boolean; start: string; end: string }
 type EditSchedule = Record<string, EditDay>
 
-// Convert GHL v3 rules array to our simple edit state
-function ghlToEdit(rules: GhlRule[]): EditSchedule {
+function fmt(h: number, m: number) {
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+function ghlToEdit(openHours: OpenHoursEntry[] | Record<string, unknown>): EditSchedule {
   const edit: EditSchedule = {}
   for (const k of DAY_KEYS) edit[k] = { open: false, start: '09:00', end: '18:00' }
-  for (const rule of rules) {
-    if (rule.type !== 'wday' || !rule.day) continue
-    const key = rule.day.toLowerCase()
-    if (!DAY_KEYS.includes(key)) continue
-    const interval = rule.intervals?.[0]
-    if (interval) edit[key] = { open: true, start: interval.from, end: interval.to }
+
+  if (!Array.isArray(openHours)) return edit
+
+  for (const entry of openHours) {
+    const h = entry.hours?.[0]
+    if (!h) continue
+    const timeRange = { open: true, start: fmt(h.openHour, h.openMinute ?? 0), end: fmt(h.closeHour, h.closeMinute ?? 0) }
+    for (const dayIdx of entry.daysOfTheWeek ?? []) {
+      const key = DAY_KEYS[dayIdx]
+      if (key) edit[key] = timeRange
+    }
   }
   return edit
 }
 
-// Convert our edit state back to GHL v3 rules format
-function editToGhlRules(edit: EditSchedule): GhlRule[] {
-  return DAY_KEYS
-    .filter(k => edit[k]?.open)
-    .map(k => ({
-      type: 'wday' as const,
-      day: k,
-      intervals: [{ from: edit[k].start, to: edit[k].end }],
-    }))
+function editToOpenHours(edit: EditSchedule): OpenHoursEntry[] {
+  // Group days that share the same time range into one entry
+  const groups: Record<string, number[]> = {}
+  for (const key of DAY_KEYS) {
+    if (!edit[key]?.open) continue
+    const groupKey = `${edit[key].start}-${edit[key].end}`
+    if (!groups[groupKey]) groups[groupKey] = []
+    groups[groupKey].push(DAY_IDX[key])
+  }
+  return Object.entries(groups).map(([timeKey, days]) => {
+    const [start, end] = timeKey.split('-')
+    const [oh, om] = start.split(':').map(Number)
+    const [ch, cm] = end.split(':').map(Number)
+    return {
+      daysOfTheWeek: days.sort((a, b) => a - b),
+      hours: [{ openHour: oh, openMinute: om, closeHour: ch, closeMinute: cm }],
+    }
+  })
 }
 
-function UserScheduleEditor({
-  user, schedule, onChange,
-}: { user: GhlUser; schedule: EditSchedule; onChange: (s: EditSchedule) => void }) {
+function UserScheduleEditor({ schedule, onChange }: { schedule: EditSchedule; onChange: (s: EditSchedule) => void }) {
   function toggle(key: string) {
     onChange({ ...schedule, [key]: { ...schedule[key], open: !schedule[key]?.open } })
   }
@@ -71,13 +85,10 @@ function UserScheduleEditor({
         const day = schedule[key] ?? { open: false, start: '09:00', end: '18:00' }
         return (
           <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button
-              onClick={() => toggle(key)}
-              style={{
-                width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', flexShrink: 0,
-                background: day.open ? 'var(--bs-black)' : 'var(--bs-line)', position: 'relative', transition: 'background 0.2s',
-              }}
-            >
+            <button onClick={() => toggle(key)} style={{
+              width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', flexShrink: 0,
+              background: day.open ? 'var(--bs-black)' : 'var(--bs-line)', position: 'relative', transition: 'background 0.2s',
+            }}>
               <span style={{
                 position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%', background: 'white',
                 transition: 'left 0.2s', left: day.open ? 18 : 2,
@@ -106,8 +117,8 @@ function UserScheduleEditor({
 
 export default function ImpostazioniPage() {
   const [users, setUsers] = useState<GhlUser[]>([])
-  const [scheduleMap, setScheduleMap] = useState<Record<string, GhlSchedule>>({}) // userId → schedule
-  const [editMap, setEditMap] = useState<Record<string, EditSchedule>>({}) // userId → edit state
+  // Map userId → { calendarId, editSchedule }
+  const [calMap, setCalMap] = useState<Record<string, { calendarId: string; edit: EditSchedule }>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [savedMsg, setSavedMsg] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -116,49 +127,34 @@ export default function ImpostazioniPage() {
   useEffect(() => {
     Promise.all([
       fetch('/api/bellessere/services').then(r => r.json()),
-      fetch('/api/bellessere/schedules').then(r => r.json()),
-    ]).then(([svc, schData]) => {
-      const usrs: GhlUser[] = svc.users ?? []
-      setUsers(usrs)
-
-      const schedules: GhlSchedule[] = schData.schedules ?? []
-      const sMap: Record<string, GhlSchedule> = {}
-      const eMap: Record<string, EditSchedule> = {}
-
-      for (const s of schedules) {
-        if (s.userId) {
-          sMap[s.userId] = s
-          eMap[s.userId] = ghlToEdit(s.rules ?? [])
+      fetch('/api/bellessere/user-availability').then(r => r.json()),
+    ]).then(([svc, avail]) => {
+      setUsers(svc.users ?? [])
+      const personal: PersonalCalendar[] = avail.personal ?? []
+      const map: Record<string, { calendarId: string; edit: EditSchedule }> = {}
+      for (const p of personal) {
+        if (p.userId) {
+          map[p.userId] = { calendarId: p.calendarId, edit: ghlToEdit(p.openHours as OpenHoursEntry[]) }
         }
       }
-
-      // Users without a matching schedule get an empty default
-      for (const u of usrs) {
-        if (!eMap[u.id]) eMap[u.id] = ghlToEdit([])
-      }
-
-      setScheduleMap(sMap)
-      setEditMap(eMap)
+      setCalMap(map)
     }).catch(e => setError(String(e))).finally(() => setLoading(false))
   }, [])
 
   async function save(userId: string) {
-    const schedule = scheduleMap[userId]
-    if (!schedule?.id) { setError('Nessun schedule GHL trovato per questo utente'); return }
+    const entry = calMap[userId]
+    if (!entry) return
     setSaving(p => ({ ...p, [userId]: true }))
     setSavedMsg(p => ({ ...p, [userId]: '' }))
-    const res = await fetch('/api/bellessere/schedules', {
+    setError('')
+    const res = await fetch('/api/bellessere/user-availability', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        scheduleId: schedule.id,
-        rules: editToGhlRules(editMap[userId] ?? {}),
-        timezone: schedule.timezone ?? 'Europe/Rome',
-      }),
+      body: JSON.stringify({ calendarId: entry.calendarId, openHours: editToOpenHours(entry.edit) }),
     })
     setSaving(p => ({ ...p, [userId]: false }))
     if (res.ok) {
-      setSavedMsg(p => ({ ...p, [userId]: 'Salvato' }))
+      setSavedMsg(p => ({ ...p, [userId]: 'Salvato su GHL' }))
       setTimeout(() => setSavedMsg(p => ({ ...p, [userId]: '' })), 3000)
     } else {
       const d = await res.json()
@@ -185,42 +181,46 @@ export default function ImpostazioniPage() {
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--bs-text-faint)' }}>Nessun membro del team trovato</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {users.map(u => (
-            <div key={u.id} className="bs-card">
-              {/* Header */}
-              <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--bs-line)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bs-gold-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12, color: 'var(--bs-gold)', flexShrink: 0 }}>
-                    {u.name.split(' ').map((p: string) => p[0]).join('').toUpperCase().slice(0, 2)}
+          {users.map(u => {
+            const entry = calMap[u.id]
+            return (
+              <div key={u.id} className="bs-card">
+                <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--bs-line)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bs-gold-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12, color: 'var(--bs-gold)', flexShrink: 0 }}>
+                      {u.name.split(' ').map((p: string) => p[0]).join('').toUpperCase().slice(0, 2)}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13.5 }}>{u.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--bs-text-muted)' }}>{u.email}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 13.5 }}>{u.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--bs-text-muted)' }}>{u.email}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {savedMsg[u.id] && <span style={{ fontSize: 12.5, color: '#16a34a' }}>{savedMsg[u.id]}</span>}
+                    {!entry && <span style={{ fontSize: 11.5, color: 'var(--bs-text-faint)', fontStyle: 'italic' }}>nessun calendario personale GHL</span>}
+                    <button
+                      className="bs-btn-primary"
+                      style={{ fontSize: 13 }}
+                      disabled={saving[u.id] || !entry}
+                      onClick={() => save(u.id)}
+                    >
+                      {saving[u.id] ? 'Salvataggio...' : 'Salva su GHL'}
+                    </button>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {savedMsg[u.id] && <span style={{ fontSize: 12.5, color: '#16a34a' }}>{savedMsg[u.id]}</span>}
-                  {!scheduleMap[u.id] && (
-                    <span style={{ fontSize: 11.5, color: 'var(--bs-text-faint)', fontStyle: 'italic' }}>nessun schedule GHL</span>
-                  )}
-                  <button
-                    className="bs-btn-primary"
-                    style={{ fontSize: 13 }}
-                    disabled={saving[u.id] || !scheduleMap[u.id]}
-                    onClick={() => save(u.id)}
-                  >
-                    {saving[u.id] ? 'Salvataggio...' : 'Salva su GHL'}
-                  </button>
-                </div>
+                {entry ? (
+                  <UserScheduleEditor
+                    schedule={entry.edit}
+                    onChange={s => setCalMap(p => ({ ...p, [u.id]: { ...p[u.id], edit: s } }))}
+                  />
+                ) : (
+                  <div style={{ padding: '16px 20px', fontSize: 12.5, color: 'var(--bs-text-faint)' }}>
+                    Crea un calendario personale per questo utente su GHL per gestirne gli orari.
+                  </div>
+                )}
               </div>
-              {/* Schedule editor */}
-              <UserScheduleEditor
-                user={u}
-                schedule={editMap[u.id] ?? ghlToEdit([]  as GhlRule[])}
-                onChange={s => setEditMap(p => ({ ...p, [u.id]: s }))}
-              />
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
