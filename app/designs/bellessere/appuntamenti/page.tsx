@@ -178,17 +178,31 @@ function AppointmentPanel({
 function AddAppointmentModal({ onClose, onAdded, contacts, calendars }: {
   onClose: () => void; onAdded: () => void; contacts: Contact[]; calendars: Calendar[]
 }) {
-  const [form, setForm] = useState({ contactId: '', calendarId: '', startTime: '', appointmentStatus: 'confirmed', title: '' })
+  const [form, setForm] = useState({ contactId: '', calendarId: '', date: '', slot: '', appointmentStatus: 'confirmed' })
+  const [slots, setSlots] = useState<string[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // Fetch available slots whenever calendar + date both set
+  useEffect(() => {
+    if (!form.calendarId || !form.date) { setSlots([]); return }
+    setLoadingSlots(true)
+    setForm(p => ({ ...p, slot: '' }))
+    fetch(`/api/bellessere/free-slots?calendarId=${form.calendarId}&date=${form.date}`)
+      .then(r => r.json())
+      .then(d => setSlots(d.slots ?? []))
+      .catch(() => setSlots([]))
+      .finally(() => setLoadingSlots(false))
+  }, [form.calendarId, form.date])
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.calendarId || !form.startTime) { setError('Seleziona un servizio e una data'); return }
+    if (!form.calendarId || !form.date || !form.slot) { setError('Seleziona servizio, data e orario'); return }
     setSaving(true); setError('')
     try {
-      const start = new Date(form.startTime)
       const cal = calendars.find(c => c.id === form.calendarId)
+      const start = new Date(`${form.date}T${form.slot}:00`)
       const end = new Date(start.getTime() + (cal?.slotDuration ?? 30) * 60000)
       const res = await fetch('/api/bellessere/appointments', {
         method: 'POST',
@@ -199,15 +213,17 @@ function AddAppointmentModal({ onClose, onAdded, contacts, calendars }: {
           startTime: start.toISOString(),
           endTime: end.toISOString(),
           appointmentStatus: form.appointmentStatus,
-          title: form.title || cal?.name || 'Appuntamento',
+          title: cal?.name ?? 'Appuntamento',
         }),
       })
       if (!res.ok) { const d = await res.json(); setError(d.message ?? d.error ?? 'Errore'); return }
-      onAdded(); onClose()
+      // Small delay: GHL needs ~1s before the new event appears in the events query
+      setTimeout(onAdded, 1200)
+      onClose()
     } catch { setError('Errore di rete') } finally { setSaving(false) }
   }
 
-  const f = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm(p => ({ ...p, [k]: e.target.value }))
+  const today = new Date().toISOString().slice(0, 10)
 
   return (
     <div className="bs-modal-overlay" onClick={onClose}>
@@ -221,7 +237,7 @@ function AddAppointmentModal({ onClose, onAdded, contacts, calendars }: {
             {error && <div style={{ padding: '10px 14px', background: '#FEF2F2', color: '#DC2626', borderRadius: 9, fontSize: 13 }}>{error}</div>}
             <div>
               <label className="bs-field-label">Servizio *</label>
-              <select className="bs-select" value={form.calendarId} onChange={f('calendarId')} required>
+              <select className="bs-select" value={form.calendarId} onChange={e => setForm(p => ({ ...p, calendarId: e.target.value, slot: '' }))} required>
                 <option value="">Seleziona servizio...</option>
                 {calendars.filter(c => c.isActive !== false).map(c => (
                   <option key={c.id} value={c.id}>{c.name}{c.price ? ` — €${c.price}` : ''}</option>
@@ -230,20 +246,33 @@ function AddAppointmentModal({ onClose, onAdded, contacts, calendars }: {
             </div>
             <div>
               <label className="bs-field-label">Cliente</label>
-              <select className="bs-select" value={form.contactId} onChange={f('contactId')}>
+              <select className="bs-select" value={form.contactId} onChange={e => setForm(p => ({ ...p, contactId: e.target.value }))}>
                 <option value="">Senza cliente</option>
                 {contacts.map(c => (
                   <option key={c.id} value={c.id}>{`${c.firstName} ${c.lastName}`.trim() || c.email || c.phone}</option>
                 ))}
               </select>
             </div>
-            <div>
-              <label className="bs-field-label">Data e ora *</label>
-              <input className="bs-input" type="datetime-local" value={form.startTime} onChange={f('startTime')} required />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <label className="bs-field-label">Data *</label>
+                <input className="bs-input" type="date" min={today} value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value, slot: '' }))} required />
+              </div>
+              <div>
+                <label className="bs-field-label">Orario *</label>
+                {loadingSlots ? (
+                  <div className="bs-input" style={{ color: 'var(--bs-text-faint)', fontSize: 13 }}>Caricamento...</div>
+                ) : (
+                  <select className="bs-select" value={form.slot} onChange={e => setForm(p => ({ ...p, slot: e.target.value }))} required disabled={!form.calendarId || !form.date}>
+                    <option value="">{!form.calendarId || !form.date ? '— prima scegli data —' : slots.length === 0 ? 'Nessuno slot disponibile' : 'Scegli orario...'}</option>
+                    {slots.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                )}
+              </div>
             </div>
             <div>
               <label className="bs-field-label">Stato</label>
-              <select className="bs-select" value={form.appointmentStatus} onChange={f('appointmentStatus')}>
+              <select className="bs-select" value={form.appointmentStatus} onChange={e => setForm(p => ({ ...p, appointmentStatus: e.target.value }))}>
                 <option value="confirmed">Confermato</option>
                 <option value="new">In attesa</option>
               </select>
@@ -251,7 +280,7 @@ function AddAppointmentModal({ onClose, onAdded, contacts, calendars }: {
           </div>
           <div className="bs-modal-footer">
             <button type="button" className="bs-btn-ghost" onClick={onClose}>Annulla</button>
-            <button type="submit" className="bs-btn-primary" disabled={saving}>{saving ? 'Salvataggio...' : 'Crea appuntamento'}</button>
+            <button type="submit" className="bs-btn-primary" disabled={saving || !form.slot}>{saving ? 'Salvataggio...' : 'Crea appuntamento'}</button>
           </div>
         </form>
       </div>
