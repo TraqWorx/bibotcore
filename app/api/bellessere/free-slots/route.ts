@@ -37,8 +37,12 @@ export async function GET(req: NextRequest) {
   const data = await res.json()
 
   // GHL returns either { _dates_: { "YYYY-MM-DD": { slots: [] } } } or { "YYYY-MM-DD": { slots: [] } }
+  // Slot values may be full ISO strings ("2026-07-01T07:00:00+02:00") or plain "HH:MM" — normalise to HH:MM
   const dateEntry = data._dates_?.[date] ?? data[date]
-  const slots: string[] = dateEntry?.slots ?? []
+  const slots: string[] = (dateEntry?.slots ?? []).map((s: string) => {
+    const m = s.match(/T(\d{2}:\d{2})/)
+    return m ? m[1] : s
+  })
 
   return NextResponse.json({ slots })
 }
