@@ -4,17 +4,13 @@ import { useState, useEffect } from 'react'
 
 interface GhlUser { id: string; name: string; email: string }
 
-interface GhlHour {
-  openHour?: number; openMinute?: number
-  closeHour?: number; closeMinute?: number
-}
-
-interface GhlAvailabilityDay {
-  day?: string | number
-  date?: string | null
-  hours?: GhlHour[]
-  // some GHL versions use flat fields
-  openHour?: number; openMinute?: number; closeHour?: number; closeMinute?: number
+// GHL v3 schedule rule format
+interface GhlInterval { from: string; to: string }
+interface GhlRule {
+  type: 'wday' | 'date'
+  day?: string   // "monday", "tuesday", etc. (for wday rules)
+  date?: string  // "YYYY-MM-DD" (for date-specific overrides — we ignore these)
+  intervals: GhlInterval[]
 }
 
 interface GhlSchedule {
@@ -22,7 +18,7 @@ interface GhlSchedule {
   userId?: string
   name?: string
   timezone?: string
-  availability?: GhlAvailabilityDay[]
+  rules?: GhlRule[]
 }
 
 const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
@@ -34,45 +30,29 @@ const DAY_LABELS_IT: Record<string, string> = {
 type EditDay = { open: boolean; start: string; end: string }
 type EditSchedule = Record<string, EditDay>
 
-function fmt(h: number, m: number) {
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
-
-function normDayKey(day: string | number | undefined): string | null {
-  if (day == null) return null
-  if (typeof day === 'number') return DAY_KEYS[day] ?? null
-  return String(day).toLowerCase()
-}
-
-function ghlToEdit(availability: GhlAvailabilityDay[]): EditSchedule {
+// Convert GHL v3 rules array to our simple edit state
+function ghlToEdit(rules: GhlRule[]): EditSchedule {
   const edit: EditSchedule = {}
   for (const k of DAY_KEYS) edit[k] = { open: false, start: '09:00', end: '18:00' }
-  for (const entry of availability) {
-    if (entry.date !== undefined && entry.date !== null) continue
-    const key = normDayKey(entry.day)
-    if (!key || !DAY_KEYS.includes(key)) continue
-    const h = entry.hours?.[0]
-    if (h?.openHour != null) {
-      edit[key] = { open: true, start: fmt(h.openHour, h.openMinute ?? 0), end: fmt(h.closeHour ?? 18, h.closeMinute ?? 0) }
-    } else if (entry.openHour != null) {
-      edit[key] = { open: true, start: fmt(entry.openHour, entry.openMinute ?? 0), end: fmt(entry.closeHour ?? 18, entry.closeMinute ?? 0) }
-    }
+  for (const rule of rules) {
+    if (rule.type !== 'wday' || !rule.day) continue
+    const key = rule.day.toLowerCase()
+    if (!DAY_KEYS.includes(key)) continue
+    const interval = rule.intervals?.[0]
+    if (interval) edit[key] = { open: true, start: interval.from, end: interval.to }
   }
   return edit
 }
 
-function editToGhl(edit: EditSchedule): GhlAvailabilityDay[] {
+// Convert our edit state back to GHL v3 rules format
+function editToGhlRules(edit: EditSchedule): GhlRule[] {
   return DAY_KEYS
     .filter(k => edit[k]?.open)
-    .map(k => {
-      const [oh, om] = edit[k].start.split(':').map(Number)
-      const [ch, cm] = edit[k].end.split(':').map(Number)
-      return {
-        day: k,
-        date: null,
-        hours: [{ openHour: oh, openMinute: om, closeHour: ch, closeMinute: cm }],
-      }
-    })
+    .map(k => ({
+      type: 'wday' as const,
+      day: k,
+      intervals: [{ from: edit[k].start, to: edit[k].end }],
+    }))
 }
 
 function UserScheduleEditor({
@@ -148,7 +128,7 @@ export default function ImpostazioniPage() {
       for (const s of schedules) {
         if (s.userId) {
           sMap[s.userId] = s
-          eMap[s.userId] = ghlToEdit(s.availability ?? [])
+          eMap[s.userId] = ghlToEdit(s.rules ?? [])
         }
       }
 
@@ -172,7 +152,7 @@ export default function ImpostazioniPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         scheduleId: schedule.id,
-        availability: editToGhl(editMap[userId] ?? {}),
+        rules: editToGhlRules(editMap[userId] ?? {}),
         timezone: schedule.timezone ?? 'Europe/Rome',
       }),
     })
@@ -236,7 +216,7 @@ export default function ImpostazioniPage() {
               {/* Schedule editor */}
               <UserScheduleEditor
                 user={u}
-                schedule={editMap[u.id] ?? ghlToEdit([])}
+                schedule={editMap[u.id] ?? ghlToEdit([]  as GhlRule[])}
                 onChange={s => setEditMap(p => ({ ...p, [u.id]: s }))}
               />
             </div>

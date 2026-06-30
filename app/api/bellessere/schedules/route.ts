@@ -7,7 +7,8 @@ import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 export const dynamic = 'force-dynamic'
 
 const GHL = 'https://services.leadconnectorhq.com'
-const V = '2021-04-15'
+// Schedules endpoint uses v3 (different from most GHL endpoints)
+const V = 'v3'
 
 async function getToken(): Promise<string> {
   const sb = createAdminClient()
@@ -27,7 +28,7 @@ async function authCheck(req: NextRequest) {
   return null
 }
 
-// GET — list all schedules for the location (each has a userId linking it to a team member)
+// GET — list all schedules for the location (each schedule has a userId)
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
@@ -37,23 +38,24 @@ export async function GET(req: NextRequest) {
     headers: { Authorization: `Bearer ${token}`, Version: V },
   })
   const data = await res.json()
-  // GHL returns { schedules: [...] } or { data: [...] }
-  const schedules = data.schedules ?? data.data ?? data ?? []
+  // GHL returns { schedules: [...] } — each item has id, userId, name, rules, timezone
+  const schedules = data.schedules ?? data.data ?? []
   return NextResponse.json({ schedules }, {
     headers: { 'Cache-Control': 'private, max-age=60' },
   })
 }
 
-// PUT — update an existing schedule's availability
+// PUT — update an existing schedule's rules (availability)
+// GHL v3 format: rules = [{ type: "wday", day: "monday", intervals: [{ from: "09:00", to: "18:00" }] }]
 export async function PUT(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
-  const { scheduleId, availability, timezone } = await req.json()
+  const { scheduleId, rules, timezone } = await req.json()
   if (!scheduleId) return NextResponse.json({ error: 'scheduleId required' }, { status: 400 })
 
   const token = await getToken()
-  const payload: Record<string, unknown> = { availability }
+  const payload: Record<string, unknown> = { rules }
   if (timezone) payload.timezone = timezone
 
   const res = await fetch(`${GHL}/calendars/schedules/${scheduleId}`, {
