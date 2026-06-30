@@ -39,33 +39,12 @@ export async function GET(req: NextRequest) {
     userIds = (usersData.users ?? []).map((u: { id: string }) => u.id)
   }
 
-  // Debug: probe multiple paths to find schedules
-  const firstUserId = userIds[0]
-  const [
-    calsData,
-    schedTrailing,
-    schedList,
-    schedUser,
-  ] = await Promise.all([
-    // All calendars — check if any have userId / type=personal
-    fetch(`${GHL}/calendars/?locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: '2021-04-15' } }).then(r => r.json()),
-    // GET /calendars/schedules/ (trailing slash)
-    fetch(`${GHL}/calendars/schedules/?locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()),
-    // GET /calendars/schedules/list
-    fetch(`${GHL}/calendars/schedules/list?locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()),
-    // GET /calendars/schedules?userId=firstUser
-    fetch(`${GHL}/calendars/schedules?userId=${firstUserId}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()),
-  ])
+  // Fetch full details of Adriana's Personal Calendar to see openHours + userId fields
+  const adrianaCalId = '9XiWbEpTXnJGGa9ToTZa'
+  const calRes = await fetch(`${GHL}/calendars/${adrianaCalId}`, {
+    headers: { Authorization: `Bearer ${token}`, Version: '2021-04-15' },
+  })
+  const calData = await calRes.json()
 
-  // Summarise calendars to avoid huge response
-  const calSummary = (calsData.calendars ?? []).map((c: Record<string, unknown>) => ({
-    id: c.id, name: c.name, calendarType: c.calendarType, userId: c.userId ?? null,
-  }))
-
-  return NextResponse.json({
-    calendars: calSummary,
-    schedTrailing,
-    schedList,
-    schedUser,
-  }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({ calendar: calData }, { headers: { 'Cache-Control': 'no-store' } })
 }
