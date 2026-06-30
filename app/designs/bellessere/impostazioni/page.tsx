@@ -4,23 +4,20 @@ import { useState, useEffect } from 'react'
 
 interface GhlUser { id: string; name: string; email: string }
 
-interface PersonalCalendar {
-  calendarId: string
-  name: string
-  userId: string | null
-  openHours: OpenHoursEntry[] | Record<string, unknown>
+interface ScheduleRule {
+  type: 'wday' | 'date'
+  day?: string
+  date?: string
+  intervals: { from: string; to: string }[]
+}
+
+interface UserSchedule {
+  scheduleId: string
+  rules: ScheduleRule[]
   timezone: string
 }
 
-// GHL openHours format: array of { daysOfTheWeek: number[], hours: [{ openHour, openMinute, closeHour, closeMinute }] }
-// daysOfTheWeek: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
-interface OpenHoursEntry {
-  daysOfTheWeek: number[]
-  hours: { openHour: number; openMinute: number; closeHour: number; closeMinute: number }[]
-}
-
 const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-const DAY_IDX: Record<string, number> = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 }
 const DAY_LABELS_IT: Record<string, string> = {
   sunday: 'Dom', monday: 'Lun', tuesday: 'Mar',
   wednesday: 'Mer', thursday: 'Gio', friday: 'Ven', saturday: 'Sab',
@@ -29,46 +26,20 @@ const DAY_LABELS_IT: Record<string, string> = {
 type EditDay = { open: boolean; start: string; end: string }
 type EditSchedule = Record<string, EditDay>
 
-function fmt(h: number, m: number) {
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
-
-function ghlToEdit(openHours: OpenHoursEntry[] | Record<string, unknown>): EditSchedule {
+function rulesToEdit(rules: ScheduleRule[]): EditSchedule {
   const edit: EditSchedule = {}
   for (const k of DAY_KEYS) edit[k] = { open: false, start: '09:00', end: '18:00' }
-
-  if (!Array.isArray(openHours)) return edit
-
-  for (const entry of openHours) {
-    const h = entry.hours?.[0]
-    if (!h) continue
-    const timeRange = { open: true, start: fmt(h.openHour, h.openMinute ?? 0), end: fmt(h.closeHour, h.closeMinute ?? 0) }
-    for (const dayIdx of entry.daysOfTheWeek ?? []) {
-      const key = DAY_KEYS[dayIdx]
-      if (key) edit[key] = timeRange
-    }
+  for (const rule of rules) {
+    if (rule.type !== 'wday' || !rule.day || !rule.intervals?.[0]) continue
+    edit[rule.day] = { open: true, start: rule.intervals[0].from, end: rule.intervals[0].to }
   }
   return edit
 }
 
-function editToOpenHours(edit: EditSchedule): OpenHoursEntry[] {
-  // Group days that share the same time range into one entry
-  const groups: Record<string, number[]> = {}
-  for (const key of DAY_KEYS) {
-    if (!edit[key]?.open) continue
-    const groupKey = `${edit[key].start}-${edit[key].end}`
-    if (!groups[groupKey]) groups[groupKey] = []
-    groups[groupKey].push(DAY_IDX[key])
-  }
-  return Object.entries(groups).map(([timeKey, days]) => {
-    const [start, end] = timeKey.split('-')
-    const [oh, om] = start.split(':').map(Number)
-    const [ch, cm] = end.split(':').map(Number)
-    return {
-      daysOfTheWeek: days.sort((a, b) => a - b),
-      hours: [{ openHour: oh, openMinute: om, closeHour: ch, closeMinute: cm }],
-    }
-  })
+function editToRules(edit: EditSchedule): ScheduleRule[] {
+  return DAY_KEYS
+    .filter(k => edit[k]?.open)
+    .map(k => ({ type: 'wday' as const, day: k, intervals: [{ from: edit[k].start, to: edit[k].end }] }))
 }
 
 function UserScheduleEditor({ schedule, onChange }: { schedule: EditSchedule; onChange: (s: EditSchedule) => void }) {
@@ -117,8 +88,8 @@ function UserScheduleEditor({ schedule, onChange }: { schedule: EditSchedule; on
 
 export default function ImpostazioniPage() {
   const [users, setUsers] = useState<GhlUser[]>([])
-  // Map userId → { calendarId, editSchedule }
-  const [calMap, setCalMap] = useState<Record<string, { calendarId: string; edit: EditSchedule }>>({})
+  const [scheduleMap, setScheduleMap] = useState<Record<string, UserSchedule>>({})
+  const [edits, setEdits] = useState<Record<string, EditSchedule>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [savedMsg, setSavedMsg] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -129,28 +100,30 @@ export default function ImpostazioniPage() {
       fetch('/api/bellessere/services').then(r => r.json()),
       fetch('/api/bellessere/user-availability').then(r => r.json()),
     ]).then(([svc, avail]) => {
-      setUsers(svc.users ?? [])
-      const personal: PersonalCalendar[] = avail.personal ?? []
-      const map: Record<string, { calendarId: string; edit: EditSchedule }> = {}
-      for (const p of personal) {
-        if (p.userId) {
-          map[p.userId] = { calendarId: p.calendarId, edit: ghlToEdit(p.openHours as OpenHoursEntry[]) }
-        }
+      const fetchedUsers: GhlUser[] = svc.users ?? []
+      const map: Record<string, UserSchedule> = avail.scheduleMap ?? {}
+      setUsers(fetchedUsers)
+      setScheduleMap(map)
+      const initialEdits: Record<string, EditSchedule> = {}
+      for (const u of fetchedUsers) {
+        if (map[u.id]) initialEdits[u.id] = rulesToEdit(map[u.id].rules)
       }
-      setCalMap(map)
+      setEdits(initialEdits)
     }).catch(e => setError(String(e))).finally(() => setLoading(false))
   }, [])
 
   async function save(userId: string) {
-    const entry = calMap[userId]
-    if (!entry) return
+    const sched = scheduleMap[userId]
+    if (!sched) return
+    const edit = edits[userId]
+    if (!edit) return
     setSaving(p => ({ ...p, [userId]: true }))
     setSavedMsg(p => ({ ...p, [userId]: '' }))
     setError('')
     const res = await fetch('/api/bellessere/user-availability', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ calendarId: entry.calendarId, openHours: editToOpenHours(entry.edit) }),
+      body: JSON.stringify({ scheduleId: sched.scheduleId, rules: editToRules(edit), timezone: sched.timezone }),
     })
     setSaving(p => ({ ...p, [userId]: false }))
     if (res.ok) {
@@ -182,7 +155,8 @@ export default function ImpostazioniPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {users.map(u => {
-            const entry = calMap[u.id]
+            const hasSched = !!scheduleMap[u.id]
+            const edit = edits[u.id]
             return (
               <div key={u.id} className="bs-card">
                 <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--bs-line)' }}>
@@ -197,25 +171,25 @@ export default function ImpostazioniPage() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {savedMsg[u.id] && <span style={{ fontSize: 12.5, color: '#16a34a' }}>{savedMsg[u.id]}</span>}
-                    {!entry && <span style={{ fontSize: 11.5, color: 'var(--bs-text-faint)', fontStyle: 'italic' }}>nessun calendario personale GHL</span>}
+                    {!hasSched && <span style={{ fontSize: 11.5, color: 'var(--bs-text-faint)', fontStyle: 'italic' }}>nessuno schedule GHL</span>}
                     <button
                       className="bs-btn-primary"
                       style={{ fontSize: 13 }}
-                      disabled={saving[u.id] || !entry}
+                      disabled={saving[u.id] || !hasSched}
                       onClick={() => save(u.id)}
                     >
                       {saving[u.id] ? 'Salvataggio...' : 'Salva su GHL'}
                     </button>
                   </div>
                 </div>
-                {entry ? (
+                {hasSched && edit ? (
                   <UserScheduleEditor
-                    schedule={entry.edit}
-                    onChange={s => setCalMap(p => ({ ...p, [u.id]: { ...p[u.id], edit: s } }))}
+                    schedule={edit}
+                    onChange={s => setEdits(p => ({ ...p, [u.id]: s }))}
                   />
                 ) : (
                   <div style={{ padding: '16px 20px', fontSize: 12.5, color: 'var(--bs-text-faint)' }}>
-                    Crea un calendario personale per questo utente su GHL per gestirne gli orari.
+                    Nessuno schedule trovato su GHL per questo utente.
                   </div>
                 )}
               </div>

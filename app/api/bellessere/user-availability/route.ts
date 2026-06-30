@@ -7,7 +7,15 @@ import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 export const dynamic = 'force-dynamic'
 
 const GHL = 'https://services.leadconnectorhq.com'
+const V_SCHED = 'v3'
 const V = '2021-04-15'
+
+interface ScheduleRule {
+  type: 'wday' | 'date'
+  day?: string
+  date?: string
+  intervals: { from: string; to: string }[]
+}
 
 async function getToken(): Promise<string> {
   const sb = createAdminClient()
@@ -27,44 +35,67 @@ async function authCheck(req: NextRequest) {
   return null
 }
 
-// GET — debug: probe schedule endpoints with Mauro's personal calendar ID as the schedule ID
+// GET — fetch each user's availability schedule from GHL
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
   const token = await getToken()
-  const mauroCalId = 'qTevrg8wOe3lv2nAPavV'
-  const mauroUserId = 'CQtzhB8DHj5yGvYcOx4d'
 
-  const tries = await Promise.all([
-    // Calendar ID as schedule ID, v3
-    fetch(`${GHL}/calendars/schedules/${mauroCalId}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()).then(d => ({ path: `schedules/${mauroCalId} v3`, d })),
-    // No params (hoping token scopes the location)
-    fetch(`${GHL}/calendars/schedules`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()).then(d => ({ path: 'schedules (no params) v3', d })),
-    // userId as query param (not path)
-    fetch(`${GHL}/calendars/schedules?userId=${mauroUserId}&locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()).then(d => ({ path: `schedules?userId v3`, d })),
-    // Different base — maybe /schedule not /schedules
-    fetch(`${GHL}/calendars/schedule?locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()).then(d => ({ path: 'schedule (singular) v3', d })),
-  ])
+  // Get all location users
+  const usersRes = await fetch(`${GHL}/users/?locationId=${BELLESSERE_LOCATION_ID}`, {
+    headers: { Authorization: `Bearer ${token}`, Version: V },
+  })
+  const usersData = await usersRes.json()
+  const users: { id: string }[] = usersData.users ?? []
 
-  return NextResponse.json({ tries }, { headers: { 'Cache-Control': 'no-store' } })
+  // Fetch schedule for each user in parallel via /calendars/schedules/search
+  const scheduleMap: Record<string, { scheduleId: string; rules: ScheduleRule[]; timezone: string }> = {}
+  await Promise.all(users.map(async (u) => {
+    try {
+      const res = await fetch(
+        `${GHL}/calendars/schedules/search?locationId=${BELLESSERE_LOCATION_ID}&userId=${u.id}&limit=1`,
+        { headers: { Authorization: `Bearer ${token}`, Version: V_SCHED } }
+      )
+      const data = await res.json()
+      const sched = data.schedules?.[0]
+      if (sched) {
+        scheduleMap[u.id] = {
+          scheduleId: sched.id,
+          rules: (sched.rules ?? []) as ScheduleRule[],
+          timezone: sched.timezone ?? 'Europe/Rome',
+        }
+      }
+    } catch {
+      // skip users where schedule fetch fails
+    }
+  }))
+
+  return NextResponse.json({ scheduleMap }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
-// PUT — update a personal calendar's openHours
-// openHours format: [{ daysOfTheWeek: [1,2,3,4,5], hours: [{ openHour, openMinute, closeHour, closeMinute }] }]
+// PUT — update a user's schedule rules on GHL
 export async function PUT(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
-  const { calendarId, openHours } = await req.json()
-  if (!calendarId) return NextResponse.json({ error: 'calendarId required' }, { status: 400 })
+  const { scheduleId, rules, timezone } = await req.json() as {
+    scheduleId: string
+    rules: ScheduleRule[]
+    timezone?: string
+  }
+  if (!scheduleId || !rules) return NextResponse.json({ error: 'scheduleId and rules required' }, { status: 400 })
 
   const token = await getToken()
-  const res = await fetch(`${GHL}/calendars/${calendarId}`, {
+
+  const body: Record<string, unknown> = { rules }
+  if (timezone) body.timezone = timezone
+
+  const res = await fetch(`${GHL}/calendars/schedules/${scheduleId}`, {
     method: 'PUT',
-    headers: { Authorization: `Bearer ${token}`, Version: V, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ openHours }),
+    headers: { Authorization: `Bearer ${token}`, Version: V_SCHED, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   })
-  const result = await res.json()
-  return NextResponse.json(result, { status: res.status })
+  const data = await res.json()
+  return NextResponse.json(data, { status: res.status })
 }
