@@ -39,20 +39,14 @@ export async function GET(req: NextRequest) {
     userIds = (usersData.users ?? []).map((u: { id: string }) => u.id)
   }
 
-  // Fetch availability for each user in parallel — return raw response for debugging
-  const results = await Promise.all(
-    userIds.map(async (userId) => {
-      try {
-        const res = await fetch(`${GHL}/users/${userId}/availability`, {
-          headers: { Authorization: `Bearer ${token}`, Version: V },
-        })
-        const data = await res.json()
-        return { userId, _raw: data, ok: res.ok, status: res.status }
-      } catch (e) {
-        return { userId, _raw: null, ok: false, status: 0, error: String(e) }
-      }
-    })
-  )
+  // Debug: try multiple approaches for the first user to find where schedules live
+  const firstUserId = userIds[0]
+  const tries = await Promise.all([
+    fetch(`${GHL}/users/${firstUserId}/availability`, { headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' } }).then(r => r.json()).then(d => ({ endpoint: `users/${firstUserId}/availability v2021-07-28`, data: d })),
+    fetch(`${GHL}/users/${firstUserId}/availability`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()).then(d => ({ endpoint: `users/${firstUserId}/availability v3`, data: d })),
+    fetch(`${GHL}/calendars/schedules/${firstUserId}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()).then(d => ({ endpoint: `calendars/schedules/${firstUserId} v3`, data: d })),
+    fetch(`${GHL}/calendars/schedules/${firstUserId}`, { headers: { Authorization: `Bearer ${token}`, Version: '2021-04-15' } }).then(r => r.json()).then(d => ({ endpoint: `calendars/schedules/${firstUserId} v2021-04-15`, data: d })),
+  ]).catch(() => [])
 
-  return NextResponse.json({ results }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({ firstUserId, userIds, tries }, { headers: { 'Cache-Control': 'no-store' } })
 }
