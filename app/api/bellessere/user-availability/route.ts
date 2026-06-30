@@ -74,6 +74,36 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ scheduleMap }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
+// POST — create a new schedule for a user who doesn't have one
+export async function POST(req: NextRequest) {
+  const err = await authCheck(req)
+  if (err) return err
+
+  const { userId, userName, rules, timezone } = await req.json() as {
+    userId: string
+    userName: string
+    rules: ScheduleRule[]
+    timezone?: string
+  }
+  if (!userId || !rules) return NextResponse.json({ error: 'userId and rules required' }, { status: 400 })
+
+  const token = await getToken()
+
+  const res = await fetch(`${GHL}/calendars/schedules`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, Version: V_SCHED, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: `${userName} Schedule`,
+      locationId: BELLESSERE_LOCATION_ID,
+      userId,
+      rules,
+      timezone: timezone ?? 'Europe/Rome',
+    }),
+  })
+  const data = await res.json()
+  return NextResponse.json(data, { status: res.status })
+}
+
 // PUT — update a user's schedule rules on GHL
 export async function PUT(req: NextRequest) {
   const err = await authCheck(req)
@@ -97,5 +127,24 @@ export async function PUT(req: NextRequest) {
     body: JSON.stringify(body),
   })
   const data = await res.json()
+  return NextResponse.json(data, { status: res.status })
+}
+
+// DELETE — remove a user's schedule from GHL
+export async function DELETE(req: NextRequest) {
+  const err = await authCheck(req)
+  if (err) return err
+
+  const { scheduleId } = await req.json() as { scheduleId: string }
+  if (!scheduleId) return NextResponse.json({ error: 'scheduleId required' }, { status: 400 })
+
+  const token = await getToken()
+
+  const res = await fetch(`${GHL}/calendars/schedules/${scheduleId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}`, Version: V_SCHED },
+  })
+  if (res.status === 204 || res.status === 200) return NextResponse.json({ ok: true })
+  const data = await res.json().catch(() => ({}))
   return NextResponse.json(data, { status: res.status })
 }

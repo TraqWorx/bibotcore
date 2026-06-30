@@ -86,6 +86,16 @@ function UserScheduleEditor({ schedule, onChange }: { schedule: EditSchedule; on
   )
 }
 
+const DEFAULT_EDIT: EditSchedule = {
+  sunday:    { open: false, start: '09:00', end: '18:00' },
+  monday:    { open: true,  start: '09:00', end: '18:00' },
+  tuesday:   { open: true,  start: '09:00', end: '18:00' },
+  wednesday: { open: true,  start: '09:00', end: '18:00' },
+  thursday:  { open: true,  start: '09:00', end: '18:00' },
+  friday:    { open: true,  start: '09:00', end: '18:00' },
+  saturday:  { open: true,  start: '09:00', end: '14:00' },
+}
+
 export default function ImpostazioniPage() {
   const [users, setUsers] = useState<GhlUser[]>([])
   const [scheduleMap, setScheduleMap] = useState<Record<string, UserSchedule>>({})
@@ -106,32 +116,74 @@ export default function ImpostazioniPage() {
       setScheduleMap(map)
       const initialEdits: Record<string, EditSchedule> = {}
       for (const u of fetchedUsers) {
-        if (map[u.id]) initialEdits[u.id] = rulesToEdit(map[u.id].rules)
+        initialEdits[u.id] = map[u.id] ? rulesToEdit(map[u.id].rules) : { ...DEFAULT_EDIT }
       }
       setEdits(initialEdits)
     }).catch(e => setError(String(e))).finally(() => setLoading(false))
   }, [])
 
-  async function save(userId: string) {
+  async function save(u: GhlUser) {
+    const edit = edits[u.id]
+    if (!edit) return
+    setSaving(p => ({ ...p, [u.id]: true }))
+    setSavedMsg(p => ({ ...p, [u.id]: '' }))
+    setError('')
+
+    const sched = scheduleMap[u.id]
+    const rules = editToRules(edit)
+    let res: Response
+
+    if (sched) {
+      // Update existing schedule
+      res = await fetch('/api/bellessere/user-availability', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduleId: sched.scheduleId, rules, timezone: sched.timezone }),
+      })
+    } else {
+      // Create new schedule
+      res = await fetch('/api/bellessere/user-availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: u.id, userName: u.name, rules, timezone: 'Europe/Rome' }),
+      })
+      if (res.ok) {
+        const created = await res.json()
+        const newSchedId = created.schedule?.id ?? created.id
+        if (newSchedId) {
+          setScheduleMap(p => ({ ...p, [u.id]: { scheduleId: newSchedId, rules, timezone: 'Europe/Rome' } }))
+        }
+      }
+    }
+
+    setSaving(p => ({ ...p, [u.id]: false }))
+    if (res.ok) {
+      setSavedMsg(p => ({ ...p, [u.id]: 'Salvato' }))
+      setTimeout(() => setSavedMsg(p => ({ ...p, [u.id]: '' })), 3000)
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setError(d.message ?? d.error ?? 'Errore durante il salvataggio')
+    }
+  }
+
+  async function deleteSchedule(userId: string) {
     const sched = scheduleMap[userId]
     if (!sched) return
-    const edit = edits[userId]
-    if (!edit) return
+    if (!confirm('Eliminare lo schedule di disponibilità su GHL?')) return
     setSaving(p => ({ ...p, [userId]: true }))
-    setSavedMsg(p => ({ ...p, [userId]: '' }))
     setError('')
     const res = await fetch('/api/bellessere/user-availability', {
-      method: 'PUT',
+      method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scheduleId: sched.scheduleId, rules: editToRules(edit), timezone: sched.timezone }),
+      body: JSON.stringify({ scheduleId: sched.scheduleId }),
     })
     setSaving(p => ({ ...p, [userId]: false }))
     if (res.ok) {
-      setSavedMsg(p => ({ ...p, [userId]: 'Salvato su GHL' }))
-      setTimeout(() => setSavedMsg(p => ({ ...p, [userId]: '' })), 3000)
+      setScheduleMap(p => { const n = { ...p }; delete n[userId]; return n })
+      setEdits(p => ({ ...p, [userId]: { ...DEFAULT_EDIT } }))
     } else {
-      const d = await res.json()
-      setError(d.message ?? d.error ?? 'Errore durante il salvataggio')
+      const d = await res.json().catch(() => ({}))
+      setError(d.message ?? d.error ?? 'Errore durante l\'eliminazione')
     }
   }
 
@@ -169,29 +221,33 @@ export default function ImpostazioniPage() {
                       <div style={{ fontSize: 12, color: 'var(--bs-text-muted)' }}>{u.email}</div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {savedMsg[u.id] && <span style={{ fontSize: 12.5, color: '#16a34a' }}>{savedMsg[u.id]}</span>}
-                    {!hasSched && <span style={{ fontSize: 11.5, color: 'var(--bs-text-faint)', fontStyle: 'italic' }}>nessuno schedule GHL</span>}
+                    {!hasSched && <span style={{ fontSize: 11.5, color: 'var(--bs-text-faint)', fontStyle: 'italic' }}>nessuno schedule</span>}
+                    {hasSched && (
+                      <button
+                        onClick={() => deleteSchedule(u.id)}
+                        disabled={saving[u.id]}
+                        title="Elimina schedule"
+                        style={{ background: 'none', border: '1.5px solid var(--bs-line)', borderRadius: 8, padding: '5px 9px', cursor: 'pointer', color: '#DC2626', fontSize: 14, lineHeight: 1 }}
+                      >
+                        🗑
+                      </button>
+                    )}
                     <button
                       className="bs-btn-primary"
                       style={{ fontSize: 13 }}
-                      disabled={saving[u.id] || !hasSched}
-                      onClick={() => save(u.id)}
+                      disabled={saving[u.id]}
+                      onClick={() => save(u)}
                     >
-                      {saving[u.id] ? 'Salvataggio...' : 'Salva su GHL'}
+                      {saving[u.id] ? 'Salvataggio...' : hasSched ? 'Salva' : 'Aggiungi'}
                     </button>
                   </div>
                 </div>
-                {hasSched && edit ? (
-                  <UserScheduleEditor
-                    schedule={edit}
-                    onChange={s => setEdits(p => ({ ...p, [u.id]: s }))}
-                  />
-                ) : (
-                  <div style={{ padding: '16px 20px', fontSize: 12.5, color: 'var(--bs-text-faint)' }}>
-                    Nessuno schedule trovato su GHL per questo utente.
-                  </div>
-                )}
+                <UserScheduleEditor
+                  schedule={edit ?? DEFAULT_EDIT}
+                  onChange={s => setEdits(p => ({ ...p, [u.id]: s }))}
+                />
               </div>
             )
           })}
@@ -199,7 +255,7 @@ export default function ImpostazioniPage() {
       )}
 
       <div style={{ padding: '12px 16px', borderRadius: 10, background: 'var(--bs-gold-tint)', border: '1px solid var(--bs-line)', fontSize: 12.5, color: 'var(--bs-text-muted)', lineHeight: 1.6 }}>
-        Le modifiche vengono salvate direttamente su GoHighLevel e influenzano la disponibilità di prenotazione in tempo reale.
+        Le modifiche agli orari vengono sincronizzate con il calendario e influenzano la disponibilità di prenotazione in tempo reale.
       </div>
     </div>
   )
