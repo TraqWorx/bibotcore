@@ -28,12 +28,13 @@ async function authCheck(req: NextRequest) {
   return null
 }
 
-// GET — read from DB tables; auto-syncs from GHL if empty, refreshes in background if stale
+// GET — read from DB tables; auto-syncs from GHL if empty, falls back to GHL directly if still empty
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
-  await ensureFresh()
+  // Try to populate DB if empty (errors are swallowed — we fall back to GHL below)
+  try { await ensureFresh() } catch { /* fall through to GHL fallback */ }
 
   const sb = createAdminClient()
   const [svcRes, usersRes, groupsRes] = await Promise.all([
@@ -41,6 +42,25 @@ export async function GET(req: NextRequest) {
     sb.from('bellessere_users').select('*').eq('location_id', BELLESSERE_LOCATION_ID).order('name'),
     sb.from('bellessere_groups').select('*').eq('location_id', BELLESSERE_LOCATION_ID).order('name'),
   ])
+
+  // If DB is still empty (sync failed or hasn't run yet), hit GHL directly and populate in background
+  if ((svcRes.data ?? []).length === 0) {
+    try {
+      const token = await getToken()
+      const [calsRes, usersGhlRes, groupsGhlRes] = await Promise.all([
+        fetch(`${GHL}/calendars/?locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: CAL_V } }),
+        fetch(`${GHL}/users/?locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' } }),
+        fetch(`${GHL}/calendars/groups?locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: CAL_V } }),
+      ])
+      const [cals, usersGhl, groups] = await Promise.all([calsRes.json(), usersGhlRes.json(), groupsGhlRes.json()])
+      const payload = { calendars: (cals.calendars ?? []).filter((c: Record<string, unknown>) => c.calendarType === 'service'), users: usersGhl.users ?? [], groups: groups.groups ?? [] }
+      // Populate DB in background for next time
+      import('@/lib/bellessere/sync').then(m => m.syncBellessere('all')).catch(() => {})
+      return NextResponse.json(payload, { headers: { 'Cache-Control': 'private, max-age=60' } })
+    } catch (e) {
+      return NextResponse.json({ error: 'Failed to load services', calendars: [], users: [], groups: [] }, { status: 500 })
+    }
+  }
 
   // Shape to match the GHL response format the UI already expects
   const calendars = (svcRes.data ?? []).map(s => ({
