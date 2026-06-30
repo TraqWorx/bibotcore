@@ -9,10 +9,11 @@ export const dynamic = 'force-dynamic'
 const GHL = 'https://services.leadconnectorhq.com'
 const CAL_V = '2021-04-15'
 const USR_V = '2021-07-28'
+const SERVICES_TTL = 5 * 60 * 1000  // 5 minutes
+const CACHE_KEY = '_servicesCache'
 
-// In-memory cache: services list changes rarely during a session (60s TTL)
-let servicesCache: { data: unknown; ts: number } | null = null
-const SERVICES_TTL = 60_000
+// L1: in-memory (warm within same instance, zero latency)
+let memCache: { data: unknown; ts: number } | null = null
 
 async function getToken(): Promise<string> {
   const sb = createAdminClient()
@@ -32,20 +33,65 @@ async function authCheck(req: NextRequest) {
   return null
 }
 
-// GET — list all calendars (= services) + location users
-// Cached in-process for 60s; also sets browser Cache-Control so navigating away and back is instant
+function cacheHeaders() {
+  return { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' }
+}
+
+async function readDbCache(sb: ReturnType<typeof createAdminClient>) {
+  const { data } = await sb
+    .from('dashboard_configs')
+    .select('theme')
+    .eq('location_id', BELLESSERE_LOCATION_ID)
+    .maybeSingle()
+  const theme = (data?.theme as Record<string, unknown>) ?? {}
+  return { theme, entry: theme[CACHE_KEY] as { ts: number; data: unknown } | undefined }
+}
+
+async function writeDbCache(sb: ReturnType<typeof createAdminClient>, theme: Record<string, unknown>, payload: unknown) {
+  const newTheme = { ...theme, [CACHE_KEY]: { ts: Date.now(), data: payload } }
+  await sb.from('dashboard_configs').upsert(
+    { location_id: BELLESSERE_LOCATION_ID, theme: newTheme },
+    { onConflict: 'location_id' }
+  )
+}
+
+// GET — list all calendars (= services) + location users + groups
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
-  // Skip cache when caller explicitly wants fresh data (e.g. after create/update/delete)
   const bust = req.nextUrl.searchParams.get('bust')
-  if (!bust && servicesCache && Date.now() - servicesCache.ts < SERVICES_TTL) {
-    return NextResponse.json(servicesCache.data, {
-      headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
-    })
+
+  // L1: in-memory
+  if (!bust && memCache && Date.now() - memCache.ts < SERVICES_TTL) {
+    return NextResponse.json(memCache.data, { headers: cacheHeaders() })
   }
 
+  const sb = createAdminClient()
+
+  // L2: Supabase DB (survives across Vercel instances)
+  if (!bust) {
+    const { theme, entry } = await readDbCache(sb)
+    if (entry && Date.now() - entry.ts < SERVICES_TTL) {
+      memCache = { data: entry.data, ts: entry.ts }
+      return NextResponse.json(entry.data, { headers: cacheHeaders() })
+    }
+    // Cache miss — fetch from GHL and store
+    const payload = await fetchFromGhl()
+    memCache = { data: payload, ts: Date.now() }
+    writeDbCache(sb, theme, payload).catch(() => {}) // async, don't block response
+    return NextResponse.json(payload, { headers: cacheHeaders() })
+  }
+
+  // bust=1: skip cache entirely
+  const payload = await fetchFromGhl()
+  memCache = { data: payload, ts: Date.now() }
+  const { theme } = await readDbCache(sb)
+  writeDbCache(sb, theme, payload).catch(() => {})
+  return NextResponse.json(payload, { headers: cacheHeaders() })
+}
+
+async function fetchFromGhl() {
   const token = await getToken()
   const [calsRes, usersRes, groupsRes] = await Promise.all([
     fetch(`${GHL}/calendars/?locationId=${BELLESSERE_LOCATION_ID}`, {
@@ -59,11 +105,16 @@ export async function GET(req: NextRequest) {
     }),
   ])
   const [cals, users, groups] = await Promise.all([calsRes.json(), usersRes.json(), groupsRes.json()])
-  const payload = { calendars: cals.calendars ?? [], users: users.users ?? [], groups: groups.groups ?? [] }
-  servicesCache = { data: payload, ts: Date.now() }
-  return NextResponse.json(payload, {
-    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
-  })
+  return { calendars: cals.calendars ?? [], users: users.users ?? [], groups: groups.groups ?? [] }
+}
+
+function bustCache(sb: ReturnType<typeof createAdminClient>) {
+  memCache = null
+  readDbCache(sb).then(({ theme }) => {
+    const newTheme = { ...theme }
+    delete newTheme[CACHE_KEY]
+    void sb.from('dashboard_configs').upsert({ location_id: BELLESSERE_LOCATION_ID, theme: newTheme }, { onConflict: 'location_id' })
+  }).catch(() => {})
 }
 
 // POST — create a calendar (service)
@@ -97,7 +148,7 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify(payload),
   })
   const data = await res.json()
-  if (res.ok) servicesCache = null // force fresh fetch next GET
+  if (res.ok) bustCache(createAdminClient())
   return NextResponse.json(data, { status: res.status })
 }
 
@@ -131,7 +182,7 @@ export async function PUT(req: NextRequest) {
     body: JSON.stringify(payload),
   })
   const data = await res.json()
-  if (res.ok) servicesCache = null
+  if (res.ok) bustCache(createAdminClient())
   return NextResponse.json(data, { status: res.status })
 }
 
@@ -148,6 +199,6 @@ export async function DELETE(req: NextRequest) {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}`, Version: CAL_V },
   })
-  if (res.ok) servicesCache = null
+  if (res.ok) bustCache(createAdminClient())
   return NextResponse.json({ ok: res.ok }, { status: res.status })
 }
