@@ -39,12 +39,33 @@ export async function GET(req: NextRequest) {
     userIds = (usersData.users ?? []).map((u: { id: string }) => u.id)
   }
 
-  // Debug: fetch the full user object to check if it contains scheduleId
+  // Debug: probe multiple paths to find schedules
   const firstUserId = userIds[0]
-  const userRes = await fetch(`${GHL}/users/${firstUserId}`, {
-    headers: { Authorization: `Bearer ${token}`, Version: V },
-  })
-  const userData = await userRes.json()
+  const [
+    calsData,
+    schedTrailing,
+    schedList,
+    schedUser,
+  ] = await Promise.all([
+    // All calendars — check if any have userId / type=personal
+    fetch(`${GHL}/calendars/?locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: '2021-04-15' } }).then(r => r.json()),
+    // GET /calendars/schedules/ (trailing slash)
+    fetch(`${GHL}/calendars/schedules/?locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()),
+    // GET /calendars/schedules/list
+    fetch(`${GHL}/calendars/schedules/list?locationId=${BELLESSERE_LOCATION_ID}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()),
+    // GET /calendars/schedules?userId=firstUser
+    fetch(`${GHL}/calendars/schedules?userId=${firstUserId}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()),
+  ])
 
-  return NextResponse.json({ firstUserId, user: userData }, { headers: { 'Cache-Control': 'no-store' } })
+  // Summarise calendars to avoid huge response
+  const calSummary = (calsData.calendars ?? []).map((c: Record<string, unknown>) => ({
+    id: c.id, name: c.name, calendarType: c.calendarType, userId: c.userId ?? null,
+  }))
+
+  return NextResponse.json({
+    calendars: calSummary,
+    schedTrailing,
+    schedList,
+    schedUser,
+  }, { headers: { 'Cache-Control': 'no-store' } })
 }
