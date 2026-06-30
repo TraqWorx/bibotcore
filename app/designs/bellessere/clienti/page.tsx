@@ -99,7 +99,7 @@ function TagEditor({ contactId, initialTags }: { contactId: string; initialTags:
   )
 }
 
-function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; visitCount: number; onClose: () => void }) {
+function CustomerPanel({ contact, onClose }: { contact: Contact; onClose: () => void }) {
   const [tab, setTab] = useState<'appuntamenti' | 'messaggi'>('appuntamenti')
   const [events, setEvents] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
@@ -200,7 +200,7 @@ function CustomerPanel({ contact, visitCount, onClose }: { contact: Contact; vis
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--bs-line)' }}>
             {[
-              { value: visitCount, label: 'Visite' },
+              { value: events.length, label: 'Prenotazioni' },
               { value: events.filter(e => e.appointmentStatus === 'showed').length, label: 'Completati' },
               { value: events.filter(e => e.appointmentStatus === 'cancelled').length, label: 'Annullati' },
             ].map((s, i) => (
@@ -368,7 +368,8 @@ function AddCustomerModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
 
 export default function ClientiPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
-  const [visitCounts, setVisitCounts] = useState<Record<string, number>>({})
+  const [bookingCounts, setBookingCounts] = useState<Record<string, number>>({})
+  const [lastBooking, setLastBooking] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Contact | null>(null)
@@ -377,22 +378,25 @@ export default function ClientiPage() {
 
   useEffect(() => {
     setLoading(true)
-    const start = new Date(); start.setMonth(start.getMonth() - 12)
-    const end = new Date(); end.setMonth(end.getMonth() + 2)
+    const start = new Date(); start.setFullYear(start.getFullYear() - 2)
+    const end = new Date(); end.setMonth(end.getMonth() + 6)
     Promise.all([
       fetch('/api/bellessere/contacts').then(r => r.json()),
       fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`).then(r => r.json()),
     ]).then(([ct, appts]) => {
       setContacts(ct.contacts ?? [])
-      // count appointments per contact
       const counts: Record<string, number> = {}
+      const last: Record<string, string> = {}
       for (const e of (appts.events ?? [])) {
-        if (e.contactId) counts[e.contactId] = (counts[e.contactId] ?? 0) + 1
+        if (!e.contactId) continue
+        counts[e.contactId] = (counts[e.contactId] ?? 0) + 1
+        if (e.startTime && (!last[e.contactId] || e.startTime > last[e.contactId])) {
+          last[e.contactId] = e.startTime
+        }
       }
-      setVisitCounts(counts)
-    })
-    .catch(() => {})
-    .finally(() => setLoading(false))
+      setBookingCounts(counts)
+      setLastBooking(last)
+    }).catch(() => {}).finally(() => setLoading(false))
   }, [refreshKey])
 
   const filtered = useMemo(() => {
@@ -403,10 +407,15 @@ export default function ClientiPage() {
     )
   }, [contacts, search])
 
-  // Sort by visit count desc
+  // Sort by most recent booking desc, then alphabetically
   const sorted = useMemo(() =>
-    [...filtered].sort((a, b) => (visitCounts[b.id] ?? 0) - (visitCounts[a.id] ?? 0)),
-    [filtered, visitCounts]
+    [...filtered].sort((a, b) => {
+      const la = lastBooking[a.id] ?? ''
+      const lb = lastBooking[b.id] ?? ''
+      if (lb !== la) return lb > la ? 1 : -1
+      return fullName(a).localeCompare(fullName(b))
+    }),
+    [filtered, lastBooking]
   )
 
   const thisMonth = new Date(); thisMonth.setDate(1); thisMonth.setHours(0,0,0,0)
@@ -464,30 +473,32 @@ export default function ClientiPage() {
         </div>
 
         {!loading && sorted.map(c => {
-          const visits = visitCounts[c.id] ?? 0
+          const count = bookingCounts[c.id] ?? 0
+          const last = lastBooking[c.id]
+          const lastLabel = last
+            ? new Date(last) > new Date()
+              ? `Prossimo: ${new Date(last).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}`
+              : `Ultima: ${new Date(last).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: '2-digit' })}`
+            : null
           return (
             <div key={c.id} className="bs-list-row" onClick={() => setSelected(c)}>
               <div className="bs-avatar">{initials(c)}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 13.5 }}>{fullName(c)}</div>
-                <div style={{ fontSize: 12, color: 'var(--bs-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {c.email && (
-                    <>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                        <polyline points="22,6 12,13 2,6"/>
-                      </svg>
-                      {c.email}
-                    </>
-                  )}
+                <div style={{ fontSize: 12, color: 'var(--bs-text-muted)', display: 'flex', alignItems: 'center', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+                  {c.phone && <span>{c.phone}</span>}
+                  {c.phone && c.email && <span style={{ color: 'var(--bs-line)' }}>·</span>}
+                  {c.email && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{c.email}</span>}
                 </div>
               </div>
-              {visits > 0 && (
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{visits}</div>
-                  <div style={{ fontSize: 11, color: 'var(--bs-text-faint)' }}>visite</div>
-                </div>
-              )}
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                {count > 0 && (
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--bs-text)' }}>
+                    {count} <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--bs-text-faint)' }}>prenotaz.</span>
+                  </div>
+                )}
+                {lastLabel && <div style={{ fontSize: 11.5, color: 'var(--bs-text-faint)', marginTop: 1 }}>{lastLabel}</div>}
+              </div>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--bs-text-faint)" strokeWidth="2">
                 <polyline points="9 18 15 12 9 6"/>
               </svg>
@@ -496,7 +507,7 @@ export default function ClientiPage() {
         })}
       </div>
 
-      {selected && <CustomerPanel contact={selected} visitCount={visitCounts[selected.id] ?? 0} onClose={() => setSelected(null)} />}
+      {selected && <CustomerPanel contact={selected} onClose={() => setSelected(null)} />}
       {showAdd && <AddCustomerModal onClose={() => setShowAdd(false)} onAdded={() => setRefreshKey(k => k + 1)} />}
     </div>
   )
