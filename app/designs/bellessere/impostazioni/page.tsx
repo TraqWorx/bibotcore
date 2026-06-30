@@ -4,101 +4,187 @@ import { useState, useEffect } from 'react'
 
 interface GhlUser { id: string; name: string; email: string }
 
-// GHL availability slot: either { openHour, openMinute, closeHour, closeMinute }
-// or { open: "HH:MM", close: "HH:MM" } — we handle both
 interface GhlHour {
   openHour?: number; openMinute?: number
   closeHour?: number; closeMinute?: number
-  open?: string; close?: string
 }
 
 interface GhlAvailabilityDay {
-  // GHL uses either a "day" string ("monday", "tuesday", ...) or numeric index (0=Sun,1=Mon,...)
   day?: string | number
-  // Some GHL responses use "date" for specific dates — skip these (null = recurring weekly)
   date?: string | null
   hours?: GhlHour[]
-  // Flat fields (some API versions)
+  // some GHL versions use flat fields
   openHour?: number; openMinute?: number; closeHour?: number; closeMinute?: number
+}
+
+interface GhlSchedule {
+  id: string
+  userId?: string
+  name?: string
+  timezone?: string
+  availability?: GhlAvailabilityDay[]
 }
 
 const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 const DAY_LABELS_IT: Record<string, string> = {
-  sunday: 'Dom', monday: 'Lun', tuesday: 'Mar', wednesday: 'Mer',
-  thursday: 'Gio', friday: 'Ven', saturday: 'Sab',
+  sunday: 'Dom', monday: 'Lun', tuesday: 'Mar',
+  wednesday: 'Mer', thursday: 'Gio', friday: 'Ven', saturday: 'Sab',
 }
+
+type EditDay = { open: boolean; start: string; end: string }
+type EditSchedule = Record<string, EditDay>
 
 function fmt(h: number, m: number) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-function parseHourRange(entry: GhlAvailabilityDay): string {
-  // Flat format
-  if (entry.openHour != null) return `${fmt(entry.openHour, entry.openMinute ?? 0)} – ${fmt(entry.closeHour ?? 17, entry.closeMinute ?? 0)}`
-  const h = entry.hours?.[0]
-  if (!h) return ''
-  if (h.openHour != null) return `${fmt(h.openHour, h.openMinute ?? 0)} – ${fmt(h.closeHour ?? 17, h.closeMinute ?? 0)}`
-  if (h.open) return `${h.open} – ${h.close ?? ''}`
-  return ''
-}
-
-function normaliseDayKey(day: string | number | undefined): string | null {
+function normDayKey(day: string | number | undefined): string | null {
   if (day == null) return null
   if (typeof day === 'number') return DAY_KEYS[day] ?? null
   return String(day).toLowerCase()
 }
 
-function buildScheduleMap(availability: GhlAvailabilityDay[]): Record<string, string | null> {
-  const map: Record<string, string | null> = {}
-  for (const k of DAY_KEYS) map[k] = null // null = closed
-
+function ghlToEdit(availability: GhlAvailabilityDay[]): EditSchedule {
+  const edit: EditSchedule = {}
+  for (const k of DAY_KEYS) edit[k] = { open: false, start: '09:00', end: '18:00' }
   for (const entry of availability) {
-    // Skip specific-date overrides (only show recurring weekly)
     if (entry.date !== undefined && entry.date !== null) continue
-    const key = normaliseDayKey(entry.day)
+    const key = normDayKey(entry.day)
     if (!key || !DAY_KEYS.includes(key)) continue
-    const range = parseHourRange(entry)
-    map[key] = range || 'Aperto'
+    const h = entry.hours?.[0]
+    if (h?.openHour != null) {
+      edit[key] = { open: true, start: fmt(h.openHour, h.openMinute ?? 0), end: fmt(h.closeHour ?? 18, h.closeMinute ?? 0) }
+    } else if (entry.openHour != null) {
+      edit[key] = { open: true, start: fmt(entry.openHour, entry.openMinute ?? 0), end: fmt(entry.closeHour ?? 18, entry.closeMinute ?? 0) }
+    }
   }
-  return map
+  return edit
 }
 
-function AvailabilityGrid({ availability }: { availability: GhlAvailabilityDay[] }) {
-  const schedule = buildScheduleMap(availability)
-  const workDays = DAY_KEYS.filter(k => schedule[k] !== null)
+function editToGhl(edit: EditSchedule): GhlAvailabilityDay[] {
+  return DAY_KEYS
+    .filter(k => edit[k]?.open)
+    .map(k => {
+      const [oh, om] = edit[k].start.split(':').map(Number)
+      const [ch, cm] = edit[k].end.split(':').map(Number)
+      return {
+        day: k,
+        date: null,
+        hours: [{ openHour: oh, openMinute: om, closeHour: ch, closeMinute: cm }],
+      }
+    })
+}
 
-  if (workDays.length === 0) {
-    return <span style={{ fontSize: 12, color: 'var(--bs-text-faint)', fontStyle: 'italic' }}>Nessun orario impostato su GHL</span>
+function UserScheduleEditor({
+  user, schedule, onChange,
+}: { user: GhlUser; schedule: EditSchedule; onChange: (s: EditSchedule) => void }) {
+  function toggle(key: string) {
+    onChange({ ...schedule, [key]: { ...schedule[key], open: !schedule[key]?.open } })
+  }
+  function setTime(key: string, field: 'start' | 'end', val: string) {
+    onChange({ ...schedule, [key]: { ...schedule[key], [field]: val } })
   }
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: 6 }}>
-      {DAY_KEYS.filter(k => schedule[k] !== null).map(k => (
-        <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--bs-text-muted)', width: 28 }}>{DAY_LABELS_IT[k]}</span>
-          <span style={{ fontSize: 12, color: 'var(--bs-text)' }}>{schedule[k]}</span>
-        </div>
-      ))}
+    <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {DAY_KEYS.map(key => {
+        const day = schedule[key] ?? { open: false, start: '09:00', end: '18:00' }
+        return (
+          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={() => toggle(key)}
+              style={{
+                width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', flexShrink: 0,
+                background: day.open ? 'var(--bs-black)' : 'var(--bs-line)', position: 'relative', transition: 'background 0.2s',
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%', background: 'white',
+                transition: 'left 0.2s', left: day.open ? 18 : 2,
+              }} />
+            </button>
+            <span style={{ width: 34, fontSize: 13, fontWeight: 700, color: day.open ? 'var(--bs-text)' : 'var(--bs-text-faint)' }}>
+              {DAY_LABELS_IT[key]}
+            </span>
+            {day.open ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="time" value={day.start} onChange={e => setTime(key, 'start', e.target.value)}
+                  style={{ border: '1.5px solid var(--bs-line)', borderRadius: 8, padding: '4px 8px', fontSize: 13, fontFamily: 'inherit', color: 'var(--bs-text)' }} />
+                <span style={{ color: 'var(--bs-text-faint)', fontSize: 12 }}>→</span>
+                <input type="time" value={day.end} onChange={e => setTime(key, 'end', e.target.value)}
+                  style={{ border: '1.5px solid var(--bs-line)', borderRadius: 8, padding: '4px 8px', fontSize: 13, fontFamily: 'inherit', color: 'var(--bs-text)' }} />
+              </div>
+            ) : (
+              <span style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Chiuso</span>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
 
 export default function ImpostazioniPage() {
   const [users, setUsers] = useState<GhlUser[]>([])
-  const [schedules, setSchedules] = useState<Record<string, GhlAvailabilityDay[]>>({})
+  const [scheduleMap, setScheduleMap] = useState<Record<string, GhlSchedule>>({}) // userId → schedule
+  const [editMap, setEditMap] = useState<Record<string, EditSchedule>>({}) // userId → edit state
+  const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [savedMsg, setSavedMsg] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     Promise.all([
       fetch('/api/bellessere/services').then(r => r.json()),
-      fetch('/api/bellessere/user-availability').then(r => r.json()),
-    ]).then(([svc, avail]) => {
-      setUsers(svc.users ?? [])
-      const map: Record<string, GhlAvailabilityDay[]> = {}
-      for (const s of (avail.schedules ?? [])) map[s.userId] = s.availability ?? []
-      setSchedules(map)
-    }).catch(() => {}).finally(() => setLoading(false))
+      fetch('/api/bellessere/schedules').then(r => r.json()),
+    ]).then(([svc, schData]) => {
+      const usrs: GhlUser[] = svc.users ?? []
+      setUsers(usrs)
+
+      const schedules: GhlSchedule[] = schData.schedules ?? []
+      const sMap: Record<string, GhlSchedule> = {}
+      const eMap: Record<string, EditSchedule> = {}
+
+      for (const s of schedules) {
+        if (s.userId) {
+          sMap[s.userId] = s
+          eMap[s.userId] = ghlToEdit(s.availability ?? [])
+        }
+      }
+
+      // Users without a matching schedule get an empty default
+      for (const u of usrs) {
+        if (!eMap[u.id]) eMap[u.id] = ghlToEdit([])
+      }
+
+      setScheduleMap(sMap)
+      setEditMap(eMap)
+    }).catch(e => setError(String(e))).finally(() => setLoading(false))
   }, [])
+
+  async function save(userId: string) {
+    const schedule = scheduleMap[userId]
+    if (!schedule?.id) { setError('Nessun schedule GHL trovato per questo utente'); return }
+    setSaving(p => ({ ...p, [userId]: true }))
+    setSavedMsg(p => ({ ...p, [userId]: '' }))
+    const res = await fetch('/api/bellessere/schedules', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scheduleId: schedule.id,
+        availability: editToGhl(editMap[userId] ?? {}),
+        timezone: schedule.timezone ?? 'Europe/Rome',
+      }),
+    })
+    setSaving(p => ({ ...p, [userId]: false }))
+    if (res.ok) {
+      setSavedMsg(p => ({ ...p, [userId]: 'Salvato' }))
+      setTimeout(() => setSavedMsg(p => ({ ...p, [userId]: '' })), 3000)
+    } else {
+      const d = await res.json()
+      setError(d.message ?? d.error ?? 'Errore durante il salvataggio')
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -107,20 +193,23 @@ export default function ImpostazioniPage() {
         <h1 className="bs-page-title">Impostazioni</h1>
       </div>
 
-      {/* Team + GHL availability */}
-      <div>
-        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
-          Team — Disponibilità da GHL
+      {error && (
+        <div style={{ padding: '10px 14px', background: '#FEF2F2', color: '#DC2626', borderRadius: 9, fontSize: 13 }}>
+          {error}
         </div>
-        {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--bs-text-faint)' }}>Caricamento...</div>
-        ) : users.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--bs-text-faint)' }}>Nessun membro del team trovato</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {users.map(u => (
-              <div key={u.id} className="bs-card" style={{ padding: '14px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+      )}
+
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--bs-text-faint)' }}>Caricamento...</div>
+      ) : users.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--bs-text-faint)' }}>Nessun membro del team trovato</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {users.map(u => (
+            <div key={u.id} className="bs-card">
+              {/* Header */}
+              <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--bs-line)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bs-gold-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12, color: 'var(--bs-gold)', flexShrink: 0 }}>
                     {u.name.split(' ').map((p: string) => p[0]).join('').toUpperCase().slice(0, 2)}
                   </div>
@@ -129,15 +218,34 @@ export default function ImpostazioniPage() {
                     <div style={{ fontSize: 12, color: 'var(--bs-text-muted)' }}>{u.email}</div>
                   </div>
                 </div>
-                <AvailabilityGrid availability={schedules[u.id] ?? []} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {savedMsg[u.id] && <span style={{ fontSize: 12.5, color: '#16a34a' }}>{savedMsg[u.id]}</span>}
+                  {!scheduleMap[u.id] && (
+                    <span style={{ fontSize: 11.5, color: 'var(--bs-text-faint)', fontStyle: 'italic' }}>nessun schedule GHL</span>
+                  )}
+                  <button
+                    className="bs-btn-primary"
+                    style={{ fontSize: 13 }}
+                    disabled={saving[u.id] || !scheduleMap[u.id]}
+                    onClick={() => save(u.id)}
+                  >
+                    {saving[u.id] ? 'Salvataggio...' : 'Salva su GHL'}
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              {/* Schedule editor */}
+              <UserScheduleEditor
+                user={u}
+                schedule={editMap[u.id] ?? ghlToEdit([])}
+                onChange={s => setEditMap(p => ({ ...p, [u.id]: s }))}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{ padding: '12px 16px', borderRadius: 10, background: 'var(--bs-gold-tint)', border: '1px solid var(--bs-line)', fontSize: 12.5, color: 'var(--bs-text-muted)', lineHeight: 1.6 }}>
-        Gli orari mostrati sono quelli configurati nel profilo utente su GoHighLevel. Le prenotazioni rispettano automaticamente questa disponibilità.
+        Le modifiche vengono salvate direttamente su GoHighLevel e influenzano la disponibilità di prenotazione in tempo reale.
       </div>
     </div>
   )
