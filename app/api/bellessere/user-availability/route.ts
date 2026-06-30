@@ -39,14 +39,12 @@ export async function GET(req: NextRequest) {
     userIds = (usersData.users ?? []).map((u: { id: string }) => u.id)
   }
 
-  // Debug: try multiple approaches for the first user to find where schedules live
+  // Debug: fetch the full user object to check if it contains scheduleId
   const firstUserId = userIds[0]
-  const tries = await Promise.all([
-    fetch(`${GHL}/users/${firstUserId}/availability`, { headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' } }).then(r => r.json()).then(d => ({ endpoint: `users/${firstUserId}/availability v2021-07-28`, data: d })),
-    fetch(`${GHL}/users/${firstUserId}/availability`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()).then(d => ({ endpoint: `users/${firstUserId}/availability v3`, data: d })),
-    fetch(`${GHL}/calendars/schedules/${firstUserId}`, { headers: { Authorization: `Bearer ${token}`, Version: 'v3' } }).then(r => r.json()).then(d => ({ endpoint: `calendars/schedules/${firstUserId} v3`, data: d })),
-    fetch(`${GHL}/calendars/schedules/${firstUserId}`, { headers: { Authorization: `Bearer ${token}`, Version: '2021-04-15' } }).then(r => r.json()).then(d => ({ endpoint: `calendars/schedules/${firstUserId} v2021-04-15`, data: d })),
-  ]).catch(() => [])
+  const userRes = await fetch(`${GHL}/users/${firstUserId}`, {
+    headers: { Authorization: `Bearer ${token}`, Version: V },
+  })
+  const userData = await userRes.json()
 
-  return NextResponse.json({ firstUserId, userIds, tries }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({ firstUserId, user: userData }, { headers: { 'Cache-Control': 'no-store' } })
 }
