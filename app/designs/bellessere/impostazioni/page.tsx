@@ -103,7 +103,6 @@ export default function ImpostazioniPage() {
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [savedMsg, setSavedMsg] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -188,45 +187,11 @@ export default function ImpostazioniPage() {
     }
   }
 
-  async function syncAll() {
-    setSyncing(true)
-    setError('')
-    const res = await fetch('/api/bellessere/sync', { method: 'POST' })
-    if (res.ok) {
-      // Reload data from DB
-      const [svc, avail] = await Promise.all([
-        fetch('/api/bellessere/services').then(r => r.json()),
-        fetch('/api/bellessere/user-availability').then(r => r.json()),
-      ])
-      const fetchedUsers: GhlUser[] = svc.users ?? []
-      const map: Record<string, UserSchedule> = avail.scheduleMap ?? {}
-      setUsers(fetchedUsers)
-      setScheduleMap(map)
-      const newEdits: Record<string, EditSchedule> = {}
-      for (const u of fetchedUsers) {
-        newEdits[u.id] = map[u.id] ? rulesToEdit(map[u.id].rules) : { ...DEFAULT_EDIT }
-      }
-      setEdits(newEdits)
-    } else {
-      const d = await res.json().catch(() => ({}))
-      setError(d.error ?? 'Errore durante la sincronizzazione')
-    }
-    setSyncing(false)
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div>
-          <div className="bs-page-eyebrow">Bibot</div>
-          <h1 className="bs-page-title">Impostazioni</h1>
-        </div>
-        <button className="bs-btn-ghost" onClick={syncAll} disabled={syncing} style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }}>
-            <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-          </svg>
-          {syncing ? 'Sincronizzazione...' : 'Sincronizza'}
-        </button>
+      <div>
+        <div className="bs-page-eyebrow">Bibot</div>
+        <h1 className="bs-page-title">Impostazioni</h1>
       </div>
 
       {error && (

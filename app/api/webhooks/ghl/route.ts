@@ -203,6 +203,15 @@ export async function POST(req: Request) {
     }
   }
 
+  // ── Bellessere: keep bellessere_users table in sync via user webhooks ────
+  const { BELLESSERE_LOCATION_ID } = await import('@/lib/bellessere/constants')
+  if (locationId === BELLESSERE_LOCATION_ID) {
+    const { syncBellessere } = await import('@/lib/bellessere/sync')
+    if ([...USER_CREATED_EVENTS, ...USER_DELETED_EVENTS].includes(eventType)) {
+      syncBellessere('users').catch(() => {})
+    }
+  }
+
   // ── Process CRM entity events into cache (non-blocking) ──────────────────
   processWebhookEvent(locationId, eventType, body)
     .then(({ processed, entity }) => {

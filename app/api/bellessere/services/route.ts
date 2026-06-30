@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+import { ensureFresh } from '@/lib/bellessere/sync'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,10 +28,12 @@ async function authCheck(req: NextRequest) {
   return null
 }
 
-// GET — read from DB tables (instant, no GHL dependency)
+// GET — read from DB tables; auto-syncs from GHL if empty, refreshes in background if stale
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
+
+  await ensureFresh()
 
   const sb = createAdminClient()
   const [svcRes, usersRes, groupsRes] = await Promise.all([
