@@ -88,12 +88,12 @@ function UserScheduleEditor({ schedule, onChange }: { schedule: EditSchedule; on
 
 const DEFAULT_EDIT: EditSchedule = {
   sunday:    { open: false, start: '09:00', end: '18:00' },
-  monday:    { open: true,  start: '09:00', end: '18:00' },
-  tuesday:   { open: true,  start: '09:00', end: '18:00' },
-  wednesday: { open: true,  start: '09:00', end: '18:00' },
-  thursday:  { open: true,  start: '09:00', end: '18:00' },
-  friday:    { open: true,  start: '09:00', end: '18:00' },
-  saturday:  { open: true,  start: '09:00', end: '14:00' },
+  monday:    { open: false, start: '09:00', end: '18:00' },
+  tuesday:   { open: false, start: '09:00', end: '18:00' },
+  wednesday: { open: false, start: '09:00', end: '18:00' },
+  thursday:  { open: false, start: '09:00', end: '18:00' },
+  friday:    { open: false, start: '09:00', end: '18:00' },
+  saturday:  { open: false, start: '09:00', end: '18:00' },
 }
 
 export default function ImpostazioniPage() {
