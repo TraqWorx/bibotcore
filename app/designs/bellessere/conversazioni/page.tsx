@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 
 interface ConversationItem {
   id: string
@@ -64,7 +63,7 @@ export default function ConversazioniPage() {
 
   useEffect(() => {
     setLoading(true)
-    fetch(`/api/conversations?locationId=${BELLESSERE_LOCATION_ID}`)
+    fetch('/api/bellessere/conversations')
       .then(r => r.json())
       .then(d => setConversations(d.conversations ?? []))
       .catch(() => {})

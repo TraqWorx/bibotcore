@@ -94,17 +94,24 @@ export async function POST(req: NextRequest) {
     headers: { Authorization: `Bearer ${token}`, Version: V, 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...body, locationId: BELLESSERE_LOCATION_ID }),
   })
-  const data = await res.json()
+  const text = await res.text()
+  let data: Record<string, unknown> = {}
+  try { data = JSON.parse(text) } catch { /* non-JSON GHL response */ }
+
+  if (!res.ok) {
+    const msg = (data.message as string) ?? (data.error as string) ?? text.slice(0, 300) ?? 'GHL error'
+    return NextResponse.json({ error: msg }, { status: res.status })
+  }
 
   // Write to cache immediately so the booking appears before the webhook fires
-  if (res.ok && data.id) {
+  if (data.id) {
     const sb = createAdminClient()
     await sb.from('cached_calendar_events').upsert({
       ghl_id: data.id,
       location_id: BELLESSERE_LOCATION_ID,
       calendar_id: body.calendarId ?? null,
       contact_ghl_id: body.contactId ?? null,
-      user_id: data.userId ?? body.userId ?? null,
+      user_id: (data.userId as string | null) ?? body.userId ?? null,
       title: body.title ?? null,
       start_time: body.startTime ?? null,
       end_time: body.endTime ?? null,
@@ -113,7 +120,7 @@ export async function POST(req: NextRequest) {
     }, { onConflict: 'location_id,ghl_id' })
   }
 
-  return NextResponse.json(data, { status: res.status })
+  return NextResponse.json(data)
 }
 
 // PUT — update appointment status in GHL + update cache immediately
@@ -131,10 +138,17 @@ export async function PUT(req: NextRequest) {
     headers: { Authorization: `Bearer ${token}`, Version: V, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
-  const data = await res.json()
+  const putText = await res.text()
+  let data: Record<string, unknown> = {}
+  try { data = JSON.parse(putText) } catch { /* non-JSON GHL response */ }
+
+  if (!res.ok) {
+    const msg = (data.message as string) ?? (data.error as string) ?? putText.slice(0, 300) ?? 'GHL error'
+    return NextResponse.json({ error: msg }, { status: res.status })
+  }
 
   // Mirror the status change to cache immediately
-  if (res.ok && payload.appointmentStatus) {
+  if (payload.appointmentStatus) {
     const sb = createAdminClient()
     await sb.from('cached_calendar_events')
       .update({ appointment_status: payload.appointmentStatus, synced_at: new Date().toISOString() })
@@ -142,5 +156,5 @@ export async function PUT(req: NextRequest) {
       .eq('ghl_id', eventId)
   }
 
-  return NextResponse.json(data, { status: res.status })
+  return NextResponse.json(data)
 }

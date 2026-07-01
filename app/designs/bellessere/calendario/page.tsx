@@ -18,32 +18,152 @@ interface CalEvent {
   contactId?: string
   contactName?: string
   userId?: string
+  calendarId?: string
 }
 
 interface GhlUser { id: string; name: string }
+interface GhlCalendar { id: string; name: string; slotDuration?: number; teamMembers?: { userId: string }[] }
 
-const HOURS = Array.from({ length: 13 }, (_, i) => i + 8) // 8am–8pm
-const DAYS = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab']
+type ViewMode = 'week' | 'day'
 
-function getWeekDates(anchor: Date) {
-  const d = new Date(anchor)
-  d.setDate(d.getDate() - d.getDay())
-  return Array.from({ length: 7 }, (_, i) => {
-    const day = new Date(d)
-    day.setDate(d.getDate() + i)
-    return day
-  })
+const HOURS = Array.from({ length: 13 }, (_, i) => i + 8) // 8–20
+const DAYS_IT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab']
+
+// Per-user border colors (assigned by stable index)
+const USER_COLORS = ['#C9A84C', '#6366F1', '#10B981', '#EF4444', '#F59E0B', '#8B5CF6', '#06B6D4', '#EC4899', '#14B8A6', '#F97316']
+
+// Status background + text color
+function statusStyle(s?: string): { background: string; color: string } {
+  const status = s ?? 'new'
+  if (status === 'cancelled') return { background: 'rgba(239,68,68,0.12)', color: '#B91C1C' }
+  if (status === 'no-show' || status === 'noshow') return { background: 'rgba(107,114,128,0.12)', color: '#374151' }
+  if (status === 'showed') return { background: 'rgba(99,102,241,0.14)', color: '#4338CA' }
+  if (status === 'pending') return { background: 'rgba(245,158,11,0.13)', color: '#92400E' }
+  return { background: 'rgba(16,185,129,0.12)', color: '#065F46' } // confirmed/new
 }
 
-function eventClass(status: string) {
-  if (status === 'cancelled') return 'bs-cal-event bs-cal-event-cancelled'
-  if (status === 'new' || !status) return 'bs-cal-event bs-cal-event-pending'
-  return 'bs-cal-event bs-cal-event-confirmed'
+function initials(name: string) {
+  return name.split(' ').map(p => p[0] ?? '').join('').toUpperCase().slice(0, 2) || '?'
 }
 
-function AppointmentPanel({ event, onClose, onAction }: { event: CalEvent; onClose: () => void; onAction: () => void }) {
+// ── Reschedule mini-modal ─────────────────────────────────────────────────
+function RescheduleModal({ event, calendars, users, onClose, onDone }: {
+  event: CalEvent; calendars: GhlCalendar[]; users: GhlUser[]
+  onClose: () => void; onDone: () => void
+}) {
+  const cal = calendars.find(c => c.id === event.calendarId)
+  const calTeamIds = new Set((cal?.teamMembers ?? []).map(m => m.userId))
+  const calUsers = users.filter(u => calTeamIds.has(u.id))
+
+  const [userId, setUserId] = useState(event.userId ?? '')
+  const [date, setDate] = useState('')
+  const [slot, setSlot] = useState('')
+  const [slots, setSlots] = useState<string[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!event.calendarId || !date) { setSlots([]); return }
+    setLoadingSlots(true); setSlot('')
+    const params = new URLSearchParams({ calendarId: event.calendarId, date })
+    if (userId) params.set('userId', userId)
+    fetch(`/api/bellessere/free-slots?${params}`)
+      .then(r => r.json()).then(d => setSlots(d.slots ?? [])).catch(() => setSlots([]))
+      .finally(() => setLoadingSlots(false))
+  }, [event.calendarId, date, userId])
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!date || !slot) { setError('Scegli data e orario'); return }
+    setSaving(true); setError('')
+    try {
+      const tzParts = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Rome', timeZoneName: 'longOffset' })
+        .formatToParts(new Date(`${date}T12:00:00Z`))
+      const offsetStr = (tzParts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT+02:00').replace('GMT', '')
+      const start = new Date(`${date}T${slot}:00${offsetStr}`)
+      const end = new Date(start.getTime() + (cal?.slotDuration ?? 30) * 60000)
+      const res = await fetch('/api/bellessere/appointments', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: event.id, startTime: start.toISOString(), endTime: end.toISOString() }),
+      })
+      const data = await res.json().catch(() => ({})) as { error?: string; message?: string }
+      if (!res.ok) { setError(data.message ?? data.error ?? 'Errore'); return }
+      onDone(); onClose()
+    } catch (err) { setError(err instanceof Error ? err.message : 'Errore') } finally { setSaving(false) }
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
+
+  return (
+    <div className="bs-modal-overlay" style={{ zIndex: 310 }} onClick={onClose}>
+      <div className="bs-modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+        <div className="bs-modal-header">
+          <span className="bs-modal-title">Rischedula appuntamento</span>
+          <button className="bs-panel-close" onClick={onClose}>✕</button>
+        </div>
+        <form onSubmit={submit}>
+          <div className="bs-modal-body">
+            {error && <div style={{ padding: '10px 14px', background: '#FEF2F2', color: '#DC2626', borderRadius: 9, fontSize: 13 }}>{error}</div>}
+            <div style={{ padding: '10px 14px', background: 'var(--bs-bg)', borderRadius: 9, fontSize: 13, color: 'var(--bs-text-muted)' }}>
+              Servizio: <strong style={{ color: 'var(--bs-text)' }}>{cal?.name ?? event.title ?? 'Appuntamento'}</strong>
+            </div>
+            {calUsers.length > 0 && (
+              <div>
+                <label className="bs-field-label">Professionista</label>
+                <select className="bs-select" value={userId} onChange={e => setUserId(e.target.value)}>
+                  <option value="">Qualsiasi</option>
+                  {calUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <label className="bs-field-label">Data *</label>
+                <input className="bs-input" type="date" min={today} value={date} onChange={e => setDate(e.target.value)} required />
+              </div>
+              <div>
+                <label className="bs-field-label">Orario *</label>
+                {loadingSlots
+                  ? <div className="bs-input" style={{ color: 'var(--bs-text-faint)', fontSize: 13 }}>Caricamento...</div>
+                  : <select className="bs-select" value={slot} onChange={e => setSlot(e.target.value)} required disabled={!date}>
+                      <option value="">{!date ? '— prima la data —' : slots.length === 0 ? 'Nessuno slot' : 'Scegli...'}</option>
+                      {slots.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                }
+              </div>
+            </div>
+          </div>
+          <div className="bs-modal-footer">
+            <button type="button" className="bs-btn-ghost" onClick={onClose}>Annulla</button>
+            <button type="submit" className="bs-btn-primary" disabled={saving || !slot}>{saving ? 'Salvataggio...' : 'Conferma'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ── Appointment popup modal ───────────────────────────────────────────────
+function AppointmentModal({ event, users, calendars, onClose, onAction }: {
+  event: CalEvent; users: GhlUser[]; calendars: GhlCalendar[]
+  onClose: () => void; onAction: () => void
+}) {
   const [loading, setLoading] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [showReschedule, setShowReschedule] = useState(false)
+
+  const dt = event.startTime ? new Date(event.startTime) : null
+  const operator = users.find(u => u.id === event.userId)
+  const calendar = calendars.find(c => c.id === event.calendarId)
+  const st = event.appointmentStatus ?? 'new'
+  const { background, color } = statusStyle(st)
+
+  const STATUS_LABEL: Record<string, string> = {
+    confirmed: 'Confermato', new: 'In attesa', cancelled: 'Annullato',
+    showed: 'Completato', 'no-show': 'No-show', noshow: 'No-show', pending: 'In attesa',
+  }
 
   async function setStatus(status: string) {
     setLoading(true); setActionError('')
@@ -52,74 +172,176 @@ function AppointmentPanel({ event, onClose, onAction }: { event: CalEvent; onClo
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId: event.id, appointmentStatus: status }),
     })
+    const data = await res.json().catch(() => ({})) as { message?: string; error?: string }
     setLoading(false)
-    if (!res.ok) { const d = await res.json().catch(() => ({})); setActionError(d.message ?? 'Errore aggiornamento'); return }
-    onAction()
-    onClose()
+    if (!res.ok) { setActionError(data.message ?? data.error ?? 'Errore'); return }
+    onAction(); onClose()
   }
-
-  const dt = event.startTime ? new Date(event.startTime) : null
 
   return (
     <>
-      <div className="bs-overlay" onClick={onClose} />
-      <div className="bs-panel">
-        <div className="bs-panel-header">
-          <span className="bs-panel-title">Appuntamento</span>
-          <button className="bs-panel-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="bs-panel-body">
-          {event.contactName && <div style={{ fontWeight: 700, fontSize: 16 }}>{event.contactName}</div>}
-          {event.title && <div style={{ fontSize: 13.5, color: 'var(--bs-text-muted)' }}>{event.title}</div>}
-          {dt && (
-            <div style={{ fontSize: 13.5 }}>
-              {dt.toLocaleString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+      <div className="bs-modal-overlay" style={{ zIndex: 300 }} onClick={onClose}>
+        <div className="bs-modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+          <div className="bs-modal-header" style={{ borderBottom: '1px solid var(--bs-line)' }}>
+            <span className="bs-modal-title">Dettagli appuntamento</span>
+            <button className="bs-panel-close" onClick={onClose}>✕</button>
+          </div>
+
+          <div className="bs-modal-body">
+            {/* Client + status */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div className="bs-avatar" style={{ width: 48, height: 48, fontSize: 16, flexShrink: 0 }}>
+                {initials(event.contactName ?? event.title ?? '?')}
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 17 }}>{event.contactName ?? 'Cliente'}</div>
+                <div style={{ marginTop: 4 }}>
+                  <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 100, fontSize: 12, fontWeight: 700, background, color }}>
+                    {STATUS_LABEL[st] ?? st}
+                  </span>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-        <div className="bs-panel-actions">
-          {actionError && <div style={{ padding: '8px 12px', background: '#FEF2F2', color: '#DC2626', borderRadius: 8, fontSize: 12.5 }}>{actionError}</div>}
-          {event.appointmentStatus !== 'showed' && (
-            <button className="bs-btn-primary" style={{ justifyContent: 'center', width: '100%' }} onClick={() => setStatus('showed')} disabled={loading}>Segna completato</button>
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {event.appointmentStatus !== 'cancelled' && (
-              <button className="bs-btn-danger" style={{ justifyContent: 'center' }} onClick={() => setStatus('cancelled')} disabled={loading}>Annulla</button>
+
+            {/* Details rows */}
+            <div className="bs-card" style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {dt && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--bs-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--bs-text-muted)" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--bs-text-faint)', marginBottom: 2 }}>Data e ora</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, textTransform: 'capitalize' }}>
+                      {dt.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} alle {dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {(event.title || calendar?.name) && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--bs-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--bs-text-muted)" strokeWidth="2">
+                      <path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5V5c0-.83.67-1.5 1.5-1.5"/><path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--bs-text-faint)', marginBottom: 2 }}>Servizio</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600 }}>{event.title || calendar?.name}</div>
+                  </div>
+                </div>
+              )}
+              {operator && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--bs-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--bs-text-muted)" strokeWidth="2">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--bs-text-faint)', marginBottom: 2 }}>Operatore</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600 }}>{operator.name}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {actionError && <div style={{ padding: '8px 12px', background: '#FEF2F2', color: '#DC2626', borderRadius: 8, fontSize: 12.5 }}>{actionError}</div>}
+          </div>
+
+          <div className="bs-modal-footer" style={{ flexDirection: 'column', gap: 8 }}>
+            {st !== 'showed' && (
+              <button className="bs-btn-primary" style={{ justifyContent: 'center', width: '100%' }} onClick={() => setStatus('showed')} disabled={loading}>
+                Segna come completato
+              </button>
             )}
-            {event.appointmentStatus !== 'noshow' && event.appointmentStatus !== 'cancelled' && (
-              <button className="bs-btn-ghost" style={{ justifyContent: 'center' }} onClick={() => setStatus('noshow')} disabled={loading}>No-show</button>
-            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%' }}>
+              <button className="bs-btn-ghost" style={{ justifyContent: 'center' }} onClick={() => setShowReschedule(true)} disabled={loading}>
+                Rischedula
+              </button>
+              {st !== 'cancelled' && (
+                <button className="bs-btn-danger" style={{ justifyContent: 'center' }} onClick={() => setStatus('cancelled')} disabled={loading}>
+                  Annulla
+                </button>
+              )}
+              {st !== 'confirmed' && st !== 'showed' && (
+                <button className="bs-btn-ghost" style={{ justifyContent: 'center' }} onClick={() => setStatus('confirmed')} disabled={loading}>
+                  Conferma
+                </button>
+              )}
+              {st !== 'no-show' && st !== 'noshow' && st !== 'cancelled' && (
+                <button className="bs-btn-ghost" style={{ justifyContent: 'center' }} onClick={() => setStatus('no-show')} disabled={loading}>
+                  No-show
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
+      {showReschedule && (
+        <RescheduleModal
+          event={event}
+          calendars={calendars}
+          users={users}
+          onClose={() => setShowReschedule(false)}
+          onDone={() => { onAction(); onClose() }}
+        />
+      )}
     </>
   )
 }
 
+// ── Week helpers ──────────────────────────────────────────────────────────
+function getWeekDates(anchor: Date) {
+  const d = new Date(anchor)
+  d.setDate(d.getDate() - d.getDay())
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(d); day.setDate(d.getDate() + i); return day
+  })
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────
 export default function CalendarioPage() {
+  const [viewMode, setViewMode] = useState<ViewMode>('week')
   const [anchor, setAnchor] = useState(() => new Date())
   const [events, setEvents] = useState<CalEvent[]>([])
   const [users, setUsers] = useState<GhlUser[]>([])
+  const [calendars, setCalendars] = useState<GhlCalendar[]>([])
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<CalEvent | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  // Load users once
+  // Build stable user→color map
+  const userColorMap = Object.fromEntries(users.map((u, i) => [u.id, USER_COLORS[i % USER_COLORS.length]]))
+
   useEffect(() => {
     fetch('/api/bellessere/services')
       .then(r => r.json())
-      .then(d => setUsers((d.users ?? []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name }))))
+      .then(d => {
+        setUsers((d.users ?? []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })))
+        setCalendars(d.calendars ?? [])
+      })
       .catch(() => {})
   }, [])
 
   const weekDates = getWeekDates(anchor)
-  const weekStart = weekDates[0]
-  const weekEnd = weekDates[6]
 
-  const fetchWeekEvents = useCallback((wStart: Date, wEnd: Date, userIds: string[]) => {
-    const start = new Date(wStart); start.setHours(0, 0, 0, 0)
-    const end = new Date(wEnd); end.setHours(23, 59, 59, 999)
+  // Compute visible date range based on view mode
+  const { rangeStart, rangeEnd } = (() => {
+    if (viewMode === 'day') {
+      const s = new Date(anchor); s.setHours(0, 0, 0, 0)
+      const e = new Date(anchor); e.setHours(23, 59, 59, 999)
+      return { rangeStart: s, rangeEnd: e }
+    }
+    const s = new Date(weekDates[0]); s.setHours(0, 0, 0, 0)
+    const e = new Date(weekDates[6]); e.setHours(23, 59, 59, 999)
+    return { rangeStart: s, rangeEnd: e }
+  })()
+
+  const fetchEvents = useCallback((start: Date, end: Date, userIds: string[]) => {
     if (userIds.length === 0) {
       return fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`)
         .then(r => r.json()).then(d => setEvents(d.events ?? [])).catch(() => {})
@@ -137,42 +359,52 @@ export default function CalendarioPage() {
 
   useEffect(() => {
     setLoading(true)
-    fetchWeekEvents(weekStart, weekEnd, selectedUserIds).finally(() => setLoading(false))
-  }, [weekStart.toISOString(), weekEnd.toISOString(), selectedUserIds.join(','), refreshKey, fetchWeekEvents])
+    fetchEvents(rangeStart, rangeEnd, selectedUserIds).finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangeStart.toISOString(), rangeEnd.toISOString(), selectedUserIds.join(','), refreshKey, fetchEvents])
 
-  // Real-time: re-fetch current week whenever cached_calendar_events changes
   useEffect(() => {
     const channel = supabase
       .channel('bellessere-calendario')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'cached_calendar_events',
-        filter: `location_id=eq.${BELLESSERE_LOCATION_ID}`,
-      }, () => { fetchWeekEvents(weekStart, weekEnd, selectedUserIds) })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cached_calendar_events', filter: `location_id=eq.${BELLESSERE_LOCATION_ID}` },
+        () => { fetchEvents(rangeStart, rangeEnd, selectedUserIds) })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [weekStart.toISOString(), weekEnd.toISOString(), selectedUserIds.join(','), fetchWeekEvents])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangeStart.toISOString(), rangeEnd.toISOString(), selectedUserIds.join(','), fetchEvents])
 
-  function prevWeek() { const d = new Date(anchor); d.setDate(d.getDate() - 7); setAnchor(d) }
-  function nextWeek() { const d = new Date(anchor); d.setDate(d.getDate() + 7); setAnchor(d) }
+  function prevPeriod() {
+    const d = new Date(anchor)
+    if (viewMode === 'day') d.setDate(d.getDate() - 1)
+    else d.setDate(d.getDate() - 7)
+    setAnchor(d)
+  }
+  function nextPeriod() {
+    const d = new Date(anchor)
+    if (viewMode === 'day') d.setDate(d.getDate() + 1)
+    else d.setDate(d.getDate() + 7)
+    setAnchor(d)
+  }
 
   const todayStr = new Date().toISOString().slice(0, 10)
-
-  const romeDateFmt = new Intl.DateTimeFormat('sv', { timeZone: 'Europe/Rome' }) // YYYY-MM-DD
+  const romeFmt = new Intl.DateTimeFormat('sv', { timeZone: 'Europe/Rome' })
   const romeHourFmt = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Rome', hour: 'numeric', hour12: false })
 
   function eventsForSlot(dayDate: Date, hour: number) {
-    const dateStr = romeDateFmt.format(dayDate)
+    const dateStr = romeFmt.format(dayDate)
     return events.filter(e => {
       if (!e.startTime) return false
       const d = new Date(e.startTime)
-      return romeDateFmt.format(d) === dateStr && parseInt(romeHourFmt.format(d), 10) === hour
+      return romeFmt.format(d) === dateStr && parseInt(romeHourFmt.format(d), 10) === hour
     })
   }
 
-  const monthLabel = weekStart.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
-  const dateRange = `${weekStart.getDate()} – ${weekEnd.getDate()}`
+  // Heading label
+  const navLabel = viewMode === 'day'
+    ? anchor.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : `${weekDates[0].getDate()} – ${weekDates[6].getDate()} ${weekDates[0].toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}`
+
+  const displayDates = viewMode === 'week' ? weekDates : [anchor]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -189,46 +421,56 @@ export default function CalendarioPage() {
         </button>
       </div>
 
-      {/* Calendar nav + user filter */}
+      {/* Controls bar */}
       <div className="bs-card" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        {/* View toggle */}
+        <div style={{ display: 'flex', background: 'var(--bs-bg)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--bs-line)' }}>
+          {(['week', 'day'] as ViewMode[]).map(v => (
+            <button key={v} onClick={() => setViewMode(v)} style={{
+              padding: '7px 16px', border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: viewMode === v ? 700 : 500,
+              background: viewMode === v ? 'var(--bs-black)' : 'transparent',
+              color: viewMode === v ? 'white' : 'var(--bs-text-muted)',
+              transition: 'all 0.15s',
+            }}>
+              {v === 'week' ? 'Settimana' : 'Giorno'}
+            </button>
+          ))}
+        </div>
+
+        {/* Navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button className="bs-btn-ghost" onClick={prevWeek} style={{ padding: '7px 12px' }}>‹</button>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, textTransform: 'capitalize' }}>{monthLabel}</div>
-            <div style={{ fontSize: 11.5, color: 'var(--bs-text-faint)' }}>{dateRange}</div>
-          </div>
-          <button className="bs-btn-ghost" onClick={nextWeek} style={{ padding: '7px 12px' }}>›</button>
+          <button className="bs-btn-ghost" onClick={prevPeriod} style={{ padding: '7px 12px' }}>‹</button>
+          <div style={{ fontWeight: 700, fontSize: 14.5, textTransform: 'capitalize', minWidth: 180 }}>{navLabel}</div>
+          <button className="bs-btn-ghost" onClick={nextPeriod} style={{ padding: '7px 12px' }}>›</button>
           <button className="bs-btn-ghost" onClick={() => setAnchor(new Date())} style={{ fontSize: 12.5 }}>Oggi</button>
         </div>
 
-        {/* User filter — multi-select pills */}
+        {/* User filter pills */}
         {users.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
             <button
               onClick={() => setSelectedUserIds([])}
               style={{
-                padding: '5px 14px', borderRadius: 100, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.15s',
+                padding: '5px 14px', borderRadius: 100, fontSize: 12.5, cursor: 'pointer',
                 border: `1.5px solid ${selectedUserIds.length === 0 ? 'var(--bs-black)' : 'var(--bs-line)'}`,
                 background: selectedUserIds.length === 0 ? 'var(--bs-black)' : 'white',
                 color: selectedUserIds.length === 0 ? 'white' : 'var(--bs-text-muted)',
                 fontWeight: selectedUserIds.length === 0 ? 700 : 400,
               }}
-            >
-              Tutti
-            </button>
-            {users.map(u => {
+            >Tutti</button>
+            {users.map((u, idx) => {
               const active = selectedUserIds.includes(u.id)
+              const col = USER_COLORS[idx % USER_COLORS.length]
               return (
-                <button
-                  key={u.id}
+                <button key={u.id}
                   onClick={() => setSelectedUserIds(prev =>
                     prev.includes(u.id) ? prev.filter(id => id !== u.id) : [...prev, u.id]
                   )}
                   style={{
-                    padding: '5px 14px', borderRadius: 100, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.15s',
-                    border: `1.5px solid ${active ? 'var(--bs-gold)' : 'var(--bs-line)'}`,
-                    background: active ? 'var(--bs-gold-tint)' : 'white',
-                    color: active ? 'var(--bs-gold)' : 'var(--bs-text-muted)',
+                    padding: '5px 14px', borderRadius: 100, fontSize: 12.5, cursor: 'pointer',
+                    border: `1.5px solid ${active ? col : 'var(--bs-line)'}`,
+                    background: active ? col + '22' : 'white',
+                    color: active ? col : 'var(--bs-text-muted)',
                     fontWeight: active ? 700 : 400,
                   }}
                 >
@@ -245,17 +487,20 @@ export default function CalendarioPage() {
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--bs-text-faint)' }}>Caricamento...</div>
         ) : (
-          <div className="bs-cal-grid">
+          <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(${displayDates.length}, 1fr)`, minWidth: displayDates.length > 1 ? 700 : 400 }}>
             {/* Header */}
-            <div className="bs-cal-header-cell" style={{ borderBottom: '1px solid var(--bs-line)' }} />
-            {weekDates.map((d, i) => {
-              const isToday = d.toISOString().slice(0, 10) === todayStr
+            <div style={{ borderBottom: '1px solid var(--bs-line)', borderRight: '1px solid var(--bs-line)' }} />
+            {displayDates.map((d, i) => {
+              const iso = d.toISOString().slice(0, 10)
+              const isToday = iso === todayStr
               return (
-                <div key={i} className={`bs-cal-header-cell ${isToday ? 'today' : ''}`}>
-                  <div style={{ fontSize: 11, textTransform: 'uppercase', color: isToday ? 'var(--bs-gold)' : 'var(--bs-text-faint)' }}>{DAYS[i]}</div>
+                <div key={i} style={{ padding: '10px 8px', textAlign: 'center', borderBottom: '1px solid var(--bs-line)', borderRight: i < displayDates.length - 1 ? '1px solid var(--bs-line)' : 'none' }}>
+                  <div style={{ fontSize: 11, textTransform: 'uppercase', color: isToday ? 'var(--bs-gold)' : 'var(--bs-text-faint)' }}>
+                    {viewMode === 'week' ? DAYS_IT[d.getDay()] : d.toLocaleDateString('it-IT', { weekday: 'long' })}
+                  </div>
                   <div style={{
                     fontSize: 18, fontWeight: 800, marginTop: 2,
-                    width: 32, height: 32, borderRadius: '50%',
+                    width: 32, height: 32, borderRadius: '50%', margin: '2px auto 0',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: isToday ? 'var(--bs-black)' : 'transparent',
                     color: isToday ? 'white' : 'var(--bs-text)',
@@ -269,21 +514,37 @@ export default function CalendarioPage() {
             {/* Hour rows */}
             {HOURS.map(hour => (
               <React.Fragment key={hour}>
-                <div className="bs-cal-time-cell">{hour}:00</div>
-                {weekDates.map((d, di) => {
+                <div style={{ padding: '4px 8px', fontSize: 11.5, color: 'var(--bs-text-faint)', textAlign: 'right', borderBottom: '1px solid var(--bs-line)', borderRight: '1px solid var(--bs-line)', whiteSpace: 'nowrap' }}>
+                  {hour}:00
+                </div>
+                {displayDates.map((d, di) => {
                   const slotEvents = eventsForSlot(d, hour)
                   return (
-                    <div key={di} className="bs-cal-day-cell">
-                      {slotEvents.map(ev => (
-                        <div
-                          key={ev.id}
-                          className={eventClass(ev.appointmentStatus ?? 'new')}
-                          onClick={() => setSelected(ev)}
-                          title={`${ev.contactName ?? ''} · ${ev.title ?? ''}`}
-                        >
-                          {ev.contactName || ev.title || 'Appuntamento'}
-                        </div>
-                      ))}
+                    <div key={di} style={{ minHeight: 52, padding: 3, borderBottom: '1px solid var(--bs-line)', borderRight: di < displayDates.length - 1 ? '1px solid var(--bs-line)' : 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {slotEvents.map(ev => {
+                        const { background, color } = statusStyle(ev.appointmentStatus)
+                        const userBorderColor = ev.userId ? (userColorMap[ev.userId] ?? '#C9A84C') : '#C9A84C'
+                        const opName = users.find(u => u.id === ev.userId)?.name
+                        const startTime = ev.startTime ? new Date(ev.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : ''
+                        return (
+                          <div
+                            key={ev.id}
+                            onClick={() => setSelected(ev)}
+                            style={{
+                              padding: '4px 7px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
+                              background, color, borderLeft: `3px solid ${userBorderColor}`,
+                              lineHeight: 1.3, overflow: 'hidden',
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {startTime && <span style={{ opacity: 0.7, marginRight: 4 }}>{startTime}</span>}
+                              {ev.contactName || 'Cliente'}
+                            </div>
+                            {ev.title && <div style={{ opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.title}</div>}
+                            {opName && <div style={{ opacity: 0.65, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>↳ {opName}</div>}
+                          </div>
+                        )
+                      })}
                     </div>
                   )
                 })}
@@ -294,22 +555,38 @@ export default function CalendarioPage() {
       </div>
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 20, justifyContent: 'center', fontSize: 12.5 }}>
+      <div style={{ display: 'flex', gap: 20, justifyContent: 'center', fontSize: 12.5, flexWrap: 'wrap' }}>
         {[
-          { label: 'Confermato', color: 'var(--bs-cta)' },
-          { label: 'In attesa', color: 'var(--bs-warning)' },
-          { label: 'Annullato', color: 'var(--bs-danger)' },
+          { label: 'Confermato', bg: 'rgba(16,185,129,0.14)', border: '#10B981' },
+          { label: 'In attesa', bg: 'rgba(245,158,11,0.14)', border: '#F59E0B' },
+          { label: 'Annullato', bg: 'rgba(239,68,68,0.14)', border: '#EF4444' },
+          { label: 'No-show', bg: 'rgba(107,114,128,0.14)', border: '#6B7280' },
+          { label: 'Completato', bg: 'rgba(99,102,241,0.14)', border: '#6366F1' },
         ].map(l => (
           <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 3, background: l.color }} />
+            <div style={{ width: 14, height: 10, borderRadius: 3, background: l.bg, borderLeft: `3px solid ${l.border}` }} />
             <span style={{ color: 'var(--bs-text-muted)' }}>{l.label}</span>
           </div>
         ))}
+        {users.length > 0 && (
+          <>
+            <div style={{ width: 1, background: 'var(--bs-line)' }} />
+            <span style={{ color: 'var(--bs-text-faint)', fontSize: 12 }}>Bordo = operatore:</span>
+            {users.map((u, i) => (
+              <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 3, height: 14, borderRadius: 2, background: USER_COLORS[i % USER_COLORS.length] }} />
+                <span style={{ color: 'var(--bs-text-muted)', fontSize: 12 }}>{u.name}</span>
+              </div>
+            ))}
+          </>
+        )}
       </div>
 
       {selected && (
-        <AppointmentPanel
+        <AppointmentModal
           event={selected}
+          users={users}
+          calendars={calendars}
           onClose={() => setSelected(null)}
           onAction={() => setRefreshKey(k => k + 1)}
         />

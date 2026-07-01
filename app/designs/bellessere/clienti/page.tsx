@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 
 interface Contact {
   id: string
@@ -14,11 +13,17 @@ interface Contact {
   tags: string[]
 }
 
+interface Calendar { id: string; name: string; slotDuration?: number; price?: number; isActive?: boolean; teamMembers?: { userId: string }[] }
+
 interface Appointment {
   id: string
   title?: string
   startTime?: string
+  endTime?: string
   appointmentStatus?: string
+  contactId?: string
+  calendarId?: string
+  userId?: string
 }
 
 function initials(c: Contact) {
@@ -99,10 +104,13 @@ function TagEditor({ contactId, initialTags }: { contactId: string; initialTags:
   )
 }
 
-function CustomerPanel({ contact, onClose }: { contact: Contact; onClose: () => void }) {
+function CustomerPanel({ contact, onClose, onBookAppointment }: {
+  contact: Contact; onClose: () => void; onBookAppointment: (contactId: string) => void
+}) {
   const [tab, setTab] = useState<'appuntamenti' | 'messaggi'>('appuntamenti')
   const [events, setEvents] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
+  const [apptSearch, setApptSearch] = useState('')
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [msgText, setMsgText] = useState('')
@@ -110,15 +118,16 @@ function CustomerPanel({ contact, onClose }: { contact: Contact; onClose: () => 
 
   useEffect(() => {
     setLoading(true)
-    const start = new Date(); start.setMonth(start.getMonth() - 6)
-    const end = new Date(); end.setMonth(end.getMonth() + 2)
+    const start = new Date(); start.setFullYear(start.getFullYear() - 3)
+    const end = new Date(); end.setMonth(end.getMonth() + 6)
     Promise.all([
       fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`).then(r => r.json()),
       fetch(`/api/bellessere/contact-conversation?contactId=${contact.id}`).then(r => r.json()),
     ]).then(([apptData, convData]) => {
       setEvents((apptData.events ?? [])
         .filter((e: { contactId?: string }) => e.contactId === contact.id)
-        .map((e: Appointment) => ({ id: e.id, title: e.title, startTime: e.startTime, appointmentStatus: e.appointmentStatus })))
+        .map((e: Appointment) => ({ id: e.id, title: e.title, startTime: e.startTime, endTime: e.endTime, appointmentStatus: e.appointmentStatus, contactId: e.contactId, calendarId: e.calendarId, userId: e.userId }))
+        .sort((a: Appointment, b: Appointment) => (b.startTime ?? '').localeCompare(a.startTime ?? '')))
       setConversationId(convData.conversationId ?? null)
       setMessages(convData.messages ?? [])
     }).catch(() => {}).finally(() => setLoading(false))
@@ -233,33 +242,48 @@ function CustomerPanel({ contact, onClose }: { contact: Contact; onClose: () => 
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {tab === 'appuntamenti' && (
             <>
-              {loading ? (
-                <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Caricamento...</div>
-              ) : events.length === 0 ? (
-                <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Nessun appuntamento trovato.</div>
-              ) : events.map(ev => {
-                const cls = STATUS_CLS[ev.appointmentStatus ?? 'new'] ?? 'bs-badge-pending'
-                const lbl = STATUS_LBL[ev.appointmentStatus ?? 'new'] ?? 'In attesa'
-                return (
-                  <div key={ev.id} style={{ padding: '10px 14px', background: 'var(--bs-bg)', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{ev.title || 'Appuntamento'}</div>
-                      {ev.startTime && (
-                        <div style={{ fontSize: 11.5, color: 'var(--bs-text-muted)' }}>
-                          {new Date(ev.startTime).toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' })}
-                        </div>
-                      )}
-                    </div>
-                    <span className={`bs-badge ${cls}`}>{lbl}</span>
-                  </div>
-                )
-              })}
-              <a href="/designs/bellessere/appuntamenti" className="bs-btn-primary" style={{ justifyContent: 'center', marginTop: 4 }}>
+              <button className="bs-btn-primary" style={{ justifyContent: 'center', width: '100%' }}
+                onClick={() => { onClose(); onBookAppointment(contact.id) }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
                 Prenota appuntamento
-              </a>
+              </button>
+
+              {events.length > 5 && (
+                <div className="bs-search-wrap" style={{ background: 'var(--bs-bg)', borderRadius: 8 }}>
+                  <svg className="bs-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <input className="bs-search-input" placeholder="Cerca appuntamento..." value={apptSearch} onChange={e => setApptSearch(e.target.value)} style={{ fontSize: 12.5 }} />
+                </div>
+              )}
+
+              {loading ? (
+                <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Caricamento...</div>
+              ) : events.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Nessun appuntamento trovato.</div>
+              ) : events
+                .filter(ev => !apptSearch || (ev.title ?? '').toLowerCase().includes(apptSearch.toLowerCase()) || (ev.startTime ?? '').includes(apptSearch))
+                .map(ev => {
+                  const cls = STATUS_CLS[ev.appointmentStatus ?? 'new'] ?? 'bs-badge-pending'
+                  const lbl = STATUS_LBL[ev.appointmentStatus ?? 'new'] ?? 'In attesa'
+                  const isFuture = ev.startTime && new Date(ev.startTime) > new Date()
+                  return (
+                    <div key={ev.id} style={{ padding: '10px 14px', background: 'var(--bs-bg)', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: isFuture ? 1 : 0.85 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{ev.title || 'Appuntamento'}</div>
+                        {ev.startTime && (
+                          <div style={{ fontSize: 11.5, color: 'var(--bs-text-muted)' }}>
+                            {new Date(ev.startTime).toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' })}
+                          </div>
+                        )}
+                      </div>
+                      <span className={`bs-badge ${cls}`}>{lbl}</span>
+                    </div>
+                  )
+                })
+              }
             </>
           )}
 
@@ -366,6 +390,163 @@ function AddCustomerModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
   )
 }
 
+// ── Minimal AddAppointmentModal inline (re-uses shared logic) ────────────
+function AddAppointmentModal({ onClose, onAdded, contacts, preselectedContactId }: {
+  onClose: () => void; onAdded: () => void; contacts: Contact[]; preselectedContactId?: string
+}) {
+  interface CalEntry { id: string; name: string; slotDuration?: number; price?: number; isActive?: boolean; teamMembers?: { userId: string }[] }
+  const [calendars, setCalendars] = useState<CalEntry[]>([])
+  const [users, setUsers] = useState<{ id: string; name: string }[]>([])
+  const [form, setForm] = useState({ contactId: preselectedContactId ?? '', calendarId: '', userId: '', date: '', slot: '', appointmentStatus: 'confirmed' })
+  const [slots, setSlots] = useState<string[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    fetch('/api/bellessere/services').then(r => r.json()).then(d => {
+      setCalendars(d.calendars ?? [])
+      setUsers((d.users ?? []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })))
+    }).catch(() => {})
+  }, [])
+
+  const selectedCal = calendars.find(c => c.id === form.calendarId)
+  const calTeamIds = new Set((selectedCal?.teamMembers ?? []).map(m => m.userId))
+  const calUsers = users.filter(u => calTeamIds.has(u.id))
+
+  useEffect(() => { setForm(p => ({ ...p, userId: '', slot: '' })) }, [form.calendarId])
+
+  useEffect(() => {
+    if (!form.calendarId || !form.date) { setSlots([]); return }
+    setLoadingSlots(true); setForm(p => ({ ...p, slot: '' }))
+    const params = new URLSearchParams({ calendarId: form.calendarId, date: form.date })
+    if (form.userId) params.set('userId', form.userId)
+    fetch(`/api/bellessere/free-slots?${params}`)
+      .then(r => r.json()).then(d => setSlots(d.slots ?? [])).catch(() => setSlots([]))
+      .finally(() => setLoadingSlots(false))
+  }, [form.calendarId, form.date, form.userId])
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.calendarId || !form.date || !form.slot) { setError('Seleziona servizio, data e orario'); return }
+    setSaving(true); setError('')
+    try {
+      const cal = calendars.find(c => c.id === form.calendarId)
+      const tzParts = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Rome', timeZoneName: 'longOffset' })
+        .formatToParts(new Date(`${form.date}T12:00:00Z`))
+      const offsetStr = (tzParts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT+02:00').replace('GMT', '')
+      const start = new Date(`${form.date}T${form.slot}:00${offsetStr}`)
+      const end = new Date(start.getTime() + (cal?.slotDuration ?? 30) * 60000)
+      const res = await fetch('/api/bellessere/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          calendarId: form.calendarId, contactId: form.contactId || undefined,
+          userId: form.userId || undefined, startTime: start.toISOString(), endTime: end.toISOString(),
+          appointmentStatus: form.appointmentStatus, title: cal?.name ?? 'Appuntamento', selectedTimezone: 'Europe/Rome',
+        }),
+      })
+      const data = await res.json().catch(() => ({})) as { message?: string; error?: string }
+      if (!res.ok) { setError(data.message ?? data.error ?? 'Errore'); return }
+      setTimeout(onAdded, 1200); onClose()
+    } catch (err) { setError(err instanceof Error ? err.message : 'Errore di rete') } finally { setSaving(false) }
+  }
+
+  // Reuse ContactCombobox logic inline
+  const [query, setQuery] = useState('')
+  const [comboOpen, setComboOpen] = useState(false)
+  const displayName = (c: Contact) => `${c.firstName} ${c.lastName}`.trim() || c.email || c.phone
+  const selectedContact = contacts.find(c => c.id === form.contactId)
+  const results = query.length > 0
+    ? contacts.filter(c => displayName(c).toLowerCase().includes(query.toLowerCase()) || c.phone?.includes(query)).slice(0, 30)
+    : contacts.slice(0, 30)
+
+  const today = new Date().toISOString().slice(0, 10)
+
+  return (
+    <div className="bs-modal-overlay" onClick={onClose}>
+      <div className="bs-modal" onClick={ev => ev.stopPropagation()}>
+        <div className="bs-modal-header">
+          <span className="bs-modal-title">Nuovo appuntamento</span>
+          <button className="bs-panel-close" onClick={onClose}>✕</button>
+        </div>
+        <form onSubmit={submit}>
+          <div className="bs-modal-body">
+            {error && <div style={{ padding: '10px 14px', background: '#FEF2F2', color: '#DC2626', borderRadius: 9, fontSize: 13 }}>{error}</div>}
+            <div>
+              <label className="bs-field-label">Servizio *</label>
+              <select className="bs-select" value={form.calendarId} onChange={e => setForm(p => ({ ...p, calendarId: e.target.value, slot: '' }))} required>
+                <option value="">Seleziona servizio...</option>
+                {calendars.filter(c => c.isActive !== false).map(c => <option key={c.id} value={c.id}>{c.name}{c.price ? ` — €${c.price}` : ''}</option>)}
+              </select>
+            </div>
+            {calUsers.length > 0 && (
+              <div>
+                <label className="bs-field-label">Professionista</label>
+                <select className="bs-select" value={form.userId} onChange={e => setForm(p => ({ ...p, userId: e.target.value, slot: '' }))}>
+                  <option value="">Qualsiasi disponibile</option>
+                  {calUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="bs-field-label">Cliente</label>
+              <div style={{ position: 'relative' }}>
+                <input className="bs-input" placeholder="Cerca cliente..." autoComplete="off"
+                  value={comboOpen ? query : (selectedContact ? displayName(selectedContact) : '')}
+                  onChange={e => { setQuery(e.target.value); if (!comboOpen) setComboOpen(true) }}
+                  onFocus={() => setComboOpen(true)} onBlur={() => setTimeout(() => setComboOpen(false), 150)} />
+                {comboOpen && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', border: '1px solid var(--bs-line)', borderRadius: 9, maxHeight: 200, overflowY: 'auto', zIndex: 200, boxShadow: '0 6px 20px rgba(0,0,0,0.12)' }}>
+                    <div onMouseDown={() => { setForm(p => ({ ...p, contactId: '' })); setQuery(''); setComboOpen(false) }} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--bs-text-muted)', borderBottom: '1px solid var(--bs-line)' }}>Senza cliente</div>
+                    {results.length === 0
+                      ? <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--bs-text-faint)' }}>Nessun risultato</div>
+                      : results.map(c => (
+                        <div key={c.id} onMouseDown={() => { setForm(p => ({ ...p, contactId: c.id })); setQuery(''); setComboOpen(false) }}
+                          style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, fontWeight: c.id === form.contactId ? 600 : 400, display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{displayName(c)}</span>
+                          {c.phone && <span style={{ fontSize: 11, color: 'var(--bs-text-faint)' }}>{c.phone}</span>}
+                        </div>
+                      ))
+                    }
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <label className="bs-field-label">Data *</label>
+                <input className="bs-input" type="date" min={today} value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value, slot: '' }))} required />
+              </div>
+              <div>
+                <label className="bs-field-label">Orario *</label>
+                {loadingSlots
+                  ? <div className="bs-input" style={{ color: 'var(--bs-text-faint)', fontSize: 13 }}>Caricamento...</div>
+                  : <select className="bs-select" value={form.slot} onChange={e => setForm(p => ({ ...p, slot: e.target.value }))} required disabled={!form.calendarId || !form.date}>
+                      <option value="">{!form.calendarId || !form.date ? '— prima scegli data —' : slots.length === 0 ? 'Nessuno slot' : 'Scegli orario...'}</option>
+                      {slots.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                }
+              </div>
+            </div>
+            <div>
+              <label className="bs-field-label">Stato</label>
+              <select className="bs-select" value={form.appointmentStatus} onChange={e => setForm(p => ({ ...p, appointmentStatus: e.target.value }))}>
+                <option value="confirmed">Confermato</option>
+                <option value="new">In attesa</option>
+              </select>
+            </div>
+          </div>
+          <div className="bs-modal-footer">
+            <button type="button" className="bs-btn-ghost" onClick={onClose}>Annulla</button>
+            <button type="submit" className="bs-btn-primary" disabled={saving || !form.slot}>{saving ? 'Salvataggio...' : 'Crea appuntamento'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function ClientiPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [bookingCounts, setBookingCounts] = useState<Record<string, number>>({})
@@ -375,6 +556,7 @@ export default function ClientiPage() {
   const [selected, setSelected] = useState<Contact | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [bookForContact, setBookForContact] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     setLoading(true)
@@ -507,8 +689,22 @@ export default function ClientiPage() {
         })}
       </div>
 
-      {selected && <CustomerPanel contact={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <CustomerPanel
+          contact={selected}
+          onClose={() => setSelected(null)}
+          onBookAppointment={(contactId) => { setSelected(null); setBookForContact(contactId) }}
+        />
+      )}
       {showAdd && <AddCustomerModal onClose={() => setShowAdd(false)} onAdded={() => setRefreshKey(k => k + 1)} />}
+      {bookForContact !== undefined && (
+        <AddAppointmentModal
+          contacts={contacts}
+          preselectedContactId={bookForContact}
+          onClose={() => setBookForContact(undefined)}
+          onAdded={() => setRefreshKey(k => k + 1)}
+        />
+      )}
     </div>
   )
 }
