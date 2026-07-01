@@ -104,6 +104,17 @@ export default function ImpostazioniPage() {
   const [savedMsg, setSavedMsg] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [reminderTemplate, setReminderTemplate] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('bellessere_reminder_template') ?? ''
+    return ''
+  })
+  const [reminderSaved, setReminderSaved] = useState(false)
+
+  function saveReminderTemplate() {
+    localStorage.setItem('bellessere_reminder_template', reminderTemplate)
+    setReminderSaved(true)
+    setTimeout(() => setReminderSaved(false), 2000)
+  }
 
   useEffect(() => {
     Promise.all([
@@ -190,7 +201,6 @@ export default function ImpostazioniPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
       <div>
-        <div className="bs-page-eyebrow">Bibot</div>
         <h1 className="bs-page-title">Impostazioni</h1>
       </div>
 
@@ -256,6 +266,32 @@ export default function ImpostazioniPage() {
 
       <div style={{ padding: '12px 16px', borderRadius: 10, background: 'var(--bs-gold-tint)', border: '1px solid var(--bs-line)', fontSize: 12.5, color: 'var(--bs-text-muted)', lineHeight: 1.6 }}>
         Le modifiche agli orari vengono sincronizzate con il calendario e influenzano la disponibilità di prenotazione in tempo reale.
+      </div>
+
+      {/* Reminder template */}
+      <div className="bs-card" style={{ padding: '22px 24px' }}>
+        <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Testo del reminder</div>
+        <div style={{ fontSize: 13, color: 'var(--bs-text-muted)', marginBottom: 14 }}>
+          Testo predefinito per i reminder SMS. Usa <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{nome}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{servizio}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{data}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{ora}}'}</code> come segnaposto.
+        </div>
+        <textarea
+          className="bs-input"
+          rows={4}
+          style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: 13.5 }}
+          placeholder={`Ciao {{nome}}, ti ricordiamo il tuo appuntamento per {{servizio}} il {{data}} alle {{ora}}. Per info chiama il salone. Grazie!`}
+          value={reminderTemplate}
+          onChange={e => setReminderTemplate(e.target.value)}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+          <button className="bs-btn-primary" onClick={saveReminderTemplate}>
+            {reminderSaved ? 'Salvato ✓' : 'Salva'}
+          </button>
+          {reminderTemplate && (
+            <button className="bs-btn-ghost" onClick={() => { setReminderTemplate(''); localStorage.removeItem('bellessere_reminder_template') }} style={{ fontSize: 12.5 }}>
+              Ripristina default
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stripe */}

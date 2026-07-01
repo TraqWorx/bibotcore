@@ -148,9 +148,16 @@ function RescheduleModal({ appt, calendars, users, onClose, onDone }: {
 // ── Reminder modal ─────────────────────────────────────────────────────────
 function ReminderModal({ appt, onClose }: { appt: Appointment; onClose: () => void }) {
   const dt = appt.startTime ? new Date(appt.startTime) : null
-  const defaultMsg = `Ciao ${appt.contactName ?? ''}, ti ricordiamo il tuo appuntamento${appt.title ? ` per ${appt.title}` : ''}${dt ? ` il ${dt.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} alle ${dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` : ''}.\nPer modifiche contattaci. Bellessere`
+  const savedTemplate = typeof window !== 'undefined' ? localStorage.getItem('bellessere_reminder_template') : ''
+  const builtMsg = savedTemplate
+    ? savedTemplate
+        .replace('{{nome}}', appt.contactName ?? '')
+        .replace('{{servizio}}', appt.title ?? '')
+        .replace('{{data}}', dt ? dt.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }) : '')
+        .replace('{{ora}}', dt ? dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '')
+    : `Ciao ${appt.contactName ?? ''}, ti ricordiamo il tuo appuntamento${appt.title ? ` per ${appt.title}` : ''}${dt ? ` il ${dt.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} alle ${dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` : ''}.\nPer modifiche contattaci. Bellessere`
 
-  const [msg, setMsg] = useState(defaultMsg)
+  const [msg, setMsg] = useState(builtMsg)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
@@ -543,7 +550,6 @@ function AddAppointmentModal({ onClose, onAdded, contacts, calendars, users, pre
               <label className="bs-field-label">Stato</label>
               <select className="bs-select" value={form.appointmentStatus} onChange={e => setForm(p => ({ ...p, appointmentStatus: e.target.value }))}>
                 <option value="confirmed">Confermato</option>
-                <option value="new">In attesa</option>
               </select>
             </div>
           </div>
@@ -654,7 +660,6 @@ export default function AppuntamentiPage() {
   const FILTER_TABS: { key: StatusFilter; label: string }[] = [
     { key: 'all', label: 'Tutti' },
     { key: 'confirmed', label: 'Confermati' },
-    { key: 'pending', label: 'In attesa' },
     { key: 'showed', label: 'Completati' },
     { key: 'cancelled', label: 'Annullati' },
     { key: 'noshow', label: 'No-show' },
@@ -681,7 +686,6 @@ export default function AppuntamentiPage() {
       <div className="bs-stats-grid">
         {[
           { value: totalToday, label: 'Oggi', color: 'var(--bs-text)' },
-          { value: pending, label: 'In attesa', color: 'var(--bs-warning)' },
           { value: confirmed, label: 'Confermati', color: 'var(--bs-text)' },
           { value: noshow, label: 'No-show', color: 'var(--bs-danger)' },
         ].map(s => (

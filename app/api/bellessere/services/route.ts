@@ -157,7 +157,7 @@ export async function PUT(req: NextRequest) {
   else if (duration !== undefined) ghlPayload.slotInterval = Number(duration)
   if (slotBuffer !== undefined) ghlPayload.slotBuffer = Number(slotBuffer)
   if (preBuffer !== undefined) ghlPayload.preBuffer = Number(preBuffer)
-  if (price !== undefined) ghlPayload.price = Number(price)
+  if (price !== undefined) ghlPayload.price = Number(price) || 0
   if (color !== undefined) ghlPayload.eventColor = color
   if (groupId !== undefined) ghlPayload.groupId = groupId
   if (teamMembers !== undefined) {

@@ -171,7 +171,6 @@ function AddAppointmentModal({ contacts, calendars, users, onClose, onAdded }: {
               <label className="bs-field-label">Stato</label>
               <select className="bs-select" value={form.appointmentStatus} onChange={e => setForm(p => ({ ...p, appointmentStatus: e.target.value }))}>
                 <option value="confirmed">Confermato</option>
-                <option value="new">In attesa</option>
               </select>
             </div>
           </div>
@@ -509,10 +508,17 @@ export default function CalendarioPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeStart.toISOString(), rangeEnd.toISOString(), fetchEvents])
 
-  // Client-side user filter
+  // Client-side user filter — userId direct match OR calendar's team members as fallback
   const displayedEvents = selectedUserIds.length === 0
     ? events
-    : events.filter(e => e.userId && selectedUserIds.includes(e.userId))
+    : events.filter(e => {
+        if (e.userId && selectedUserIds.includes(e.userId)) return true
+        if (e.calendarId) {
+          const cal = calendars.find(c => c.id === e.calendarId)
+          return cal?.teamMembers?.some(m => selectedUserIds.includes(m.userId)) ?? false
+        }
+        return false
+      })
 
   function prevPeriod() {
     const d = new Date(anchor)
@@ -682,7 +688,7 @@ export default function CalendarioPage() {
                 {displayDates.map((d, di) => {
                   const slotEvents = eventsForSlot(d, hour)
                   return (
-                    <div key={di} style={{ minHeight: 52, padding: 3, borderBottom: '1px solid var(--bs-line)', borderRight: di < displayDates.length - 1 ? '1px solid var(--bs-line)' : 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <div key={di} style={{ minHeight: 52, padding: 3, borderBottom: '1px solid var(--bs-line)', borderRight: di < displayDates.length - 1 ? '1px solid var(--bs-line)' : 'none', display: 'flex', flexDirection: 'column', gap: 2, background: d.toISOString().slice(0, 10) === todayStr ? 'rgba(210,171,75,0.04)' : undefined }}>
                       {slotEvents.map(ev => {
                         const { background, color } = statusStyle(ev.appointmentStatus)
                         const userBorderColor = ev.userId ? (userColorMap[ev.userId] ?? '#C9A84C') : '#C9A84C'

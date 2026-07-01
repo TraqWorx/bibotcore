@@ -30,7 +30,8 @@
   --bs-shadow-lg: 0 26px 70px rgba(15,23,42,0.18), 0 8px 22px rgba(15,23,42,0.10);
 
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background:
     radial-gradient(circle at 18% 0%, rgba(210,171,75,0.12), transparent 30%),
     radial-gradient(circle at 88% 14%, rgba(74,86,104,0.10), transparent 24%),
@@ -211,6 +212,8 @@
 .bs-main {
   flex: 1;
   min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
   padding: 38px 42px 48px;
   display: flex;
   flex-direction: column;

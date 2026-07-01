@@ -54,7 +54,7 @@ function ServiceModal({
         description: form.description,
         groupId: form.groupId || undefined,
         duration: Number(form.duration),
-        price: form.price ? Number(form.price) : undefined,
+        price: form.price !== '' ? Number(form.price) : 0,
         slotInterval: Number(form.slotInterval) || undefined,
         slotBuffer: Number(form.slotBuffer) || undefined,
         teamMembers: form.teamMembers,

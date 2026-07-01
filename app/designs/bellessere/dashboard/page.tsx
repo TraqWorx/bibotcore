@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+import NewAppointmentButton from '../_components/NewAppointmentButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -93,6 +94,7 @@ export default async function Dashboard() {
     { data: todayEvents },
     { data: tomorrowEvents },
     { data: contacts },
+    { data: services },
     users,
   ] = await Promise.all([
     sb.from('cached_calendar_events')
@@ -115,6 +117,9 @@ export default async function Dashboard() {
     sb.from('cached_contacts')
       .select('ghl_id, first_name, last_name, date_added')
       .eq('location_id', BELLESSERE_LOCATION_ID),
+    sb.from('bellessere_services')
+      .select('id, name')
+      .eq('location_id', BELLESSERE_LOCATION_ID),
     token ? getGhlUsers(token) : Promise.resolve([] as { id: string; name: string }[]),
   ])
 
@@ -125,6 +130,7 @@ export default async function Dashboard() {
 
   const contactMap = new Map(allContacts.map(c => [c.ghl_id, `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()]))
   const userMap = new Map(users.map(u => [u.id, u.name]))
+  const serviceNameMap = new Map((services ?? []).map(s => [s.id, s.name]))
 
   // Stats
   const todayTotal = tEvents.length
@@ -151,10 +157,11 @@ export default async function Dashboard() {
     .filter(o => o.count > 0)
     .sort((a, b) => b.count - a.count)
 
-  // Top 5 services by title this month
+  // Top 5 services by title this month (fall back to service name via calendar_id)
   const titleCounts: Record<string, number> = {}
   for (const e of mEvents) {
-    if (e.title) titleCounts[e.title] = (titleCounts[e.title] ?? 0) + 1
+    const label = e.title || (e.calendar_id ? serviceNameMap.get(e.calendar_id) : null)
+    if (label) titleCounts[label] = (titleCounts[label] ?? 0) + 1
   }
   const topServices = Object.entries(titleCounts)
     .sort(([, a], [, b]) => b - a)
@@ -189,12 +196,7 @@ export default async function Dashboard() {
             </svg>
             <span style={{ textTransform: 'capitalize' }}>{dateLabel}</span>
           </div>
-          <a href="/designs/bellessere/appuntamenti" className="bs-btn-primary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Nuovo appuntamento
-          </a>
+          <NewAppointmentButton />
         </div>
       </div>
 
