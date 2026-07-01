@@ -38,13 +38,14 @@ function DonutChart({ slices }: { slices: { label: string; value: number; color:
   const total = slices.reduce((s, d) => s + d.value, 0)
   if (total === 0) return null
   const r = 52; const cx = 60; const cy = 60; const ir = 28
-  let currentAngle = -Math.PI / 2
-  const paths = slices.map(s => {
-    const start = currentAngle
+  const paths = slices.map((s, index) => {
+    const start = -Math.PI / 2 + slices
+      .slice(0, index)
+      .reduce((sum, item) => sum + (item.value / total) * 2 * Math.PI, 0)
     const sweep = (s.value / total) * 2 * Math.PI
-    currentAngle += sweep
+    const end = start + sweep
     const x1 = cx + r * Math.cos(start); const y1 = cy + r * Math.sin(start)
-    const x2 = cx + r * Math.cos(currentAngle); const y2 = cy + r * Math.sin(currentAngle)
+    const x2 = cx + r * Math.cos(end); const y2 = cy + r * Math.sin(end)
     const large = sweep > Math.PI ? 1 : 0
     const d = `M ${cx} ${cy} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`
     return { ...s, d }
@@ -390,7 +391,7 @@ export default async function Dashboard() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                 <DonutChart slices={topServices} />
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 9 }}>
-                  {topServices.map((s, i) => (
+                  {topServices.map((s) => (
                     <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />
                       <div style={{ flex: 1, fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.label}</div>

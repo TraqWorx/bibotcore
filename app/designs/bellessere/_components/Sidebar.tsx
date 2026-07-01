@@ -96,7 +96,7 @@ export default function Sidebar({ email }: { email: string }) {
   return (
     <aside className="bs-sidebar">
       <div className="bs-brand">
-        <div style={{ position: 'relative', width: '100%', height: 88, overflow: 'hidden' }}>
+        <div className="bs-brand-frame">
           <Image
             src="/bellessere-logo.png"
             alt="Bellessere"
