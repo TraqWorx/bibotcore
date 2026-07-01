@@ -173,14 +173,15 @@ export default async function Dashboard() {
   const dateLabel = today.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="bs-page-stack">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <div>
+      <div className="bs-page-header">
+        <div className="bs-page-header-start">
           <div className="bs-page-eyebrow">Bentornato</div>
           <h1 className="bs-page-title">Dashboard</h1>
+          <div className="bs-page-subtitle">Vista operativa su appuntamenti, clienti, operatori e servizi più richiesti.</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="bs-page-actions">
           <div className="bs-date-chip">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>

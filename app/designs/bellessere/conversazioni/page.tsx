@@ -22,11 +22,6 @@ interface Message {
   attachments?: string[]
 }
 
-const TYPE_ICON: Record<string, string> = {
-  TYPE_PHONE: '📱', TYPE_SMS: '📱', TYPE_EMAIL: '✉️',
-  TYPE_WHATSAPP: '💬', TYPE_FB: 'f', TYPE_IG: '📷', TYPE_LIVE_CHAT: '💬',
-}
-
 const TYPE_LABEL: Record<string, string> = {
   TYPE_PHONE: 'SMS', TYPE_SMS: 'SMS', TYPE_EMAIL: 'Email',
   TYPE_WHATSAPP: 'WhatsApp', TYPE_FB: 'Facebook', TYPE_IG: 'Instagram',
@@ -113,18 +108,19 @@ export default function ConversazioniPage() {
     : conversations
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, height: 'calc(100vh - 72px)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div>
+    <div className="bs-page-stack-tight" style={{ height: 'calc(100vh - 72px)' }}>
+      <div className="bs-page-header" style={{ flexShrink: 0 }}>
+        <div className="bs-page-header-start">
           <div className="bs-page-eyebrow">Messaggistica</div>
           <h1 className="bs-page-title">Conversazioni</h1>
+          <div className="bs-page-subtitle">Inbox cliente con ricerca, canale, unread count e thread SMS in tempo reale.</div>
         </div>
       </div>
 
-      <div className="bs-card" style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: 0 }}>
+      <div className="bs-card bs-conversation-shell">
         {/* Left: conversation list */}
-        <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--bs-line)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--bs-line)' }}>
+        <div className="bs-conversation-list">
+          <div className="bs-conversation-search">
             <div className="bs-search-wrap">
               <svg className="bs-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -138,36 +134,32 @@ export default function ConversazioniPage() {
             </div>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div className="bs-conversation-scroll">
             {loading ? (
-              <div style={{ padding: 32, textAlign: 'center', color: 'var(--bs-text-faint)', fontSize: 13 }}>Caricamento...</div>
+              <div className="bs-loading-state">Caricamento conversazioni...</div>
             ) : filtered.length === 0 ? (
-              <div style={{ padding: 32, textAlign: 'center', color: 'var(--bs-text-faint)', fontSize: 13 }}>Nessuna conversazione.</div>
+              <div className="bs-empty-state">Nessuna conversazione.</div>
             ) : (
               filtered.map(conv => (
                 <div
                   key={conv.id}
+                  className="bs-conversation-row"
+                  data-active={selected?.id === conv.id ? 'true' : 'false'}
                   onClick={() => setSelected(conv)}
-                  style={{
-                    display: 'flex', alignItems: 'flex-start', gap: 12, padding: '13px 16px',
-                    borderBottom: '1px solid var(--bs-line)', cursor: 'pointer',
-                    background: selected?.id === conv.id ? 'var(--bs-gold-tint)' : 'transparent',
-                    transition: 'background 0.12s',
-                  }}
                 >
                   <div className="bs-avatar" style={{ flexShrink: 0 }}>{initials(conv.contactName)}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
-                      <span style={{ fontWeight: 700, fontSize: 13.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.contactName}</span>
-                      <span style={{ fontSize: 11, color: 'var(--bs-text-faint)', flexShrink: 0 }}>{timeAgo(conv.lastMessageDate)}</span>
+                  <div className="bs-conversation-main">
+                    <div className="bs-conversation-topline">
+                      <span className="bs-conversation-name">{conv.contactName}</span>
+                      <span className="bs-conversation-time">{timeAgo(conv.lastMessageDate)}</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 11, color: 'var(--bs-text-faint)' }}>{TYPE_ICON[conv.type] ?? '💬'}</span>
-                      <span style={{ fontSize: 12, color: 'var(--bs-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                    <div className="bs-conversation-preview">
+                      <span className="bs-channel-pill">{TYPE_LABEL[conv.type] ?? 'Chat'}</span>
+                      <span className="bs-preview-text">
                         {conv.lastMessageDirection === 'outbound' ? 'Tu: ' : ''}{conv.lastMessageBody || '—'}
                       </span>
                       {conv.unreadCount > 0 && (
-                        <span style={{ background: 'var(--bs-gold)', color: 'var(--bs-black)', fontSize: 10, fontWeight: 800, borderRadius: '100px', padding: '1px 6px', flexShrink: 0 }}>
+                        <span className="bs-unread-pill">
                           {conv.unreadCount}
                         </span>
                       )}
@@ -181,50 +173,40 @@ export default function ConversazioniPage() {
 
         {/* Right: message thread */}
         {!selected ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10, color: 'var(--bs-text-faint)' }}>
+          <div className="bs-thread-empty">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" style={{ opacity: 0.3 }}>
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
-            <div style={{ fontSize: 13 }}>Seleziona una conversazione</div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Seleziona una conversazione</div>
           </div>
         ) : (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="bs-thread">
             {/* Thread header */}
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bs-line)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+            <div className="bs-thread-header">
               <div className="bs-avatar" style={{ width: 36, height: 36, fontSize: 13 }}>{initials(selected.contactName)}</div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 14.5 }}>{selected.contactName}</div>
-                <div style={{ fontSize: 12, color: 'var(--bs-text-faint)' }}>{TYPE_LABEL[selected.type] ?? selected.type}</div>
+                <div className="bs-thread-name">{selected.contactName}</div>
+                <div className="bs-thread-meta">{TYPE_LABEL[selected.type] ?? selected.type}</div>
               </div>
             </div>
 
             {/* Messages */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="bs-message-list">
               {msgsLoading ? (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bs-text-faint)', fontSize: 13 }}>Caricamento...</div>
+                <div className="bs-loading-state">Caricamento messaggi...</div>
               ) : messages.length === 0 ? (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--bs-text-faint)', fontSize: 13 }}>Nessun messaggio.</div>
+                <div className="bs-empty-state">Nessun messaggio.</div>
               ) : (
                 messages.map(msg => (
                   <div
                     key={msg.id}
-                    style={{
-                      alignSelf: msg.direction === 'outbound' ? 'flex-end' : 'flex-start',
-                      maxWidth: '72%',
-                    }}
+                    className="bs-message-item"
+                    data-direction={msg.direction}
                   >
-                    <div style={{
-                      padding: '9px 13px',
-                      borderRadius: msg.direction === 'outbound' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                      background: msg.direction === 'outbound' ? 'var(--bs-black)' : 'var(--bs-bg)',
-                      color: msg.direction === 'outbound' ? 'white' : 'var(--bs-text)',
-                      fontSize: 13.5,
-                      lineHeight: 1.45,
-                      border: msg.direction === 'inbound' ? '1px solid var(--bs-line)' : 'none',
-                    }}>
+                    <div className="bs-message-bubble">
                       {msg.body}
                     </div>
-                    <div style={{ fontSize: 10.5, color: 'var(--bs-text-faint)', marginTop: 3, textAlign: msg.direction === 'outbound' ? 'right' : 'left', paddingInline: 4 }}>
+                    <div className="bs-message-time">
                       {new Date(msg.dateAdded).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
@@ -234,7 +216,7 @@ export default function ConversazioniPage() {
             </div>
 
             {/* Compose */}
-            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--bs-line)', display: 'flex', gap: 10, flexShrink: 0 }}>
+            <div className="bs-compose-bar">
               <input
                 ref={inputRef}
                 className="bs-input"

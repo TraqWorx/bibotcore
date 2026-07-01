@@ -91,15 +91,15 @@ function ServiceModal({
             {groups.length > 0 && (
               <div>
                 <label className="bs-field-label">Categoria *</label>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div className="bs-pill-bar">
                   {groups.map(g => (
-                    <button key={g.id} type="button" onClick={() => setForm(p => ({ ...p, groupId: g.id }))} style={{
-                      padding: '7px 18px', borderRadius: 9, cursor: 'pointer', fontSize: 13, transition: 'all 0.15s',
-                      border: `1.5px solid ${form.groupId === g.id ? 'var(--bs-gold)' : 'var(--bs-line)'}`,
-                      background: form.groupId === g.id ? 'var(--bs-gold-tint)' : 'white',
-                      color: form.groupId === g.id ? 'var(--bs-gold)' : 'var(--bs-text-muted)',
-                      fontWeight: form.groupId === g.id ? 700 : 500,
-                    }}>
+                    <button
+                      key={g.id}
+                      type="button"
+                      className="bs-choice-pill"
+                      data-active={form.groupId === g.id ? 'true' : 'false'}
+                      onClick={() => setForm(p => ({ ...p, groupId: g.id }))}
+                    >
                       {g.name}
                     </button>
                   ))}
@@ -140,7 +140,7 @@ function ServiceModal({
                 <label className="bs-field-label">Chi offre questo servizio</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
                   {users.map(u => (
-                    <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13.5, padding: '8px 12px', borderRadius: 9, border: `1.5px solid ${form.teamMembers.includes(u.id) ? 'var(--bs-gold)' : 'var(--bs-line)'}`, background: form.teamMembers.includes(u.id) ? 'var(--bs-gold-tint)' : 'white', transition: 'all 0.15s' }}>
+                    <label key={u.id} className="bs-compact-card" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13.5, borderColor: form.teamMembers.includes(u.id) ? 'var(--bs-gold)' : 'var(--bs-line-strong)', background: form.teamMembers.includes(u.id) ? 'var(--bs-gold-faint)' : undefined }}>
                       <input type="checkbox" checked={form.teamMembers.includes(u.id)} onChange={() => toggleMember(u.id)} style={{ width: 16, height: 16, accentColor: 'var(--bs-gold)' }} />
                       <span style={{ fontWeight: 600 }}>{u.name}</span>
                     </label>
@@ -215,22 +215,25 @@ export default function ServiziPage() {
     : 0
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div>
+    <div className="bs-page-stack">
+      <div className="bs-page-header">
+        <div className="bs-page-header-start">
           <div className="bs-page-eyebrow">Gestione</div>
           <h1 className="bs-page-title">Servizi</h1>
+          <div className="bs-page-subtitle">Catalogo servizi con categorie, durata, prezzo e operatori assegnati.</div>
         </div>
+        <div className="bs-page-actions">
         <button className="bs-btn-primary" onClick={() => setEditTarget('new')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           Aggiungi servizio
         </button>
+        </div>
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+      <div className="bs-stats-grid">
         <div className="bs-stat-card">
           <div className="bs-stat-value">{services.length}</div>
           <div className="bs-stat-label">Servizi totali</div>
@@ -246,54 +249,39 @@ export default function ServiziPage() {
       </div>
 
       {/* Group filter */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button onClick={() => setActiveGroup('all')} style={{
-          padding: '8px 20px', borderRadius: 10, cursor: 'pointer', fontSize: 13.5, transition: 'all 0.15s',
-          border: `1.5px solid ${activeGroup === 'all' ? 'var(--bs-black)' : 'var(--bs-line)'}`,
-          background: activeGroup === 'all' ? 'var(--bs-black)' : 'white',
-          color: activeGroup === 'all' ? 'white' : 'var(--bs-text-muted)',
-          fontWeight: activeGroup === 'all' ? 700 : 500,
-        }}>
+      <div className="bs-pill-bar">
+        <button className="bs-filter-pill" data-active={activeGroup === 'all' ? 'true' : 'false'} onClick={() => setActiveGroup('all')}>
           Tutti <span style={{ opacity: 0.6, fontSize: 12, marginLeft: 4 }}>{services.length}</span>
         </button>
         {groups.map(g => (
-          <button key={g.id} onClick={() => setActiveGroup(g.id)} style={{
-            padding: '8px 20px', borderRadius: 10, cursor: 'pointer', fontSize: 13.5, transition: 'all 0.15s',
-            border: `1.5px solid ${activeGroup === g.id ? 'var(--bs-black)' : 'var(--bs-line)'}`,
-            background: activeGroup === g.id ? 'var(--bs-black)' : 'white',
-            color: activeGroup === g.id ? 'white' : 'var(--bs-text-muted)',
-            fontWeight: activeGroup === g.id ? 700 : 500,
-          }}>
+          <button key={g.id} className="bs-filter-pill" data-active={activeGroup === g.id ? 'true' : 'false'} onClick={() => setActiveGroup(g.id)}>
             {g.name} <span style={{ opacity: 0.6, fontSize: 12, marginLeft: 4 }}>{services.filter(s => s.groupId === g.id).length}</span>
           </button>
         ))}
       </div>
 
       {loading ? (
-        <div style={{ padding: 60, textAlign: 'center', color: 'var(--bs-text-faint)' }}>Caricamento...</div>
+        <div className="bs-loading-state">Caricamento servizi...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ padding: 60, textAlign: 'center', color: 'var(--bs-text-faint)', fontSize: 13 }}>Nessun servizio trovato.</div>
+        <div className="bs-empty-state">Nessun servizio trovato.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           {Object.entries(grouped).map(([groupName, items]) => (
-            <div key={groupName} className="bs-card">
-              <div style={{ padding: '14px 20px 12px', borderBottom: '1px solid var(--bs-line)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 16, height: 3, background: 'var(--bs-gold)', borderRadius: 2 }} />
-                <span style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--bs-text-muted)' }}>{groupName}</span>
-                <span style={{ fontSize: 12, color: 'var(--bs-text-faint)', marginLeft: 'auto' }}>{items.length} servizi</span>
+            <div key={groupName} className="bs-card bs-service-group">
+              <div className="bs-service-group-header">
+                <div className="bs-service-group-mark" />
+                <span className="bs-service-group-title">{groupName}</span>
+                <span className="bs-count-chip" style={{ marginLeft: 'auto' }}>{items.length} servizi</span>
               </div>
-              {items.map((svc, idx) => {
+              {items.map((svc) => {
                 const memberNames = (svc.teamMembers ?? [])
                   .map(m => users.find(u => u.id === m.userId)?.name)
                   .filter(Boolean) as string[]
                 return (
-                  <div key={svc.id} style={{
-                    padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14,
-                    borderBottom: idx < items.length - 1 ? '1px solid var(--bs-line)' : 'none',
-                  }}>
+                  <div key={svc.id} className="bs-service-list-row">
                     {/* Icon box */}
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--bs-gold-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--bs-gold)" strokeWidth="1.8">
+                    <div className="bs-service-list-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                         <path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5V5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v3.5c0 .83-.67 1.5-1.5 1.5z"/>
                         <path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
                         <path d="M9.5 14c.83 0 1.5.67 1.5 1.5V19c0 .83-.67 1.5-1.5 1.5S8 19.83 8 19v-3.5c0-.83.67-1.5 1.5-1.5z"/>
@@ -307,23 +295,23 @@ export default function ServiziPage() {
 
                     {/* Name + description + staff */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{svc.name}</div>
+                      <div className="bs-service-list-name">{svc.name}</div>
                       {svc.cleanDescription && (
-                        <div style={{ fontSize: 12.5, color: 'var(--bs-text-muted)', marginTop: 2 }}>{svc.cleanDescription}</div>
+                        <div className="bs-service-list-desc">{svc.cleanDescription}</div>
                       )}
                       {memberNames.length > 0 && (
-                        <div style={{ fontSize: 12, color: 'var(--bs-text-faint)', marginTop: 3 }}>{memberNames.join(' · ')}</div>
+                        <div className="bs-service-list-members">{memberNames.join(' · ')}</div>
                       )}
                     </div>
 
                     {/* Duration + price */}
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      {svc.price != null && <div style={{ fontSize: 14, fontWeight: 800 }}>€{svc.price}</div>}
-                      <div style={{ fontSize: 12, color: 'var(--bs-text-faint)', marginTop: 2 }}>{svc.slotDuration ? `${svc.slotDuration} min` : '—'}</div>
+                    <div className="bs-service-price-stack">
+                      {svc.price != null && <div className="bs-service-price-value">€{svc.price}</div>}
+                      <div className="bs-service-duration-value">{svc.slotDuration ? `${svc.slotDuration} min` : '—'}</div>
                     </div>
 
                     {/* Actions */}
-                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    <div className="bs-service-list-actions">
                       <button className="bs-icon-btn" onClick={() => setEditTarget(svc)} title="Modifica">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>

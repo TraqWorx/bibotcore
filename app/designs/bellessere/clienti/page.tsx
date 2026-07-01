@@ -13,8 +13,6 @@ interface Contact {
   tags: string[]
 }
 
-interface Calendar { id: string; name: string; slotDuration?: number; price?: number; isActive?: boolean; teamMembers?: { userId: string }[] }
-
 interface Appointment {
   id: string
   title?: string
@@ -73,7 +71,7 @@ function TagEditor({ contactId, initialTags }: { contactId: string; initialTags:
       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--bs-text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Tag</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
         {tags.map(t => (
-          <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 10px', background: 'var(--bs-gold-tint)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: 100, fontSize: 12 }}>
+          <span key={t} className="bs-tag">
             {t}
             <button onClick={() => removeTag(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--bs-gold)', padding: 0, fontSize: 12, lineHeight: 1, opacity: saving ? 0.4 : 1 }} disabled={saving}>×</button>
           </span>
@@ -174,48 +172,48 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
 
         {/* Scrollable top section: avatar, contact info, stats, tags */}
         <div className="bs-panel-body" style={{ flex: '0 0 auto' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, paddingBottom: 4 }}>
+          <div className="bs-panel-hero">
             <div className="bs-avatar" style={{ width: 60, height: 60, fontSize: 20 }}>{initials(contact)}</div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontWeight: 800, fontSize: 18 }}>{fullName(contact)}</div>
-              {memberSince && <div style={{ fontSize: 12, color: 'var(--bs-text-faint)', marginTop: 2 }}>Cliente dal {memberSince}</div>}
+            <div>
+              <div className="bs-panel-hero-name">{fullName(contact)}</div>
+              {memberSince && <div className="bs-panel-hero-meta">Cliente dal {memberSince}</div>}
             </div>
           </div>
 
-          <div className="bs-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="bs-card bs-info-card">
             {contact.email && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bs-gold-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--bs-gold)" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <div className="bs-info-row">
+                <div className="bs-info-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10.5, color: 'var(--bs-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 1 }}>Email</div>
-                  <div style={{ fontSize: 13.5 }}>{contact.email}</div>
+                  <div className="bs-info-label">Email</div>
+                  <div className="bs-info-value">{contact.email}</div>
                 </div>
               </div>
             )}
             {contact.phone && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--bs-gold-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--bs-gold)" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 10a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.37h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8 9a16 16 0 0 0 6 6l.86-.86a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.73 16c.06.44.06.89 0 1.33z"/></svg>
+              <div className="bs-info-row">
+                <div className="bs-info-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 10a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.37h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8 9a16 16 0 0 0 6 6l.86-.86a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.73 16c.06.44.06.89 0 1.33z"/></svg>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10.5, color: 'var(--bs-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 1 }}>Telefono</div>
-                  <div style={{ fontSize: 13.5 }}>{contact.phone}</div>
+                  <div className="bs-info-label">Telefono</div>
+                  <div className="bs-info-value">{contact.phone}</div>
                 </div>
               </div>
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--bs-line)' }}>
+          <div className="bs-mini-stat-grid">
             {[
               { value: events.length, label: 'Prenotazioni' },
               { value: events.filter(e => e.appointmentStatus === 'showed').length, label: 'Completati' },
               { value: events.filter(e => e.appointmentStatus === 'cancelled').length, label: 'Annullati' },
-            ].map((s, i) => (
-              <div key={s.label} style={{ padding: '14px 10px', textAlign: 'center', background: 'white', borderRight: i < 2 ? '1px solid var(--bs-line)' : 'none' }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--bs-text)', letterSpacing: '-0.02em' }}>{s.value}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--bs-text-muted)', marginTop: 2 }}>{s.label}</div>
+            ].map((s) => (
+              <div key={s.label} className="bs-mini-stat">
+                <div className="bs-mini-stat-value">{s.value}</div>
+                <div className="bs-mini-stat-label">{s.label}</div>
               </div>
             ))}
           </div>
@@ -224,15 +222,9 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', borderTop: '1px solid var(--bs-line)', borderBottom: '1px solid var(--bs-line)', flexShrink: 0 }}>
+        <div className="bs-panel-tabs">
           {(['appuntamenti', 'messaggi'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              flex: 1, padding: '12px 0', background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: 13, fontWeight: tab === t ? 700 : 500,
-              color: tab === t ? 'var(--bs-text)' : 'var(--bs-text-faint)',
-              borderBottom: tab === t ? '2px solid var(--bs-black)' : '2px solid transparent',
-              textTransform: 'capitalize', transition: 'all 0.15s',
-            }}>
+            <button key={t} className="bs-panel-tab" data-active={tab === t ? 'true' : 'false'} onClick={() => setTab(t)}>
               {t === 'appuntamenti' ? 'Appuntamenti' : 'Messaggi'}
             </button>
           ))}
@@ -270,7 +262,7 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
                   const lbl = STATUS_LBL[ev.appointmentStatus ?? 'new'] ?? 'In attesa'
                   const isFuture = ev.startTime && new Date(ev.startTime) > new Date()
                   return (
-                    <div key={ev.id} style={{ padding: '10px 14px', background: 'var(--bs-bg)', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: isFuture ? 1 : 0.85 }}>
+                    <div key={ev.id} className="bs-compact-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: isFuture ? 1 : 0.85 }}>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{ev.title || 'Appuntamento'}</div>
                         {ev.startTime && (
@@ -497,13 +489,13 @@ function AddAppointmentModal({ onClose, onAdded, contacts, preselectedContactId 
                   onChange={e => { setQuery(e.target.value); if (!comboOpen) setComboOpen(true) }}
                   onFocus={() => setComboOpen(true)} onBlur={() => setTimeout(() => setComboOpen(false), 150)} />
                 {comboOpen && (
-                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', border: '1px solid var(--bs-line)', borderRadius: 9, maxHeight: 200, overflowY: 'auto', zIndex: 200, boxShadow: '0 6px 20px rgba(0,0,0,0.12)' }}>
-                    <div onMouseDown={() => { setForm(p => ({ ...p, contactId: '' })); setQuery(''); setComboOpen(false) }} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--bs-text-muted)', borderBottom: '1px solid var(--bs-line)' }}>Senza cliente</div>
+                  <div className="bs-combo-popover">
+                    <div onMouseDown={() => { setForm(p => ({ ...p, contactId: '' })); setQuery(''); setComboOpen(false) }} className="bs-combo-option" style={{ color: 'var(--bs-text-muted)' }}>Senza cliente</div>
                     {results.length === 0
-                      ? <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--bs-text-faint)' }}>Nessun risultato</div>
+                      ? <div className="bs-combo-option" style={{ color: 'var(--bs-text-faint)', cursor: 'default' }}>Nessun risultato</div>
                       : results.map(c => (
                         <div key={c.id} onMouseDown={() => { setForm(p => ({ ...p, contactId: c.id })); setQuery(''); setComboOpen(false) }}
-                          style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, fontWeight: c.id === form.contactId ? 600 : 400, display: 'flex', justifyContent: 'space-between' }}>
+                          className="bs-combo-option" style={{ fontWeight: c.id === form.contactId ? 750 : 500 }}>
                           <span>{displayName(c)}</span>
                           {c.phone && <span style={{ fontSize: 11, color: 'var(--bs-text-faint)' }}>{c.phone}</span>}
                         </div>
@@ -604,22 +596,25 @@ export default function ClientiPage() {
   const newThisMonth = contacts.filter(c => c.dateAdded && new Date(c.dateAdded) >= thisMonth).length
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <div>
+    <div className="bs-page-stack">
+      <div className="bs-page-header">
+        <div className="bs-page-header-start">
           <div className="bs-page-eyebrow">Gestione</div>
           <h1 className="bs-page-title">Clienti</h1>
+          <div className="bs-page-subtitle">Anagrafica, prenotazioni recenti, tag e messaggi cliente in un unico drawer.</div>
         </div>
+        <div className="bs-page-actions">
         <button className="bs-btn-primary" onClick={() => setShowAdd(true)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           Aggiungi cliente
         </button>
+        </div>
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      <div className="bs-stats-grid">
         {[
           { value: contacts.length, label: 'Clienti totali' },
           { value: newThisMonth, label: 'Nuovi questo mese' },
@@ -649,12 +644,16 @@ export default function ClientiPage() {
           </div>
         </div>
 
-        <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--bs-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 13.5, fontWeight: 700 }}>Tutti i clienti</span>
-          <span style={{ fontSize: 12.5, color: 'var(--bs-text-muted)' }}>{loading ? '...' : `${sorted.length} trovati`}</span>
+        <div className="bs-list-summary">
+          <span className="bs-list-summary-title">Tutti i clienti</span>
+          <span className="bs-count-chip">{loading ? '...' : `${sorted.length} trovati`}</span>
         </div>
 
-        {!loading && sorted.map(c => {
+        {loading ? (
+          <div className="bs-loading-state">Caricamento clienti...</div>
+        ) : sorted.length === 0 ? (
+          <div className="bs-empty-state">Nessun cliente trovato.</div>
+        ) : sorted.map(c => {
           const count = bookingCounts[c.id] ?? 0
           const last = lastBooking[c.id]
           const lastLabel = last

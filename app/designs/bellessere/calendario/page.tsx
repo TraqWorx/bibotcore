@@ -407,22 +407,25 @@ export default function CalendarioPage() {
   const displayDates = viewMode === 'week' ? weekDates : [anchor]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div>
+    <div className="bs-page-stack">
+      <div className="bs-page-header">
+        <div className="bs-page-header-start">
           <div className="bs-page-eyebrow">Agenda</div>
           <h1 className="bs-page-title">Calendario</h1>
+          <div className="bs-page-subtitle">Vista settimanale o giornaliera con filtri operatore e dettagli appuntamento.</div>
         </div>
+        <div className="bs-page-actions">
         <button className="bs-btn-primary" onClick={() => window.location.href = '/designs/bellessere/appuntamenti'}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           Nuovo appuntamento
         </button>
+        </div>
       </div>
 
       {/* Controls bar */}
-      <div className="bs-card" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+      <div className="bs-card bs-calendar-toolbar">
         {/* View toggle */}
         <div style={{ display: 'flex', background: 'var(--bs-bg)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--bs-line)' }}>
           {(['week', 'day'] as ViewMode[]).map(v => (

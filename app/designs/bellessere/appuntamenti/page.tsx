@@ -407,19 +407,14 @@ function ContactCombobox({ contacts, value, onChange }: {
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
       {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
-          background: '#fff', border: '1px solid var(--bs-line)', borderRadius: 9,
-          maxHeight: 220, overflowY: 'auto', zIndex: 200,
-          boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
-        }}>
-          <div onMouseDown={() => pick('')} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--bs-text-muted)', borderBottom: '1px solid var(--bs-line)' }}>
+        <div className="bs-combo-popover">
+          <div onMouseDown={() => pick('')} className="bs-combo-option" style={{ color: 'var(--bs-text-muted)' }}>
             Senza cliente
           </div>
           {results.length === 0
-            ? <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--bs-text-faint)' }}>Nessun risultato</div>
+            ? <div className="bs-combo-option" style={{ color: 'var(--bs-text-faint)', cursor: 'default' }}>Nessun risultato</div>
             : results.map(c => (
-              <div key={c.id} onMouseDown={() => pick(c.id)} style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, fontWeight: c.id === value ? 600 : 400, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={c.id} onMouseDown={() => pick(c.id)} className="bs-combo-option" style={{ fontWeight: c.id === value ? 750 : 500 }}>
                 <span>{displayName(c)}</span>
                 {c.phone && <span style={{ fontSize: 11, color: 'var(--bs-text-faint)' }}>{c.phone}</span>}
               </div>
@@ -664,18 +659,21 @@ export default function AppuntamentiPage() {
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <div>
+    <div className="bs-page-stack">
+      <div className="bs-page-header">
+        <div className="bs-page-header-start">
           <div className="bs-page-eyebrow">Gestione</div>
           <h1 className="bs-page-title">Appuntamenti</h1>
+          <div className="bs-page-subtitle">Filtra, controlla e aggiorna ogni prenotazione con azioni rapide e dettagli cliente.</div>
         </div>
+        <div className="bs-page-actions">
         <button className="bs-btn-primary" onClick={() => setShowAdd(true)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           Nuovo appuntamento
         </button>
+        </div>
       </div>
 
       <div className="bs-stats-grid">
@@ -716,9 +714,9 @@ export default function AppuntamentiPage() {
       </div>
 
       {loading ? (
-        <div style={{ padding: 60, textAlign: 'center', color: 'var(--bs-text-faint)' }}>Caricamento...</div>
+        <div className="bs-loading-state">Caricamento appuntamenti...</div>
       ) : groups.length === 0 ? (
-        <div style={{ padding: 60, textAlign: 'center', color: 'var(--bs-text-faint)', fontSize: 13 }}>Nessun appuntamento trovato.</div>
+        <div className="bs-empty-state">Nessun appuntamento trovato.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           {groups.map(([date, appts]) => (
