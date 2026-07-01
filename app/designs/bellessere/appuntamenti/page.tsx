@@ -697,7 +697,7 @@ export default function AppuntamentiPage() {
       </div>
 
       <div className="bs-card">
-        <div className="bs-filter-bar">
+        <div className="bs-filter-bar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
           <div className="bs-search-wrap">
             <svg className="bs-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -709,7 +709,7 @@ export default function AppuntamentiPage() {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          <div className="bs-filter-tabs">
+          <div className="bs-filter-tabs" style={{ alignSelf: 'flex-start' }}>
             {FILTER_TABS.map(t => (
               <button key={t.key} className="bs-filter-tab" data-active={filter === t.key ? 'true' : 'false'} onClick={() => setFilter(t.key)}>
                 {t.label}

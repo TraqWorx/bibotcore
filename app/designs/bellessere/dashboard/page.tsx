@@ -71,6 +71,18 @@ async function getGhlUsers(token: string): Promise<{ id: string; name: string }[
   } catch { return [] }
 }
 
+async function getGhlMonthEvents(token: string, start: Date, end: Date): Promise<Record<string, unknown>[]> {
+  try {
+    const res = await fetch(
+      `${GHL}/calendars/events?locationId=${BELLESSERE_LOCATION_ID}&startTime=${start.getTime()}&endTime=${end.getTime()}&includeAll=true`,
+      { headers: { Authorization: `Bearer ${token}`, Version: '2021-04-15' } }
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data?.events as Record<string, unknown>[]) ?? []
+  } catch { return [] }
+}
+
 export default async function Dashboard() {
   const sb = createAdminClient()
   const today = new Date()
@@ -90,18 +102,13 @@ export default async function Dashboard() {
   const token = conn ? await refreshIfNeeded(BELLESSERE_LOCATION_ID, conn).catch(() => null) : null
 
   const [
-    { data: monthEvents },
     { data: todayEvents },
     { data: tomorrowEvents },
     { data: contacts },
     { data: services },
     users,
+    ghlMonthEvents,
   ] = await Promise.all([
-    sb.from('cached_calendar_events')
-      .select('ghl_id, title, start_time, appointment_status, contact_ghl_id, user_id, calendar_id')
-      .eq('location_id', BELLESSERE_LOCATION_ID)
-      .gte('start_time', monthStart.toISOString())
-      .lte('start_time', monthEnd.toISOString()),
     sb.from('cached_calendar_events')
       .select('ghl_id, title, start_time, appointment_status, contact_ghl_id, user_id')
       .eq('location_id', BELLESSERE_LOCATION_ID)
@@ -121,9 +128,9 @@ export default async function Dashboard() {
       .select('id, name')
       .eq('location_id', BELLESSERE_LOCATION_ID),
     token ? getGhlUsers(token) : Promise.resolve([] as { id: string; name: string }[]),
+    token ? getGhlMonthEvents(token, monthStart, monthEnd) : Promise.resolve([] as Record<string, unknown>[]),
   ])
 
-  const mEvents = monthEvents ?? []
   const tEvents = todayEvents ?? []
   const tmrEvents = tomorrowEvents ?? []
   const allContacts = contacts ?? []
@@ -132,35 +139,39 @@ export default async function Dashboard() {
   const userMap = new Map(users.map(u => [u.id, u.name]))
   const serviceNameMap = new Map((services ?? []).map(s => [s.id, s.name]))
 
+  // Use GHL month events for reliable stats (cache may lack user_id / title)
+  const mEvents = ghlMonthEvents
+
   // Stats
   const todayTotal = tEvents.length
   const todayPending = tEvents.filter(e => !e.appointment_status || e.appointment_status === 'new' || e.appointment_status === 'pending').length
   const newClientsThisMonth = allContacts.filter(c => c.date_added && c.date_added >= monthStart.toISOString()).length
   const totalClients = allContacts.length
 
-  // Performance (month)
+  // Performance (month) — from GHL events
   const totalM = mEvents.length
-  const confirmedM = mEvents.filter(e => e.appointment_status === 'confirmed' || e.appointment_status === 'new').length
-  const showedM = mEvents.filter(e => e.appointment_status === 'showed').length
-  const noshowM = mEvents.filter(e => e.appointment_status === 'no-show' || e.appointment_status === 'noshow').length
-  const cancelledM = mEvents.filter(e => e.appointment_status === 'cancelled').length
-  const bookingRate = totalM > 0 ? Math.round((confirmedM / totalM) * 100) : 0
+  const showedM = mEvents.filter(e => e.appointmentStatus === 'showed').length
+  const noshowM = mEvents.filter(e => e.appointmentStatus === 'no-show' || e.appointmentStatus === 'noshow').length
+  const cancelledM = mEvents.filter(e => e.appointmentStatus === 'cancelled').length
   const showRate = (showedM + noshowM) > 0 ? Math.round((showedM / (showedM + noshowM)) * 100) : 0
+  const completionRate = totalM > 0 ? Math.round((showedM / totalM) * 100) : 0
+  const cancelRate = totalM > 0 ? Math.round((cancelledM / totalM) * 100) : 0
 
-  // Operatori stats this month
+  // Operatori stats this month — from GHL events (have userId)
   const userCounts: Record<string, number> = {}
   for (const e of mEvents) {
-    if (e.user_id) userCounts[e.user_id] = (userCounts[e.user_id] ?? 0) + 1
+    const uid = (e.userId ?? e.assignedUserId) as string | undefined
+    if (uid) userCounts[uid] = (userCounts[uid] ?? 0) + 1
   }
   const operatori = users
     .map(u => ({ name: u.name, count: userCounts[u.id] ?? 0 }))
     .filter(o => o.count > 0)
     .sort((a, b) => b.count - a.count)
 
-  // Top 5 services by title this month (fall back to service name via calendar_id)
+  // Top 5 services — from GHL events (have calendarId / title)
   const titleCounts: Record<string, number> = {}
   for (const e of mEvents) {
-    const label = e.title || (e.calendar_id ? serviceNameMap.get(e.calendar_id) : null)
+    const label = (e.title as string) || (e.calendarId ? serviceNameMap.get(e.calendarId as string) : null)
     if (label) titleCounts[label] = (titleCounts[label] ?? 0) + 1
   }
   const topServices = Object.entries(titleCounts)
@@ -168,10 +179,11 @@ export default async function Dashboard() {
     .slice(0, 5)
     .map(([name, value], i) => ({ label: name, value, color: PIE_COLORS[i] }))
 
-  // Top clients by appointment count this month
+  // Top clients by appointment count this month — from GHL events
   const clientApptCount: Record<string, number> = {}
   for (const e of mEvents) {
-    if (e.contact_ghl_id) clientApptCount[e.contact_ghl_id] = (clientApptCount[e.contact_ghl_id] ?? 0) + 1
+    const cid = e.contactId as string | undefined
+    if (cid) clientApptCount[cid] = (clientApptCount[cid] ?? 0) + 1
   }
   const topClients = Object.entries(clientApptCount)
     .sort(([, a], [, b]) => b - a).slice(0, 5)
@@ -316,9 +328,9 @@ export default async function Dashboard() {
             <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 20 }}>Performance</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {[
-                { label: 'Tasso di prenotazione', sublabel: 'Questo mese', value: bookingRate, color: '#10B981' },
-                { label: 'Tasso di presenza', sublabel: `Presenze / (presenze + no-show)`, value: showRate, color: '#C9A84C' },
-                { label: 'Tasso di completamento', sublabel: 'Servizi completati', value: totalM > 0 ? Math.round((showedM / totalM) * 100) : 0, color: '#6366F1' },
+                { label: 'Tasso di presenza', sublabel: 'Presenti / (presenti + no-show)', value: showRate, color: '#10B981' },
+                { label: 'Tasso di completamento', sublabel: 'Completati su totale mese', value: completionRate, color: '#C9A84C' },
+                { label: 'Tasso di cancellazione', sublabel: 'Annullati su totale mese', value: cancelRate, color: '#EF4444' },
               ].map(p => (
                 <div key={p.label} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                   <PerformanceRing pct={p.value} color={p.color} />

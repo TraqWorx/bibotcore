@@ -108,7 +108,7 @@ export default function ConversazioniPage() {
     : conversations
 
   return (
-    <div className="bs-page-stack-tight" style={{ height: 'calc(100vh - 72px)' }}>
+    <div className="bs-page-stack-tight" style={{ flex: 1, minHeight: 0 }}>
       <div className="bs-page-header" style={{ flexShrink: 0 }}>
         <div className="bs-page-header-start">
           <div className="bs-page-eyebrow">Messaggistica</div>

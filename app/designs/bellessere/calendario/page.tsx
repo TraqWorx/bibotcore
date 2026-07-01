@@ -498,6 +498,16 @@ export default function CalendarioPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeStart.toISOString(), rangeEnd.toISOString(), refreshKey, fetchEvents])
 
+  // When exactly one user is selected, fetch directly from GHL for accurate filtering
+  const [ghlUserEvents, setGhlUserEvents] = useState<CalEvent[] | null>(null)
+  useEffect(() => {
+    if (selectedUserIds.length !== 1) { setGhlUserEvents(null); return }
+    const uid = selectedUserIds[0]
+    fetch(`/api/bellessere/appointments?startTime=${rangeStart.toISOString()}&endTime=${rangeEnd.toISOString()}&userId=${uid}`)
+      .then(r => r.json()).then(d => setGhlUserEvents(d.events ?? [])).catch(() => setGhlUserEvents(null))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUserIds.join(','), rangeStart.toISOString(), rangeEnd.toISOString()])
+
   useEffect(() => {
     const channel = supabase
       .channel('bellessere-calendario')
@@ -508,17 +518,26 @@ export default function CalendarioPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeStart.toISOString(), rangeEnd.toISOString(), fetchEvents])
 
-  // Client-side user filter — userId direct match OR calendar's team members as fallback
+  // User filter: single user → use GHL-fetched events (accurate); multiple → client-side fallback
   const displayedEvents = selectedUserIds.length === 0
     ? events
-    : events.filter(e => {
-        if (e.userId && selectedUserIds.includes(e.userId)) return true
-        if (e.calendarId) {
-          const cal = calendars.find(c => c.id === e.calendarId)
-          return cal?.teamMembers?.some(m => selectedUserIds.includes(m.userId)) ?? false
-        }
-        return false
-      })
+    : selectedUserIds.length === 1
+      ? (ghlUserEvents ?? events.filter(e => {
+          if (e.userId && selectedUserIds.includes(e.userId)) return true
+          if (e.calendarId) {
+            const cal = calendars.find(c => c.id === e.calendarId)
+            return cal?.teamMembers?.some(m => selectedUserIds.includes(m.userId)) ?? false
+          }
+          return false
+        }))
+      : events.filter(e => {
+          if (e.userId && selectedUserIds.includes(e.userId)) return true
+          if (e.calendarId) {
+            const cal = calendars.find(c => c.id === e.calendarId)
+            return cal?.teamMembers?.some(m => selectedUserIds.includes(m.userId)) ?? false
+          }
+          return false
+        })
 
   function prevPeriod() {
     const d = new Date(anchor)
@@ -597,7 +616,6 @@ export default function CalendarioPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto', flexWrap: 'wrap' }}>
             {[
               { label: 'Confermato', bg: 'rgba(16,185,129,0.14)', border: '#10B981' },
-              { label: 'In attesa', bg: 'rgba(245,158,11,0.14)', border: '#F59E0B' },
               { label: 'Completato', bg: 'rgba(99,102,241,0.14)', border: '#6366F1' },
               { label: 'Annullato', bg: 'rgba(239,68,68,0.14)', border: '#EF4444' },
               { label: 'No-show', bg: 'rgba(107,114,128,0.14)', border: '#6B7280' },
@@ -688,7 +706,7 @@ export default function CalendarioPage() {
                 {displayDates.map((d, di) => {
                   const slotEvents = eventsForSlot(d, hour)
                   return (
-                    <div key={di} style={{ minHeight: 52, padding: 3, borderBottom: '1px solid var(--bs-line)', borderRight: di < displayDates.length - 1 ? '1px solid var(--bs-line)' : 'none', display: 'flex', flexDirection: 'column', gap: 2, background: d.toISOString().slice(0, 10) === todayStr ? 'rgba(210,171,75,0.04)' : undefined }}>
+                    <div key={di} style={{ minHeight: 52, padding: 3, borderBottom: '1px solid var(--bs-line)', borderRight: di < displayDates.length - 1 ? '1px solid var(--bs-line)' : 'none', display: 'flex', flexDirection: 'column', gap: 2, background: d.toISOString().slice(0, 10) === todayStr ? 'rgba(210,171,75,0.10)' : undefined }}>
                       {slotEvents.map(ev => {
                         const { background, color } = statusStyle(ev.appointmentStatus)
                         const userBorderColor = ev.userId ? (userColorMap[ev.userId] ?? '#C9A84C') : '#C9A84C'
