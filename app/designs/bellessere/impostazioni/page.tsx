@@ -257,6 +257,34 @@ export default function ImpostazioniPage() {
       <div style={{ padding: '12px 16px', borderRadius: 10, background: 'var(--bs-gold-tint)', border: '1px solid var(--bs-line)', fontSize: 12.5, color: 'var(--bs-text-muted)', lineHeight: 1.6 }}>
         Le modifiche agli orari vengono sincronizzate con il calendario e influenzano la disponibilità di prenotazione in tempo reale.
       </div>
+
+      {/* Stripe */}
+      <div className="bs-card" style={{ padding: '22px 24px', display: 'flex', alignItems: 'flex-start', gap: 20 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: '#635BFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+            <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+          </svg>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>Pagamenti Stripe</div>
+          <div style={{ fontSize: 13, color: 'var(--bs-text-muted)', lineHeight: 1.65, marginBottom: 16 }}>
+            Per accettare pagamenti online e gestire le transazioni, collega il tuo account Stripe direttamente da GoHighLevel.<br />
+            Vai su <strong>GHL → Impostazioni → Pagamenti → Integrazioni</strong> e clicca <strong>Connect with Stripe</strong>. Una volta collegato, i pagamenti per gli appuntamenti vengono gestiti automaticamente.
+          </div>
+          <a
+            href="https://app.gohighlevel.com/settings/payments/integrations"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bs-btn-primary"
+            style={{ display: 'inline-flex', textDecoration: 'none', background: '#635BFF' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+            Apri impostazioni pagamenti in GHL
+          </a>
+        </div>
+      </div>
     </div>
   )
 }

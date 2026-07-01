@@ -11,6 +11,8 @@ export async function POST(req: NextRequest) {
   if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const result = await syncBellessere('all')
+  const body = await req.json().catch(() => ({}))
+  const scope = body?.scope === 'appointments' ? 'appointments' : 'all'
+  const result = await syncBellessere(scope)
   return NextResponse.json({ ok: true, synced: result })
 }

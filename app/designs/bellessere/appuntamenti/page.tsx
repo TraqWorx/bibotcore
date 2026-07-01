@@ -25,7 +25,7 @@ interface Contact { id: string; firstName: string; lastName: string; email: stri
 interface CalTeamMember { userId: string }
 interface Calendar { id: string; name: string; slotDuration?: number; price?: number; isActive?: boolean; teamMembers?: CalTeamMember[] }
 
-type StatusFilter = 'all' | 'confirmed' | 'pending' | 'cancelled' | 'noshow'
+type StatusFilter = 'all' | 'confirmed' | 'pending' | 'cancelled' | 'noshow' | 'showed'
 
 const STATUS_CFG: Record<string, { cls: string; label: string }> = {
   confirmed:  { cls: 'bs-badge-confirmed', label: 'CONFERMATO' },
@@ -627,6 +627,7 @@ export default function AppuntamentiPage() {
         const s = a.appointmentStatus ?? 'new'
         if (filter === 'confirmed') return s === 'confirmed' || s === 'new'
         if (filter === 'pending') return s === 'pending'
+        if (filter === 'showed') return s === 'showed'
         if (filter === 'cancelled') return s === 'cancelled'
         if (filter === 'noshow') return s === 'no-show' || s === 'noshow'
         return true
@@ -654,6 +655,7 @@ export default function AppuntamentiPage() {
     { key: 'all', label: 'Tutti' },
     { key: 'confirmed', label: 'Confermati' },
     { key: 'pending', label: 'In attesa' },
+    { key: 'showed', label: 'Completati' },
     { key: 'cancelled', label: 'Annullati' },
     { key: 'noshow', label: 'No-show' },
   ]

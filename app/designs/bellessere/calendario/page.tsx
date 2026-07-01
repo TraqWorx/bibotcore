@@ -22,7 +22,7 @@ interface CalEvent {
 }
 
 interface GhlUser { id: string; name: string }
-interface GhlCalendar { id: string; name: string; slotDuration?: number; teamMembers?: { userId: string }[] }
+interface GhlCalendar { id: string; name: string; slotDuration?: number; isActive?: boolean; price?: number; teamMembers?: { userId: string }[] }
 
 type ViewMode = 'week' | 'day'
 
@@ -44,6 +44,145 @@ function statusStyle(s?: string): { background: string; color: string } {
 
 function initials(name: string) {
   return name.split(' ').map(p => p[0] ?? '').join('').toUpperCase().slice(0, 2) || '?'
+}
+
+interface Contact { id: string; firstName: string; lastName: string; email: string; phone: string }
+
+function ContactCombobox({ contacts, value, onChange }: { contacts: Contact[]; value: string; onChange: (id: string) => void }) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const selected = contacts.find(c => c.id === value)
+  const displayName = (c: Contact) => `${c.firstName} ${c.lastName}`.trim() || c.email
+  const results = query.length < 1 ? contacts.slice(0, 40) : contacts.filter(c => displayName(c).toLowerCase().includes(query.toLowerCase()) || c.phone?.includes(query)).slice(0, 40)
+  const pick = (id: string) => { onChange(id); setOpen(false); setQuery('') }
+  return (
+    <div style={{ position: 'relative' }}>
+      <input className="bs-input" placeholder="Cerca cliente..." autoComplete="off"
+        value={open ? query : (selected ? displayName(selected) : '')}
+        onChange={e => { setQuery(e.target.value); if (!open) setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
+      {open && (
+        <div className="bs-combo-popover">
+          <div onMouseDown={() => pick('')} className="bs-combo-option" style={{ color: 'var(--bs-text-muted)' }}>Senza cliente</div>
+          {results.length === 0
+            ? <div className="bs-combo-option" style={{ color: 'var(--bs-text-faint)', cursor: 'default' }}>Nessun risultato</div>
+            : results.map(c => (
+              <div key={c.id} onMouseDown={() => pick(c.id)} className="bs-combo-option" style={{ fontWeight: c.id === value ? 750 : 500 }}>
+                <span>{displayName(c)}</span>
+                {c.phone && <span style={{ fontSize: 11, color: 'var(--bs-text-faint)' }}>{c.phone}</span>}
+              </div>
+            ))
+          }
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AddAppointmentModal({ contacts, calendars, users, onClose, onAdded }: {
+  contacts: Contact[]; calendars: GhlCalendar[]; users: GhlUser[]
+  onClose: () => void; onAdded: () => void
+}) {
+  const [form, setForm] = useState({ contactId: '', calendarId: '', userId: '', date: '', slot: '', appointmentStatus: 'confirmed' })
+  const [slots, setSlots] = useState<string[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const selectedCal = calendars.find(c => c.id === form.calendarId)
+  const calTeamIds = new Set((selectedCal?.teamMembers ?? []).map(m => m.userId))
+  const calUsers = users.filter(u => calTeamIds.has(u.id))
+  useEffect(() => { setForm(p => ({ ...p, userId: '', slot: '' })) }, [form.calendarId])
+  useEffect(() => {
+    if (!form.calendarId || !form.date) { setSlots([]); return }
+    setLoadingSlots(true); setForm(p => ({ ...p, slot: '' }))
+    const params = new URLSearchParams({ calendarId: form.calendarId, date: form.date })
+    if (form.userId) params.set('userId', form.userId)
+    fetch(`/api/bellessere/free-slots?${params}`).then(r => r.json()).then(d => setSlots(d.slots ?? [])).catch(() => setSlots([])).finally(() => setLoadingSlots(false))
+  }, [form.calendarId, form.date, form.userId])
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.calendarId || !form.date || !form.slot) { setError('Seleziona servizio, data e orario'); return }
+    setSaving(true); setError('')
+    try {
+      const cal = calendars.find(c => c.id === form.calendarId)
+      const tzParts = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Rome', timeZoneName: 'longOffset' }).formatToParts(new Date(`${form.date}T12:00:00Z`))
+      const offsetStr = (tzParts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT+02:00').replace('GMT', '')
+      const start = new Date(`${form.date}T${form.slot}:00${offsetStr}`)
+      const end = new Date(start.getTime() + (cal?.slotDuration ?? 30) * 60000)
+      const res = await fetch('/api/bellessere/appointments', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calendarId: form.calendarId, contactId: form.contactId || undefined, userId: form.userId || undefined, startTime: start.toISOString(), endTime: end.toISOString(), appointmentStatus: form.appointmentStatus, title: cal?.name ?? 'Appuntamento', selectedTimezone: 'Europe/Rome' }),
+      })
+      const data = await res.json().catch(() => ({})) as { message?: string; error?: string }
+      if (!res.ok) { setError(data.message ?? data.error ?? 'Errore'); return }
+      setTimeout(onAdded, 1200); onClose()
+    } catch (err) { setError(err instanceof Error ? err.message : 'Errore di rete') } finally { setSaving(false) }
+  }
+  const today = new Date().toISOString().slice(0, 10)
+  return (
+    <div className="bs-modal-overlay" onClick={onClose}>
+      <div className="bs-modal" onClick={ev => ev.stopPropagation()}>
+        <div className="bs-modal-header">
+          <span className="bs-modal-title">Nuovo appuntamento</span>
+          <button className="bs-panel-close" onClick={onClose}>✕</button>
+        </div>
+        <form onSubmit={submit}>
+          <div className="bs-modal-body">
+            {error && <div style={{ padding: '10px 14px', background: '#FEF2F2', color: '#DC2626', borderRadius: 9, fontSize: 13 }}>{error}</div>}
+            <div>
+              <label className="bs-field-label">Servizio *</label>
+              <select className="bs-select" value={form.calendarId} onChange={e => setForm(p => ({ ...p, calendarId: e.target.value }))} required>
+                <option value="">Seleziona servizio...</option>
+                {calendars.filter(c => c.isActive !== false).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            {calUsers.length > 0 && (
+              <div>
+                <label className="bs-field-label">Professionista</label>
+                <select className="bs-select" value={form.userId} onChange={e => setForm(p => ({ ...p, userId: e.target.value, slot: '' }))}>
+                  <option value="">Qualsiasi disponibile</option>
+                  {calUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="bs-field-label">Cliente</label>
+              <ContactCombobox contacts={contacts} value={form.contactId} onChange={id => setForm(p => ({ ...p, contactId: id }))} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <label className="bs-field-label">Data *</label>
+                <input className="bs-input" type="date" min={today} value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value, slot: '' }))} required />
+              </div>
+              <div>
+                <label className="bs-field-label">Orario *</label>
+                {loadingSlots
+                  ? <div className="bs-input" style={{ color: 'var(--bs-text-faint)', fontSize: 13 }}>Caricamento...</div>
+                  : <select className="bs-select" value={form.slot} onChange={e => setForm(p => ({ ...p, slot: e.target.value }))} required disabled={!form.calendarId || !form.date}>
+                      <option value="">{!form.calendarId || !form.date ? '— prima scegli data —' : slots.length === 0 ? 'Nessuno slot' : 'Scegli orario...'}</option>
+                      {slots.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                }
+              </div>
+            </div>
+            <div>
+              <label className="bs-field-label">Stato</label>
+              <select className="bs-select" value={form.appointmentStatus} onChange={e => setForm(p => ({ ...p, appointmentStatus: e.target.value }))}>
+                <option value="confirmed">Confermato</option>
+                <option value="new">In attesa</option>
+              </select>
+            </div>
+          </div>
+          <div className="bs-modal-footer">
+            <button type="button" className="bs-btn-ghost" onClick={onClose}>Annulla</button>
+            <button type="submit" className="bs-btn-primary" disabled={saving || !form.slot}>{saving ? 'Salvataggio...' : 'Crea appuntamento'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
 }
 
 // ── Reschedule mini-modal ─────────────────────────────────────────────────
@@ -308,10 +447,12 @@ export default function CalendarioPage() {
   const [anchor, setAnchor] = useState(() => new Date())
   const [events, setEvents] = useState<CalEvent[]>([])
   const [users, setUsers] = useState<GhlUser[]>([])
+  const [contacts, setContacts] = useState<{ id: string; firstName: string; lastName: string; email: string; phone: string }[]>([])
   const [calendars, setCalendars] = useState<GhlCalendar[]>([])
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<CalEvent | null>(null)
+  const [showAdd, setShowAdd] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
   // Build stable user→color map
@@ -325,6 +466,12 @@ export default function CalendarioPage() {
         setCalendars(d.calendars ?? [])
       })
       .catch(() => {})
+    fetch('/api/bellessere/contacts')
+      .then(r => r.json())
+      .then(d => setContacts(d.contacts ?? []))
+      .catch(() => {})
+    // Backfill user_id for cached events in background (non-blocking)
+    fetch('/api/bellessere/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'appointments' }) }).catch(() => {})
   }, [])
 
   const weekDates = getWeekDates(anchor)
@@ -341,37 +488,31 @@ export default function CalendarioPage() {
     return { rangeStart: s, rangeEnd: e }
   })()
 
-  const fetchEvents = useCallback((start: Date, end: Date, userIds: string[]) => {
-    if (userIds.length === 0) {
-      return fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`)
-        .then(r => r.json()).then(d => setEvents(d.events ?? [])).catch(() => {})
-    }
-    return Promise.all(
-      userIds.map(uid =>
-        fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}&userId=${uid}`)
-          .then(r => r.json()).then(d => d.events ?? []).catch(() => [])
-      )
-    ).then(results => {
-      const seen = new Set<string>()
-      setEvents(results.flat().filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true }))
-    })
+  const fetchEvents = useCallback((start: Date, end: Date) => {
+    return fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`)
+      .then(r => r.json()).then(d => setEvents(d.events ?? [])).catch(() => {})
   }, [])
 
   useEffect(() => {
     setLoading(true)
-    fetchEvents(rangeStart, rangeEnd, selectedUserIds).finally(() => setLoading(false))
+    fetchEvents(rangeStart, rangeEnd).finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeStart.toISOString(), rangeEnd.toISOString(), selectedUserIds.join(','), refreshKey, fetchEvents])
+  }, [rangeStart.toISOString(), rangeEnd.toISOString(), refreshKey, fetchEvents])
 
   useEffect(() => {
     const channel = supabase
       .channel('bellessere-calendario')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cached_calendar_events', filter: `location_id=eq.${BELLESSERE_LOCATION_ID}` },
-        () => { fetchEvents(rangeStart, rangeEnd, selectedUserIds) })
+        () => { fetchEvents(rangeStart, rangeEnd) })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeStart.toISOString(), rangeEnd.toISOString(), selectedUserIds.join(','), fetchEvents])
+  }, [rangeStart.toISOString(), rangeEnd.toISOString(), fetchEvents])
+
+  // Client-side user filter
+  const displayedEvents = selectedUserIds.length === 0
+    ? events
+    : events.filter(e => e.userId && selectedUserIds.includes(e.userId))
 
   function prevPeriod() {
     const d = new Date(anchor)
@@ -392,7 +533,7 @@ export default function CalendarioPage() {
 
   function eventsForSlot(dayDate: Date, hour: number) {
     const dateStr = romeFmt.format(dayDate)
-    return events.filter(e => {
+    return displayedEvents.filter(e => {
       if (!e.startTime) return false
       const d = new Date(e.startTime)
       return romeFmt.format(d) === dateStr && parseInt(romeHourFmt.format(d), 10) === hour
@@ -415,48 +556,64 @@ export default function CalendarioPage() {
           <div className="bs-page-subtitle">Vista settimanale o giornaliera con filtri operatore e dettagli appuntamento.</div>
         </div>
         <div className="bs-page-actions">
-        <button className="bs-btn-primary" onClick={() => window.location.href = '/designs/bellessere/appuntamenti'}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Nuovo appuntamento
-        </button>
+          <button className="bs-btn-primary" onClick={() => setShowAdd(true)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Nuovo appuntamento
+          </button>
         </div>
       </div>
 
       {/* Controls bar */}
-      <div className="bs-card bs-calendar-toolbar">
-        {/* View toggle */}
-        <div style={{ display: 'flex', background: 'var(--bs-bg)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--bs-line)' }}>
-          {(['week', 'day'] as ViewMode[]).map(v => (
-            <button key={v} onClick={() => setViewMode(v)} style={{
-              padding: '7px 16px', border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: viewMode === v ? 700 : 500,
-              background: viewMode === v ? 'var(--bs-black)' : 'transparent',
-              color: viewMode === v ? 'white' : 'var(--bs-text-muted)',
-              transition: 'all 0.15s',
-            }}>
-              {v === 'week' ? 'Settimana' : 'Giorno'}
-            </button>
-          ))}
+      <div className="bs-card" style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Row 1: view toggle + navigation */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', background: 'var(--bs-bg)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--bs-line)', flexShrink: 0 }}>
+            {(['week', 'day'] as ViewMode[]).map(v => (
+              <button key={v} onClick={() => setViewMode(v)} style={{
+                padding: '7px 16px', border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: viewMode === v ? 700 : 500,
+                background: viewMode === v ? 'var(--bs-black)' : 'transparent',
+                color: viewMode === v ? 'white' : 'var(--bs-text-muted)',
+                transition: 'all 0.15s',
+              }}>
+                {v === 'week' ? 'Settimana' : 'Giorno'}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <button className="bs-btn-ghost" onClick={prevPeriod} style={{ padding: '7px 12px' }}>‹</button>
+            <div style={{ fontWeight: 700, fontSize: 14.5, textTransform: 'capitalize', minWidth: 160 }}>{navLabel}</div>
+            <button className="bs-btn-ghost" onClick={nextPeriod} style={{ padding: '7px 12px' }}>›</button>
+            <button className="bs-btn-ghost" onClick={() => setAnchor(new Date())} style={{ fontSize: 12.5 }}>Oggi</button>
+          </div>
+          {/* Status legend inline */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto', flexWrap: 'wrap' }}>
+            {[
+              { label: 'Confermato', bg: 'rgba(16,185,129,0.14)', border: '#10B981' },
+              { label: 'In attesa', bg: 'rgba(245,158,11,0.14)', border: '#F59E0B' },
+              { label: 'Completato', bg: 'rgba(99,102,241,0.14)', border: '#6366F1' },
+              { label: 'Annullato', bg: 'rgba(239,68,68,0.14)', border: '#EF4444' },
+              { label: 'No-show', bg: 'rgba(107,114,128,0.14)', border: '#6B7280' },
+            ].map(l => (
+              <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 12, height: 9, borderRadius: 2, background: l.bg, borderLeft: `3px solid ${l.border}`, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: 'var(--bs-text-muted)', whiteSpace: 'nowrap' }}>{l.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Navigation */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button className="bs-btn-ghost" onClick={prevPeriod} style={{ padding: '7px 12px' }}>‹</button>
-          <div style={{ fontWeight: 700, fontSize: 14.5, textTransform: 'capitalize', minWidth: 180 }}>{navLabel}</div>
-          <button className="bs-btn-ghost" onClick={nextPeriod} style={{ padding: '7px 12px' }}>›</button>
-          <button className="bs-btn-ghost" onClick={() => setAnchor(new Date())} style={{ fontSize: 12.5 }}>Oggi</button>
-        </div>
-
-        {/* User filter pills */}
+        {/* Row 2: user filter pills (only when users exist) */}
         {users.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', paddingTop: 4, borderTop: '1px solid var(--bs-line)' }}>
+            <span style={{ fontSize: 11.5, color: 'var(--bs-text-faint)', marginRight: 4, flexShrink: 0 }}>Operatore:</span>
             <button
               onClick={() => setSelectedUserIds([])}
               style={{
-                padding: '5px 14px', borderRadius: 100, fontSize: 12.5, cursor: 'pointer',
+                padding: '4px 12px', borderRadius: 100, fontSize: 12, cursor: 'pointer',
                 border: `1.5px solid ${selectedUserIds.length === 0 ? 'var(--bs-black)' : 'var(--bs-line)'}`,
-                background: selectedUserIds.length === 0 ? 'var(--bs-black)' : 'white',
+                background: selectedUserIds.length === 0 ? 'var(--bs-black)' : 'transparent',
                 color: selectedUserIds.length === 0 ? 'white' : 'var(--bs-text-muted)',
                 fontWeight: selectedUserIds.length === 0 ? 700 : 400,
               }}
@@ -470,13 +627,15 @@ export default function CalendarioPage() {
                     prev.includes(u.id) ? prev.filter(id => id !== u.id) : [...prev, u.id]
                   )}
                   style={{
-                    padding: '5px 14px', borderRadius: 100, fontSize: 12.5, cursor: 'pointer',
+                    padding: '4px 12px', borderRadius: 100, fontSize: 12, cursor: 'pointer',
                     border: `1.5px solid ${active ? col : 'var(--bs-line)'}`,
-                    background: active ? col + '22' : 'white',
+                    background: active ? col + '20' : 'transparent',
                     color: active ? col : 'var(--bs-text-muted)',
                     fontWeight: active ? 700 : 400,
+                    display: 'flex', alignItems: 'center', gap: 5,
                   }}
                 >
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: col, flexShrink: 0 }} />
                   {u.name}
                 </button>
               )
@@ -557,34 +716,6 @@ export default function CalendarioPage() {
         )}
       </div>
 
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: 20, justifyContent: 'center', fontSize: 12.5, flexWrap: 'wrap' }}>
-        {[
-          { label: 'Confermato', bg: 'rgba(16,185,129,0.14)', border: '#10B981' },
-          { label: 'In attesa', bg: 'rgba(245,158,11,0.14)', border: '#F59E0B' },
-          { label: 'Annullato', bg: 'rgba(239,68,68,0.14)', border: '#EF4444' },
-          { label: 'No-show', bg: 'rgba(107,114,128,0.14)', border: '#6B7280' },
-          { label: 'Completato', bg: 'rgba(99,102,241,0.14)', border: '#6366F1' },
-        ].map(l => (
-          <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 14, height: 10, borderRadius: 3, background: l.bg, borderLeft: `3px solid ${l.border}` }} />
-            <span style={{ color: 'var(--bs-text-muted)' }}>{l.label}</span>
-          </div>
-        ))}
-        {users.length > 0 && (
-          <>
-            <div style={{ width: 1, background: 'var(--bs-line)' }} />
-            <span style={{ color: 'var(--bs-text-faint)', fontSize: 12 }}>Bordo = operatore:</span>
-            {users.map((u, i) => (
-              <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 3, height: 14, borderRadius: 2, background: USER_COLORS[i % USER_COLORS.length] }} />
-                <span style={{ color: 'var(--bs-text-muted)', fontSize: 12 }}>{u.name}</span>
-              </div>
-            ))}
-          </>
-        )}
-      </div>
-
       {selected && (
         <AppointmentModal
           event={selected}
@@ -592,6 +723,15 @@ export default function CalendarioPage() {
           calendars={calendars}
           onClose={() => setSelected(null)}
           onAction={() => setRefreshKey(k => k + 1)}
+        />
+      )}
+      {showAdd && (
+        <AddAppointmentModal
+          contacts={contacts}
+          calendars={calendars}
+          users={users}
+          onClose={() => setShowAdd(false)}
+          onAdded={() => setRefreshKey(k => k + 1)}
         />
       )}
     </div>

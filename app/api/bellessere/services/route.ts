@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     eventColor: color,
     isActive: true,
     price: price ? Number(price) : undefined,
-    teamMembers: teamMembers.map((id: string) => ({ userId: id, priority: 0, meetingLocationType: 'default' })),
+    teamMembers: teamMembers.map((id: string) => ({ userId: id, priority: 0, meetingLocationType: 'custom' })),
     calendarType: 'service',
   }
   if (groupId) ghlPayload.groupId = groupId
@@ -161,7 +161,7 @@ export async function PUT(req: NextRequest) {
   if (color !== undefined) ghlPayload.eventColor = color
   if (groupId !== undefined) ghlPayload.groupId = groupId
   if (teamMembers !== undefined) {
-    ghlPayload.teamMembers = teamMembers.map((id: string) => ({ userId: id, priority: 0, meetingLocationType: 'default' }))
+    ghlPayload.teamMembers = teamMembers.map((id: string) => ({ userId: id, priority: 0, meetingLocationType: 'custom' }))
   }
 
   const res = await fetch(`${GHL}/calendars/${calendarId}`, {

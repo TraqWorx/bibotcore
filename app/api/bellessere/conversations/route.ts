@@ -20,10 +20,25 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Back-fill missing contact names from cached_contacts
+  const missingIds = (data ?? []).filter(c => !c.contact_name && c.contact_ghl_id).map(c => c.contact_ghl_id as string)
+  let fallbackMap: Record<string, string> = {}
+  if (missingIds.length > 0) {
+    const { data: contacts } = await sb
+      .from('cached_contacts')
+      .select('ghl_id, first_name, last_name')
+      .eq('location_id', BELLESSERE_LOCATION_ID)
+      .in('ghl_id', missingIds)
+    for (const c of contacts ?? []) {
+      const name = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()
+      if (name) fallbackMap[c.ghl_id] = name
+    }
+  }
+
   const conversations = (data ?? []).map(c => ({
     id: c.ghl_id,
     contactId: c.contact_ghl_id ?? '',
-    contactName: c.contact_name ?? 'Sconosciuto',
+    contactName: c.contact_name || (c.contact_ghl_id ? fallbackMap[c.contact_ghl_id] : '') || 'Sconosciuto',
     type: c.type ?? '',
     lastMessageBody: c.last_message_body ?? '',
     lastMessageDate: c.last_message_date ?? '',

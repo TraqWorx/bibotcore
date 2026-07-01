@@ -109,6 +109,8 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
   const [events, setEvents] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [apptSearch, setApptSearch] = useState('')
+  const [apptDateFrom, setApptDateFrom] = useState('')
+  const [apptDateTo, setApptDateTo] = useState('')
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [msgText, setMsgText] = useState('')
@@ -243,11 +245,23 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
               </button>
 
               {events.length > 5 && (
-                <div className="bs-search-wrap" style={{ background: 'var(--bs-bg)', borderRadius: 8 }}>
-                  <svg className="bs-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                  </svg>
-                  <input className="bs-search-input" placeholder="Cerca appuntamento..." value={apptSearch} onChange={e => setApptSearch(e.target.value)} style={{ fontSize: 12.5 }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="bs-search-wrap" style={{ background: 'var(--bs-bg)', borderRadius: 8 }}>
+                    <svg className="bs-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input className="bs-search-input" placeholder="Cerca servizio..." value={apptSearch} onChange={e => setApptSearch(e.target.value)} style={{ fontSize: 12.5 }} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    <input className="bs-input" type="date" style={{ fontSize: 12 }} title="Dal" value={apptDateFrom} onChange={e => setApptDateFrom(e.target.value)} />
+                    <input className="bs-input" type="date" style={{ fontSize: 12 }} title="Al" value={apptDateTo} onChange={e => setApptDateTo(e.target.value)} />
+                  </div>
+                  {(apptSearch || apptDateFrom || apptDateTo) && (
+                    <button style={{ fontSize: 11.5, color: 'var(--bs-text-faint)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
+                      onClick={() => { setApptSearch(''); setApptDateFrom(''); setApptDateTo('') }}>
+                      Azzera filtri
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -256,7 +270,12 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
               ) : events.length === 0 ? (
                 <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Nessun appuntamento trovato.</div>
               ) : events
-                .filter(ev => !apptSearch || (ev.title ?? '').toLowerCase().includes(apptSearch.toLowerCase()) || (ev.startTime ?? '').includes(apptSearch))
+                .filter(ev => {
+                  if (apptSearch && !(ev.title ?? '').toLowerCase().includes(apptSearch.toLowerCase())) return false
+                  if (apptDateFrom && ev.startTime && ev.startTime.slice(0, 10) < apptDateFrom) return false
+                  if (apptDateTo && ev.startTime && ev.startTime.slice(0, 10) > apptDateTo) return false
+                  return true
+                })
                 .map(ev => {
                   const cls = STATUS_CLS[ev.appointmentStatus ?? 'new'] ?? 'bs-badge-pending'
                   const lbl = STATUS_LBL[ev.appointmentStatus ?? 'new'] ?? 'In attesa'

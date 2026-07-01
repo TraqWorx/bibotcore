@@ -17,7 +17,7 @@ async function getToken(): Promise<string> {
   return refreshIfNeeded(BELLESSERE_LOCATION_ID, conn)
 }
 
-export async function syncBellessere(scope: 'all' | 'users' = 'all') {
+export async function syncBellessere(scope: 'all' | 'users' | 'appointments' = 'all') {
   const token = await getToken()
   const sb = createAdminClient()
   const now = new Date().toISOString()
@@ -106,6 +106,38 @@ export async function syncBellessere(scope: 'all' | 'users' = 'all') {
       )
     }
     return { users: users.length }
+  }
+
+  if (scope === 'appointments') {
+    // Sync the last 6 months + 3 months ahead of calendar events from GHL to populate user_id
+    const start = new Date(); start.setMonth(start.getMonth() - 6)
+    const end = new Date(); end.setMonth(end.getMonth() + 3)
+    const res = await fetch(
+      `${GHL}/calendars/events?locationId=${BELLESSERE_LOCATION_ID}&startTime=${start.getTime()}&endTime=${end.getTime()}&includeAll=true`,
+      { headers: { Authorization: `Bearer ${token}`, Version: V } }
+    )
+    if (!res.ok) return { appointments: 0 }
+    const data = await res.json()
+    const events: Record<string, unknown>[] = data?.events ?? []
+    if (events.length > 0) {
+      const rows = events.map(e => ({
+        ghl_id: e.id as string,
+        location_id: BELLESSERE_LOCATION_ID,
+        calendar_id: (e.calendarId as string) ?? null,
+        contact_ghl_id: (e.contactId as string) ?? null,
+        user_id: ((e.userId ?? e.assignedUserId ?? e.user_id) as string) ?? null,
+        title: (e.title as string) ?? null,
+        start_time: (e.startTime as string) ?? null,
+        end_time: (e.endTime as string) ?? null,
+        appointment_status: ((e.appointmentStatus ?? e.status) as string) ?? null,
+        synced_at: now,
+      }))
+      // Upsert in batches of 200
+      for (let i = 0; i < rows.length; i += 200) {
+        await sb.from('cached_calendar_events').upsert(rows.slice(i, i + 200), { onConflict: 'location_id,ghl_id' })
+      }
+    }
+    return { appointments: events.length }
   }
 }
 
