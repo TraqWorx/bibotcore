@@ -709,7 +709,7 @@ export default function AppuntamentiPage() {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          <div className="bs-filter-tabs" style={{ alignSelf: 'flex-start' }}>
+          <div className="bs-filter-tabs" style={{ alignSelf: 'flex-start', flexWrap: 'wrap' }}>
             {FILTER_TABS.map(t => (
               <button key={t.key} className="bs-filter-tab" data-active={filter === t.key ? 'true' : 'false'} onClick={() => setFilter(t.key)}>
                 {t.label}

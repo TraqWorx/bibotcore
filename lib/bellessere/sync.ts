@@ -109,30 +109,26 @@ export async function syncBellessere(scope: 'all' | 'users' | 'appointments' = '
   }
 
   if (scope === 'appointments') {
-    // Sync the last 6 months + 3 months ahead of calendar events from GHL to populate user_id
+    // Sync last 6 months + 3 months ahead. GHL's /calendars/events 422s without a
+    // calendarId/userId/groupId, so fan out over groups (via the shared helper) and
+    // store the operator from assignedUserId → user_id.
+    const { fetchBellessereEvents } = await import('./events')
     const start = new Date(); start.setMonth(start.getMonth() - 6)
     const end = new Date(); end.setMonth(end.getMonth() + 3)
-    const res = await fetch(
-      `${GHL}/calendars/events?locationId=${BELLESSERE_LOCATION_ID}&startTime=${start.getTime()}&endTime=${end.getTime()}&includeAll=true`,
-      { headers: { Authorization: `Bearer ${token}`, Version: V } }
-    )
-    if (!res.ok) return { appointments: 0 }
-    const data = await res.json()
-    const events: Record<string, unknown>[] = data?.events ?? []
+    const events = await fetchBellessereEvents(token, start.getTime(), end.getTime())
     if (events.length > 0) {
       const rows = events.map(e => ({
-        ghl_id: e.id as string,
+        ghl_id: e.id,
         location_id: BELLESSERE_LOCATION_ID,
-        calendar_id: (e.calendarId as string) ?? null,
-        contact_ghl_id: (e.contactId as string) ?? null,
-        user_id: ((e.userId ?? e.assignedUserId ?? e.user_id) as string) ?? null,
-        title: (e.title as string) ?? null,
-        start_time: (e.startTime as string) ?? null,
-        end_time: (e.endTime as string) ?? null,
-        appointment_status: ((e.appointmentStatus ?? e.status) as string) ?? null,
+        calendar_id: e.calendarId,
+        contact_ghl_id: e.contactId,
+        user_id: e.userId,
+        title: e.title,
+        start_time: e.startTime,
+        end_time: e.endTime,
+        appointment_status: e.appointmentStatus,
         synced_at: now,
       }))
-      // Upsert in batches of 200
       for (let i = 0; i < rows.length; i += 200) {
         await sb.from('cached_calendar_events').upsert(rows.slice(i, i + 200), { onConflict: 'location_id,ghl_id' })
       }

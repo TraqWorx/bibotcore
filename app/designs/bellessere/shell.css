@@ -1424,6 +1424,9 @@
 .bs-conversation-shell {
   display: grid;
   grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  /* Bound the single grid row to the container height (otherwise it auto-sizes
+     to content and the inner panels never get a scroll boundary). */
+  grid-template-rows: minmax(0, 1fr);
   flex: 1;
   overflow: hidden;
   min-height: 0;
@@ -1433,6 +1436,7 @@
 .bs-conversation-list {
   display: flex;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
   border-right: 1px solid var(--bs-line);
   background: linear-gradient(180deg, rgba(248,250,252,0.82), rgba(255,255,255,0.72));
@@ -1546,6 +1550,7 @@
 
 .bs-thread {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1894,6 +1899,7 @@
 
   .bs-conversation-shell {
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
     min-height: 680px;
   }
 

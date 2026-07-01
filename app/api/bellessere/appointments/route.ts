@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+import { fetchBellessereEvents } from '@/lib/bellessere/events'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +28,8 @@ async function authCheck(req: NextRequest) {
   return null
 }
 
-// GET — read from cached_calendar_events or GHL directly (when userId filter is active)
+// GET — fetch live from GHL (via calendar groups) since the operator lives in
+// assignedUserId and the cache/userId-filter endpoints don't expose it reliably.
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
@@ -39,88 +41,42 @@ export async function GET(req: NextRequest) {
   if (!startTime || !endTime) return NextResponse.json({ error: 'startTime and endTime required' }, { status: 400 })
 
   const sb = createAdminClient()
+  const token = await getToken().catch(() => null)
+  if (!token) return NextResponse.json({ events: [] })
 
-  // When filtering by user: call GHL API directly — cache may lack user_id for unassigned events
-  if (userId) {
-    const token = await getToken().catch(() => null)
-    if (token) {
-      const startMs = new Date(startTime).getTime()
-      const endMs = new Date(endTime).getTime()
-      const ghlRes = await fetch(
-        `${GHL}/calendars/events?locationId=${BELLESSERE_LOCATION_ID}&userId=${userId}&startTime=${startMs}&endTime=${endMs}&includeAll=true`,
-        { headers: { Authorization: `Bearer ${token}`, Version: V } }
-      ).catch(() => null)
+  const startMs = new Date(startTime).getTime()
+  const endMs = new Date(endTime).getTime()
+  let all = await fetchBellessereEvents(token, startMs, endMs)
 
-      if (ghlRes?.ok) {
-        const ghlData = await ghlRes.json().catch(() => ({})) as Record<string, unknown>
-        const ghlEvents: Record<string, unknown>[] = (ghlData?.events as Record<string, unknown>[]) ?? []
+  // Filter by operator (assignedUserId, normalised to userId in the helper)
+  if (userId) all = all.filter(e => e.userId === userId)
 
-        // Join contact names from cache
-        const contactIds = [...new Set(ghlEvents.map(e => e.contactId as string).filter(Boolean))]
-        let contactMap: Record<string, string> = {}
-        if (contactIds.length > 0) {
-          const { data: contacts } = await sb
-            .from('cached_contacts')
-            .select('ghl_id, first_name, last_name')
-            .eq('location_id', BELLESSERE_LOCATION_ID)
-            .in('ghl_id', contactIds)
-          for (const c of contacts ?? []) {
-            contactMap[c.ghl_id] = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() || c.ghl_id
-          }
-        }
-
-        const events = ghlEvents.map(e => ({
-          id: e.id as string,
-          calendarId: e.calendarId as string ?? null,
-          contactId: e.contactId as string ?? null,
-          userId: ((e.userId ?? e.assignedUserId) as string) ?? null,
-          title: e.title as string ?? null,
-          startTime: e.startTime as string ?? null,
-          endTime: e.endTime as string ?? null,
-          appointmentStatus: ((e.appointmentStatus ?? e.status) as string) ?? null,
-          contactName: e.contactId ? (contactMap[e.contactId as string] ?? undefined) : undefined,
-        }))
-
-        return NextResponse.json({ events })
-      }
-    }
-  }
-
-  // Default: read from cache (no userId filter, or GHL call failed)
-  const { data: rows, error } = await sb
-    .from('cached_calendar_events')
-    .select('ghl_id, calendar_id, contact_ghl_id, user_id, title, start_time, end_time, appointment_status')
-    .eq('location_id', BELLESSERE_LOCATION_ID)
-    .gte('start_time', startTime)
-    .lte('start_time', endTime)
-    .order('start_time', { ascending: true })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  all.sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''))
 
   // Join contact names from cache
-  const contactIds = [...new Set((rows ?? []).map(r => r.contact_ghl_id).filter(Boolean))]
+  const contactIds = [...new Set(all.map(e => e.contactId).filter(Boolean))] as string[]
   let contactMap: Record<string, string> = {}
   if (contactIds.length > 0) {
     const { data: contacts } = await sb
       .from('cached_contacts')
       .select('ghl_id, first_name, last_name')
       .eq('location_id', BELLESSERE_LOCATION_ID)
-      .in('ghl_id', contactIds as string[])
+      .in('ghl_id', contactIds)
     for (const c of contacts ?? []) {
       contactMap[c.ghl_id] = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() || c.ghl_id
     }
   }
 
-  const events = (rows ?? []).map(r => ({
-    id: r.ghl_id,
-    calendarId: r.calendar_id,
-    contactId: r.contact_ghl_id,
-    userId: r.user_id,
-    title: r.title,
-    startTime: r.start_time,
-    endTime: r.end_time,
-    appointmentStatus: r.appointment_status,
-    contactName: r.contact_ghl_id ? (contactMap[r.contact_ghl_id] ?? undefined) : undefined,
+  const events = all.map(e => ({
+    id: e.id,
+    calendarId: e.calendarId,
+    contactId: e.contactId,
+    userId: e.userId,
+    title: e.title,
+    startTime: e.startTime,
+    endTime: e.endTime,
+    appointmentStatus: e.appointmentStatus,
+    contactName: e.contactId ? (contactMap[e.contactId] ?? undefined) : undefined,
   }))
 
   return NextResponse.json({ events })

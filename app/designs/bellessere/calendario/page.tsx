@@ -498,16 +498,6 @@ export default function CalendarioPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeStart.toISOString(), rangeEnd.toISOString(), refreshKey, fetchEvents])
 
-  // When exactly one user is selected, fetch directly from GHL for accurate filtering
-  const [ghlUserEvents, setGhlUserEvents] = useState<CalEvent[] | null>(null)
-  useEffect(() => {
-    if (selectedUserIds.length !== 1) { setGhlUserEvents(null); return }
-    const uid = selectedUserIds[0]
-    fetch(`/api/bellessere/appointments?startTime=${rangeStart.toISOString()}&endTime=${rangeEnd.toISOString()}&userId=${uid}`)
-      .then(r => r.json()).then(d => setGhlUserEvents(d.events ?? [])).catch(() => setGhlUserEvents(null))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedUserIds.join(','), rangeStart.toISOString(), rangeEnd.toISOString()])
-
   useEffect(() => {
     const channel = supabase
       .channel('bellessere-calendario')
@@ -518,26 +508,11 @@ export default function CalendarioPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeStart.toISOString(), rangeEnd.toISOString(), fetchEvents])
 
-  // User filter: single user → use GHL-fetched events (accurate); multiple → client-side fallback
+  // Client-side operator filter. Events now carry the operator in userId
+  // (normalised from GHL's assignedUserId server-side).
   const displayedEvents = selectedUserIds.length === 0
     ? events
-    : selectedUserIds.length === 1
-      ? (ghlUserEvents ?? events.filter(e => {
-          if (e.userId && selectedUserIds.includes(e.userId)) return true
-          if (e.calendarId) {
-            const cal = calendars.find(c => c.id === e.calendarId)
-            return cal?.teamMembers?.some(m => selectedUserIds.includes(m.userId)) ?? false
-          }
-          return false
-        }))
-      : events.filter(e => {
-          if (e.userId && selectedUserIds.includes(e.userId)) return true
-          if (e.calendarId) {
-            const cal = calendars.find(c => c.id === e.calendarId)
-            return cal?.teamMembers?.some(m => selectedUserIds.includes(m.userId)) ?? false
-          }
-          return false
-        })
+    : events.filter(e => e.userId != null && selectedUserIds.includes(e.userId))
 
   function prevPeriod() {
     const d = new Date(anchor)

@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+import { fetchBellessereEvents } from '@/lib/bellessere/events'
 import NewAppointmentButton from '../_components/NewAppointmentButton'
 
 export const dynamic = 'force-dynamic'
@@ -39,6 +40,10 @@ function DonutChart({ slices }: { slices: { label: string; value: number; color:
   const total = slices.reduce((s, d) => s + d.value, 0)
   if (total === 0) return null
   const r = 52; const cx = 60; const cy = 60; const ir = 28
+  const nonZero = slices.filter(s => s.value > 0)
+  // A single slice is a full circle — an SVG arc with identical start/end draws
+  // nothing, so render a plain ring in that case.
+  const single = nonZero.length === 1
   const paths = slices.map((s, index) => {
     const start = -Math.PI / 2 + slices
       .slice(0, index)
@@ -53,7 +58,9 @@ function DonutChart({ slices }: { slices: { label: string; value: number; color:
   })
   return (
     <svg width="120" height="120" viewBox="0 0 120 120" style={{ flexShrink: 0 }}>
-      {paths.map((p, i) => <path key={i} d={p.d} fill={p.color} stroke="white" strokeWidth="2" />)}
+      {single
+        ? <circle cx={cx} cy={cy} r={r} fill={nonZero[0].color} />
+        : paths.map((p, i) => <path key={i} d={p.d} fill={p.color} stroke="white" strokeWidth="2" />)}
       <circle cx={cx} cy={cy} r={ir} fill="white" />
       <text x={cx} y={cy + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill="#111">{total}</text>
       <text x={cx} y={cy + 16} textAnchor="middle" fontSize="9" fill="#888">totale</text>
@@ -71,17 +78,6 @@ async function getGhlUsers(token: string): Promise<{ id: string; name: string }[
   } catch { return [] }
 }
 
-async function getGhlMonthEvents(token: string, start: Date, end: Date): Promise<Record<string, unknown>[]> {
-  try {
-    const res = await fetch(
-      `${GHL}/calendars/events?locationId=${BELLESSERE_LOCATION_ID}&startTime=${start.getTime()}&endTime=${end.getTime()}&includeAll=true`,
-      { headers: { Authorization: `Bearer ${token}`, Version: '2021-04-15' } }
-    )
-    if (!res.ok) return []
-    const data = await res.json()
-    return (data?.events as Record<string, unknown>[]) ?? []
-  } catch { return [] }
-}
 
 export default async function Dashboard() {
   const sb = createAdminClient()
@@ -128,7 +124,7 @@ export default async function Dashboard() {
       .select('id, name')
       .eq('location_id', BELLESSERE_LOCATION_ID),
     token ? getGhlUsers(token) : Promise.resolve([] as { id: string; name: string }[]),
-    token ? getGhlMonthEvents(token, monthStart, monthEnd) : Promise.resolve([] as Record<string, unknown>[]),
+    token ? fetchBellessereEvents(token, monthStart.getTime(), monthEnd.getTime()) : Promise.resolve([]),
   ])
 
   const tEvents = todayEvents ?? []
@@ -139,7 +135,7 @@ export default async function Dashboard() {
   const userMap = new Map(users.map(u => [u.id, u.name]))
   const serviceNameMap = new Map((services ?? []).map(s => [s.id, s.name]))
 
-  // Use GHL month events for reliable stats (cache may lack user_id / title)
+  // Live GHL month events (fetched via calendar groups; operator = assignedUserId)
   const mEvents = ghlMonthEvents
 
   // Stats
@@ -157,21 +153,20 @@ export default async function Dashboard() {
   const completionRate = totalM > 0 ? Math.round((showedM / totalM) * 100) : 0
   const cancelRate = totalM > 0 ? Math.round((cancelledM / totalM) * 100) : 0
 
-  // Operatori stats this month — from GHL events (have userId)
+  // Operatori stats this month — userId is normalised from assignedUserId
   const userCounts: Record<string, number> = {}
   for (const e of mEvents) {
-    const uid = (e.userId ?? e.assignedUserId) as string | undefined
-    if (uid) userCounts[uid] = (userCounts[uid] ?? 0) + 1
+    if (e.userId) userCounts[e.userId] = (userCounts[e.userId] ?? 0) + 1
   }
   const operatori = users
     .map(u => ({ name: u.name, count: userCounts[u.id] ?? 0 }))
     .filter(o => o.count > 0)
     .sort((a, b) => b.count - a.count)
 
-  // Top 5 services — from GHL events (have calendarId / title)
+  // Top 5 services — by title, falling back to service name via calendarId
   const titleCounts: Record<string, number> = {}
   for (const e of mEvents) {
-    const label = (e.title as string) || (e.calendarId ? serviceNameMap.get(e.calendarId as string) : null)
+    const label = e.title || (e.calendarId ? serviceNameMap.get(e.calendarId) : null)
     if (label) titleCounts[label] = (titleCounts[label] ?? 0) + 1
   }
   const topServices = Object.entries(titleCounts)
@@ -179,11 +174,10 @@ export default async function Dashboard() {
     .slice(0, 5)
     .map(([name, value], i) => ({ label: name, value, color: PIE_COLORS[i] }))
 
-  // Top clients by appointment count this month — from GHL events
+  // Top clients by appointment count this month
   const clientApptCount: Record<string, number> = {}
   for (const e of mEvents) {
-    const cid = e.contactId as string | undefined
-    if (cid) clientApptCount[cid] = (clientApptCount[cid] ?? 0) + 1
+    if (e.contactId) clientApptCount[e.contactId] = (clientApptCount[e.contactId] ?? 0) + 1
   }
   const topClients = Object.entries(clientApptCount)
     .sort(([, a], [, b]) => b - a).slice(0, 5)
