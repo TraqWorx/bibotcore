@@ -80,6 +80,17 @@ const NAV = [
     ),
   },
   {
+    href: `${BASE}/team`,
+    label: 'Team',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="bs-nav-icon">
+        <circle cx="12" cy="8" r="4"/>
+        <path d="M6 21v-1a6 6 0 0 1 12 0v1"/>
+        <path d="M12 12v2"/>
+      </svg>
+    ),
+  },
+  {
     href: `${BASE}/impostazioni`,
     label: 'Impostazioni',
     icon: (
