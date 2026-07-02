@@ -64,13 +64,13 @@ export default function ImpostazioniPage() {
       <div className="bs-card" style={{ padding: '22px 24px' }}>
         <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Testo invito lista d&apos;attesa</div>
         <div style={{ fontSize: 13, color: 'var(--bs-text-muted)', marginBottom: 14 }}>
-          Messaggio SMS inviato quando si libera un posto. Usa <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{nome}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{servizio}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{giorno}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{link}}'}</code> come segnaposto.
+          Messaggio SMS inviato quando si libera un posto. Usa <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{nome}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{servizio}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{giorno}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{ora}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{link}}'}</code> come segnaposto.
         </div>
         <textarea
           className="bs-input"
           rows={4}
           style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: 13.5 }}
-          placeholder={`Ciao {{nome}}! Si è liberato un posto per {{servizio}} il {{giorno}} da Bellessere. Prenota subito qui: {{link}}`}
+          placeholder={`Ciao {{nome}}! Si è liberato un posto per {{servizio}} il {{giorno}} alle {{ora}} da Bellessere. Prenota subito qui: {{link}}`}
           value={inviteText}
           onChange={e => setInviteText(e.target.value)}
         />

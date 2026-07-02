@@ -41,6 +41,16 @@ export async function inviteEntry(entryId: string, freedSlot?: FreedSlot): Promi
     ? new Date(entry.preferred_date + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })
     : ''
 
+  // Exact freed-slot time when we have one (passed on auto-invite, or stored on
+  // the entry from a previous auto-invite); else the customer's specific window.
+  const slot = freedSlot ?? (entry.freed_slot as FreedSlot | null)
+  let timeLabel = ''
+  if (slot && typeof slot.startMinutes === 'number') {
+    timeLabel = `${String(Math.floor(slot.startMinutes / 60)).padStart(2, '0')}:${String(slot.startMinutes % 60).padStart(2, '0')}`
+  } else if (entry.time_pref === 'specific' && entry.preferred_from) {
+    timeLabel = `${entry.preferred_from.slice(0, 5)}${entry.preferred_to ? `–${entry.preferred_to.slice(0, 5)}` : ''}`
+  }
+
   // Use the custom invite text from Impostazioni if set, else the default.
   const { data: settings } = await sb.from('bellessere_settings')
     .select('invite_text').eq('location_id', BELLESSERE_LOCATION_ID).maybeSingle()
@@ -48,11 +58,11 @@ export async function inviteEntry(entryId: string, freedSlot?: FreedSlot): Promi
   const message = template
     ? renderInviteText(template, {
         nome: entry.first_name ?? '', servizio: entry.service_name ?? 'il tuo servizio',
-        giorno: dateLabel, link: BELLESSERE_BOOKING_LINK,
+        giorno: dateLabel, ora: timeLabel, link: BELLESSERE_BOOKING_LINK,
       })
     : buildWaitlistSms({
         name: entry.first_name ?? '', serviceName: entry.service_name ?? 'il tuo servizio',
-        dateLabel: dateLabel || undefined, bookingLink: BELLESSERE_BOOKING_LINK,
+        dateLabel: dateLabel || undefined, timeLabel: timeLabel || undefined, bookingLink: BELLESSERE_BOOKING_LINK,
       })
 
   try {

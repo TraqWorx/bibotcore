@@ -96,12 +96,13 @@ export function matchWaitlist(
 /** Substitute {{nome}} {{servizio}} {{giorno}} {{link}} in a custom invite text. */
 export function renderInviteText(
   template: string,
-  vars: { nome?: string; servizio?: string; giorno?: string; link?: string },
+  vars: { nome?: string; servizio?: string; giorno?: string; ora?: string; link?: string },
 ): string {
   return template
     .replace(/\{\{\s*nome\s*\}\}/gi, vars.nome ?? '')
     .replace(/\{\{\s*servizio\s*\}\}/gi, vars.servizio ?? '')
     .replace(/\{\{\s*giorno\s*\}\}/gi, vars.giorno ?? '')
+    .replace(/\{\{\s*ora\s*\}\}/gi, vars.ora ?? '')
     .replace(/\{\{\s*link\s*\}\}/gi, vars.link ?? '')
     .trim()
 }
@@ -111,10 +112,13 @@ export function buildWaitlistSms(opts: {
   name: string
   serviceName: string
   dateLabel?: string
+  timeLabel?: string
   bookingLink: string
 }): string {
-  const { name, serviceName, dateLabel, bookingLink } = opts
-  const when = dateLabel ? ` per ${dateLabel}` : ''
+  const { name, serviceName, dateLabel, timeLabel, bookingLink } = opts
+  const day = dateLabel ? ` ${dateLabel}` : ''
+  const time = timeLabel ? ` alle ${timeLabel}` : ''
+  const when = day || time ? ` per${day}${time}` : ''
   return `Ciao ${name || ''}! Si è liberato un posto per ${serviceName}${when} da Bellessere. `
     + `Prenota subito qui: ${bookingLink}`.trim()
 }

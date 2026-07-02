@@ -92,10 +92,10 @@ describe('matchWaitlist', () => {
 
 describe('renderInviteText', () => {
   it('substitutes all placeholders (case/space-insensitive)', () => {
-    const out = renderInviteText('Ciao {{nome}}, {{ SERVIZIO }} il {{giorno}}: {{link}}', {
-      nome: 'Marco', servizio: 'Barba', giorno: '10 luglio', link: 'https://x.y',
+    const out = renderInviteText('Ciao {{nome}}, {{ SERVIZIO }} il {{giorno}} alle {{ora}}: {{link}}', {
+      nome: 'Marco', servizio: 'Barba', giorno: '10 luglio', ora: '09:30', link: 'https://x.y',
     })
-    expect(out).toBe('Ciao Marco, Barba il 10 luglio: https://x.y')
+    expect(out).toBe('Ciao Marco, Barba il 10 luglio alle 09:30: https://x.y')
   })
   it('replaces missing vars with empty string', () => {
     expect(renderInviteText('{{nome}}{{servizio}}', {})).toBe('')
