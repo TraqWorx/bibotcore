@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     isActive: true,
     price: price ? Number(price) : undefined,
     teamMembers: teamMembers.map((id: string) => ({ userId: id, priority: 0, meetingLocationType: 'custom' })),
-    calendarType: 'service',
+    calendarType: 'service_booking',
   }
   if (groupId) ghlPayload.groupId = groupId
   if (slotBuffer != null) ghlPayload.slotBuffer = Number(slotBuffer)
