@@ -57,14 +57,14 @@ export async function POST(req: NextRequest) {
   let contactId: string | null = null
   try {
     const token = await getToken()
+    // Only include non-empty fields — GHL rejects an empty-string email (422).
+    const upsertBody: Record<string, unknown> = { locationId: BELLESSERE_LOCATION_ID, firstName: firstName ?? '', lastName: lastName ?? '' }
+    if (phone) upsertBody.phone = phone
+    if (email) upsertBody.email = email
     const res = await fetch(`${GHL}/contacts/upsert`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, Version: V, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        locationId: BELLESSERE_LOCATION_ID,
-        firstName: firstName ?? '', lastName: lastName ?? '',
-        phone: phone ?? '', email: email ?? '',
-      }),
+      body: JSON.stringify(upsertBody),
     })
     const d = await res.json().catch(() => ({}))
     contactId = d?.contact?.id ?? d?.id ?? null

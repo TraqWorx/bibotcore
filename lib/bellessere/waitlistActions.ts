@@ -28,6 +28,28 @@ export function romeParts(iso: string): { date: string; minutes: number } {
   return { date, minutes: h * 60 + m }
 }
 
+/** Resolve (and persist) the GHL contact id for an entry from its phone/email. */
+async function ensureContactId(entry: { id: string; contact_ghl_id: string | null; first_name: string | null; last_name: string | null; phone: string | null; email: string | null }): Promise<string | null> {
+  if (entry.contact_ghl_id) return entry.contact_ghl_id
+  if (!entry.phone && !entry.email) return null
+  try {
+    const token = await getToken()
+    // Only include non-empty fields — GHL rejects an empty-string email (422).
+    const body: Record<string, unknown> = { locationId: BELLESSERE_LOCATION_ID, firstName: entry.first_name ?? '', lastName: entry.last_name ?? '' }
+    if (entry.phone) body.phone = entry.phone
+    if (entry.email) body.email = entry.email
+    const res = await fetch(`${GHL}/contacts/upsert`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, Version: V, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const d = await res.json().catch(() => ({}))
+    const id = (d?.contact?.id as string) ?? (d?.id as string) ?? null
+    if (id) await createAdminClient().from('bellessere_waitlist').update({ contact_ghl_id: id }).eq('id', entry.id)
+    return id
+  } catch { return null }
+}
+
 /** Send the invite SMS for one entry and flip it to `invited` with a hold window.
  *  `freedSlot` (optional) is stored so the cron can drip to the next person. */
 export async function inviteEntry(entryId: string, freedSlot?: FreedSlot): Promise<{ ok: true } | { error: string; status?: number }> {
@@ -35,7 +57,10 @@ export async function inviteEntry(entryId: string, freedSlot?: FreedSlot): Promi
   const { data: entry } = await sb.from('bellessere_waitlist')
     .select('*').eq('location_id', BELLESSERE_LOCATION_ID).eq('id', entryId).single()
   if (!entry) return { error: 'Voce non trovata', status: 404 }
-  if (!entry.contact_ghl_id) return { error: 'Contatto GHL mancante per questa voce', status: 400 }
+
+  // Link the GHL contact now if it wasn't captured at join time (phone/email).
+  const contactId = await ensureContactId(entry)
+  if (!contactId) return { error: 'Nessun contatto: aggiungi un telefono o una email alla voce', status: 400 }
 
   const dateLabel = entry.preferred_date
     ? new Date(entry.preferred_date + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -76,7 +101,7 @@ export async function inviteEntry(entryId: string, freedSlot?: FreedSlot): Promi
     const res = await fetch(`${GHL}/conversations/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, Version: V, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'SMS', contactId: entry.contact_ghl_id, message }),
+      body: JSON.stringify({ type: 'SMS', contactId, message }),
     })
     const text = await res.text()
     if (!res.ok) {
