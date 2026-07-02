@@ -5,13 +5,13 @@ import WaitlistForm from './WaitlistForm'
 export const dynamic = 'force-dynamic'
 export const metadata = { title: "Bellessere — Lista d'attesa" }
 
-export interface WlService { id: string; name: string; groupName: string; teamMembers: string[]; duration: number | null }
+export interface WlService { id: string; name: string; groupName: string; teamMembers: string[]; duration: number | null; interval: number | null }
 export interface WlOperator { id: string; name: string }
 
 export default async function WaitlistPublicPage() {
   const sb = createAdminClient()
   const [{ data: services }, { data: groups }, { data: users }] = await Promise.all([
-    sb.from('bellessere_services').select('id, name, group_id, team_members, slot_duration, is_active').eq('location_id', BELLESSERE_LOCATION_ID),
+    sb.from('bellessere_services').select('id, name, group_id, team_members, slot_duration, slot_interval, is_active').eq('location_id', BELLESSERE_LOCATION_ID),
     sb.from('bellessere_groups').select('id, name').eq('location_id', BELLESSERE_LOCATION_ID),
     sb.from('bellessere_users').select('id, name').eq('location_id', BELLESSERE_LOCATION_ID).order('name'),
   ])
@@ -24,6 +24,7 @@ export default async function WaitlistPublicPage() {
       groupName: (s.group_id ? groupName.get(s.group_id) : '') ?? 'Servizi',
       teamMembers: ((s.team_members as { userId: string }[]) ?? []).map(m => m.userId),
       duration: s.slot_duration ?? null,
+      interval: s.slot_interval ?? null,
     }))
     .sort((a, b) => a.groupName.localeCompare(b.groupName) || a.name.localeCompare(b.name))
   const ops: WlOperator[] = (users ?? []).map(u => ({ id: u.id, name: u.name ?? '' }))

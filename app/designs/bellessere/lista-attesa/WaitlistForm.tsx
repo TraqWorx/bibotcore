@@ -45,6 +45,8 @@ export default function WaitlistForm({ services, operators }: { services: WlServ
   }, [services])
 
   const today = new Date().toISOString().slice(0, 10)
+  // Time picker steps by the selected service's booking interval (default 15 min)
+  const stepSeconds = (selectedService?.interval || 15) * 60
 
   const setSlot = (i: number, patch: Partial<DaySlot>) => setSlots(prev => prev.map((s, idx) => idx === i ? { ...s, ...patch } : s))
   const addSlot = () => setSlots(prev => [...prev, emptySlot()])
@@ -144,9 +146,9 @@ export default function WaitlistForm({ services, operators }: { services: WlServ
                 </div>
                 {s.timePref === 'specific' && (
                   <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
-                    <input style={field} type="time" value={s.from} onChange={e => setSlot(i, { from: e.target.value })} />
+                    <input style={field} type="time" step={stepSeconds} value={s.from} onChange={e => setSlot(i, { from: e.target.value })} />
                     <span style={{ color: '#8C96A6' }}>→</span>
-                    <input style={field} type="time" value={s.to} onChange={e => setSlot(i, { to: e.target.value })} />
+                    <input style={field} type="time" step={stepSeconds} value={s.to} onChange={e => setSlot(i, { to: e.target.value })} />
                   </div>
                 )}
               </div>
