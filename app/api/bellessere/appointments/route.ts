@@ -179,6 +179,23 @@ export async function PUT(req: NextRequest) {
       .update({ appointment_status: payload.appointmentStatus, synced_at: new Date().toISOString() })
       .eq('location_id', BELLESSERE_LOCATION_ID)
       .eq('ghl_id', eventId)
+
+    // When a booking is cancelled, a slot frees up → auto-invite the first
+    // matching person on the waiting list (guarded so it never breaks the cancel).
+    if (payload.appointmentStatus === 'cancelled') {
+      try {
+        const { data: ev } = await sb.from('cached_calendar_events')
+          .select('calendar_id, user_id, start_time, end_time')
+          .eq('location_id', BELLESSERE_LOCATION_ID).eq('ghl_id', eventId).single()
+        if (ev) {
+          const { processFreedSlot } = await import('@/lib/bellessere/waitlistActions')
+          await processFreedSlot(
+            { calendarId: ev.calendar_id, operatorId: ev.user_id, startTime: ev.start_time, endTime: ev.end_time },
+            true,
+          )
+        }
+      } catch { /* waiting-list is best-effort; never block the cancellation */ }
+    }
   }
 
   return NextResponse.json(data)

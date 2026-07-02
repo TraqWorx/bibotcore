@@ -80,6 +80,16 @@ const NAV = [
     ),
   },
   {
+    href: `${BASE}/attesa`,
+    label: "Lista d'attesa",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="bs-nav-icon">
+        <circle cx="12" cy="12" r="9"/>
+        <polyline points="12 7 12 12 15 14"/>
+      </svg>
+    ),
+  },
+  {
     href: `${BASE}/team`,
     label: 'Team',
     icon: (

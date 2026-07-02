@@ -210,6 +210,26 @@ export async function POST(req: Request) {
     if ([...USER_CREATED_EVENTS, ...USER_DELETED_EVENTS].includes(eventType)) {
       syncBellessere('users').catch(() => {})
     }
+
+    // ── Waiting list: react to appointment events ─────────────────────────
+    const isAppt = ['AppointmentCreate', 'AppointmentUpdate', 'appointment.create', 'appointment.update'].some(e => eventType === e || eventType.includes(e))
+    if (isAppt) {
+      const status = (body.appointmentStatus ?? body.status) as string | undefined
+      const contactId = (body.contactId ?? body.contact_id) as string | undefined
+      if (status === 'cancelled') {
+        // A slot freed up somewhere in GHL → auto-invite first-in-line
+        import('@/lib/bellessere/waitlistActions').then(m => m.processFreedSlot({
+          calendarId: (body.calendarId ?? body.calendar_id) as string ?? null,
+          operatorId: (body.userId ?? body.assignedUserId ?? body.user_id) as string ?? null,
+          startTime: (body.startTime ?? body.start_time) as string ?? null,
+          endTime: (body.endTime ?? body.end_time) as string ?? null,
+        }, true)).catch(() => {})
+      } else if (contactId && (eventType.includes('Create') || eventType.includes('create'))) {
+        // The contact booked → close their active waiting-list entries
+        const eventId = (body.id ?? body.appointmentId ?? body.appointment_id) as string | undefined
+        import('@/lib/bellessere/waitlistActions').then(m => m.closeBookedForContact(contactId, eventId)).catch(() => {})
+      }
+    }
   }
 
   // ── Process CRM entity events into cache (non-blocking) ──────────────────

@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/sync-users",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/bellessere-waitlist",
+      "schedule": "20 * * * *"
     }
   ]
 }
