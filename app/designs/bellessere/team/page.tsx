@@ -128,8 +128,23 @@ export default function TeamPage() {
     })
   }
 
+  const [refreshing, setRefreshing] = useState(false)
+
+  // Pull the latest roster from GHL, then reload the cache-backed view
+  function syncRoster() {
+    setRefreshing(true)
+    return fetch('/api/bellessere/sync', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope: 'users' }),
+    }).then(() => loadTeam()).catch(() => {}).finally(() => setRefreshing(false))
+  }
+
   useEffect(() => {
-    loadTeam(true).catch(e => setError(String(e))).finally(() => setLoading(false))
+    loadTeam(true)
+      .then(() => syncRoster()) // catch members added directly in GHL
+      .catch(e => setError(String(e)))
+      .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function addMember(e: React.FormEvent) {
@@ -235,7 +250,10 @@ export default function TeamPage() {
           <h1 className="bs-page-title">Team</h1>
           <div className="bs-page-subtitle">Aggiungi o rimuovi operatori e imposta i loro orari di lavoro.</div>
         </div>
-        <div className="bs-page-actions">
+        <div className="bs-page-actions" style={{ display: 'flex', gap: 8 }}>
+          <button className="bs-btn-ghost" onClick={syncRoster} disabled={refreshing} style={{ fontSize: 13 }}>
+            {refreshing ? 'Aggiornamento...' : 'Aggiorna'}
+          </button>
           <button className="bs-btn-primary" onClick={() => setShowAddMember(v => !v)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Aggiungi membro

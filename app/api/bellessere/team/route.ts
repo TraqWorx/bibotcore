@@ -83,7 +83,11 @@ export async function POST(req: NextRequest) {
     }, { onConflict: 'id' })
   }
 
-  // Full sync in the background to pick up the auto-created personal calendar + schedule
+  // AWAIT a fast users-only sync so the roster cache is authoritative before we
+  // respond (covers any id-shape mismatch in the create response above). The
+  // heavier full sync (calendars + the auto-created personal calendar/schedule)
+  // runs in the background.
+  await import('@/lib/bellessere/sync').then(m => m.syncBellessere('users')).catch(() => {})
   import('@/lib/bellessere/sync').then(m => m.syncBellessere('all')).catch(() => {})
 
   return NextResponse.json({ id: newId, ok: true })
