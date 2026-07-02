@@ -64,7 +64,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  if (pathname.startsWith('/designs')) {
+  // Bibot-owned designs hardcode their own location, so the locationId
+  // discovery/redirect below is pure overhead (an extra round-trip per nav).
+  if (pathname.startsWith('/designs') && !pathname.startsWith('/designs/bellessere')) {
     let locationId: string | null = req.nextUrl.searchParams.get('locationId')
 
     if (!locationId) {
