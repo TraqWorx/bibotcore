@@ -7,14 +7,31 @@ export const metadata = { title: "Bellessere — Lista d'attesa" }
 
 export interface WlService { id: string; name: string; groupName: string; teamMembers: string[]; duration: number | null; interval: number | null }
 export interface WlOperator { id: string; name: string }
+export type WlInterval = { from: string; to: string }
+// userId → weekday ('monday'…) → working intervals
+export type WlSchedules = Record<string, Record<string, WlInterval[]>>
+
+interface SchedRule { type?: string; day?: string; intervals?: WlInterval[] }
 
 export default async function WaitlistPublicPage() {
   const sb = createAdminClient()
-  const [{ data: services }, { data: groups }, { data: users }] = await Promise.all([
+  const [{ data: services }, { data: groups }, { data: users }, { data: schedules }] = await Promise.all([
     sb.from('bellessere_services').select('id, name, group_id, team_members, slot_duration, slot_interval, is_active').eq('location_id', BELLESSERE_LOCATION_ID),
     sb.from('bellessere_groups').select('id, name').eq('location_id', BELLESSERE_LOCATION_ID),
     sb.from('bellessere_users').select('id, name').eq('location_id', BELLESSERE_LOCATION_ID).order('name'),
+    sb.from('bellessere_schedules').select('user_id, rules').eq('location_id', BELLESSERE_LOCATION_ID),
   ])
+
+  const schedulesByUser: WlSchedules = {}
+  for (const s of schedules ?? []) {
+    const byDay: Record<string, WlInterval[]> = {}
+    for (const rule of ((s.rules as SchedRule[]) ?? [])) {
+      if (rule.type === 'wday' && rule.day && Array.isArray(rule.intervals)) {
+        byDay[rule.day] = rule.intervals.map(iv => ({ from: iv.from, to: iv.to }))
+      }
+    }
+    schedulesByUser[s.user_id] = byDay
+  }
 
   const groupName = new Map((groups ?? []).map(g => [g.id, g.name as string]))
   const svc: WlService[] = (services ?? [])
@@ -43,7 +60,7 @@ export default async function WaitlistPublicPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="https://ghlcustomdash.com/bellessere-logo.png" alt="Bellessere" width={120} height={120} style={{ display: 'block', margin: '0 auto', objectFit: 'contain', borderRadius: 18 }} />
         </div>
-        <WaitlistForm services={svc} operators={ops} />
+        <WaitlistForm services={svc} operators={ops} schedules={schedulesByUser} />
       </div>
     </div>
   )

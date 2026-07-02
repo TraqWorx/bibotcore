@@ -1,7 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { WlService, WlOperator } from './page'
+import type { WlService, WlOperator, WlSchedules } from './page'
+
+const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
+const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 
 const card: React.CSSProperties = {
   background: 'linear-gradient(180deg, #FFFFFF, #FBFCFE)',
@@ -22,7 +26,7 @@ const TIME_OPTS = [
   { k: 'specific', l: 'Orario preciso' },
 ]
 
-export default function WaitlistForm({ services, operators }: { services: WlService[]; operators: WlOperator[] }) {
+export default function WaitlistForm({ services, operators, schedules }: { services: WlService[]; operators: WlOperator[]; schedules: WlSchedules }) {
   const [contact, setContact] = useState({ firstName: '', lastName: '', phone: '', email: '' })
   const [calendarId, setCalendarId] = useState('')
   const [operatorId, setOperatorId] = useState('')
@@ -45,15 +49,25 @@ export default function WaitlistForm({ services, operators }: { services: WlServ
   }, [services])
 
   const today = new Date().toISOString().slice(0, 10)
-  // Time options generated at the selected service's booking interval (default 15 min)
   const intervalMin = selectedService?.interval || 15
-  const timeOptions = useMemo(() => {
+
+  // Time options for a given day, generated at the service interval within the
+  // working hours of the chosen operator (or any operator on the service) for
+  // that weekday. Falls back to 07:00–21:00 if no schedule data is available.
+  function optionsForDate(dateStr: string): { opts: string[]; closed: boolean } {
+    const fallback = () => { const o: string[] = []; for (let m = 7 * 60; m <= 21 * 60; m += intervalMin) o.push(fmt(m)); return o }
+    if (!dateStr || !selectedService) return { opts: fallback(), closed: false }
+    const dk = DAY_KEYS[new Date(dateStr + 'T12:00:00').getDay()]
+    const ops = operatorId ? [operatorId] : selectedService.teamMembers
+    const hasAnySchedule = ops.some(op => schedules[op] && Object.keys(schedules[op]).length > 0)
+    const intervals = ops.flatMap(op => schedules[op]?.[dk] ?? [])
+    if (intervals.length === 0) return hasAnySchedule ? { opts: [], closed: true } : { opts: fallback(), closed: false }
     const opts: string[] = []
-    for (let m = 7 * 60; m <= 21 * 60; m += intervalMin) {
-      opts.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`)
+    for (let m = 0; m <= 24 * 60; m += intervalMin) {
+      if (intervals.some(iv => m >= toMin(iv.from) && m < toMin(iv.to))) opts.push(fmt(m))
     }
-    return opts
-  }, [intervalMin])
+    return { opts, closed: opts.length === 0 }
+  }
 
   const setSlot = (i: number, patch: Partial<DaySlot>) => setSlots(prev => prev.map((s, idx) => idx === i ? { ...s, ...patch } : s))
   const addSlot = () => setSlots(prev => [...prev, emptySlot()])
@@ -151,19 +165,27 @@ export default function WaitlistForm({ services, operators }: { services: WlServ
                     }}>{o.l}</button>
                   ))}
                 </div>
-                {s.timePref === 'specific' && (
-                  <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
-                    <select style={field} value={s.from} onChange={e => setSlot(i, { from: e.target.value })}>
-                      <option value="">Dalle...</option>
-                      {timeOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                    <span style={{ color: '#8C96A6' }}>→</span>
-                    <select style={field} value={s.to} onChange={e => setSlot(i, { to: e.target.value })}>
-                      <option value="">Alle...</option>
-                      {timeOptions.filter(t => !s.from || t > s.from).map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                )}
+                {s.timePref === 'specific' && (() => {
+                  const { opts, closed } = optionsForDate(s.date)
+                  if (closed) return (
+                    <div style={{ marginTop: 10, fontSize: 12.5, color: '#B91C1C', background: '#FEF2F2', borderRadius: 9, padding: '9px 12px' }}>
+                      Nessun orario disponibile in questo giorno per l&apos;operatore scelto.
+                    </div>
+                  )
+                  return (
+                    <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
+                      <select style={field} value={s.from} onChange={e => setSlot(i, { from: e.target.value })}>
+                        <option value="">Dalle...</option>
+                        {opts.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <span style={{ color: '#8C96A6' }}>→</span>
+                      <select style={field} value={s.to} onChange={e => setSlot(i, { to: e.target.value })}>
+                        <option value="">Alle...</option>
+                        {opts.filter(t => !s.from || t > s.from).map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  )
+                })()}
               </div>
             ))}
           </div>
