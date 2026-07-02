@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { BELLESSERE_BOOKING_LINK } from '@/lib/bellessere/constants'
+
+const QR_URL = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=10&data=${encodeURIComponent(BELLESSERE_BOOKING_LINK)}`
 
 export default function ImpostazioniPage() {
   const [reminderTemplate, setReminderTemplate] = useState(() => {
@@ -8,6 +11,28 @@ export default function ImpostazioniPage() {
     return ''
   })
   const [reminderSaved, setReminderSaved] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  function copyLink() {
+    navigator.clipboard?.writeText(BELLESSERE_BOOKING_LINK).then(() => {
+      setCopied(true); setTimeout(() => setCopied(false), 1600)
+    }).catch(() => {})
+  }
+
+  function printQr() {
+    const w = window.open('', '_blank', 'width=620,height=860')
+    if (!w) return
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Prenota da Bellessere</title></head>
+      <body style="margin:0;text-align:center;font-family:-apple-system,'Segoe UI',sans-serif;color:#121417;padding:48px 32px">
+        <img src="https://ghlcustomdash.com/bellessere-logo.png" width="130" height="130" style="border-radius:18px;object-fit:contain"/>
+        <h1 style="font-size:30px;margin:26px 0 6px;letter-spacing:-.5px">Prenota il tuo appuntamento</h1>
+        <p style="font-size:16px;color:#5F6876;margin:0 0 28px">Inquadra il QR code con la fotocamera del telefono</p>
+        <img src="${QR_URL}" width="340" height="340" alt="QR"/>
+        <p style="font-size:12px;color:#8C96A6;word-break:break-all;margin-top:24px">${BELLESSERE_BOOKING_LINK}</p>
+      </body></html>`)
+    w.document.close()
+    setTimeout(() => { w.focus(); w.print() }, 600)
+  }
 
   const [inviteText, setInviteText] = useState('')
   const [inviteSaved, setInviteSaved] = useState(false)
@@ -32,6 +57,33 @@ export default function ImpostazioniPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
       <div>
         <h1 className="bs-page-title">Impostazioni</h1>
+      </div>
+
+      {/* Booking link + QR to print */}
+      <div className="bs-card" style={{ padding: '22px 24px', display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Link prenotazioni</div>
+          <div style={{ fontSize: 13, color: 'var(--bs-text-muted)', marginBottom: 14, lineHeight: 1.55 }}>
+            Condividi questo link con i clienti per prenotare online, oppure stampa il QR code e mettilo in salone.
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input readOnly value={BELLESSERE_BOOKING_LINK} onFocus={e => e.currentTarget.select()}
+              className="bs-input" style={{ flex: 1, minWidth: 200, fontSize: 12.5, color: 'var(--bs-text-muted)' }} />
+            <button className="bs-btn-ghost" onClick={copyLink} style={{ fontSize: 12.5 }}>{copied ? 'Copiato ✓' : 'Copia'}</button>
+            <a className="bs-btn-ghost" href={BELLESSERE_BOOKING_LINK} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, textDecoration: 'none' }}>Apri</a>
+          </div>
+          <button className="bs-btn-primary" onClick={printQr} style={{ marginTop: 14 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+            </svg>
+            Stampa QR code
+          </button>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={QR_URL} alt="QR prenotazioni" width={150} height={150} style={{ border: '1px solid var(--bs-line)', borderRadius: 12, padding: 8, background: '#fff' }} />
+          <div style={{ fontSize: 11, color: 'var(--bs-text-faint)', marginTop: 6 }}>Anteprima QR</div>
+        </div>
       </div>
 
       {/* Reminder template */}
