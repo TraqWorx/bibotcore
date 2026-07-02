@@ -99,11 +99,20 @@ export async function syncBellessere(scope: 'all' | 'users' | 'appointments' = '
     })
     const data = await res.json()
     const users: { id: string; name: string; email: string; phone?: string }[] = data.users ?? []
+    if (!res.ok) return { users: 0 }
     if (users.length > 0) {
       await sb.from('bellessere_users').upsert(
         users.map(u => ({ id: u.id, location_id: BELLESSERE_LOCATION_ID, name: u.name, email: u.email, phone: u.phone ?? null, synced_at: now })),
         { onConflict: 'id' }
       )
+    }
+    // Reconcile deletions: drop cached members (and their schedules) that no
+    // longer exist in GHL — so removing a user directly in GHL is reflected too.
+    const ghlIds = users.map(u => u.id)
+    if (ghlIds.length > 0) {
+      const inList = `(${ghlIds.join(',')})`
+      await sb.from('bellessere_users').delete().eq('location_id', BELLESSERE_LOCATION_ID).not('id', 'in', inList)
+      await sb.from('bellessere_schedules').delete().eq('location_id', BELLESSERE_LOCATION_ID).not('user_id', 'in', inList)
     }
     return { users: users.length }
   }
