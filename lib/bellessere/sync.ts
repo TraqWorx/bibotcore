@@ -126,6 +126,23 @@ export async function syncBellessere(scope: 'all' | 'users' | 'appointments' = '
     const end = new Date(); end.setMonth(end.getMonth() + 3)
     const events = await fetchBellessereEvents(token, start.getTime(), end.getTime())
     if (events.length > 0) {
+      // Snapshot previous statuses so we can detect appointments that just got
+      // cancelled — and fire the waiting-list auto-invite regardless of WHERE
+      // the cancellation happened (GHL widget, email/SMS link, or dashboard).
+      const { data: existing } = await sb.from('cached_calendar_events')
+        .select('ghl_id, appointment_status')
+        .eq('location_id', BELLESSERE_LOCATION_ID)
+        .gte('start_time', start.toISOString())
+        .lte('start_time', end.toISOString())
+      const prevStatus = new Map((existing ?? []).map(r => [r.ghl_id, r.appointment_status]))
+      const nowMs = Date.now()
+      const newlyCancelled = events.filter(e => {
+        const prev = prevStatus.get(e.id)
+        return prev !== undefined && prev !== 'cancelled'
+          && e.appointmentStatus === 'cancelled'
+          && !!e.startTime && new Date(e.startTime).getTime() >= nowMs
+      })
+
       const rows = events.map(e => ({
         ghl_id: e.id,
         location_id: BELLESSERE_LOCATION_ID,
@@ -140,6 +157,16 @@ export async function syncBellessere(scope: 'all' | 'users' | 'appointments' = '
       }))
       for (let i = 0; i < rows.length; i += 200) {
         await sb.from('cached_calendar_events').upsert(rows.slice(i, i + 200), { onConflict: 'location_id,ghl_id' })
+      }
+
+      if (newlyCancelled.length > 0) {
+        const { processFreedSlot } = await import('./waitlistActions')
+        for (const e of newlyCancelled) {
+          await processFreedSlot(
+            { calendarId: e.calendarId, operatorId: e.userId, startTime: e.startTime, endTime: e.endTime },
+            true,
+          ).catch(() => {})
+        }
       }
     }
     return { appointments: events.length }

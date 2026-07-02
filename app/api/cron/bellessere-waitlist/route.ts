@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { promoteExpiredHolds, reconcileWaitlistBookings } from '@/lib/bellessere/waitlistActions'
+import { syncBellessere } from '@/lib/bellessere/sync'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -14,9 +15,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
+    // Sync appointments first — this detects cancellations from ANY source and
+    // auto-invites the waiting list; then reconcile bookings and expire holds.
+    const synced = await syncBellessere('appointments').catch(() => null)
     const booked = await reconcileWaitlistBookings()
     const result = await promoteExpiredHolds()
-    console.log('[cron/bellessere-waitlist]', { booked, ...result })
+    console.log('[cron/bellessere-waitlist]', { synced, booked, ...result })
     return NextResponse.json({ ok: true, booked, ...result })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'error' }, { status: 500 })
