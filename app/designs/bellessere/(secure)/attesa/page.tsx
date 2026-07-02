@@ -146,7 +146,11 @@ export default function ListaAttesaPage() {
               <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: i < filtered.length - 1 ? '1px solid var(--bs-line)' : 'none' }}>
                 <div className="bs-avatar" style={{ flexShrink: 0 }}>{initials(name)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{name} {e.phone && <span style={{ fontWeight: 500, color: 'var(--bs-text-faint)', fontSize: 12 }}>· {e.phone}</span>}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--bs-text-faint)', marginTop: 1, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {e.phone && <span>{e.phone}</span>}
+                    {e.email && <span>{e.email}</span>}
+                  </div>
                   <div style={{ fontSize: 12, color: 'var(--bs-text-muted)', marginTop: 2 }}>
                     {e.service_name ?? 'Servizio'} · {dateLabel} · {timeLabel}
                     {e.operator_id ? ` · ${users[e.operator_id] ?? 'operatore'}` : ' · qualsiasi operatore'}
