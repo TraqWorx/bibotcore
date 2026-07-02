@@ -92,14 +92,50 @@ export async function inviteEntry(entryId: string, freedSlot?: FreedSlot): Promi
   return { ok: true }
 }
 
-/** Mark any active waiting-list entries for a contact as booked (they responded). */
+const digits9 = (p?: string | null) => (p ? p.replace(/\D/g, '').slice(-9) : '')
+
+/**
+ * Mark a contact's active waiting-list entries as booked. Matches by GHL contact
+ * id OR phone (last 9 digits) OR email — because booking through the widget can
+ * resolve to a slightly different contact than the one saved on the waitlist.
+ */
 export async function closeBookedForContact(contactId: string, eventId?: string): Promise<void> {
   const sb = createAdminClient()
-  await sb.from('bellessere_waitlist')
-    .update({ status: 'booked', booked_event_id: eventId ?? null, updated_at: new Date().toISOString() })
+
+  // Get this contact's phone/email (cache first, then GHL) for fuzzy matching
+  let phone: string | null = null
+  let email: string | null = null
+  const { data: cached } = await sb.from('cached_contacts')
+    .select('phone, email').eq('location_id', BELLESSERE_LOCATION_ID).eq('ghl_id', contactId).maybeSingle()
+  if (cached) { phone = cached.phone; email = cached.email }
+  else {
+    try {
+      const token = await getToken()
+      const res = await fetch(`${GHL}/contacts/${contactId}`, { headers: { Authorization: `Bearer ${token}`, Version: V } })
+      const d = await res.json().catch(() => ({}))
+      phone = d?.contact?.phone ?? null; email = d?.contact?.email ?? null
+    } catch { /* best-effort */ }
+  }
+
+  const ph = digits9(phone)
+  const em = email?.toLowerCase() ?? ''
+
+  const { data: entries } = await sb.from('bellessere_waitlist')
+    .select('id, contact_ghl_id, phone, email')
     .eq('location_id', BELLESSERE_LOCATION_ID)
-    .eq('contact_ghl_id', contactId)
     .in('status', ['invited', 'waiting'])
+
+  const toClose = (entries ?? []).filter(e =>
+    e.contact_ghl_id === contactId ||
+    (ph && digits9(e.phone) === ph) ||
+    (em && (e.email ?? '').toLowerCase() === em),
+  ).map(e => e.id)
+
+  if (toClose.length > 0) {
+    await sb.from('bellessere_waitlist')
+      .update({ status: 'booked', booked_event_id: eventId ?? null, updated_at: new Date().toISOString() })
+      .in('id', toClose)
+  }
 }
 
 /**

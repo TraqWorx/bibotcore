@@ -66,6 +66,14 @@ export default function ListaAttesaPage() {
     } finally { setBusy(p => ({ ...p, [id]: false })) }
   }
 
+  async function markBooked(id: string) {
+    setBusy(p => ({ ...p, [id]: true })); setError('')
+    try {
+      const res = await fetch('/api/bellessere/waitlist', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'booked' }) })
+      if (res.ok) await load()
+    } finally { setBusy(p => ({ ...p, [id]: false })) }
+  }
+
   async function remove(id: string) {
     if (!confirm('Rimuovere questa persona dalla lista d\'attesa?')) return
     setBusy(p => ({ ...p, [id]: true })); setError('')
@@ -162,6 +170,11 @@ export default function ListaAttesaPage() {
                 {(e.status === 'waiting' || e.status === 'invited' || e.status === 'expired') && (
                   <button className="bs-btn-primary" style={{ fontSize: 12.5, flexShrink: 0 }} disabled={busy[e.id]} onClick={() => invite(e.id)}>
                     {busy[e.id] ? '...' : e.status === 'invited' ? 'Re-invita' : 'Invita'}
+                  </button>
+                )}
+                {(e.status === 'invited' || e.status === 'expired') && (
+                  <button className="bs-btn-ghost" style={{ fontSize: 12.5, flexShrink: 0, color: 'var(--bs-success)', borderColor: 'var(--bs-success)' }} disabled={busy[e.id]} onClick={() => markBooked(e.id)} title="Segna come prenotato">
+                    Prenotato
                   </button>
                 )}
                 <button className="bs-btn-ghost" style={{ fontSize: 12.5, flexShrink: 0 }} disabled={busy[e.id]} onClick={() => remove(e.id)} title="Rimuovi">

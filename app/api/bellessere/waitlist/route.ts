@@ -112,13 +112,22 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ entries: data ?? [] })
 }
 
-// PATCH — AUTH: manually invite an entry (send SMS + mark invited with a hold window)
+// PATCH — AUTH: invite an entry (send SMS), or mark it booked manually
 export async function PATCH(req: NextRequest) {
   const err = await requireAuth(req)
   if (err) return err
 
-  const { id } = await req.json().catch(() => ({})) as { id?: string }
+  const { id, action } = await req.json().catch(() => ({})) as { id?: string; action?: string }
   if (!id) return NextResponse.json({ error: 'id obbligatorio' }, { status: 400 })
+
+  if (action === 'booked') {
+    const sb = createAdminClient()
+    const { error } = await sb.from('bellessere_waitlist')
+      .update({ status: 'booked', updated_at: new Date().toISOString() })
+      .eq('location_id', BELLESSERE_LOCATION_ID).eq('id', id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
 
   const result = await inviteEntry(id)
   if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status ?? 500 })
