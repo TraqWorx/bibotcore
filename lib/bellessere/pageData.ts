@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { BELLESSERE_LOCATION_ID } from './constants'
 import type { InitialClienti } from '@/app/designs/bellessere/(secure)/clienti/ClientiView'
+import type { InitialAppuntamenti } from '@/app/designs/bellessere/(secure)/appuntamenti/AppuntamentiView'
 
 const CLIENTI_PAGE = 60
 
@@ -54,5 +55,55 @@ export async function getInitialClienti(): Promise<InitialClienti> {
     hasMore: total > contacts.length,
     bookingCounts,
     lastBooking,
+  }
+}
+
+const APPT_PAGE = 100
+
+export async function getInitialAppuntamenti(): Promise<InitialAppuntamenti> {
+  const sb = createAdminClient()
+  const start = new Date(); start.setMonth(start.getMonth() - 1)
+  const end = new Date(); end.setMonth(end.getMonth() + 3)
+  const startIso = start.toISOString(), endIso = end.toISOString()
+  const todayStr = new Date().toISOString().slice(0, 10)
+
+  const evsSel = 'ghl_id, calendar_id, contact_ghl_id, user_id, title, start_time, end_time, appointment_status'
+
+  const [{ data: rows, count }, { data: services }, { data: usersRaw }, todayC, confC, cancC, noshowC] = await Promise.all([
+    sb.from('cached_calendar_events').select(evsSel, { count: 'exact' })
+      .eq('location_id', BELLESSERE_LOCATION_ID).gte('start_time', startIso).lte('start_time', endIso)
+      .order('start_time', { ascending: true }).range(0, APPT_PAGE - 1),
+    sb.from('bellessere_services').select('id, name, slot_duration, price, team_members, is_active').eq('location_id', BELLESSERE_LOCATION_ID),
+    sb.from('bellessere_users').select('id, name').eq('location_id', BELLESSERE_LOCATION_ID).order('name'),
+    sb.from('cached_calendar_events').select('*', { count: 'exact', head: true }).eq('location_id', BELLESSERE_LOCATION_ID).gte('start_time', `${todayStr}T00:00:00.000Z`).lte('start_time', `${todayStr}T23:59:59.999Z`),
+    sb.from('cached_calendar_events').select('*', { count: 'exact', head: true }).eq('location_id', BELLESSERE_LOCATION_ID).gte('start_time', startIso).lte('start_time', endIso).in('appointment_status', ['confirmed', 'new']),
+    sb.from('cached_calendar_events').select('*', { count: 'exact', head: true }).eq('location_id', BELLESSERE_LOCATION_ID).gte('start_time', startIso).lte('start_time', endIso).in('appointment_status', ['cancelled']),
+    sb.from('cached_calendar_events').select('*', { count: 'exact', head: true }).eq('location_id', BELLESSERE_LOCATION_ID).gte('start_time', startIso).lte('start_time', endIso).in('appointment_status', ['no-show', 'noshow']),
+  ])
+
+  const contactIds = [...new Set((rows ?? []).map(r => r.contact_ghl_id).filter(Boolean))] as string[]
+  const contactMap: Record<string, string> = {}
+  if (contactIds.length > 0) {
+    const { data: cts } = await sb.from('cached_contacts').select('ghl_id, first_name, last_name').eq('location_id', BELLESSERE_LOCATION_ID).in('ghl_id', contactIds)
+    for (const c of cts ?? []) contactMap[c.ghl_id] = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() || c.ghl_id
+  }
+
+  const appointments = (rows ?? []).map(r => ({
+    id: r.ghl_id, title: r.title ?? undefined, startTime: r.start_time ?? undefined, endTime: r.end_time ?? undefined,
+    appointmentStatus: r.appointment_status ?? undefined, contactId: r.contact_ghl_id ?? undefined,
+    contactName: r.contact_ghl_id ? contactMap[r.contact_ghl_id] : undefined,
+    calendarId: r.calendar_id ?? undefined, userId: r.user_id ?? undefined,
+  }))
+  const calendars = (services ?? []).map(s => ({
+    id: s.id, name: s.name ?? '', slotDuration: s.slot_duration ?? undefined, price: s.price ?? undefined,
+    isActive: s.is_active ?? undefined, teamMembers: (s.team_members ?? []) as { userId: string }[],
+  }))
+
+  return {
+    appointments,
+    hasMore: (count ?? 0) > appointments.length,
+    counts: { today: todayC.count ?? 0, confirmed: confC.count ?? 0, cancelled: cancC.count ?? 0, noshow: noshowC.count ?? 0 },
+    calendars,
+    users: (usersRaw ?? []).map(u => ({ id: u.id, name: u.name ?? '' })),
   }
 }

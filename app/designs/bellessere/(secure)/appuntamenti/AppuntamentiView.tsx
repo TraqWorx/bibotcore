@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 import ContactCombobox from '../_components/ContactCombobox'
@@ -531,13 +531,21 @@ function formatGroupDate(d: string) {
 // ── Page ───────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 100
 
-export default function AppuntamentiPage() {
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [calendars, setCalendars] = useState<Calendar[]>([])
-  const [users, setUsers] = useState<{ id: string; name: string }[]>([])
-  const [loading, setLoading] = useState(true)
+export interface InitialAppuntamenti {
+  appointments: Appointment[]
+  hasMore: boolean
+  counts: { today: number; confirmed: number; cancelled: number; noshow: number }
+  calendars: Calendar[]
+  users: { id: string; name: string }[]
+}
+
+export default function AppuntamentiView({ initial }: { initial?: InitialAppuntamenti }) {
+  const [appointments, setAppointments] = useState<Appointment[]>(initial?.appointments ?? [])
+  const [calendars, setCalendars] = useState<Calendar[]>(initial?.calendars ?? [])
+  const [users, setUsers] = useState<{ id: string; name: string }[]>(initial?.users ?? [])
+  const [loading, setLoading] = useState(!initial)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMore, setHasMore] = useState(false)
+  const [hasMore, setHasMore] = useState(initial?.hasMore ?? false)
   const [filter, setFilter] = useState<StatusFilter>('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Appointment | null>(null)
@@ -566,22 +574,29 @@ export default function AppuntamentiPage() {
   }, [filter])
 
   // Reset + load first page whenever the filter or a refresh changes
+  // (skip the very first run when the server already seeded the page)
+  const seededList = useRef(!!initial)
   useEffect(() => {
+    if (seededList.current) { seededList.current = false; return }
     setLoading(true)
     loadPage(0, false).finally(() => setLoading(false))
   }, [loadPage, refreshKey])
 
   // Load services/users once (for the modal + operator names)
   useEffect(() => {
+    if (initial?.calendars?.length || initial?.users?.length) return
     fetch('/api/bellessere/services').then(r => r.json()).then(svcData => {
       setCalendars(svcData.calendars ?? [])
       setUsers((svcData.users ?? []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })))
     }).catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Stat-card counts (window totals, independent of the active filter/pagination)
-  const [counts, setCounts] = useState({ today: 0, confirmed: 0, cancelled: 0, noshow: 0 })
+  const [counts, setCounts] = useState(initial?.counts ?? { today: 0, confirmed: 0, cancelled: 0, noshow: 0 })
+  const seededCounts = useRef(!!initial)
   useEffect(() => {
+    if (seededCounts.current) { seededCounts.current = false; return }
     const { start, end } = buildRange()
     const todayStr = new Date().toISOString().slice(0, 10)
     const totalOf = (params: Record<string, string>) =>
