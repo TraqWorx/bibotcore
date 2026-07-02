@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  hhmmToMinutes, entryWindow, overlaps, entryMatchesSlot, matchWaitlist, buildWaitlistSms,
+  hhmmToMinutes, entryWindow, overlaps, entryMatchesSlot, matchWaitlist, buildWaitlistSms, renderInviteText,
   type WaitEntry, type FreedSlot, type ServiceInfo,
 } from '@/lib/bellessere/waitlist'
 
@@ -87,6 +87,18 @@ describe('matchWaitlist', () => {
     const other = baseEntry({ id: 'wrongday', preferred_date: '2026-07-12' })
     const result = matchWaitlist(freed(), [newer, older, other], services)
     expect(result.map(e => e.id)).toEqual(['old', 'new'])
+  })
+})
+
+describe('renderInviteText', () => {
+  it('substitutes all placeholders (case/space-insensitive)', () => {
+    const out = renderInviteText('Ciao {{nome}}, {{ SERVIZIO }} il {{giorno}}: {{link}}', {
+      nome: 'Marco', servizio: 'Barba', giorno: '10 luglio', link: 'https://x.y',
+    })
+    expect(out).toBe('Ciao Marco, Barba il 10 luglio: https://x.y')
+  })
+  it('replaces missing vars with empty string', () => {
+    expect(renderInviteText('{{nome}}{{servizio}}', {})).toBe('')
   })
 })
 

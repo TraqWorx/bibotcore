@@ -9,11 +9,11 @@ export default function ImpostazioniPage() {
   })
   const [reminderSaved, setReminderSaved] = useState(false)
 
-  const [inviteChannel, setInviteChannel] = useState('SMS')
-  const [channelSaved, setChannelSaved] = useState(false)
+  const [inviteText, setInviteText] = useState('')
+  const [inviteSaved, setInviteSaved] = useState(false)
 
   useEffect(() => {
-    fetch('/api/bellessere/settings').then(r => r.json()).then(d => setInviteChannel(d.inviteChannel ?? 'SMS')).catch(() => {})
+    fetch('/api/bellessere/settings').then(r => r.json()).then(d => setInviteText(d.inviteText ?? '')).catch(() => {})
   }, [])
 
   function saveReminderTemplate() {
@@ -22,11 +22,10 @@ export default function ImpostazioniPage() {
     setTimeout(() => setReminderSaved(false), 2000)
   }
 
-  async function saveChannel(next: string) {
-    setInviteChannel(next)
-    await fetch('/api/bellessere/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inviteChannel: next }) }).catch(() => {})
-    setChannelSaved(true)
-    setTimeout(() => setChannelSaved(false), 2000)
+  async function saveInviteText() {
+    await fetch('/api/bellessere/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inviteText }) }).catch(() => {})
+    setInviteSaved(true)
+    setTimeout(() => setInviteSaved(false), 2000)
   }
 
   return (
@@ -61,22 +60,29 @@ export default function ImpostazioniPage() {
         </div>
       </div>
 
-      {/* Waiting-list notification channel */}
+      {/* Waiting-list invite text */}
       <div className="bs-card" style={{ padding: '22px 24px' }}>
-        <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Canale avvisi lista d&apos;attesa</div>
+        <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Testo invito lista d&apos;attesa</div>
         <div style={{ fontSize: 13, color: 'var(--bs-text-muted)', marginBottom: 14 }}>
-          Come inviare l&apos;invito quando si libera un posto per chi è in lista d&apos;attesa.
+          Messaggio SMS inviato quando si libera un posto. Usa <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{nome}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{servizio}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{giorno}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{link}}'}</code> come segnaposto.
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {['SMS', 'WhatsApp', 'Email'].map(c => (
-            <button key={c} onClick={() => saveChannel(c)} style={{
-              padding: '9px 18px', borderRadius: 100, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-              border: `1.5px solid ${inviteChannel === c ? 'var(--bs-black)' : 'var(--bs-line)'}`,
-              background: inviteChannel === c ? 'var(--bs-black)' : 'transparent',
-              color: inviteChannel === c ? '#fff' : 'var(--bs-text-muted)', fontWeight: inviteChannel === c ? 700 : 500,
-            }}>{c}</button>
-          ))}
-          {channelSaved && <span style={{ alignSelf: 'center', fontSize: 12.5, color: '#16a34a' }}>Salvato ✓</span>}
+        <textarea
+          className="bs-input"
+          rows={4}
+          style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: 13.5 }}
+          placeholder={`Ciao {{nome}}! Si è liberato un posto per {{servizio}} il {{giorno}} da Bellessere. Prenota subito qui: {{link}}`}
+          value={inviteText}
+          onChange={e => setInviteText(e.target.value)}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+          <button className="bs-btn-primary" onClick={saveInviteText}>
+            {inviteSaved ? 'Salvato ✓' : 'Salva'}
+          </button>
+          {inviteText && (
+            <button className="bs-btn-ghost" onClick={() => { setInviteText(''); saveInviteText() }} style={{ fontSize: 12.5 }}>
+              Ripristina default
+            </button>
+          )}
         </div>
       </div>
 

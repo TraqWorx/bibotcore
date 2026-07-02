@@ -48,7 +48,7 @@
 /* ─── Sidebar ─────────────────────────────────────────────── */
 
 .bs-sidebar {
-  width: 264px;
+  width: 300px;
   flex-shrink: 0;
   background:
     linear-gradient(180deg, rgba(210,171,75,0.10), transparent 18%),
@@ -225,7 +225,7 @@
 .bs-main::before {
   content: '';
   position: fixed;
-  inset: 0 0 0 264px;
+  inset: 0 0 0 300px;
   z-index: -1;
   pointer-events: none;
   background:

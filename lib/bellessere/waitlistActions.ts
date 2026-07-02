@@ -3,7 +3,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID, BELLESSERE_BOOKING_LINK, WAITLIST_HOLD_HOURS } from './constants'
-import { buildWaitlistSms, matchWaitlist, type FreedSlot, type WaitEntry, type ServiceInfo } from './waitlist'
+import { buildWaitlistSms, renderInviteText, matchWaitlist, type FreedSlot, type WaitEntry, type ServiceInfo } from './waitlist'
 
 const GHL = 'https://services.leadconnectorhq.com'
 const V = '2021-07-28'
@@ -39,25 +39,28 @@ export async function inviteEntry(entryId: string, freedSlot?: FreedSlot): Promi
 
   const dateLabel = entry.preferred_date
     ? new Date(entry.preferred_date + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })
-    : undefined
-  const message = buildWaitlistSms({
-    name: entry.first_name ?? '', serviceName: entry.service_name ?? 'il tuo servizio',
-    dateLabel, bookingLink: BELLESSERE_BOOKING_LINK,
-  })
+    : ''
 
-  // Notification channel is configurable in Impostazioni (SMS / WhatsApp / Email)
+  // Use the custom invite text from Impostazioni if set, else the default.
   const { data: settings } = await sb.from('bellessere_settings')
-    .select('invite_channel').eq('location_id', BELLESSERE_LOCATION_ID).maybeSingle()
-  const channel = settings?.invite_channel ?? 'SMS'
-  const payload: Record<string, unknown> = { type: channel, contactId: entry.contact_ghl_id, message }
-  if (channel === 'Email') { payload.subject = "Bellessere — Lista d'attesa"; payload.html = message }
+    .select('invite_text').eq('location_id', BELLESSERE_LOCATION_ID).maybeSingle()
+  const template = settings?.invite_text?.trim()
+  const message = template
+    ? renderInviteText(template, {
+        nome: entry.first_name ?? '', servizio: entry.service_name ?? 'il tuo servizio',
+        giorno: dateLabel, link: BELLESSERE_BOOKING_LINK,
+      })
+    : buildWaitlistSms({
+        name: entry.first_name ?? '', serviceName: entry.service_name ?? 'il tuo servizio',
+        dateLabel: dateLabel || undefined, bookingLink: BELLESSERE_BOOKING_LINK,
+      })
 
   try {
     const token = await getToken()
     const res = await fetch(`${GHL}/conversations/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, Version: V, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ type: 'SMS', contactId: entry.contact_ghl_id, message }),
     })
     const text = await res.text()
     if (!res.ok) {

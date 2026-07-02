@@ -93,7 +93,20 @@ export function matchWaitlist(
     .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''))
 }
 
-/** Build the invite SMS text. */
+/** Substitute {{nome}} {{servizio}} {{giorno}} {{link}} in a custom invite text. */
+export function renderInviteText(
+  template: string,
+  vars: { nome?: string; servizio?: string; giorno?: string; link?: string },
+): string {
+  return template
+    .replace(/\{\{\s*nome\s*\}\}/gi, vars.nome ?? '')
+    .replace(/\{\{\s*servizio\s*\}\}/gi, vars.servizio ?? '')
+    .replace(/\{\{\s*giorno\s*\}\}/gi, vars.giorno ?? '')
+    .replace(/\{\{\s*link\s*\}\}/gi, vars.link ?? '')
+    .trim()
+}
+
+/** Build the default invite SMS text. */
 export function buildWaitlistSms(opts: {
   name: string
   serviceName: string

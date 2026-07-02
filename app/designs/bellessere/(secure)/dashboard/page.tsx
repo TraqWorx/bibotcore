@@ -185,7 +185,7 @@ export default async function Dashboard() {
     .sort(([, a], [, b]) => b - a).slice(0, 5)
     .map(([id, count]) => ({ id, name: contactMap.get(id) || 'Cliente', count }))
 
-  const dateLabel = today.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })
+  const dateLabel = today.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' })
 
   return (
     <div className="bs-page-stack">
@@ -289,7 +289,7 @@ export default async function Dashboard() {
                   {section.evts.map(ev => {
                     const name = contactMap.get(ev.contactId ?? '') || ev.title || 'Cliente'
                     const opName = ev.userId ? userMap.get(ev.userId) : null
-                    const time = ev.startTime ? new Date(ev.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '—'
+                    const time = ev.startTime ? new Date(ev.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' }) : '—'
                     const statusCls = STATUS_CLS[ev.appointmentStatus ?? 'new'] ?? 'bs-badge-pending'
                     const statusLbl = STATUS_LBL[ev.appointmentStatus ?? 'new'] ?? 'In attesa'
                     return (
