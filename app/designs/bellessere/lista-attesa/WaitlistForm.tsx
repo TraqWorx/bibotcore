@@ -45,8 +45,15 @@ export default function WaitlistForm({ services, operators }: { services: WlServ
   }, [services])
 
   const today = new Date().toISOString().slice(0, 10)
-  // Time picker steps by the selected service's booking interval (default 15 min)
-  const stepSeconds = (selectedService?.interval || 15) * 60
+  // Time options generated at the selected service's booking interval (default 15 min)
+  const intervalMin = selectedService?.interval || 15
+  const timeOptions = useMemo(() => {
+    const opts: string[] = []
+    for (let m = 7 * 60; m <= 21 * 60; m += intervalMin) {
+      opts.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`)
+    }
+    return opts
+  }, [intervalMin])
 
   const setSlot = (i: number, patch: Partial<DaySlot>) => setSlots(prev => prev.map((s, idx) => idx === i ? { ...s, ...patch } : s))
   const addSlot = () => setSlots(prev => [...prev, emptySlot()])
@@ -146,9 +153,15 @@ export default function WaitlistForm({ services, operators }: { services: WlServ
                 </div>
                 {s.timePref === 'specific' && (
                   <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
-                    <input style={field} type="time" step={stepSeconds} value={s.from} onChange={e => setSlot(i, { from: e.target.value })} />
+                    <select style={field} value={s.from} onChange={e => setSlot(i, { from: e.target.value })}>
+                      <option value="">Dalle...</option>
+                      {timeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
                     <span style={{ color: '#8C96A6' }}>→</span>
-                    <input style={field} type="time" step={stepSeconds} value={s.to} onChange={e => setSlot(i, { to: e.target.value })} />
+                    <select style={field} value={s.to} onChange={e => setSlot(i, { to: e.target.value })}>
+                      <option value="">Alle...</option>
+                      {timeOptions.filter(t => !s.from || t > s.from).map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
                   </div>
                 )}
               </div>
