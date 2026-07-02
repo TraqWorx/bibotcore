@@ -1,47 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import ContactCombobox from './ContactCombobox'
 
-interface Contact { id: string; firstName: string; lastName: string; email: string; phone: string }
 interface Calendar { id: string; name: string; slotDuration?: number; isActive?: boolean; price?: number; teamMembers?: { userId: string }[] }
 interface GhlUser { id: string; name: string }
 
-function ContactCombobox({ contacts, value, onChange }: { contacts: Contact[]; value: string; onChange: (id: string) => void }) {
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const selected = contacts.find(c => c.id === value)
-  const displayName = (c: Contact) => `${c.firstName} ${c.lastName}`.trim() || c.email
-  const results = query.length < 1 ? contacts.slice(0, 40) : contacts.filter(c => displayName(c).toLowerCase().includes(query.toLowerCase()) || c.phone?.includes(query)).slice(0, 40)
-  const pick = (id: string) => { onChange(id); setOpen(false); setQuery('') }
-  return (
-    <div style={{ position: 'relative' }}>
-      <input className="bs-input" placeholder="Cerca cliente..." autoComplete="off"
-        value={open ? query : (selected ? displayName(selected) : '')}
-        onChange={e => { setQuery(e.target.value); if (!open) setOpen(true) }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-      />
-      {open && (
-        <div className="bs-combo-popover">
-          <div onMouseDown={() => pick('')} className="bs-combo-option" style={{ color: 'var(--bs-text-muted)' }}>Senza cliente</div>
-          {results.length === 0
-            ? <div className="bs-combo-option" style={{ color: 'var(--bs-text-faint)', cursor: 'default' }}>Nessun risultato</div>
-            : results.map(c => (
-              <div key={c.id} onMouseDown={() => pick(c.id)} className="bs-combo-option">
-                <span>{displayName(c)}</span>
-                {c.phone && <span style={{ fontSize: 11, color: 'var(--bs-text-faint)' }}>{c.phone}</span>}
-              </div>
-            ))
-          }
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function NewAppointmentButton() {
   const [open, setOpen] = useState(false)
-  const [contacts, setContacts] = useState<Contact[]>([])
   const [calendars, setCalendars] = useState<Calendar[]>([])
   const [users, setUsers] = useState<GhlUser[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -54,11 +20,7 @@ export default function NewAppointmentButton() {
 
   useEffect(() => {
     if (open && !loaded) {
-      Promise.all([
-        fetch('/api/bellessere/contacts').then(r => r.json()),
-        fetch('/api/bellessere/services').then(r => r.json()),
-      ]).then(([c, s]) => {
-        setContacts(c.contacts ?? [])
+      fetch('/api/bellessere/services').then(r => r.json()).then(s => {
         setCalendars(s.calendars ?? [])
         setUsers((s.users ?? []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })))
         setLoaded(true)
@@ -144,7 +106,7 @@ export default function NewAppointmentButton() {
                     )}
                     <div>
                       <label className="bs-field-label">Cliente</label>
-                      <ContactCombobox contacts={contacts} value={form.contactId} onChange={id => setForm(p => ({ ...p, contactId: id }))} />
+                      <ContactCombobox value={form.contactId} onChange={id => setForm(p => ({ ...p, contactId: id }))} />
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                       <div>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+import ContactCombobox from '../_components/ContactCombobox'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,43 +47,8 @@ function initials(name: string) {
   return name.split(' ').map(p => p[0] ?? '').join('').toUpperCase().slice(0, 2) || '?'
 }
 
-interface Contact { id: string; firstName: string; lastName: string; email: string; phone: string }
-
-function ContactCombobox({ contacts, value, onChange }: { contacts: Contact[]; value: string; onChange: (id: string) => void }) {
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const selected = contacts.find(c => c.id === value)
-  const displayName = (c: Contact) => `${c.firstName} ${c.lastName}`.trim() || c.email
-  const results = query.length < 1 ? contacts.slice(0, 40) : contacts.filter(c => displayName(c).toLowerCase().includes(query.toLowerCase()) || c.phone?.includes(query)).slice(0, 40)
-  const pick = (id: string) => { onChange(id); setOpen(false); setQuery('') }
-  return (
-    <div style={{ position: 'relative' }}>
-      <input className="bs-input" placeholder="Cerca cliente..." autoComplete="off"
-        value={open ? query : (selected ? displayName(selected) : '')}
-        onChange={e => { setQuery(e.target.value); if (!open) setOpen(true) }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-      />
-      {open && (
-        <div className="bs-combo-popover">
-          <div onMouseDown={() => pick('')} className="bs-combo-option" style={{ color: 'var(--bs-text-muted)' }}>Senza cliente</div>
-          {results.length === 0
-            ? <div className="bs-combo-option" style={{ color: 'var(--bs-text-faint)', cursor: 'default' }}>Nessun risultato</div>
-            : results.map(c => (
-              <div key={c.id} onMouseDown={() => pick(c.id)} className="bs-combo-option" style={{ fontWeight: c.id === value ? 750 : 500 }}>
-                <span>{displayName(c)}</span>
-                {c.phone && <span style={{ fontSize: 11, color: 'var(--bs-text-faint)' }}>{c.phone}</span>}
-              </div>
-            ))
-          }
-        </div>
-      )}
-    </div>
-  )
-}
-
-function AddAppointmentModal({ contacts, calendars, users, onClose, onAdded }: {
-  contacts: Contact[]; calendars: GhlCalendar[]; users: GhlUser[]
+function AddAppointmentModal({ calendars, users, onClose, onAdded }: {
+  calendars: GhlCalendar[]; users: GhlUser[]
   onClose: () => void; onAdded: () => void
 }) {
   const [form, setForm] = useState({ contactId: '', calendarId: '', userId: '', date: '', slot: '', appointmentStatus: 'confirmed' })
@@ -149,7 +115,7 @@ function AddAppointmentModal({ contacts, calendars, users, onClose, onAdded }: {
             )}
             <div>
               <label className="bs-field-label">Cliente</label>
-              <ContactCombobox contacts={contacts} value={form.contactId} onChange={id => setForm(p => ({ ...p, contactId: id }))} />
+              <ContactCombobox value={form.contactId} onChange={id => setForm(p => ({ ...p, contactId: id }))} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div>
@@ -446,7 +412,6 @@ export default function CalendarioPage() {
   const [anchor, setAnchor] = useState(() => new Date())
   const [events, setEvents] = useState<CalEvent[]>([])
   const [users, setUsers] = useState<GhlUser[]>([])
-  const [contacts, setContacts] = useState<{ id: string; firstName: string; lastName: string; email: string; phone: string }[]>([])
   const [calendars, setCalendars] = useState<GhlCalendar[]>([])
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -464,10 +429,6 @@ export default function CalendarioPage() {
         setUsers((d.users ?? []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })))
         setCalendars(d.calendars ?? [])
       })
-      .catch(() => {})
-    fetch('/api/bellessere/contacts')
-      .then(r => r.json())
-      .then(d => setContacts(d.contacts ?? []))
       .catch(() => {})
     // (appointments cache is refreshed once per session by the Sidebar)
   }, [])
@@ -725,7 +686,6 @@ export default function CalendarioPage() {
       )}
       {showAdd && (
         <AddAppointmentModal
-          contacts={contacts}
           calendars={calendars}
           users={users}
           onClose={() => setShowAdd(false)}

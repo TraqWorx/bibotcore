@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+import ContactCombobox from '../_components/ContactCombobox'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,7 +22,6 @@ interface Appointment {
   userId?: string
 }
 
-interface Contact { id: string; firstName: string; lastName: string; email: string; phone: string }
 interface CalTeamMember { userId: string }
 interface Calendar { id: string; name: string; slotDuration?: number; price?: number; isActive?: boolean; teamMembers?: CalTeamMember[] }
 
@@ -382,59 +382,9 @@ function AppointmentPanel({
 }
 
 // ── Contact combobox ───────────────────────────────────────────────────────
-function ContactCombobox({ contacts, value, onChange }: {
-  contacts: Contact[]
-  value: string
-  onChange: (id: string) => void
-}) {
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const displayName = (c: Contact) => `${c.firstName} ${c.lastName}`.trim() || c.email || c.phone
-  const selected = contacts.find(c => c.id === value)
-
-  const results = query.length > 0
-    ? contacts.filter(c => {
-        const q = query.toLowerCase()
-        return displayName(c).toLowerCase().includes(q) || c.phone?.includes(q) || c.email?.toLowerCase().includes(q)
-      }).slice(0, 30)
-    : contacts.slice(0, 30)
-
-  function pick(id: string) { onChange(id); setQuery(''); setOpen(false) }
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <input
-        className="bs-input"
-        placeholder="Cerca cliente..."
-        autoComplete="off"
-        value={open ? query : (selected ? displayName(selected) : '')}
-        onChange={e => { setQuery(e.target.value); if (!open) setOpen(true) }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-      />
-      {open && (
-        <div className="bs-combo-popover">
-          <div onMouseDown={() => pick('')} className="bs-combo-option" style={{ color: 'var(--bs-text-muted)' }}>
-            Senza cliente
-          </div>
-          {results.length === 0
-            ? <div className="bs-combo-option" style={{ color: 'var(--bs-text-faint)', cursor: 'default' }}>Nessun risultato</div>
-            : results.map(c => (
-              <div key={c.id} onMouseDown={() => pick(c.id)} className="bs-combo-option" style={{ fontWeight: c.id === value ? 750 : 500 }}>
-                <span>{displayName(c)}</span>
-                {c.phone && <span style={{ fontSize: 11, color: 'var(--bs-text-faint)' }}>{c.phone}</span>}
-              </div>
-            ))
-          }
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Add appointment modal ──────────────────────────────────────────────────
-function AddAppointmentModal({ onClose, onAdded, contacts, calendars, users, preselectedContactId }: {
-  onClose: () => void; onAdded: () => void; contacts: Contact[]; calendars: Calendar[]
+function AddAppointmentModal({ onClose, onAdded, calendars, users, preselectedContactId }: {
+  onClose: () => void; onAdded: () => void; calendars: Calendar[]
   users: { id: string; name: string }[]; preselectedContactId?: string
 }) {
   const [form, setForm] = useState({ contactId: preselectedContactId ?? '', calendarId: '', userId: '', date: '', slot: '', appointmentStatus: 'confirmed' })
@@ -527,7 +477,7 @@ function AddAppointmentModal({ onClose, onAdded, contacts, calendars, users, pre
             )}
             <div>
               <label className="bs-field-label">Cliente</label>
-              <ContactCombobox contacts={contacts} value={form.contactId} onChange={id => setForm(p => ({ ...p, contactId: id }))} />
+              <ContactCombobox value={form.contactId} onChange={id => setForm(p => ({ ...p, contactId: id }))} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div>
@@ -579,81 +529,97 @@ function formatGroupDate(d: string) {
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────
+const PAGE_SIZE = 100
+
 export default function AppuntamentiPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [contacts, setContacts] = useState<Contact[]>([])
   const [calendars, setCalendars] = useState<Calendar[]>([])
   const [users, setUsers] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
   const [filter, setFilter] = useState<StatusFilter>('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Appointment | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  const fetchAppointments = useCallback(() => {
+  // Server-side status filter + pagination window (-1mo → +3mo)
+  const buildRange = () => {
     const start = new Date(); start.setMonth(start.getMonth() - 1)
     const end = new Date(); end.setMonth(end.getMonth() + 3)
-    return fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`)
-      .then(r => r.json())
-      .then(evtsData => { setAppointments(evtsData.events ?? []) })
-      .catch(() => {})
-  }, [])
+    return { start: start.toISOString(), end: end.toISOString() }
+  }
 
+  const loadPage = useCallback((offset: number, append: boolean) => {
+    const { start, end } = buildRange()
+    const params = new URLSearchParams({ startTime: start, endTime: end, limit: String(PAGE_SIZE), offset: String(offset) })
+    if (filter !== 'all') params.set('status', filter)
+    return fetch(`/api/bellessere/appointments?${params}`)
+      .then(r => r.json())
+      .then(d => {
+        const evts: Appointment[] = d.events ?? []
+        setAppointments(prev => append ? [...prev, ...evts] : evts)
+        setHasMore(Boolean(d.hasMore))
+      })
+      .catch(() => {})
+  }, [filter])
+
+  // Reset + load first page whenever the filter or a refresh changes
   useEffect(() => {
-    const start = new Date(); start.setMonth(start.getMonth() - 1)
-    const end = new Date(); end.setMonth(end.getMonth() + 3)
     setLoading(true)
-    Promise.all([
-      fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`).then(r => r.json()),
-      fetch('/api/bellessere/contacts').then(r => r.json()),
-      fetch('/api/bellessere/services').then(r => r.json()),
-    ]).then(([evtsData, ctData, svcData]) => {
-      setAppointments(evtsData.events ?? [])
-      setContacts(ctData.contacts ?? [])
+    loadPage(0, false).finally(() => setLoading(false))
+  }, [loadPage, refreshKey])
+
+  // Load services/users once (for the modal + operator names)
+  useEffect(() => {
+    fetch('/api/bellessere/services').then(r => r.json()).then(svcData => {
       setCalendars(svcData.calendars ?? [])
       setUsers((svcData.users ?? []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })))
-    }).catch(() => {}).finally(() => setLoading(false))
+    }).catch(() => {})
+  }, [])
+
+  // Stat-card counts (window totals, independent of the active filter/pagination)
+  const [counts, setCounts] = useState({ today: 0, confirmed: 0, cancelled: 0, noshow: 0 })
+  useEffect(() => {
+    const { start, end } = buildRange()
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const totalOf = (params: Record<string, string>) =>
+      fetch(`/api/bellessere/appointments?${new URLSearchParams({ ...params, limit: '1', offset: '0' })}`)
+        .then(r => r.json()).then(d => (d.total ?? 0) as number).catch(() => 0)
+    Promise.all([
+      totalOf({ startTime: `${todayStr}T00:00:00.000Z`, endTime: `${todayStr}T23:59:59.999Z` }),
+      totalOf({ startTime: start, endTime: end, status: 'confirmed' }),
+      totalOf({ startTime: start, endTime: end, status: 'cancelled' }),
+      totalOf({ startTime: start, endTime: end, status: 'noshow' }),
+    ]).then(([today, confirmed, cancelled, noshow]) => setCounts({ today, confirmed, cancelled, noshow }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey])
 
   useEffect(() => {
     const channel = supabase
       .channel('bellessere-appointments')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cached_calendar_events', filter: `location_id=eq.${BELLESSERE_LOCATION_ID}` },
-        () => { fetchAppointments() })
+        () => { loadPage(0, false) })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [fetchAppointments])
+  }, [loadPage])
 
+  const loadMore = () => {
+    setLoadingMore(true)
+    loadPage(appointments.length, true).finally(() => setLoadingMore(false))
+  }
+
+  // Status is filtered server-side; only the free-text search is client-side
+  // (over the loaded pages).
   const filtered = useMemo(() => {
-    let list = appointments
-    if (filter !== 'all') {
-      list = list.filter(a => {
-        const s = a.appointmentStatus ?? 'new'
-        if (filter === 'confirmed') return s === 'confirmed' || s === 'new'
-        if (filter === 'pending') return s === 'pending'
-        if (filter === 'showed') return s === 'showed'
-        if (filter === 'cancelled') return s === 'cancelled'
-        if (filter === 'noshow') return s === 'no-show' || s === 'noshow'
-        return true
-      })
-    }
-    if (search) {
-      const q = search.toLowerCase()
-      list = list.filter(a => {
-        const opName = users.find(u => u.id === a.userId)?.name ?? ''
-        return (a.contactName ?? '').toLowerCase().includes(q) || (a.title ?? '').toLowerCase().includes(q) || opName.toLowerCase().includes(q)
-      })
-    }
-    return list
-  }, [appointments, filter, search, users])
-
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const totalToday = appointments.filter(a => a.startTime?.slice(0, 10) === todayStr).length
-  const pending = appointments.filter(a => a.appointmentStatus === 'pending' || (!a.appointmentStatus)).length
-  const confirmed = appointments.filter(a => a.appointmentStatus === 'confirmed' || a.appointmentStatus === 'new').length
-  const noshow = appointments.filter(a => a.appointmentStatus === 'no-show' || a.appointmentStatus === 'noshow').length
-  const cancelled = appointments.filter(a => a.appointmentStatus === 'cancelled').length
+    if (!search) return appointments
+    const q = search.toLowerCase()
+    return appointments.filter(a => {
+      const opName = users.find(u => u.id === a.userId)?.name ?? ''
+      return (a.contactName ?? '').toLowerCase().includes(q) || (a.title ?? '').toLowerCase().includes(q) || opName.toLowerCase().includes(q)
+    })
+  }, [appointments, search, users])
 
   const groups = groupByDate(filtered)
 
@@ -685,10 +651,10 @@ export default function AppuntamentiPage() {
 
       <div className="bs-stats-grid">
         {[
-          { value: totalToday, label: 'Oggi', color: 'var(--bs-text)' },
-          { value: confirmed, label: 'Confermati', color: 'var(--bs-text)' },
-          { value: cancelled, label: 'Cancellati', color: 'var(--bs-danger)' },
-          { value: noshow, label: 'No-show', color: 'var(--bs-danger)' },
+          { value: counts.today, label: 'Oggi', color: 'var(--bs-text)' },
+          { value: counts.confirmed, label: 'Confermati', color: 'var(--bs-text)' },
+          { value: counts.cancelled, label: 'Cancellati', color: 'var(--bs-danger)' },
+          { value: counts.noshow, label: 'No-show', color: 'var(--bs-danger)' },
         ].map(s => (
           <div key={s.label} className="bs-stat-card">
             <div className="bs-stat-value" style={{ color: s.color }}>{s.value}</div>
@@ -775,6 +741,13 @@ export default function AppuntamentiPage() {
               })}
             </div>
           ))}
+          {hasMore && !search && (
+            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 4 }}>
+              <button className="bs-btn-ghost" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? 'Caricamento...' : 'Carica altri'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -791,7 +764,6 @@ export default function AppuntamentiPage() {
         <AddAppointmentModal
           onClose={() => setShowAdd(false)}
           onAdded={() => setRefreshKey(k => k + 1)}
-          contacts={contacts}
           calendars={calendars}
           users={users}
         />

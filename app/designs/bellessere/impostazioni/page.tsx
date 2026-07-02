@@ -110,6 +110,61 @@ export default function ImpostazioniPage() {
   })
   const [reminderSaved, setReminderSaved] = useState(false)
 
+  // ── Team member add/remove ──────────────────────────────────────────────
+  const [showAddMember, setShowAddMember] = useState(false)
+  const [memberForm, setMemberForm] = useState({ firstName: '', lastName: '', email: '', phone: '' })
+  const [addingMember, setAddingMember] = useState(false)
+  const [removingMember, setRemovingMember] = useState<Record<string, boolean>>({})
+
+  function reloadTeam() {
+    return Promise.all([
+      fetch('/api/bellessere/services').then(r => r.json()),
+      fetch('/api/bellessere/user-availability').then(r => r.json()),
+    ]).then(([svc, avail]) => {
+      const fetchedUsers: GhlUser[] = svc.users ?? []
+      const map: Record<string, UserSchedule> = avail.scheduleMap ?? {}
+      setUsers(fetchedUsers)
+      setScheduleMap(map)
+      setEdits(prev => {
+        const next = { ...prev }
+        for (const u of fetchedUsers) if (!next[u.id]) next[u.id] = map[u.id] ? rulesToEdit(map[u.id].rules) : { ...DEFAULT_EDIT }
+        return next
+      })
+    }).catch(() => {})
+  }
+
+  async function addMember(e: React.FormEvent) {
+    e.preventDefault()
+    setAddingMember(true); setError('')
+    try {
+      const res = await fetch('/api/bellessere/team', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(memberForm),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(d.error ?? 'Errore durante l\'aggiunta del membro'); return }
+      setShowAddMember(false)
+      setMemberForm({ firstName: '', lastName: '', email: '', phone: '' })
+      await reloadTeam()
+    } catch (err) { setError(err instanceof Error ? err.message : 'Errore di rete') }
+    finally { setAddingMember(false) }
+  }
+
+  async function removeMember(u: GhlUser) {
+    if (!confirm(`Rimuovere ${u.name} dal team? L'accesso GHL dell'utente verrà eliminato.`)) return
+    setRemovingMember(p => ({ ...p, [u.id]: true })); setError('')
+    try {
+      const res = await fetch('/api/bellessere/team', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: u.id }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(d.error ?? 'Errore durante la rimozione'); return }
+      setUsers(prev => prev.filter(x => x.id !== u.id))
+    } catch (err) { setError(err instanceof Error ? err.message : 'Errore di rete') }
+    finally { setRemovingMember(p => ({ ...p, [u.id]: false })) }
+  }
+
   function saveReminderTemplate() {
     localStorage.setItem('bellessere_reminder_template', reminderTemplate)
     setReminderSaved(true)
@@ -210,6 +265,46 @@ export default function ImpostazioniPage() {
         </div>
       )}
 
+      {/* Team header + add member */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>Team & orari di lavoro</div>
+          <div style={{ fontSize: 12.5, color: 'var(--bs-text-muted)', marginTop: 2 }}>Aggiungi o rimuovi operatori e imposta la loro disponibilità.</div>
+        </div>
+        <button className="bs-btn-primary" style={{ fontSize: 13 }} onClick={() => setShowAddMember(v => !v)}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Aggiungi membro
+        </button>
+      </div>
+
+      {showAddMember && (
+        <form onSubmit={addMember} className="bs-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label className="bs-field-label">Nome *</label>
+              <input className="bs-input" value={memberForm.firstName} onChange={e => setMemberForm(p => ({ ...p, firstName: e.target.value }))} required />
+            </div>
+            <div>
+              <label className="bs-field-label">Cognome *</label>
+              <input className="bs-input" value={memberForm.lastName} onChange={e => setMemberForm(p => ({ ...p, lastName: e.target.value }))} required />
+            </div>
+            <div>
+              <label className="bs-field-label">Email *</label>
+              <input className="bs-input" type="email" value={memberForm.email} onChange={e => setMemberForm(p => ({ ...p, email: e.target.value }))} required />
+            </div>
+            <div>
+              <label className="bs-field-label">Telefono</label>
+              <input className="bs-input" value={memberForm.phone} onChange={e => setMemberForm(p => ({ ...p, phone: e.target.value }))} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <button type="button" className="bs-btn-ghost" onClick={() => setShowAddMember(false)}>Annulla</button>
+            <button type="submit" className="bs-btn-primary" disabled={addingMember}>{addingMember ? 'Creazione...' : 'Crea membro'}</button>
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--bs-text-faint)' }}>Riceverà un invito via email da GoHighLevel per impostare la password.</div>
+        </form>
+      )}
+
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--bs-text-faint)' }}>Caricamento...</div>
       ) : users.length === 0 ? (
@@ -251,6 +346,14 @@ export default function ImpostazioniPage() {
                       onClick={() => save(u)}
                     >
                       {saving[u.id] ? 'Salvataggio...' : hasSched ? 'Salva' : 'Aggiungi'}
+                    </button>
+                    <button
+                      onClick={() => removeMember(u)}
+                      disabled={removingMember[u.id]}
+                      title="Rimuovi membro dal team"
+                      style={{ background: 'none', border: '1.5px solid var(--bs-line)', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', color: 'var(--bs-text-muted)', fontSize: 12.5, lineHeight: 1 }}
+                    >
+                      {removingMember[u.id] ? '...' : 'Rimuovi'}
                     </button>
                   </div>
                 </div>

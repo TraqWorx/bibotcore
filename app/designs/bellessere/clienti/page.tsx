@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import ContactCombobox from '../_components/ContactCombobox'
 
 interface Contact {
   id: string
@@ -103,7 +104,7 @@ function TagEditor({ contactId, initialTags }: { contactId: string; initialTags:
 }
 
 function CustomerPanel({ contact, onClose, onBookAppointment }: {
-  contact: Contact; onClose: () => void; onBookAppointment: (contactId: string) => void
+  contact: Contact; onClose: () => void; onBookAppointment: (contact: Contact) => void
 }) {
   const [tab, setTab] = useState<'appuntamenti' | 'messaggi'>('appuntamenti')
   const [events, setEvents] = useState<Appointment[]>([])
@@ -118,14 +119,13 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
 
   useEffect(() => {
     setLoading(true)
-    const start = new Date(); start.setFullYear(start.getFullYear() - 3)
-    const end = new Date(); end.setMonth(end.getMonth() + 6)
+    // Fetch only THIS client's appointments (server-side contactId filter) —
+    // no more downloading the whole appointment window.
     Promise.all([
-      fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`).then(r => r.json()),
+      fetch(`/api/bellessere/appointments?contactId=${contact.id}`).then(r => r.json()),
       fetch(`/api/bellessere/contact-conversation?contactId=${contact.id}`).then(r => r.json()),
     ]).then(([apptData, convData]) => {
       setEvents((apptData.events ?? [])
-        .filter((e: { contactId?: string }) => e.contactId === contact.id)
         .map((e: Appointment) => ({ id: e.id, title: e.title, startTime: e.startTime, endTime: e.endTime, appointmentStatus: e.appointmentStatus, contactId: e.contactId, calendarId: e.calendarId, userId: e.userId }))
         .sort((a: Appointment, b: Appointment) => (b.startTime ?? '').localeCompare(a.startTime ?? '')))
       setConversationId(convData.conversationId ?? null)
@@ -237,7 +237,7 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
           {tab === 'appuntamenti' && (
             <>
               <button className="bs-btn-primary" style={{ justifyContent: 'center', width: '100%' }}
-                onClick={() => { onClose(); onBookAppointment(contact.id) }}>
+                onClick={() => { onClose(); onBookAppointment(contact) }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
@@ -402,9 +402,10 @@ function AddCustomerModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
 }
 
 // ── Minimal AddAppointmentModal inline (re-uses shared logic) ────────────
-function AddAppointmentModal({ onClose, onAdded, contacts, preselectedContactId }: {
-  onClose: () => void; onAdded: () => void; contacts: Contact[]; preselectedContactId?: string
+function AddAppointmentModal({ onClose, onAdded, preselectedContact }: {
+  onClose: () => void; onAdded: () => void; preselectedContact?: Contact | null
 }) {
+  const preselectedContactId = preselectedContact?.id ?? ''
   interface CalEntry { id: string; name: string; slotDuration?: number; price?: number; isActive?: boolean; teamMembers?: { userId: string }[] }
   const [calendars, setCalendars] = useState<CalEntry[]>([])
   const [users, setUsers] = useState<{ id: string; name: string }[]>([])
@@ -463,15 +464,6 @@ function AddAppointmentModal({ onClose, onAdded, contacts, preselectedContactId 
     } catch (err) { setError(err instanceof Error ? err.message : 'Errore di rete') } finally { setSaving(false) }
   }
 
-  // Reuse ContactCombobox logic inline
-  const [query, setQuery] = useState('')
-  const [comboOpen, setComboOpen] = useState(false)
-  const displayName = (c: Contact) => `${c.firstName} ${c.lastName}`.trim() || c.email || c.phone
-  const selectedContact = contacts.find(c => c.id === form.contactId)
-  const results = query.length > 0
-    ? contacts.filter(c => displayName(c).toLowerCase().includes(query.toLowerCase()) || c.phone?.includes(query)).slice(0, 30)
-    : contacts.slice(0, 30)
-
   const today = new Date().toISOString().slice(0, 10)
 
   return (
@@ -502,27 +494,11 @@ function AddAppointmentModal({ onClose, onAdded, contacts, preselectedContactId 
             )}
             <div>
               <label className="bs-field-label">Cliente</label>
-              <div style={{ position: 'relative' }}>
-                <input className="bs-input" placeholder="Cerca cliente..." autoComplete="off"
-                  value={comboOpen ? query : (selectedContact ? displayName(selectedContact) : '')}
-                  onChange={e => { setQuery(e.target.value); if (!comboOpen) setComboOpen(true) }}
-                  onFocus={() => setComboOpen(true)} onBlur={() => setTimeout(() => setComboOpen(false), 150)} />
-                {comboOpen && (
-                  <div className="bs-combo-popover">
-                    <div onMouseDown={() => { setForm(p => ({ ...p, contactId: '' })); setQuery(''); setComboOpen(false) }} className="bs-combo-option" style={{ color: 'var(--bs-text-muted)' }}>Senza cliente</div>
-                    {results.length === 0
-                      ? <div className="bs-combo-option" style={{ color: 'var(--bs-text-faint)', cursor: 'default' }}>Nessun risultato</div>
-                      : results.map(c => (
-                        <div key={c.id} onMouseDown={() => { setForm(p => ({ ...p, contactId: c.id })); setQuery(''); setComboOpen(false) }}
-                          className="bs-combo-option" style={{ fontWeight: c.id === form.contactId ? 750 : 500 }}>
-                          <span>{displayName(c)}</span>
-                          {c.phone && <span style={{ fontSize: 11, color: 'var(--bs-text-faint)' }}>{c.phone}</span>}
-                        </div>
-                      ))
-                    }
-                  </div>
-                )}
-              </div>
+              <ContactCombobox
+                value={form.contactId}
+                onChange={id => setForm(p => ({ ...p, contactId: id }))}
+                initialContact={preselectedContact ?? null}
+              />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div>
@@ -558,61 +534,81 @@ function AddAppointmentModal({ onClose, onAdded, contacts, preselectedContactId 
   )
 }
 
+const PAGE_SIZE = 60
+
 export default function ClientiPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [bookingCounts, setBookingCounts] = useState<Record<string, number>>({})
   const [lastBooking, setLastBooking] = useState<Record<string, string>>({})
+  const [stats, setStats] = useState({ total: 0, withEmail: 0, withPhone: 0, newThisMonth: 0 })
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selected, setSelected] = useState<Contact | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [bookForContact, setBookForContact] = useState<string | undefined>(undefined)
+  const [bookForContact, setBookForContact] = useState<Contact | null>(null)
+
+  // Debounce the search box so we hit the server at most every ~250ms
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 250)
+    return () => clearTimeout(t)
+  }, [search])
+
+  // Fetch booking count + last booking for a page of contacts in one query
+  const annotateBookings = async (ids: string[]) => {
+    if (ids.length === 0) return
+    const d = await fetch(`/api/bellessere/appointments?contactIds=${ids.join(',')}`).then(r => r.json()).catch(() => ({ events: [] }))
+    setBookingCounts(prev => {
+      const next = { ...prev }
+      for (const e of (d.events ?? [])) if (e.contactId) next[e.contactId] = (next[e.contactId] ?? 0) + 1
+      return next
+    })
+    setLastBooking(prev => {
+      const next = { ...prev }
+      for (const e of (d.events ?? [])) {
+        if (e.contactId && e.startTime && (!next[e.contactId] || e.startTime > next[e.contactId])) next[e.contactId] = e.startTime
+      }
+      return next
+    })
+  }
+
+  const loadPage = async (offset: number, append: boolean) => {
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) })
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    if (offset === 0) params.set('stats', '1')
+    const ct = await fetch(`/api/bellessere/contacts?${params}`).then(r => r.json()).catch(() => ({ contacts: [] }))
+    const page: Contact[] = ct.contacts ?? []
+    setContacts(prev => append ? [...prev, ...page] : page)
+    setHasMore(Boolean(ct.hasMore))
+    if (ct.stats) setStats(ct.stats)
+    annotateBookings(page.map(c => c.id))
+  }
 
   useEffect(() => {
     setLoading(true)
-    const start = new Date(); start.setFullYear(start.getFullYear() - 2)
-    const end = new Date(); end.setMonth(end.getMonth() + 6)
-    Promise.all([
-      fetch('/api/bellessere/contacts').then(r => r.json()),
-      fetch(`/api/bellessere/appointments?startTime=${start.toISOString()}&endTime=${end.toISOString()}`).then(r => r.json()),
-    ]).then(([ct, appts]) => {
-      setContacts(ct.contacts ?? [])
-      const counts: Record<string, number> = {}
-      const last: Record<string, string> = {}
-      for (const e of (appts.events ?? [])) {
-        if (!e.contactId) continue
-        counts[e.contactId] = (counts[e.contactId] ?? 0) + 1
-        if (e.startTime && (!last[e.contactId] || e.startTime > last[e.contactId])) {
-          last[e.contactId] = e.startTime
-        }
-      }
-      setBookingCounts(counts)
-      setLastBooking(last)
-    }).catch(() => {}).finally(() => setLoading(false))
-  }, [refreshKey])
+    setBookingCounts({}); setLastBooking({})
+    loadPage(0, false).finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey, debouncedSearch])
 
-  const filtered = useMemo(() => {
-    if (!search) return contacts
-    const q = search.toLowerCase()
-    return contacts.filter(c =>
-      fullName(c).toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || c.phone.includes(q)
-    )
-  }, [contacts, search])
+  const loadMore = () => {
+    setLoadingMore(true)
+    loadPage(contacts.length, true).finally(() => setLoadingMore(false))
+  }
 
-  // Sort by most recent booking desc, then alphabetically
+  // Server returns contacts alphabetically; surface those with a recent booking first
   const sorted = useMemo(() =>
-    [...filtered].sort((a, b) => {
+    [...contacts].sort((a, b) => {
       const la = lastBooking[a.id] ?? ''
       const lb = lastBooking[b.id] ?? ''
       if (lb !== la) return lb > la ? 1 : -1
       return fullName(a).localeCompare(fullName(b))
     }),
-    [filtered, lastBooking]
+    [contacts, lastBooking]
   )
-
-  const thisMonth = new Date(); thisMonth.setDate(1); thisMonth.setHours(0,0,0,0)
-  const newThisMonth = contacts.filter(c => c.dateAdded && new Date(c.dateAdded) >= thisMonth).length
 
   return (
     <div className="bs-page-stack">
@@ -635,10 +631,10 @@ export default function ClientiPage() {
       {/* Stats */}
       <div className="bs-stats-grid">
         {[
-          { value: contacts.length, label: 'Clienti totali' },
-          { value: newThisMonth, label: 'Nuovi questo mese' },
-          { value: contacts.filter(c => c.email).length, label: 'Con email' },
-          { value: contacts.filter(c => c.phone).length, label: 'Con telefono' },
+          { value: stats.total, label: 'Clienti totali' },
+          { value: stats.newThisMonth, label: 'Nuovi questo mese' },
+          { value: stats.withEmail, label: 'Con email' },
+          { value: stats.withPhone, label: 'Con telefono' },
         ].map(s => (
           <div key={s.label} className="bs-stat-card">
             <div className="bs-stat-value">{s.value}</div>
@@ -665,7 +661,7 @@ export default function ClientiPage() {
 
         <div className="bs-list-summary">
           <span className="bs-list-summary-title">Tutti i clienti</span>
-          <span className="bs-count-chip">{loading ? '...' : `${sorted.length} trovati`}</span>
+          <span className="bs-count-chip">{loading ? '...' : debouncedSearch ? `${sorted.length} trovati` : `${stats.total} totali`}</span>
         </div>
 
         {loading ? (
@@ -705,21 +701,27 @@ export default function ClientiPage() {
             </div>
           )
         })}
+        {hasMore && !loading && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+            <button className="bs-btn-ghost" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? 'Caricamento...' : 'Carica altri'}
+            </button>
+          </div>
+        )}
       </div>
 
       {selected && (
         <CustomerPanel
           contact={selected}
           onClose={() => setSelected(null)}
-          onBookAppointment={(contactId) => { setSelected(null); setBookForContact(contactId) }}
+          onBookAppointment={(contact) => { setSelected(null); setBookForContact(contact) }}
         />
       )}
       {showAdd && <AddCustomerModal onClose={() => setShowAdd(false)} onAdded={() => setRefreshKey(k => k + 1)} />}
-      {bookForContact !== undefined && (
+      {bookForContact !== null && (
         <AddAppointmentModal
-          contacts={contacts}
-          preselectedContactId={bookForContact}
-          onClose={() => setBookForContact(undefined)}
+          preselectedContact={bookForContact}
+          onClose={() => setBookForContact(null)}
           onAdded={() => setRefreshKey(k => k + 1)}
         />
       )}

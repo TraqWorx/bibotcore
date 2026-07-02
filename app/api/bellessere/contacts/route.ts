@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+import { parsePageParams, sanitizeSearch, contactSearchOr } from '@/lib/bellessere/query'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,24 +34,24 @@ export async function GET(req: NextRequest) {
   if (err) return err
 
   const sp = req.nextUrl.searchParams
-  const search = sp.get('search')?.toLowerCase() ?? ''
-  const limit = Math.min(parseInt(sp.get('limit') ?? '500', 10), 500)
+  const search = sanitizeSearch(sp.get('search') ?? '')
+  // Server-side pagination (default page 100) — removes the old hard 500 cap so
+  // the client list scales to thousands of contacts.
+  const { limit, offset } = parsePageParams(sp, 100, 500)
 
   const sb = createAdminClient()
   let query = sb
     .from('cached_contacts')
-    .select('ghl_id, first_name, last_name, email, phone, tags')
+    .select('ghl_id, first_name, last_name, email, phone, tags', { count: 'exact' })
     .eq('location_id', BELLESSERE_LOCATION_ID)
     .order('last_name', { ascending: true })
-    .limit(limit)
+    .range(offset, offset + limit - 1)
 
   if (search) {
-    query = query.or(
-      `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
-    )
+    query = query.or(contactSearchOr(search))
   }
 
-  const { data, error } = await query
+  const { data, count, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const contacts = (data ?? []).map(c => ({
@@ -61,7 +62,32 @@ export async function GET(req: NextRequest) {
     phone: c.phone ?? '',
     tags: c.tags ?? [],
   }))
-  return NextResponse.json({ contacts }, {
+
+  // Optional aggregate stats for the Clienti header (requested once, not per page)
+  let stats: { total: number; withEmail: number; withPhone: number; newThisMonth: number } | undefined
+  if (sp.get('stats') === '1') {
+    const base = () => sb.from('cached_contacts').select('*', { count: 'exact', head: true }).eq('location_id', BELLESSERE_LOCATION_ID)
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+    const [totalR, emailR, phoneR, newR] = await Promise.all([
+      base(),
+      base().not('email', 'is', null).neq('email', ''),
+      base().not('phone', 'is', null).neq('phone', ''),
+      base().gte('date_added', monthStart.toISOString()),
+    ])
+    stats = {
+      total: totalR.count ?? 0,
+      withEmail: emailR.count ?? 0,
+      withPhone: phoneR.count ?? 0,
+      newThisMonth: newR.count ?? 0,
+    }
+  }
+
+  return NextResponse.json({
+    contacts,
+    total: count ?? contacts.length,
+    hasMore: (count ?? 0) > offset + contacts.length,
+    ...(stats ? { stats } : {}),
+  }, {
     headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=120' },
   })
 }

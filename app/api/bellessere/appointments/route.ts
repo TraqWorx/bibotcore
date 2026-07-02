@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+import { parsePageParams, isApptStatusFilter, statusValuesFor } from '@/lib/bellessere/query'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,8 +28,9 @@ async function authCheck(req: NextRequest) {
   return null
 }
 
-// GET — cache-first read (fast). The cache stores the operator in user_id
-// (normalised from GHL's assignedUserId by the sync), so the userId filter works.
+// GET — cache-first read (fast). Supports filtering by date range, operator
+// (userId), contact (contactId), status, plus limit/offset pagination so the
+// appuntamenti/clienti views scale to thousands of appointments.
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
@@ -37,21 +39,38 @@ export async function GET(req: NextRequest) {
   const startTime = sp.get('startTime')
   const endTime = sp.get('endTime')
   const userId = sp.get('userId')
-  if (!startTime || !endTime) return NextResponse.json({ error: 'startTime and endTime required' }, { status: 400 })
+  const contactId = sp.get('contactId')
+  const contactIdsParam = sp.get('contactIds')
+  const filterContactIds = contactIdsParam ? contactIdsParam.split(',').filter(Boolean).slice(0, 200) : null
+  const statusParam = sp.get('status')
+  const paginate = sp.has('limit') || sp.has('offset')
+  const { limit, offset } = parsePageParams(sp, 200, 500)
+
+  // A date range is required unless filtering by a specific contact / set of contacts.
+  if (!contactId && !filterContactIds && (!startTime || !endTime)) {
+    return NextResponse.json({ error: 'startTime and endTime required' }, { status: 400 })
+  }
 
   const sb = createAdminClient()
 
   let query = sb
     .from('cached_calendar_events')
-    .select('ghl_id, calendar_id, contact_ghl_id, user_id, title, start_time, end_time, appointment_status')
+    .select('ghl_id, calendar_id, contact_ghl_id, user_id, title, start_time, end_time, appointment_status', paginate ? { count: 'exact' } : {})
     .eq('location_id', BELLESSERE_LOCATION_ID)
-    .gte('start_time', startTime)
-    .lte('start_time', endTime)
     .order('start_time', { ascending: true })
 
+  if (startTime) query = query.gte('start_time', startTime)
+  if (endTime) query = query.lte('start_time', endTime)
   if (userId) query = query.eq('user_id', userId)
+  if (contactId) query = query.eq('contact_ghl_id', contactId)
+  if (filterContactIds) query = query.in('contact_ghl_id', filterContactIds)
+  if (statusParam && isApptStatusFilter(statusParam)) {
+    const vals = statusValuesFor(statusParam)
+    if (vals) query = query.in('appointment_status', vals)
+  }
+  if (paginate) query = query.range(offset, offset + limit - 1)
 
-  const { data: rows, error } = await query
+  const { data: rows, count, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Join contact names from cache
@@ -80,7 +99,12 @@ export async function GET(req: NextRequest) {
     contactName: r.contact_ghl_id ? (contactMap[r.contact_ghl_id] ?? undefined) : undefined,
   }))
 
-  return NextResponse.json({ events })
+  const body: Record<string, unknown> = { events }
+  if (paginate) {
+    body.total = count ?? events.length
+    body.hasMore = (count ?? 0) > offset + events.length
+  }
+  return NextResponse.json(body)
 }
 
 // POST — create appointment in GHL + write to cache immediately (no waiting for webhook)
