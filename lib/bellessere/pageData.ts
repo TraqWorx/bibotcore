@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { BELLESSERE_LOCATION_ID } from './constants'
 import type { InitialClienti } from '@/app/designs/bellessere/(secure)/clienti/ClientiView'
 import type { InitialAppuntamenti } from '@/app/designs/bellessere/(secure)/appuntamenti/AppuntamentiView'
+import type { InitialCalendario } from '@/app/designs/bellessere/(secure)/calendario/CalendarioView'
 
 const CLIENTI_PAGE = 60
 
@@ -106,4 +107,42 @@ export async function getInitialAppuntamenti(): Promise<InitialAppuntamenti> {
     calendars,
     users: (usersRaw ?? []).map(u => ({ id: u.id, name: u.name ?? '' })),
   }
+}
+
+export async function getInitialCalendario(): Promise<InitialCalendario> {
+  const sb = createAdminClient()
+  // Current week (Sunday-based), matching the client's getWeekDates()
+  const d = new Date(); d.setDate(d.getDate() - d.getDay())
+  const start = new Date(d); start.setHours(0, 0, 0, 0)
+  const end = new Date(d); end.setDate(d.getDate() + 6); end.setHours(23, 59, 59, 999)
+
+  const [{ data: rows }, { data: services }, { data: usersRaw }] = await Promise.all([
+    sb.from('cached_calendar_events')
+      .select('ghl_id, calendar_id, contact_ghl_id, user_id, title, start_time, end_time, appointment_status')
+      .eq('location_id', BELLESSERE_LOCATION_ID)
+      .gte('start_time', start.toISOString()).lte('start_time', end.toISOString())
+      .order('start_time', { ascending: true }),
+    sb.from('bellessere_services').select('id, name, slot_duration, price, team_members, is_active').eq('location_id', BELLESSERE_LOCATION_ID),
+    sb.from('bellessere_users').select('id, name').eq('location_id', BELLESSERE_LOCATION_ID).order('name'),
+  ])
+
+  const contactIds = [...new Set((rows ?? []).map(r => r.contact_ghl_id).filter(Boolean))] as string[]
+  const contactMap: Record<string, string> = {}
+  if (contactIds.length > 0) {
+    const { data: cts } = await sb.from('cached_contacts').select('ghl_id, first_name, last_name').eq('location_id', BELLESSERE_LOCATION_ID).in('ghl_id', contactIds)
+    for (const c of cts ?? []) contactMap[c.ghl_id] = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() || c.ghl_id
+  }
+
+  const events = (rows ?? []).map(r => ({
+    id: r.ghl_id, title: r.title ?? undefined, startTime: r.start_time ?? undefined, endTime: r.end_time ?? undefined,
+    appointmentStatus: r.appointment_status ?? undefined, contactId: r.contact_ghl_id ?? undefined,
+    contactName: r.contact_ghl_id ? contactMap[r.contact_ghl_id] : undefined,
+    calendarId: r.calendar_id ?? undefined, userId: r.user_id ?? undefined,
+  }))
+  const calendars = (services ?? []).map(s => ({
+    id: s.id, name: s.name ?? '', slotDuration: s.slot_duration ?? undefined, price: s.price ?? undefined,
+    isActive: s.is_active ?? undefined, teamMembers: (s.team_members ?? []) as { userId: string }[],
+  }))
+
+  return { events, calendars, users: (usersRaw ?? []).map(u => ({ id: u.id, name: u.name ?? '' })) }
 }
