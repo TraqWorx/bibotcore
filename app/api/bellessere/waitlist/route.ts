@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
-import { inviteEntry } from '@/lib/bellessere/waitlistActions'
+import { inviteEntry, reconcileWaitlistBookings } from '@/lib/bellessere/waitlistActions'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,6 +98,9 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const err = await requireAuth(req)
   if (err) return err
+
+  // Catch bookings the AppointmentCreate webhook may have missed
+  await reconcileWaitlistBookings().catch(() => {})
 
   const status = req.nextUrl.searchParams.get('status')
   const sb = createAdminClient()

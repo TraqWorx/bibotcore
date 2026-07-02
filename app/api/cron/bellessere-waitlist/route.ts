@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { promoteExpiredHolds } from '@/lib/bellessere/waitlistActions'
+import { promoteExpiredHolds, reconcileWaitlistBookings } from '@/lib/bellessere/waitlistActions'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -14,9 +14,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
+    const booked = await reconcileWaitlistBookings()
     const result = await promoteExpiredHolds()
-    console.log('[cron/bellessere-waitlist]', result)
-    return NextResponse.json({ ok: true, ...result })
+    console.log('[cron/bellessere-waitlist]', { booked, ...result })
+    return NextResponse.json({ ok: true, booked, ...result })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'error' }, { status: 500 })
   }

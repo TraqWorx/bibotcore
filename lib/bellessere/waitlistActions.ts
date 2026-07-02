@@ -145,6 +145,40 @@ export async function closeBookedForContact(contactId: string, eventId?: string)
 }
 
 /**
+ * Reconcile bookings from the cache (webhook-independent): mark an active entry
+ * as booked when its contact has a non-cancelled appointment on its preferred
+ * day. Covers the case where the AppointmentCreate webhook doesn't reach us.
+ */
+export async function reconcileWaitlistBookings(): Promise<number> {
+  const sb = createAdminClient()
+  const { data: entries } = await sb.from('bellessere_waitlist')
+    .select('id, contact_ghl_id, preferred_date')
+    .eq('location_id', BELLESSERE_LOCATION_ID)
+    .in('status', ['invited', 'waiting'])
+  if (!entries || entries.length === 0) return 0
+
+  const { data: bookings } = await sb.from('cached_calendar_events')
+    .select('contact_ghl_id, start_time, appointment_status')
+    .eq('location_id', BELLESSERE_LOCATION_ID)
+    .in('appointment_status', ['confirmed', 'new', 'showed'])
+
+  const closeIds: string[] = []
+  for (const e of entries) {
+    if (!e.contact_ghl_id) continue
+    const booked = (bookings ?? []).some(b =>
+      b.contact_ghl_id === e.contact_ghl_id &&
+      (b.start_time ?? '').slice(0, 10) === e.preferred_date)
+    if (booked) closeIds.push(e.id)
+  }
+  if (closeIds.length > 0) {
+    await sb.from('bellessere_waitlist')
+      .update({ status: 'booked', updated_at: new Date().toISOString() })
+      .in('id', closeIds)
+  }
+  return closeIds.length
+}
+
+/**
  * Cron: expire invites whose hold window elapsed, and drip to the next matching
  * person for that freed slot. Returns counts.
  */
