@@ -1,0 +1,12 @@
+<svg width="420" height="360" viewBox="0 0 420 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="lumaxStackedWhiteTitle lumaxStackedWhiteDesc">
+  <title id="lumaxStackedWhiteTitle">Lumax Digital reversed stacked logo</title>
+  <desc id="lumaxStackedWhiteDesc">Stacked Lumax Digital logo for dark backgrounds with a two-color X icon and spread Digital subtitle.</desc>
+  <path d="M169 56L251 138" stroke="#2563EB" stroke-width="19" stroke-linecap="round"/>
+  <path d="M251 56L169 138" stroke="#22D3EE" stroke-width="19" stroke-linecap="round"/>
+  <circle cx="169" cy="56" r="8" fill="#2563EB"/>
+  <circle cx="251" cy="138" r="8" fill="#2563EB"/>
+  <circle cx="251" cy="56" r="8" fill="#22D3EE"/>
+  <circle cx="169" cy="138" r="8" fill="#22D3EE"/>
+  <text x="74" y="230" fill="#F8FAFC" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="68" font-weight="760">Lumax</text>
+  <text x="80" y="267" fill="#CBD5E1" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="19" font-weight="700" letter-spacing="14.6">DIGITAL</text>
+</svg>

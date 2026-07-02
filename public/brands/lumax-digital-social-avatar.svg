@@ -1,0 +1,11 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="lumaxAvatarTitle lumaxAvatarDesc">
+  <title id="lumaxAvatarTitle">Lumax Digital social avatar</title>
+  <desc id="lumaxAvatarDesc">Square black social avatar with the Lumax Digital two-color connected X.</desc>
+  <rect width="1024" height="1024" rx="220" fill="#030712"/>
+  <path d="M302 284L722 704" stroke="#2563EB" stroke-width="108" stroke-linecap="round"/>
+  <path d="M722 284L302 704" stroke="#22D3EE" stroke-width="108" stroke-linecap="round"/>
+  <circle cx="302" cy="284" r="44" fill="#2563EB"/>
+  <circle cx="722" cy="704" r="44" fill="#2563EB"/>
+  <circle cx="722" cy="284" r="44" fill="#22D3EE"/>
+  <circle cx="302" cy="704" r="44" fill="#22D3EE"/>
+</svg>

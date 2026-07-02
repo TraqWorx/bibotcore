@@ -38,9 +38,9 @@ export default async function WaitlistPublicPage() {
       color: '#121417', padding: '40px 16px', display: 'flex', justifyContent: 'center',
     }}>
       <div style={{ width: '100%', maxWidth: 560 }}>
-        <div style={{ textAlign: 'center', marginBottom: 22 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="https://ghlcustomdash.com/bellessere-logo.png" alt="Bellessere" width={120} height={120} style={{ objectFit: 'contain', borderRadius: 18 }} />
+          <img src="https://ghlcustomdash.com/bellessere-logo.png" alt="Bellessere" width={120} height={120} style={{ display: 'block', margin: '0 auto', objectFit: 'contain', borderRadius: 18 }} />
         </div>
         <WaitlistForm services={svc} operators={ops} />
       </div>

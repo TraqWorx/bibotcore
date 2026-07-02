@@ -1,0 +1,10 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="lumaxIconTitle lumaxIconDesc">
+  <title id="lumaxIconTitle">Lumax Digital icon</title>
+  <desc id="lumaxIconDesc">Minimal two-color connected X icon for Lumax Digital.</desc>
+  <path d="M150 142L362 354" stroke="#2563EB" stroke-width="54" stroke-linecap="round"/>
+  <path d="M362 142L150 354" stroke="#22D3EE" stroke-width="54" stroke-linecap="round"/>
+  <circle cx="150" cy="142" r="22" fill="#2563EB"/>
+  <circle cx="362" cy="354" r="22" fill="#2563EB"/>
+  <circle cx="362" cy="142" r="22" fill="#22D3EE"/>
+  <circle cx="150" cy="354" r="22" fill="#22D3EE"/>
+</svg>
