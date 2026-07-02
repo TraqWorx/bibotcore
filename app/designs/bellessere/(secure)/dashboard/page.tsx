@@ -165,10 +165,11 @@ export default async function Dashboard() {
     .filter(o => o.count > 0)
     .sort((a, b) => b.count - a.count)
 
-  // Top 5 services — by title, falling back to service name via calendarId
+  // Top 5 services — always by the actual service (calendar) name, not the
+  // event title (GHL sometimes sets the title to the customer's name).
   const titleCounts: Record<string, number> = {}
   for (const e of mEvents) {
-    const label = e.title || (e.calendarId ? serviceNameMap.get(e.calendarId) : null)
+    const label = e.calendarId ? serviceNameMap.get(e.calendarId) : null
     if (label) titleCounts[label] = (titleCounts[label] ?? 0) + 1
   }
   const topServices = Object.entries(titleCounts)
