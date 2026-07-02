@@ -263,7 +263,6 @@ function AppointmentPanel({
         <div className="bs-panel-body">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Badge s={st} />
-            <span style={{ fontSize: 11, color: 'var(--bs-text-faint)' }}>#{appt.id.slice(-6).toUpperCase()}</span>
           </div>
 
           {appt.contactName && (
@@ -351,7 +350,7 @@ function AppointmentPanel({
               </button>
             )}
             {st !== 'noshow' && st !== 'no-show' && st !== 'cancelled' && (
-              <button className="bs-btn-ghost" style={{ justifyContent: 'center' }} onClick={() => setStatus('no-show')} disabled={loading}>
+              <button className="bs-btn-ghost" style={{ justifyContent: 'center' }} onClick={() => setStatus('noshow')} disabled={loading}>
                 No-show
               </button>
             )}
@@ -654,6 +653,7 @@ export default function AppuntamentiPage() {
   const pending = appointments.filter(a => a.appointmentStatus === 'pending' || (!a.appointmentStatus)).length
   const confirmed = appointments.filter(a => a.appointmentStatus === 'confirmed' || a.appointmentStatus === 'new').length
   const noshow = appointments.filter(a => a.appointmentStatus === 'no-show' || a.appointmentStatus === 'noshow').length
+  const cancelled = appointments.filter(a => a.appointmentStatus === 'cancelled').length
 
   const groups = groupByDate(filtered)
 
@@ -687,6 +687,7 @@ export default function AppuntamentiPage() {
         {[
           { value: totalToday, label: 'Oggi', color: 'var(--bs-text)' },
           { value: confirmed, label: 'Confermati', color: 'var(--bs-text)' },
+          { value: cancelled, label: 'Cancellati', color: 'var(--bs-danger)' },
           { value: noshow, label: 'No-show', color: 'var(--bs-danger)' },
         ].map(s => (
           <div key={s.label} className="bs-stat-card">

@@ -410,7 +410,7 @@ function AppointmentModal({ event, users, calendars, onClose, onAction }: {
                 </button>
               )}
               {st !== 'no-show' && st !== 'noshow' && st !== 'cancelled' && (
-                <button className="bs-btn-ghost" style={{ justifyContent: 'center' }} onClick={() => setStatus('no-show')} disabled={loading}>
+                <button className="bs-btn-ghost" style={{ justifyContent: 'center' }} onClick={() => setStatus('noshow')} disabled={loading}>
                   No-show
                 </button>
               )}

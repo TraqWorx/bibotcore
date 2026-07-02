@@ -37,7 +37,7 @@ function ServiceModal({
     groupId: service?.groupId ?? (groups[0]?.id ?? ''),
     description: stripHtml(service?.description),
     duration: String(service?.slotDuration ?? 30),
-    price: service?.price != null ? String(service.price) : '',
+    price: service?.price ? String(service.price) : '',
     slotInterval: String(service?.slotInterval ?? 15),
     slotBuffer: String(service?.slotBuffer ?? 0),
     teamMembers: (service?.teamMembers ?? []).map(m => m.userId),
@@ -210,8 +210,10 @@ export default function ServiziPage() {
     grouped[key].push(svc)
   }
 
-  const avgPrice = services.filter(s => s.price != null).length > 0
-    ? Math.round(services.reduce((acc, s) => acc + (s.price ?? 0), 0) / services.filter(s => s.price != null).length)
+  // Only count priced services (treat 0 / unset as "no price")
+  const priced = services.filter(s => s.price != null && s.price > 0)
+  const avgPrice = priced.length > 0
+    ? priced.reduce((acc, s) => acc + (s.price ?? 0), 0) / priced.length
     : 0
 
   return (
@@ -243,7 +245,7 @@ export default function ServiziPage() {
           <div className="bs-stat-label">Categorie</div>
         </div>
         <div className="bs-stat-card">
-          <div className="bs-stat-value">{avgPrice > 0 ? `€${avgPrice}` : '—'}</div>
+          <div className="bs-stat-value">{avgPrice > 0 ? `€${avgPrice.toFixed(2)}` : '—'}</div>
           <div className="bs-stat-label">Prezzo medio</div>
         </div>
       </div>
@@ -306,7 +308,7 @@ export default function ServiziPage() {
 
                     {/* Duration + price */}
                     <div className="bs-service-price-stack">
-                      {svc.price != null && <div className="bs-service-price-value">€{svc.price}</div>}
+                      {svc.price != null && svc.price > 0 && <div className="bs-service-price-value">€{svc.price.toFixed(2)}</div>}
                       <div className="bs-service-duration-value">{svc.slotDuration ? `${svc.slotDuration} min` : '—'}</div>
                     </div>
 
