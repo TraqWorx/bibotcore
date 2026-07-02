@@ -1,12 +1,8 @@
 import { createAdminClient } from '@/lib/supabase-server'
-import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
-import { fetchBellessereEvents } from '@/lib/bellessere/events'
 import NewAppointmentButton from '../_components/NewAppointmentButton'
 
 export const dynamic = 'force-dynamic'
-
-const GHL = 'https://services.leadconnectorhq.com'
 
 function initials(name: string) {
   return name.split(' ').map(p => p[0] ?? '').join('').toUpperCase().slice(0, 2) || '?'
@@ -17,7 +13,7 @@ const STATUS_CLS: Record<string, string> = {
   cancelled: 'bs-badge-cancelled', showed: 'bs-badge-showed', 'no-show': 'bs-badge-cancelled',
 }
 const STATUS_LBL: Record<string, string> = {
-  confirmed: 'Confermato', new: 'Confermato', cancelled: 'Annullato',
+  confirmed: 'Confermato', new: 'Confermato', cancelled: 'Cancellato',
   showed: 'Completato', 'no-show': 'No-show',
 }
 
@@ -68,16 +64,18 @@ function DonutChart({ slices }: { slices: { label: string; value: number; color:
   )
 }
 
-async function getGhlUsers(token: string): Promise<{ id: string; name: string }[]> {
-  try {
-    const res = await fetch(`${GHL}/users/?locationId=${BELLESSERE_LOCATION_ID}&type=LOCATION`, {
-      headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },
-    })
-    const data = await res.json()
-    return (data?.users ?? []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name }))
-  } catch { return [] }
+interface CacheRow {
+  ghl_id: string; title: string | null; start_time: string | null
+  appointment_status: string | null; contact_ghl_id: string | null
+  user_id: string | null; calendar_id?: string | null
 }
-
+function toEvent(r: CacheRow) {
+  return {
+    id: r.ghl_id, title: r.title, startTime: r.start_time,
+    appointmentStatus: r.appointment_status, contactId: r.contact_ghl_id,
+    userId: r.user_id, calendarId: r.calendar_id ?? null,
+  }
+}
 
 export default async function Dashboard() {
   const sb = createAdminClient()
@@ -89,68 +87,72 @@ export default async function Dashboard() {
   const tomorrowStart = new Date(today); tomorrowStart.setDate(today.getDate() + 1); tomorrowStart.setHours(0, 0, 0, 0)
   const tomorrowEnd = new Date(tomorrowStart); tomorrowEnd.setHours(23, 59, 59, 999)
 
-  // Fetch GHL token for users
-  const { data: conn } = await sb
-    .from('ghl_connections')
-    .select('access_token, refresh_token, expires_at, company_id')
-    .eq('location_id', BELLESSERE_LOCATION_ID)
-    .single()
-  const token = conn ? await refreshIfNeeded(BELLESSERE_LOCATION_ID, conn).catch(() => null) : null
-
+  // Fully cache-first (no GHL calls on render → fast). The cache is kept fresh
+  // by the appointments sync triggered from the calendar/appointments pages.
   const [
     { data: todayEvents },
     { data: tomorrowEvents },
+    { data: monthEventsRaw },
     { data: contacts },
     { data: services },
-    users,
-    ghlMonthEvents,
+    { data: usersRaw },
   ] = await Promise.all([
     sb.from('cached_calendar_events')
-      .select('ghl_id, title, start_time, appointment_status, contact_ghl_id, user_id')
+      .select('ghl_id, title, start_time, appointment_status, contact_ghl_id, user_id, calendar_id')
       .eq('location_id', BELLESSERE_LOCATION_ID)
       .gte('start_time', `${todayStr}T00:00:00.000Z`)
       .lte('start_time', `${todayStr}T23:59:59.999Z`)
       .order('start_time', { ascending: true }),
     sb.from('cached_calendar_events')
-      .select('ghl_id, title, start_time, appointment_status, contact_ghl_id, user_id')
+      .select('ghl_id, title, start_time, appointment_status, contact_ghl_id, user_id, calendar_id')
       .eq('location_id', BELLESSERE_LOCATION_ID)
       .gte('start_time', tomorrowStart.toISOString())
       .lte('start_time', tomorrowEnd.toISOString())
       .order('start_time', { ascending: true }),
+    sb.from('cached_calendar_events')
+      .select('ghl_id, title, start_time, appointment_status, contact_ghl_id, user_id, calendar_id')
+      .eq('location_id', BELLESSERE_LOCATION_ID)
+      .gte('start_time', monthStart.toISOString())
+      .lte('start_time', monthEnd.toISOString()),
     sb.from('cached_contacts')
       .select('ghl_id, first_name, last_name, date_added')
       .eq('location_id', BELLESSERE_LOCATION_ID),
     sb.from('bellessere_services')
       .select('id, name')
       .eq('location_id', BELLESSERE_LOCATION_ID),
-    token ? getGhlUsers(token) : Promise.resolve([] as { id: string; name: string }[]),
-    token ? fetchBellessereEvents(token, monthStart.getTime(), monthEnd.getTime()) : Promise.resolve([]),
+    sb.from('bellessere_users')
+      .select('id, name')
+      .eq('location_id', BELLESSERE_LOCATION_ID),
   ])
 
-  const tEvents = todayEvents ?? []
-  const tmrEvents = tomorrowEvents ?? []
+  const users = (usersRaw ?? []) as { id: string; name: string }[]
+  const tEvents = (todayEvents ?? []).map(toEvent)
+  const tmrEvents = (tomorrowEvents ?? []).map(toEvent)
   const allContacts = contacts ?? []
 
   const contactMap = new Map(allContacts.map(c => [c.ghl_id, `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()]))
   const userMap = new Map(users.map(u => [u.id, u.name]))
   const serviceNameMap = new Map((services ?? []).map(s => [s.id, s.name]))
 
-  // Live GHL month events (fetched via calendar groups; operator = assignedUserId)
-  const mEvents = ghlMonthEvents
+  // Month events from cache (operator lives in user_id, from assignedUserId)
+  const mEvents = (monthEventsRaw ?? []).map(toEvent)
 
   // Stats
   const todayTotal = tEvents.length
-  const todayPending = tEvents.filter(e => !e.appointment_status || e.appointment_status === 'new' || e.appointment_status === 'pending').length
+  const todayPending = tEvents.filter(e => !e.appointmentStatus || e.appointmentStatus === 'new' || e.appointmentStatus === 'pending').length
   const newClientsThisMonth = allContacts.filter(c => c.date_added && c.date_added >= monthStart.toISOString()).length
   const totalClients = allContacts.length
 
-  // Performance (month) — from GHL events
+  // Performance (month)
   const totalM = mEvents.length
+  const confirmedM = mEvents.filter(e => e.appointmentStatus === 'confirmed' || e.appointmentStatus === 'new').length
   const showedM = mEvents.filter(e => e.appointmentStatus === 'showed').length
   const noshowM = mEvents.filter(e => e.appointmentStatus === 'no-show' || e.appointmentStatus === 'noshow').length
   const cancelledM = mEvents.filter(e => e.appointmentStatus === 'cancelled').length
+  // Confirm rate counts confirmed + completed as "confirmed" so a schedule of
+  // upcoming bookings reads as healthy rather than 0%.
+  const confirmRate = totalM > 0 ? Math.round(((confirmedM + showedM) / totalM) * 100) : 0
   const showRate = (showedM + noshowM) > 0 ? Math.round((showedM / (showedM + noshowM)) * 100) : 0
-  const completionRate = totalM > 0 ? Math.round((showedM / totalM) * 100) : 0
   const cancelRate = totalM > 0 ? Math.round((cancelledM / totalM) * 100) : 0
 
   // Operatori stats this month — userId is normalised from assignedUserId
@@ -244,7 +246,7 @@ export default async function Dashboard() {
             {noshowM > 0 && <div className="bs-stat-badge bs-stat-badge-warning">{noshowM} no-show</div>}
           </div>
           <div className="bs-stat-value">{cancelledM}</div>
-          <div className="bs-stat-label">Annullati (mese)</div>
+          <div className="bs-stat-label">Cancellati (mese)</div>
         </div>
         <div className="bs-stat-card">
           <div className="bs-stat-header">
@@ -285,13 +287,13 @@ export default async function Dashboard() {
               ) : (
                 <div>
                   {section.evts.map(ev => {
-                    const name = contactMap.get(ev.contact_ghl_id ?? '') || ev.title || 'Cliente'
-                    const opName = ev.user_id ? userMap.get(ev.user_id) : null
-                    const time = ev.start_time ? new Date(ev.start_time).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '—'
-                    const statusCls = STATUS_CLS[ev.appointment_status ?? 'new'] ?? 'bs-badge-pending'
-                    const statusLbl = STATUS_LBL[ev.appointment_status ?? 'new'] ?? 'In attesa'
+                    const name = contactMap.get(ev.contactId ?? '') || ev.title || 'Cliente'
+                    const opName = ev.userId ? userMap.get(ev.userId) : null
+                    const time = ev.startTime ? new Date(ev.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '—'
+                    const statusCls = STATUS_CLS[ev.appointmentStatus ?? 'new'] ?? 'bs-badge-pending'
+                    const statusLbl = STATUS_LBL[ev.appointmentStatus ?? 'new'] ?? 'In attesa'
                     return (
-                      <div key={ev.ghl_id} className="bs-list-row" style={{ cursor: 'default' }}>
+                      <div key={ev.id} className="bs-list-row" style={{ cursor: 'default' }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--bs-text-muted)', width: 52, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--bs-text-faint)" strokeWidth="2">
                             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -322,9 +324,9 @@ export default async function Dashboard() {
             <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 20 }}>Performance</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {[
-                { label: 'Tasso di presenza', sublabel: 'Presenti / (presenti + no-show)', value: showRate, color: '#10B981' },
-                { label: 'Tasso di completamento', sublabel: 'Completati su totale mese', value: completionRate, color: '#C9A84C' },
-                { label: 'Tasso di cancellazione', sublabel: 'Annullati su totale mese', value: cancelRate, color: '#EF4444' },
+                { label: 'Tasso di conferma', sublabel: 'Confermati + completati su totale', value: confirmRate, color: '#10B981' },
+                { label: 'Tasso di presenza', sublabel: 'Presenti / (presenti + no-show)', value: showRate, color: '#C9A84C' },
+                { label: 'Tasso di cancellazione', sublabel: 'Cancellati su totale mese', value: cancelRate, color: '#EF4444' },
               ].map(p => (
                 <div key={p.label} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                   <PerformanceRing pct={p.value} color={p.color} />
@@ -399,7 +401,7 @@ export default async function Dashboard() {
               <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 18 }}>Servizi più prenotati</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                 <DonutChart slices={topServices} />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 9 }}>
+                <div style={{ flex: 1, maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 9 }}>
                   {topServices.map((s) => (
                     <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />

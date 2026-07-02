@@ -30,7 +30,7 @@ type StatusFilter = 'all' | 'confirmed' | 'pending' | 'cancelled' | 'noshow' | '
 const STATUS_CFG: Record<string, { cls: string; label: string }> = {
   confirmed:  { cls: 'bs-badge-confirmed', label: 'CONFERMATO' },
   new:        { cls: 'bs-badge-confirmed', label: 'CONFERMATO' },
-  cancelled:  { cls: 'bs-badge-cancelled', label: 'ANNULLATO' },
+  cancelled:  { cls: 'bs-badge-cancelled', label: 'CANCELLATO' },
   showed:     { cls: 'bs-badge-showed',    label: 'COMPLETATO' },
   noshow:     { cls: 'bs-badge-cancelled', label: 'NO-SHOW' },
   'no-show':  { cls: 'bs-badge-cancelled', label: 'NO-SHOW' },
@@ -347,7 +347,7 @@ function AppointmentPanel({
             )}
             {st !== 'cancelled' && (
               <button className="bs-btn-danger" style={{ justifyContent: 'center' }} onClick={() => setStatus('cancelled')} disabled={loading}>
-                Annulla
+                Cancella
               </button>
             )}
             {st !== 'noshow' && st !== 'no-show' && st !== 'cancelled' && (
@@ -659,9 +659,9 @@ export default function AppuntamentiPage() {
 
   const FILTER_TABS: { key: StatusFilter; label: string }[] = [
     { key: 'all', label: 'Tutti' },
+    { key: 'cancelled', label: 'Cancellati' },
     { key: 'confirmed', label: 'Confermati' },
     { key: 'showed', label: 'Completati' },
-    { key: 'cancelled', label: 'Annullati' },
     { key: 'noshow', label: 'No-show' },
   ]
 

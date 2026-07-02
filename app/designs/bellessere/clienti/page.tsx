@@ -159,7 +159,7 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
     cancelled: 'bs-badge-cancelled', showed: 'bs-badge-showed',
   }
   const STATUS_LBL: Record<string, string> = {
-    confirmed: 'Confermato', new: 'Confermato', cancelled: 'Annullato', showed: 'Completato',
+    confirmed: 'Confermato', new: 'Confermato', cancelled: 'Cancellato', showed: 'Completato',
   }
 
   return (
@@ -211,7 +211,7 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
             {[
               { value: events.length, label: 'Prenotazioni' },
               { value: events.filter(e => e.appointmentStatus === 'showed').length, label: 'Completati' },
-              { value: events.filter(e => e.appointmentStatus === 'cancelled').length, label: 'Annullati' },
+              { value: events.filter(e => e.appointmentStatus === 'cancelled').length, label: 'Cancellati' },
             ].map((s) => (
               <div key={s.label} className="bs-mini-stat">
                 <div className="bs-mini-stat-value">{s.value}</div>

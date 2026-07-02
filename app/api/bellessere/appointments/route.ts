@@ -3,7 +3,6 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
-import { fetchBellessereEvents } from '@/lib/bellessere/events'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,8 +27,8 @@ async function authCheck(req: NextRequest) {
   return null
 }
 
-// GET — fetch live from GHL (via calendar groups) since the operator lives in
-// assignedUserId and the cache/userId-filter endpoints don't expose it reliably.
+// GET — cache-first read (fast). The cache stores the operator in user_id
+// (normalised from GHL's assignedUserId by the sync), so the userId filter works.
 export async function GET(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
@@ -41,20 +40,22 @@ export async function GET(req: NextRequest) {
   if (!startTime || !endTime) return NextResponse.json({ error: 'startTime and endTime required' }, { status: 400 })
 
   const sb = createAdminClient()
-  const token = await getToken().catch(() => null)
-  if (!token) return NextResponse.json({ events: [] })
 
-  const startMs = new Date(startTime).getTime()
-  const endMs = new Date(endTime).getTime()
-  let all = await fetchBellessereEvents(token, startMs, endMs)
+  let query = sb
+    .from('cached_calendar_events')
+    .select('ghl_id, calendar_id, contact_ghl_id, user_id, title, start_time, end_time, appointment_status')
+    .eq('location_id', BELLESSERE_LOCATION_ID)
+    .gte('start_time', startTime)
+    .lte('start_time', endTime)
+    .order('start_time', { ascending: true })
 
-  // Filter by operator (assignedUserId, normalised to userId in the helper)
-  if (userId) all = all.filter(e => e.userId === userId)
+  if (userId) query = query.eq('user_id', userId)
 
-  all.sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''))
+  const { data: rows, error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Join contact names from cache
-  const contactIds = [...new Set(all.map(e => e.contactId).filter(Boolean))] as string[]
+  const contactIds = [...new Set((rows ?? []).map(r => r.contact_ghl_id).filter(Boolean))] as string[]
   let contactMap: Record<string, string> = {}
   if (contactIds.length > 0) {
     const { data: contacts } = await sb
@@ -67,16 +68,16 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const events = all.map(e => ({
-    id: e.id,
-    calendarId: e.calendarId,
-    contactId: e.contactId,
-    userId: e.userId,
-    title: e.title,
-    startTime: e.startTime,
-    endTime: e.endTime,
-    appointmentStatus: e.appointmentStatus,
-    contactName: e.contactId ? (contactMap[e.contactId] ?? undefined) : undefined,
+  const events = (rows ?? []).map(r => ({
+    id: r.ghl_id,
+    calendarId: r.calendar_id,
+    contactId: r.contact_ghl_id,
+    userId: r.user_id,
+    title: r.title,
+    startTime: r.start_time,
+    endTime: r.end_time,
+    appointmentStatus: r.appointment_status,
+    contactName: r.contact_ghl_id ? (contactMap[r.contact_ghl_id] ?? undefined) : undefined,
   }))
 
   return NextResponse.json({ events })

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import LogoutButton from '@/app/admin/_components/LogoutButton'
 
@@ -92,6 +93,15 @@ const NAV = [
 
 export default function Sidebar({ email }: { email: string }) {
   const pathname = usePathname() ?? ''
+
+  // Refresh the appointments cache in the background once per session entry.
+  // Pages read cache-first (fast); this keeps it in sync with GHL without blocking.
+  useEffect(() => {
+    fetch('/api/bellessere/sync', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope: 'appointments' }),
+    }).catch(() => {})
+  }, [])
 
   return (
     <aside className="bs-sidebar">

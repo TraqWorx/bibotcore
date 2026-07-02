@@ -299,7 +299,7 @@ function AppointmentModal({ event, users, calendars, onClose, onAction }: {
   const { background, color } = statusStyle(st)
 
   const STATUS_LABEL: Record<string, string> = {
-    confirmed: 'Confermato', new: 'In attesa', cancelled: 'Annullato',
+    confirmed: 'Confermato', new: 'In attesa', cancelled: 'Cancellato',
     showed: 'Completato', 'no-show': 'No-show', noshow: 'No-show', pending: 'In attesa',
   }
 
@@ -401,7 +401,7 @@ function AppointmentModal({ event, users, calendars, onClose, onAction }: {
               </button>
               {st !== 'cancelled' && (
                 <button className="bs-btn-danger" style={{ justifyContent: 'center' }} onClick={() => setStatus('cancelled')} disabled={loading}>
-                  Annulla
+                  Cancella
                 </button>
               )}
               {st !== 'confirmed' && st !== 'showed' && (
@@ -469,8 +469,7 @@ export default function CalendarioPage() {
       .then(r => r.json())
       .then(d => setContacts(d.contacts ?? []))
       .catch(() => {})
-    // Backfill user_id for cached events in background (non-blocking)
-    fetch('/api/bellessere/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'appointments' }) }).catch(() => {})
+    // (appointments cache is refreshed once per session by the Sidebar)
   }, [])
 
   const weekDates = getWeekDates(anchor)
@@ -592,7 +591,7 @@ export default function CalendarioPage() {
             {[
               { label: 'Confermato', bg: 'rgba(16,185,129,0.14)', border: '#10B981' },
               { label: 'Completato', bg: 'rgba(99,102,241,0.14)', border: '#6366F1' },
-              { label: 'Annullato', bg: 'rgba(239,68,68,0.14)', border: '#EF4444' },
+              { label: 'Cancellato', bg: 'rgba(239,68,68,0.14)', border: '#EF4444' },
               { label: 'No-show', bg: 'rgba(107,114,128,0.14)', border: '#6B7280' },
             ].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
