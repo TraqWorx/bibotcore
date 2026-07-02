@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function ImpostazioniPage() {
   const [reminderTemplate, setReminderTemplate] = useState(() => {
@@ -9,10 +9,24 @@ export default function ImpostazioniPage() {
   })
   const [reminderSaved, setReminderSaved] = useState(false)
 
+  const [inviteChannel, setInviteChannel] = useState('SMS')
+  const [channelSaved, setChannelSaved] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/bellessere/settings').then(r => r.json()).then(d => setInviteChannel(d.inviteChannel ?? 'SMS')).catch(() => {})
+  }, [])
+
   function saveReminderTemplate() {
     localStorage.setItem('bellessere_reminder_template', reminderTemplate)
     setReminderSaved(true)
     setTimeout(() => setReminderSaved(false), 2000)
+  }
+
+  async function saveChannel(next: string) {
+    setInviteChannel(next)
+    await fetch('/api/bellessere/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inviteChannel: next }) }).catch(() => {})
+    setChannelSaved(true)
+    setTimeout(() => setChannelSaved(false), 2000)
   }
 
   return (
@@ -44,6 +58,25 @@ export default function ImpostazioniPage() {
               Ripristina default
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Waiting-list notification channel */}
+      <div className="bs-card" style={{ padding: '22px 24px' }}>
+        <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Canale avvisi lista d&apos;attesa</div>
+        <div style={{ fontSize: 13, color: 'var(--bs-text-muted)', marginBottom: 14 }}>
+          Come inviare l&apos;invito quando si libera un posto per chi è in lista d&apos;attesa.
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {['SMS', 'WhatsApp', 'Email'].map(c => (
+            <button key={c} onClick={() => saveChannel(c)} style={{
+              padding: '9px 18px', borderRadius: 100, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+              border: `1.5px solid ${inviteChannel === c ? 'var(--bs-black)' : 'var(--bs-line)'}`,
+              background: inviteChannel === c ? 'var(--bs-black)' : 'transparent',
+              color: inviteChannel === c ? '#fff' : 'var(--bs-text-muted)', fontWeight: inviteChannel === c ? 700 : 500,
+            }}>{c}</button>
+          ))}
+          {channelSaved && <span style={{ alignSelf: 'center', fontSize: 12.5, color: '#16a34a' }}>Salvato ✓</span>}
         </div>
       </div>
 

@@ -45,12 +45,19 @@ export async function inviteEntry(entryId: string, freedSlot?: FreedSlot): Promi
     dateLabel, bookingLink: BELLESSERE_BOOKING_LINK,
   })
 
+  // Notification channel is configurable in Impostazioni (SMS / WhatsApp / Email)
+  const { data: settings } = await sb.from('bellessere_settings')
+    .select('invite_channel').eq('location_id', BELLESSERE_LOCATION_ID).maybeSingle()
+  const channel = settings?.invite_channel ?? 'SMS'
+  const payload: Record<string, unknown> = { type: channel, contactId: entry.contact_ghl_id, message }
+  if (channel === 'Email') { payload.subject = "Bellessere — Lista d'attesa"; payload.html = message }
+
   try {
     const token = await getToken()
     const res = await fetch(`${GHL}/conversations/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, Version: V, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'SMS', contactId: entry.contact_ghl_id, message }),
+      body: JSON.stringify(payload),
     })
     const text = await res.text()
     if (!res.ok) {

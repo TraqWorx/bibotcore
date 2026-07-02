@@ -12,26 +12,32 @@ const card: React.CSSProperties = {
 const label: React.CSSProperties = { display: 'block', fontSize: 12.5, fontWeight: 700, color: '#5F6876', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }
 const field: React.CSSProperties = { width: '100%', border: '1px solid #C4CCD8', borderRadius: 10, padding: '11px 13px', fontSize: 14, color: '#121417', background: '#fff', fontFamily: 'inherit', boxSizing: 'border-box' }
 
+interface DaySlot { date: string; timePref: string; from: string; to: string }
+const emptySlot = (): DaySlot => ({ date: '', timePref: 'any', from: '', to: '' })
+
+const TIME_OPTS = [
+  { k: 'any', l: 'Qualsiasi' },
+  { k: 'morning', l: 'Mattina' },
+  { k: 'afternoon', l: 'Pomeriggio' },
+  { k: 'specific', l: 'Orario preciso' },
+]
+
 export default function WaitlistForm({ services, operators }: { services: WlService[]; operators: WlOperator[] }) {
-  const [form, setForm] = useState({
-    firstName: '', lastName: '', phone: '', email: '',
-    calendarId: '', operatorId: '', preferredDate: '',
-    timePref: 'any', preferredFrom: '', preferredTo: '', note: '',
-  })
+  const [contact, setContact] = useState({ firstName: '', lastName: '', phone: '', email: '' })
+  const [calendarId, setCalendarId] = useState('')
+  const [operatorId, setOperatorId] = useState('')
+  const [slots, setSlots] = useState<DaySlot[]>([emptySlot()])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
 
-  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
-
-  const selectedService = services.find(s => s.id === form.calendarId)
+  const selectedService = services.find(s => s.id === calendarId)
   const serviceOps = useMemo(() => {
     if (!selectedService) return []
     const ids = new Set(selectedService.teamMembers)
     return operators.filter(o => ids.has(o.id))
   }, [selectedService, operators])
 
-  // Group services for the <optgroup>s
   const grouped = useMemo(() => {
     const m = new Map<string, WlService[]>()
     for (const s of services) { if (!m.has(s.groupName)) m.set(s.groupName, []); m.get(s.groupName)!.push(s) }
@@ -40,17 +46,25 @@ export default function WaitlistForm({ services, operators }: { services: WlServ
 
   const today = new Date().toISOString().slice(0, 10)
 
+  const setSlot = (i: number, patch: Partial<DaySlot>) => setSlots(prev => prev.map((s, idx) => idx === i ? { ...s, ...patch } : s))
+  const addSlot = () => setSlots(prev => [...prev, emptySlot()])
+  const removeSlot = (i: number) => setSlots(prev => prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i))
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.firstName.trim()) { setError('Inserisci il tuo nome'); return }
-    if (!form.phone.trim() && !form.email.trim()) { setError('Inserisci telefono o email'); return }
-    if (!form.calendarId) { setError('Scegli un servizio'); return }
-    if (!form.preferredDate) { setError('Scegli un giorno preferito'); return }
+    if (!contact.firstName.trim()) { setError('Inserisci il tuo nome'); return }
+    if (!contact.phone.trim() && !contact.email.trim()) { setError('Inserisci telefono o email'); return }
+    if (!calendarId) { setError('Scegli un servizio'); return }
+    const validSlots = slots.filter(s => s.date)
+    if (validSlots.length === 0) { setError('Scegli almeno un giorno'); return }
     setSaving(true); setError('')
     try {
       const res = await fetch('/api/bellessere/waitlist', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, serviceName: selectedService?.name ?? '' }),
+        body: JSON.stringify({
+          ...contact, calendarId, operatorId, serviceName: selectedService?.name ?? '',
+          slots: validSlots.map(s => ({ preferredDate: s.date, timePref: s.timePref, preferredFrom: s.from, preferredTo: s.to })),
+        }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) { setError(d.error ?? 'Errore, riprova'); return }
@@ -67,7 +81,7 @@ export default function WaitlistForm({ services, operators }: { services: WlServ
         </div>
         <div style={{ fontSize: 19, fontWeight: 800, marginBottom: 8 }}>Sei in lista d&apos;attesa!</div>
         <div style={{ fontSize: 14, color: '#5F6876', lineHeight: 1.6 }}>
-          Ti avviseremo via messaggio appena si libera un posto per <strong>{selectedService?.name}</strong> nel giorno scelto. A presto da Bellessere.
+          Ti avviseremo via messaggio appena si libera un posto per <strong>{selectedService?.name}</strong> nei giorni scelti. A presto da Bellessere.
         </div>
       </div>
     )
@@ -85,7 +99,7 @@ export default function WaitlistForm({ services, operators }: { services: WlServ
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <label style={label}>Servizio *</label>
-          <select style={field} value={form.calendarId} onChange={e => { set('calendarId', e.target.value); set('operatorId', '') }} required>
+          <select style={field} value={calendarId} onChange={e => { setCalendarId(e.target.value); setOperatorId('') }} required>
             <option value="">Seleziona servizio...</option>
             {grouped.map(([g, list]) => (
               <optgroup key={g} label={g}>
@@ -98,42 +112,54 @@ export default function WaitlistForm({ services, operators }: { services: WlServ
         {serviceOps.length > 0 && (
           <div>
             <label style={label}>Operatore</label>
-            <select style={field} value={form.operatorId} onChange={e => set('operatorId', e.target.value)}>
+            <select style={field} value={operatorId} onChange={e => setOperatorId(e.target.value)}>
               <option value="">Qualsiasi operatore</option>
               {serviceOps.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
             </select>
           </div>
         )}
 
+        {/* Days + per-day time preference */}
         <div>
-          <label style={label}>Giorno preferito *</label>
-          <input style={field} type="date" min={today} value={form.preferredDate} onChange={e => set('preferredDate', e.target.value)} required />
-        </div>
-
-        <div>
-          <label style={label}>Fascia oraria</label>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {[
-              { k: 'any', l: 'Qualsiasi' },
-              { k: 'morning', l: 'Mattina' },
-              { k: 'afternoon', l: 'Pomeriggio' },
-              { k: 'specific', l: 'Orario preciso' },
-            ].map(o => (
-              <button type="button" key={o.k} onClick={() => set('timePref', o.k)} style={{
-                padding: '8px 14px', borderRadius: 100, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-                border: `1.5px solid ${form.timePref === o.k ? '#0B0907' : '#C4CCD8'}`,
-                background: form.timePref === o.k ? '#0B0907' : 'transparent',
-                color: form.timePref === o.k ? '#fff' : '#5F6876', fontWeight: form.timePref === o.k ? 700 : 500,
-              }}>{o.l}</button>
+          <label style={label}>Giorni e fasce orarie preferiti *</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {slots.map((s, i) => (
+              <div key={i} style={{ border: '1px solid #DDE3EC', borderRadius: 12, padding: '12px 14px', background: '#FBFCFE' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <input style={{ ...field, flex: 1 }} type="date" min={today} value={s.date} onChange={e => setSlot(i, { date: e.target.value })} />
+                  {slots.length > 1 && (
+                    <button type="button" onClick={() => removeSlot(i)} title="Rimuovi giorno"
+                      style={{ border: '1px solid #C4CCD8', background: '#fff', borderRadius: 9, padding: '8px 11px', cursor: 'pointer', color: '#DC2626', fontSize: 15, lineHeight: 1 }}>✕</button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {TIME_OPTS.map(o => (
+                    <button type="button" key={o.k} onClick={() => setSlot(i, { timePref: o.k })} style={{
+                      padding: '7px 12px', borderRadius: 100, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit',
+                      border: `1.5px solid ${s.timePref === o.k ? '#0B0907' : '#C4CCD8'}`,
+                      background: s.timePref === o.k ? '#0B0907' : 'transparent',
+                      color: s.timePref === o.k ? '#fff' : '#5F6876', fontWeight: s.timePref === o.k ? 700 : 500,
+                    }}>{o.l}</button>
+                  ))}
+                </div>
+                {s.timePref === 'specific' && (
+                  <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
+                    <input style={field} type="time" value={s.from} onChange={e => setSlot(i, { from: e.target.value })} />
+                    <span style={{ color: '#8C96A6' }}>→</span>
+                    <input style={field} type="time" value={s.to} onChange={e => setSlot(i, { to: e.target.value })} />
+                  </div>
+                )}
+              </div>
             ))}
           </div>
-          {form.timePref === 'specific' && (
-            <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
-              <input style={field} type="time" value={form.preferredFrom} onChange={e => set('preferredFrom', e.target.value)} />
-              <span style={{ color: '#8C96A6' }}>→</span>
-              <input style={field} type="time" value={form.preferredTo} onChange={e => set('preferredTo', e.target.value)} />
-            </div>
-          )}
+          <button type="button" onClick={addSlot} style={{
+            marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent',
+            border: '1.5px dashed #C4CCD8', borderRadius: 10, padding: '9px 14px', cursor: 'pointer',
+            color: '#5F6876', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Aggiungi un altro giorno
+          </button>
         </div>
 
         <div style={{ height: 1, background: '#DDE3EC', margin: '2px 0' }} />
@@ -141,19 +167,19 @@ export default function WaitlistForm({ services, operators }: { services: WlServ
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
             <label style={label}>Nome *</label>
-            <input style={field} value={form.firstName} onChange={e => set('firstName', e.target.value)} required />
+            <input style={field} value={contact.firstName} onChange={e => setContact(p => ({ ...p, firstName: e.target.value }))} required />
           </div>
           <div>
             <label style={label}>Cognome</label>
-            <input style={field} value={form.lastName} onChange={e => set('lastName', e.target.value)} />
+            <input style={field} value={contact.lastName} onChange={e => setContact(p => ({ ...p, lastName: e.target.value }))} />
           </div>
           <div>
             <label style={label}>Telefono *</label>
-            <input style={field} type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+39..." />
+            <input style={field} type="tel" value={contact.phone} onChange={e => setContact(p => ({ ...p, phone: e.target.value }))} placeholder="+39..." />
           </div>
           <div>
             <label style={label}>Email</label>
-            <input style={field} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+            <input style={field} type="email" value={contact.email} onChange={e => setContact(p => ({ ...p, email: e.target.value }))} />
           </div>
         </div>
 
