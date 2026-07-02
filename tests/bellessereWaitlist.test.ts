@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  hhmmToMinutes, entryWindow, overlaps, entryMatchesSlot, matchWaitlist, buildWaitlistSms, renderInviteText,
+  hhmmToMinutes, entryWindow, overlaps, entryMatchesSlot, matchWaitlist, buildWaitlistSms, renderInviteText, buildBookingLink,
   type WaitEntry, type FreedSlot, type ServiceInfo,
 } from '@/lib/bellessere/waitlist'
 
@@ -99,6 +99,19 @@ describe('renderInviteText', () => {
   })
   it('replaces missing vars with empty string', () => {
     expect(renderInviteText('{{nome}}{{servizio}}', {})).toBe('')
+  })
+})
+
+describe('buildBookingLink', () => {
+  it('appends prefill params (encoded) with ?', () => {
+    const url = buildBookingLink('https://x.y/book', { firstName: 'Mario', lastName: 'Rossi', email: 'a@b.it', phone: '+39 333' })
+    expect(url).toBe('https://x.y/book?first_name=Mario&last_name=Rossi&email=a%40b.it&phone=%2B39+333')
+  })
+  it('uses & when the base already has a query', () => {
+    expect(buildBookingLink('https://x.y/book?a=1', { phone: '333' })).toBe('https://x.y/book?a=1&phone=333')
+  })
+  it('returns the base unchanged when no contact fields', () => {
+    expect(buildBookingLink('https://x.y/book', {})).toBe('https://x.y/book')
   })
 })
 

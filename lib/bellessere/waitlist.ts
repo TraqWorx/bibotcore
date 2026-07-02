@@ -107,6 +107,25 @@ export function renderInviteText(
     .trim()
 }
 
+/**
+ * Personalise the booking link by prefilling the customer's contact fields so
+ * the GHL widget books against the SAME contact (exact match on the webhook),
+ * instead of the generic link. Unknown params are harmlessly ignored by GHL.
+ */
+export function buildBookingLink(
+  base: string,
+  c: { firstName?: string | null; lastName?: string | null; email?: string | null; phone?: string | null },
+): string {
+  const params = new URLSearchParams()
+  if (c.firstName) params.set('first_name', c.firstName)
+  if (c.lastName) params.set('last_name', c.lastName)
+  if (c.email) params.set('email', c.email)
+  if (c.phone) params.set('phone', c.phone)
+  const qs = params.toString()
+  if (!qs) return base
+  return base + (base.includes('?') ? '&' : '?') + qs
+}
+
 /** Build the default invite SMS text. */
 export function buildWaitlistSms(opts: {
   name: string

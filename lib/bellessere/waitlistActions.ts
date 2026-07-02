@@ -3,7 +3,7 @@
 import { createAdminClient } from '@/lib/supabase-server'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID, BELLESSERE_BOOKING_LINK, WAITLIST_HOLD_HOURS } from './constants'
-import { buildWaitlistSms, renderInviteText, matchWaitlist, type FreedSlot, type WaitEntry, type ServiceInfo } from './waitlist'
+import { buildWaitlistSms, renderInviteText, buildBookingLink, matchWaitlist, type FreedSlot, type WaitEntry, type ServiceInfo } from './waitlist'
 
 const GHL = 'https://services.leadconnectorhq.com'
 const V = '2021-07-28'
@@ -51,6 +51,12 @@ export async function inviteEntry(entryId: string, freedSlot?: FreedSlot): Promi
     timeLabel = `${entry.preferred_from.slice(0, 5)}${entry.preferred_to ? `–${entry.preferred_to.slice(0, 5)}` : ''}`
   }
 
+  // Personalised booking link (prefills the customer's contact so the booking
+  // lands on the same GHL contact → exact match when they book).
+  const bookingLink = buildBookingLink(BELLESSERE_BOOKING_LINK, {
+    firstName: entry.first_name, lastName: entry.last_name, email: entry.email, phone: entry.phone,
+  })
+
   // Use the custom invite text from Impostazioni if set, else the default.
   const { data: settings } = await sb.from('bellessere_settings')
     .select('invite_text').eq('location_id', BELLESSERE_LOCATION_ID).maybeSingle()
@@ -58,11 +64,11 @@ export async function inviteEntry(entryId: string, freedSlot?: FreedSlot): Promi
   const message = template
     ? renderInviteText(template, {
         nome: entry.first_name ?? '', servizio: entry.service_name ?? 'il tuo servizio',
-        giorno: dateLabel, ora: timeLabel, link: BELLESSERE_BOOKING_LINK,
+        giorno: dateLabel, ora: timeLabel, link: bookingLink,
       })
     : buildWaitlistSms({
         name: entry.first_name ?? '', serviceName: entry.service_name ?? 'il tuo servizio',
-        dateLabel: dateLabel || undefined, timeLabel: timeLabel || undefined, bookingLink: BELLESSERE_BOOKING_LINK,
+        dateLabel: dateLabel || undefined, timeLabel: timeLabel || undefined, bookingLink,
       })
 
   try {
