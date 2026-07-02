@@ -19,18 +19,44 @@ export type LocationAccessResult =
   | { status: 'forbidden' }
   | ({ status: 'authorized' } & AuthorizedLocationAccess)
 
-export async function getLocationAccess(
-  req: NextRequest,
-  locationId: string,
-): Promise<LocationAccessResult> {
-  const authClient = createServerClient(
+function authClientFor(req: NextRequest) {
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { getAll() { return req.cookies.getAll() }, setAll() {} } },
   )
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) return { status: 'unauthenticated' }
+}
 
+/**
+ * Fast variant: reads the user from the (already middleware-validated) session
+ * cookie locally instead of a getUser() round-trip to the auth server. Same
+ * location-access DB checks. Use on read-heavy routes behind the auth middleware.
+ */
+export async function getLocationAccessFast(
+  req: NextRequest,
+  locationId: string,
+): Promise<LocationAccessResult> {
+  const { data: { session } } = await authClientFor(req).auth.getSession()
+  const user = session?.user
+  if (!user) return { status: 'unauthenticated' }
+  return resolveLocationAccess(user.id, user.email ?? '', locationId)
+}
+
+export async function getLocationAccess(
+  req: NextRequest,
+  locationId: string,
+): Promise<LocationAccessResult> {
+  const { data: { user } } = await authClientFor(req).auth.getUser()
+  if (!user) return { status: 'unauthenticated' }
+  return resolveLocationAccess(user.id, user.email ?? '', locationId)
+}
+
+async function resolveLocationAccess(
+  userId: string,
+  email: string,
+  locationId: string,
+): Promise<LocationAccessResult> {
+  const user = { id: userId, email }
   const sb = createAdminClient()
 
   // Check profile + membership in parallel

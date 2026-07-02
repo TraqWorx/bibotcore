@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
-import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
+import { getLocationAccessFast } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 import { ensureFresh } from '@/lib/bellessere/sync'
@@ -22,7 +22,7 @@ async function getToken(): Promise<string> {
 }
 
 async function authCheck(req: NextRequest) {
-  const access = await getLocationAccess(req, BELLESSERE_LOCATION_ID)
+  const access = await getLocationAccessFast(req, BELLESSERE_LOCATION_ID)
   if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   return null

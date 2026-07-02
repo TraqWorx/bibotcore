@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
-import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
+import { getLocationAccessFast } from '@/lib/auth/assertLocationAccess'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const access = await getLocationAccess(req, BELLESSERE_LOCATION_ID)
+  const access = await getLocationAccessFast(req, BELLESSERE_LOCATION_ID)
   if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
