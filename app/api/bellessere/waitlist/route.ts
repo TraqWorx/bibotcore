@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccessFast } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+import { normalizePhone } from '@/lib/bellessere/query'
 import { inviteEntry, reconcileWaitlistBookings } from '@/lib/bellessere/waitlistActions'
 
 export const dynamic = 'force-dynamic'
@@ -36,7 +37,9 @@ interface SlotInput { preferredDate?: string; timePref?: string; preferredFrom?:
 // One row is created per preferred day (each with its own time preference).
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
-  const { firstName, lastName, phone, email, calendarId, serviceName, operatorId, note } = body as Record<string, string>
+  const { firstName, lastName, email, calendarId, serviceName, operatorId, note } = body as Record<string, string>
+  // Normalise the phone to E.164 (+39…) so customers can type it with or without the prefix
+  const phone = normalizePhone(body.phone)
 
   // Accept a `slots` array (multi-day) or fall back to a single day for compatibility
   const rawSlots: SlotInput[] = Array.isArray(body.slots) && body.slots.length > 0

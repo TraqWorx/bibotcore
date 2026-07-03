@@ -62,6 +62,21 @@ export function matchesStatus(status: string | null | undefined, filter: ApptSta
   return (statusValuesFor(filter) ?? []).includes(s)
 }
 
+/**
+ * Normalise a phone to E.164 so GHL can send SMS/WhatsApp. Accepts numbers with
+ * or without the country code: bare Italian numbers get +39, `00xx` → `+xx`,
+ * and already-prefixed `+` numbers are kept (digits only).
+ */
+export function normalizePhone(raw: string | null | undefined, defaultCc = '39'): string {
+  if (!raw) return ''
+  const trimmed = raw.trim()
+  if (trimmed.startsWith('+')) return '+' + trimmed.slice(1).replace(/\D/g, '')
+  const digits = trimmed.replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.startsWith('00')) return '+' + digits.slice(2)
+  return `+${defaultCc}${digits}`
+}
+
 export interface NewUserInput {
   firstName?: string
   lastName?: string

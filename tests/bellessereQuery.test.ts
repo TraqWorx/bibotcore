@@ -2,8 +2,26 @@ import { describe, expect, it } from 'vitest'
 import {
   parsePageParams, sanitizeSearch, contactSearchOr,
   isApptStatusFilter, statusValuesFor, matchesStatus,
-  validateNewUser, buildCreateUserPayload,
+  validateNewUser, buildCreateUserPayload, normalizePhone,
 } from '@/lib/bellessere/query'
+
+describe('normalizePhone', () => {
+  it('adds +39 to a bare Italian number', () => {
+    expect(normalizePhone('349 326 2902')).toBe('+393493262902')
+    expect(normalizePhone('3493262902')).toBe('+393493262902')
+  })
+  it('keeps an existing + prefix', () => {
+    expect(normalizePhone('+39 349 326 2902')).toBe('+393493262902')
+    expect(normalizePhone('+44 7700 900000')).toBe('+447700900000')
+  })
+  it('converts 00 to +', () => {
+    expect(normalizePhone('0039 3493262902')).toBe('+393493262902')
+  })
+  it('returns empty for blank', () => {
+    expect(normalizePhone('')).toBe('')
+    expect(normalizePhone(null)).toBe('')
+  })
+})
 
 const sp = (q: string) => new URLSearchParams(q)
 

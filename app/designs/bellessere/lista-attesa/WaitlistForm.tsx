@@ -212,7 +212,7 @@ export default function WaitlistForm({ services, operators, schedules }: { servi
           </div>
           <div>
             <label style={label}>Telefono *</label>
-            <input style={field} type="tel" value={contact.phone} onChange={e => setContact(p => ({ ...p, phone: e.target.value }))} placeholder="+39..." />
+            <input style={field} type="tel" value={contact.phone} onChange={e => setContact(p => ({ ...p, phone: e.target.value }))} placeholder="Es. 349 326 2902" />
           </div>
           <div>
             <label style={label}>Email</label>
