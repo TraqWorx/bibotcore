@@ -2,8 +2,8 @@
 // route (manual invite) and the cancellation hook (auto invite).
 import { createAdminClient } from '@/lib/supabase-server'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
-import { BELLESSERE_LOCATION_ID, BELLESSERE_BOOKING_LINK, BELLESSERE_BOOKING_WIDGET_BASE, WAITLIST_HOLD_HOURS } from './constants'
-import { buildWaitlistSms, renderInviteText, buildBookingLink, buildServiceBookingLink, matchWaitlist, type FreedSlot, type WaitEntry, type ServiceInfo } from './waitlist'
+import { BELLESSERE_LOCATION_ID, BELLESSERE_BOOKING_LINK, WAITLIST_HOLD_HOURS } from './constants'
+import { buildWaitlistSms, renderInviteText, buildBookingLink, matchWaitlist, type FreedSlot, type WaitEntry, type ServiceInfo } from './waitlist'
 
 const GHL = 'https://services.leadconnectorhq.com'
 const V = '2021-07-28'
@@ -95,15 +95,12 @@ export async function inviteEntry(entryId: string, freedSlot?: FreedSlot): Promi
     timeLabel = `${entry.preferred_from.slice(0, 5)}${entry.preferred_to ? `–${entry.preferred_to.slice(0, 5)}` : ''}`
   }
 
-  // Deep-link straight into the waitlisted service with the operator preselected
-  // (the freed operator on auto-invite, else the customer's chosen operator) and
-  // the contact prefilled — so they land on the time picker, not the menu.
-  const contactPrefill = { firstName: entry.first_name, lastName: entry.last_name, email: entry.email, phone: entry.phone }
-  const bookingLink = entry.calendar_id
-    ? buildServiceBookingLink(BELLESSERE_BOOKING_WIDGET_BASE, entry.calendar_id, {
-        operatorId: slot?.operatorId ?? entry.operator_id, ...contactPrefill,
-      })
-    : buildBookingLink(BELLESSERE_BOOKING_LINK, contactPrefill)
+  // Use the BRANDED service-menu widget (the per-service /widget/booking/<id>
+  // URL is a different, unbranded widget) with the contact prefilled so the
+  // booking lands on the same GHL contact → exact match.
+  const bookingLink = buildBookingLink(BELLESSERE_BOOKING_LINK, {
+    firstName: entry.first_name, lastName: entry.last_name, email: entry.email, phone: entry.phone,
+  })
 
   // Use the custom invite text from Impostazioni if set, else the default.
   const { data: settings } = await sb.from('bellessere_settings')
