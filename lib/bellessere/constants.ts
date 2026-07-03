@@ -5,5 +5,9 @@ export const BELLESSERE_LOCATION_ID = '38lvVkcTVVRFDDcHqYd1'
 // verified) and accepts contact-prefill query params.
 export const BELLESSERE_BOOKING_LINK = 'https://links.bibotcrm.it/widget/service-menus/bellessere'
 
+// Per-service booking widget base — /<calendarId> deep-links straight into one
+// service (skips the menu), and accepts ?user= + contact-prefill params.
+export const BELLESSERE_BOOKING_WIDGET_BASE = 'https://links.bibotcrm.it/widget/booking'
+
 // How long a waiting-list invite is held before we drip to the next person
 export const WAITLIST_HOLD_HOURS = 4

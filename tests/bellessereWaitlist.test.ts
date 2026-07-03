@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  hhmmToMinutes, entryWindow, overlaps, entryMatchesSlot, matchWaitlist, buildWaitlistSms, renderInviteText, buildBookingLink,
+  hhmmToMinutes, entryWindow, overlaps, entryMatchesSlot, matchWaitlist, buildWaitlistSms, renderInviteText, buildBookingLink, buildServiceBookingLink,
   type WaitEntry, type FreedSlot, type ServiceInfo,
 } from '@/lib/bellessere/waitlist'
 
@@ -99,6 +99,16 @@ describe('renderInviteText', () => {
   })
   it('replaces missing vars with empty string', () => {
     expect(renderInviteText('{{nome}}{{servizio}}', {})).toBe('')
+  })
+})
+
+describe('buildServiceBookingLink', () => {
+  it('deep-links to the calendar with operator + prefill', () => {
+    const url = buildServiceBookingLink('https://x.y/widget/booking', 'CAL1', { operatorId: 'OP1', firstName: 'Niki', phone: '+39333' })
+    expect(url).toBe('https://x.y/widget/booking/CAL1?user=OP1&first_name=Niki&phone=%2B39333')
+  })
+  it('omits operator when none (any)', () => {
+    expect(buildServiceBookingLink('https://x.y/widget/booking/', 'CAL1', { firstName: 'A' })).toBe('https://x.y/widget/booking/CAL1?first_name=A')
   })
 })
 

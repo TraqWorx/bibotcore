@@ -126,6 +126,26 @@ export function buildBookingLink(
   return base + (base.includes('?') ? '&' : '?') + qs
 }
 
+/**
+ * Deep-link straight into one service's booking widget (skips the service menu),
+ * with the operator preselected (?user=) and the customer's contact prefilled.
+ */
+export function buildServiceBookingLink(
+  base: string,
+  calendarId: string,
+  opts: { operatorId?: string | null; firstName?: string | null; lastName?: string | null; email?: string | null; phone?: string | null },
+): string {
+  const params = new URLSearchParams()
+  if (opts.operatorId) params.set('user', opts.operatorId)
+  if (opts.firstName) params.set('first_name', opts.firstName)
+  if (opts.lastName) params.set('last_name', opts.lastName)
+  if (opts.email) params.set('email', opts.email)
+  if (opts.phone) params.set('phone', opts.phone)
+  const url = `${base.replace(/\/$/, '')}/${calendarId}`
+  const qs = params.toString()
+  return qs ? `${url}?${qs}` : url
+}
+
 /** Build the default invite SMS text. */
 export function buildWaitlistSms(opts: {
   name: string
