@@ -133,12 +133,6 @@ function AddAppointmentModal({ calendars, users, onClose, onAdded }: {
                 }
               </div>
             </div>
-            <div>
-              <label className="bs-field-label">Stato</label>
-              <select className="bs-select" value={form.appointmentStatus} onChange={e => setForm(p => ({ ...p, appointmentStatus: e.target.value }))}>
-                <option value="confirmed">Confermato</option>
-              </select>
-            </div>
           </div>
           <div className="bs-modal-footer">
             <button type="button" className="bs-btn-ghost" onClick={onClose}>Annulla</button>
@@ -261,6 +255,9 @@ function AppointmentModal({ event, users, calendars, onClose, onAction }: {
   const dt = event.startTime ? new Date(event.startTime) : null
   const operator = users.find(u => u.id === event.userId)
   const calendar = calendars.find(c => c.id === event.calendarId)
+  const durationMin = event.startTime && event.endTime
+    ? Math.round((new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) / 60000)
+    : (calendar?.slotDuration ?? null)
   const st = event.appointmentStatus ?? 'new'
   const { background, color } = statusStyle(st)
 
@@ -334,6 +331,19 @@ function AppointmentModal({ event, users, calendars, onClose, onAction }: {
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--bs-text-faint)', marginBottom: 2 }}>Servizio</div>
                     <div style={{ fontSize: 13.5, fontWeight: 600 }}>{event.title || calendar?.name}</div>
+                  </div>
+                </div>
+              )}
+              {durationMin != null && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--bs-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--bs-text-muted)" strokeWidth="2">
+                      <path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--bs-text-faint)', marginBottom: 2 }}>Durata</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600 }}>{durationMin} min</div>
                   </div>
                 </div>
               )}
@@ -658,6 +668,7 @@ export default function CalendarioView({ initial }: { initial?: InitialCalendari
                         const userBorderColor = ev.userId ? (userColorMap[ev.userId] ?? '#C9A84C') : '#C9A84C'
                         const opName = users.find(u => u.id === ev.userId)?.name
                         const startTime = ev.startTime ? new Date(ev.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : ''
+                        const evDur = ev.startTime && ev.endTime ? Math.round((new Date(ev.endTime).getTime() - new Date(ev.startTime).getTime()) / 60000) : null
                         return (
                           <div
                             key={ev.id}
@@ -670,6 +681,7 @@ export default function CalendarioView({ initial }: { initial?: InitialCalendari
                           >
                             <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {startTime && <span style={{ opacity: 0.7, marginRight: 4 }}>{startTime}</span>}
+                              {evDur != null && <span style={{ opacity: 0.55, marginRight: 4 }}>({evDur}m)</span>}
                               {ev.contactName || 'Cliente'}
                             </div>
                             {ev.title && <div style={{ opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.title}</div>}

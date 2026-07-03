@@ -103,9 +103,12 @@ export default function ConversazioniPage() {
     } catch { setDraft(body) } finally { setSending(false) }
   }
 
-  const filtered = search
+  // Always show newest last-message first (belt-and-suspenders over the API order)
+  const parseTs = (s: string) => { const n = Number(s); return Number.isFinite(n) && s.length >= 10 ? n : Date.parse(s) || 0 }
+  const filtered = (search
     ? conversations.filter(c => c.contactName.toLowerCase().includes(search.toLowerCase()) || c.lastMessageBody.toLowerCase().includes(search.toLowerCase()))
     : conversations
+  ).slice().sort((a, b) => parseTs(b.lastMessageDate) - parseTs(a.lastMessageDate))
 
   return (
     <div className="bs-page-stack-tight" style={{ flex: 1, minHeight: 0 }}>

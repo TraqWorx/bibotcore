@@ -301,6 +301,17 @@ function AppointmentPanel({
                 </div>
               </div>
             )}
+            {duration != null && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--bs-gold-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--bs-gold)" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--bs-text-faint)', marginBottom: 2 }}>Durata</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{duration} min</div>
+                </div>
+              </div>
+            )}
             {operator && (
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--bs-gold-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -548,16 +559,19 @@ export default function AppuntamentiView({ initial }: { initial?: InitialAppunta
   const [hasMore, setHasMore] = useState(initial?.hasMore ?? false)
   const [filter, setFilter] = useState<StatusFilter>('all')
   const [search, setSearch] = useState('')
+  const [dayFilter, setDayFilter] = useState('') // specific day (YYYY-MM-DD), or '' for the whole window
   const [selected, setSelected] = useState<Appointment | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  // Server-side status filter + pagination window (-1mo → +3mo)
-  const buildRange = () => {
+  // Server-side status filter + pagination. Default window is -1mo → +3mo, or a
+  // single chosen day when the date filter is set.
+  const buildRange = useCallback(() => {
+    if (dayFilter) return { start: `${dayFilter}T00:00:00.000Z`, end: `${dayFilter}T23:59:59.999Z` }
     const start = new Date(); start.setMonth(start.getMonth() - 1)
     const end = new Date(); end.setMonth(end.getMonth() + 3)
     return { start: start.toISOString(), end: end.toISOString() }
-  }
+  }, [dayFilter])
 
   const loadPage = useCallback((offset: number, append: boolean) => {
     const { start, end } = buildRange()
@@ -571,7 +585,7 @@ export default function AppuntamentiView({ initial }: { initial?: InitialAppunta
         setHasMore(Boolean(d.hasMore))
       })
       .catch(() => {})
-  }, [filter])
+  }, [filter, buildRange])
 
   // Reset + load first page whenever the filter or a refresh changes
   // (skip the very first run when the server already seeded the page)
@@ -680,16 +694,20 @@ export default function AppuntamentiView({ initial }: { initial?: InitialAppunta
 
       <div className="bs-card">
         <div className="bs-filter-bar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
-          <div className="bs-search-wrap">
-            <svg className="bs-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input
-              className="bs-search-input"
-              placeholder="Cerca per cliente, servizio o operatore..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="bs-search-wrap" style={{ flex: 1, minWidth: 200 }}>
+              <svg className="bs-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                className="bs-search-input"
+                placeholder="Cerca per cliente, servizio o operatore..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            <input className="bs-input" type="date" value={dayFilter} onChange={e => setDayFilter(e.target.value)} style={{ width: 'auto', fontSize: 13 }} title="Filtra per giorno" />
+            {dayFilter && <button className="bs-btn-ghost" style={{ fontSize: 12.5 }} onClick={() => setDayFilter('')}>Tutti i giorni</button>}
           </div>
           <div className="bs-filter-tabs" style={{ alignSelf: 'flex-start', flexWrap: 'wrap' }}>
             {FILTER_TABS.map(t => (
@@ -728,6 +746,7 @@ export default function AppuntamentiView({ initial }: { initial?: InitialAppunta
                 const name = a.contactName || 'Cliente'
                 const cal = calendars.find(c => c.id === a.calendarId)
                 const operator = users.find(u => u.id === a.userId)
+                const durationMin = a.startTime && a.endTime ? Math.round((new Date(a.endTime).getTime() - new Date(a.startTime).getTime()) / 60000) : (cal?.slotDuration ?? null)
                 return (
                   <div key={a.id} className="bs-appt-row" onClick={() => setSelected(a)}>
                     <div className="bs-appt-time">
@@ -741,6 +760,7 @@ export default function AppuntamentiView({ initial }: { initial?: InitialAppunta
                       <div style={{ fontWeight: 700, fontSize: 13.5 }}>{name}</div>
                       <div style={{ fontSize: 12, color: 'var(--bs-text-muted)' }}>
                         {a.title || cal?.name || 'Appuntamento'}
+                        {durationMin != null && <span style={{ opacity: 0.7 }}> · {durationMin} min</span>}
                         {operator && <span style={{ opacity: 0.7 }}> · {operator.name}</span>}
                       </div>
                     </div>

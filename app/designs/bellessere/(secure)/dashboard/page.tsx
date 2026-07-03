@@ -65,13 +65,13 @@ function DonutChart({ slices }: { slices: { label: string; value: number; color:
 }
 
 interface CacheRow {
-  ghl_id: string; title: string | null; start_time: string | null
+  ghl_id: string; title: string | null; start_time: string | null; end_time?: string | null
   appointment_status: string | null; contact_ghl_id: string | null
   user_id: string | null; calendar_id?: string | null
 }
 function toEvent(r: CacheRow) {
   return {
-    id: r.ghl_id, title: r.title, startTime: r.start_time,
+    id: r.ghl_id, title: r.title, startTime: r.start_time, endTime: r.end_time ?? null,
     appointmentStatus: r.appointment_status, contactId: r.contact_ghl_id,
     userId: r.user_id, calendarId: r.calendar_id ?? null,
   }
@@ -98,19 +98,19 @@ export default async function Dashboard() {
     { data: usersRaw },
   ] = await Promise.all([
     sb.from('cached_calendar_events')
-      .select('ghl_id, title, start_time, appointment_status, contact_ghl_id, user_id, calendar_id')
+      .select('ghl_id, title, start_time, end_time, appointment_status, contact_ghl_id, user_id, calendar_id')
       .eq('location_id', BELLESSERE_LOCATION_ID)
       .gte('start_time', `${todayStr}T00:00:00.000Z`)
       .lte('start_time', `${todayStr}T23:59:59.999Z`)
       .order('start_time', { ascending: true }),
     sb.from('cached_calendar_events')
-      .select('ghl_id, title, start_time, appointment_status, contact_ghl_id, user_id, calendar_id')
+      .select('ghl_id, title, start_time, end_time, appointment_status, contact_ghl_id, user_id, calendar_id')
       .eq('location_id', BELLESSERE_LOCATION_ID)
       .gte('start_time', tomorrowStart.toISOString())
       .lte('start_time', tomorrowEnd.toISOString())
       .order('start_time', { ascending: true }),
     sb.from('cached_calendar_events')
-      .select('ghl_id, title, start_time, appointment_status, contact_ghl_id, user_id, calendar_id')
+      .select('ghl_id, title, start_time, end_time, appointment_status, contact_ghl_id, user_id, calendar_id')
       .eq('location_id', BELLESSERE_LOCATION_ID)
       .gte('start_time', monthStart.toISOString())
       .lte('start_time', monthEnd.toISOString()),
@@ -291,6 +291,7 @@ export default async function Dashboard() {
                     const name = contactMap.get(ev.contactId ?? '') || ev.title || 'Cliente'
                     const opName = ev.userId ? userMap.get(ev.userId) : null
                     const time = ev.startTime ? new Date(ev.startTime).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' }) : '—'
+                    const durMin = ev.startTime && ev.endTime ? Math.round((new Date(ev.endTime).getTime() - new Date(ev.startTime).getTime()) / 60000) : null
                     const statusCls = STATUS_CLS[ev.appointmentStatus ?? 'new'] ?? 'bs-badge-pending'
                     const statusLbl = STATUS_LBL[ev.appointmentStatus ?? 'new'] ?? 'In attesa'
                     return (
@@ -306,7 +307,8 @@ export default async function Dashboard() {
                           <div style={{ fontWeight: 700, fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
                           <div style={{ fontSize: 11.5, color: 'var(--bs-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {ev.title && <span>{ev.title}</span>}
-                            {opName && <span style={{ opacity: 0.7 }}>{ev.title ? ' · ' : ''}{opName}</span>}
+                            {durMin != null && <span style={{ opacity: 0.7 }}>{ev.title ? ' · ' : ''}{durMin} min</span>}
+                            {opName && <span style={{ opacity: 0.7 }}> · {opName}</span>}
                           </div>
                         </div>
                         <span className={`bs-badge ${statusCls}`}>{statusLbl}</span>

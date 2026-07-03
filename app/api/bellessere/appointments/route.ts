@@ -157,6 +157,10 @@ export async function PUT(req: NextRequest) {
   const { eventId, ...payload } = body
   if (!eventId) return NextResponse.json({ error: 'eventId required' }, { status: 400 })
 
+  // Reschedule (moving the time) — bypass GHL's slot re-validation, which
+  // otherwise 400s with "The slot you have selected is no longer available".
+  if (payload.startTime) payload.ignoreDateRange = true
+
   const token = await getToken()
   const res = await fetch(`${GHL}/calendars/events/appointments/${eventId}`, {
     method: 'PUT',
@@ -172,11 +176,15 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: res.status })
   }
 
-  // Mirror the status change to cache immediately
-  if (payload.appointmentStatus) {
+  // Mirror the change (status and/or new time) to cache immediately
+  if (payload.appointmentStatus || payload.startTime) {
     const sb = createAdminClient()
+    const patch: Record<string, unknown> = { synced_at: new Date().toISOString() }
+    if (payload.appointmentStatus) patch.appointment_status = payload.appointmentStatus
+    if (payload.startTime) patch.start_time = payload.startTime
+    if (payload.endTime) patch.end_time = payload.endTime
     await sb.from('cached_calendar_events')
-      .update({ appointment_status: payload.appointmentStatus, synced_at: new Date().toISOString() })
+      .update(patch)
       .eq('location_id', BELLESSERE_LOCATION_ID)
       .eq('ghl_id', eventId)
 
