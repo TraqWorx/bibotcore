@@ -69,6 +69,24 @@ export const CASE_STUDIES: CaseStudy[] = [
       '/case-studies/simfonia/impostazioni.png',
     ],
   },
+  {
+    slug: 'bellessere',
+    name: 'Bellessere',
+    logo: '/bellessere-logo.png',
+    tagline: 'Booking & CRM dashboard for a beauty salon — with an automated waiting list',
+    intro:
+      'A bespoke, on-brand salon CRM over GoHighLevel — appointments, clients, operators, services and conversations in one dashboard, plus a public booking widget and an automated waiting list that turns cancellations into filled slots.',
+    did: [
+      'Branded operational dashboard: today/tomorrow agenda, month KPIs (confirmation, attendance and cancellation rates), top clients, operators of the month and most-booked services.',
+      'Full CRM surface — week/day calendar with per-operator filtering, appointments with status workflow, client records with history & tags, SMS/WhatsApp conversations, and a services catalogue.',
+      'Team management: add or remove operators and set each one’s working hours, synced to the booking availability shown to customers.',
+      'Automated waiting list: customers register a preferred service, operator and multiple day/time windows; the invite matches on operator, service duration and time-of-day.',
+      'When a booking is cancelled — from the GHL widget, an email/SMS cancel link, or the dashboard — the first compatible person is auto-invited by SMS/WhatsApp with a one-tap deep link straight into that service and operator, drip-fed first-in-line with a hold window.',
+      'Cache-first, server-rendered architecture built to scale to 50–70 bookings/day, plus an on-brand public booking widget with a printable QR code for the salon.',
+    ],
+    // Drop screenshots into public/case-studies/bellessere/ then list them here.
+    shots: [],
+  },
 ]
 
 export function getCaseStudy(slug: string): CaseStudy | undefined {

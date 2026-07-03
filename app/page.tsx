@@ -21,6 +21,7 @@ const DESIGNS = [
   { slug: 'apulia-power', name: 'Apulia Power', logo: '/apulia-power-logo.webp', body: 'Energy & utilities reseller CRM — POD management, commissions and switch-outs.' },
   { slug: 'apulia-tourism', name: 'Apulia Tourism', logo: '/brands/apulia-tourism-logo.png', body: 'Contacts, campaigns and messaging for a tourism operator.' },
   { slug: 'simfonia', name: 'Simfonia', logo: '/brands/simfonia-logo.png', body: 'Telephony & energy reseller CRM — renewals pipeline + client portal.' },
+  { slug: 'bellessere', name: 'Bellessere', logo: '/bellessere-logo.png', body: 'Beauty-salon booking & CRM — with an automated waiting list that fills cancellations.' },
 ]
 
 export default function Landing() {
