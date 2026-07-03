@@ -36,10 +36,20 @@ export default function ImpostazioniPage() {
 
   const [inviteText, setInviteText] = useState('')
   const [inviteSaved, setInviteSaved] = useState(false)
+  const [joinText, setJoinText] = useState('')
+  const [joinSaved, setJoinSaved] = useState(false)
 
   useEffect(() => {
-    fetch('/api/bellessere/settings').then(r => r.json()).then(d => setInviteText(d.inviteText ?? '')).catch(() => {})
+    fetch('/api/bellessere/settings').then(r => r.json()).then(d => {
+      setInviteText(d.inviteText ?? ''); setJoinText(d.joinText ?? '')
+    }).catch(() => {})
   }, [])
+
+  async function saveJoinText() {
+    await fetch('/api/bellessere/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ joinText }) }).catch(() => {})
+    setJoinSaved(true)
+    setTimeout(() => setJoinSaved(false), 2000)
+  }
 
   function saveReminderTemplate() {
     localStorage.setItem('bellessere_reminder_template', reminderTemplate)
@@ -108,6 +118,28 @@ export default function ImpostazioniPage() {
             <button className="bs-btn-ghost" onClick={() => { setReminderTemplate(''); localStorage.removeItem('bellessere_reminder_template') }} style={{ fontSize: 12.5 }}>
               Ripristina default
             </button>
+          )}
+        </div>
+      </div>
+
+      {/* Waiting-list join confirmation text */}
+      <div className="bs-card" style={{ padding: '22px 24px' }}>
+        <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Testo conferma iscrizione</div>
+        <div style={{ fontSize: 13, color: 'var(--bs-text-muted)', marginBottom: 14 }}>
+          Messaggio SMS inviato quando un cliente si iscrive alla lista d&apos;attesa. Usa <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{nome}}'}</code>, <code style={{ background: 'var(--bs-bg)', padding: '1px 5px', borderRadius: 4 }}>{'{{servizio}}'}</code> come segnaposto.
+        </div>
+        <textarea
+          className="bs-input"
+          rows={3}
+          style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: 13.5 }}
+          placeholder={`Ciao {{nome}}! Sei in lista d'attesa da Bellessere per {{servizio}}. Ti avviseremo appena si libera un posto. A presto!`}
+          value={joinText}
+          onChange={e => setJoinText(e.target.value)}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+          <button className="bs-btn-primary" onClick={saveJoinText}>{joinSaved ? 'Salvato ✓' : 'Salva'}</button>
+          {joinText && (
+            <button className="bs-btn-ghost" onClick={() => { setJoinText(''); saveJoinText() }} style={{ fontSize: 12.5 }}>Ripristina default</button>
           )}
         </div>
       </div>

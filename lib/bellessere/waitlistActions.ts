@@ -19,6 +19,25 @@ async function getToken(): Promise<string> {
   return refreshIfNeeded(BELLESSERE_LOCATION_ID, conn)
 }
 
+/** Send the "you're on the waiting list" confirmation on join (best-effort). */
+export async function sendJoinConfirmation(contactId: string, firstName: string, serviceName: string): Promise<void> {
+  const sb = createAdminClient()
+  const { data: settings } = await sb.from('bellessere_settings')
+    .select('join_text').eq('location_id', BELLESSERE_LOCATION_ID).maybeSingle()
+  const template = settings?.join_text?.trim()
+  const message = template
+    ? renderInviteText(template, { nome: firstName, servizio: serviceName, giorno: '', ora: '', link: '' })
+    : `Ciao ${firstName || ''}! Sei in lista d'attesa da Bellessere per ${serviceName}. Ti avviseremo appena si libera un posto compatibile con le tue preferenze. A presto!`
+  try {
+    const token = await getToken()
+    await fetch(`${GHL}/conversations/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, Version: V, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'SMS', contactId, message }),
+    })
+  } catch { /* best-effort */ }
+}
+
 /** Convert an ISO instant to the Rome-local date + minutes-from-midnight. */
 export function romeParts(iso: string): { date: string; minutes: number } {
   const d = new Date(iso)

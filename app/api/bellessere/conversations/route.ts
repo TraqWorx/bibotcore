@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     .from('cached_conversations')
     .select('ghl_id, contact_ghl_id, contact_name, type, last_message_body, last_message_date, last_message_direction, unread_count')
     .eq('location_id', BELLESSERE_LOCATION_ID)
-    .order('last_message_date', { ascending: false })
+    .order('last_message_date', { ascending: false, nullsFirst: false })
     .limit(200)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

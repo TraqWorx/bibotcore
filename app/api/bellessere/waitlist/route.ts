@@ -94,6 +94,12 @@ export async function POST(req: NextRequest) {
   const { error } = await sb.from('bellessere_waitlist').insert(rows)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // One confirmation message per join (best-effort; needs a resolved contact)
+  if (contactId) {
+    const { sendJoinConfirmation } = await import('@/lib/bellessere/waitlistActions')
+    await sendJoinConfirmation(contactId, firstName ?? '', serviceName ?? 'il tuo servizio').catch(() => {})
+  }
+
   return NextResponse.json({ ok: true, count: rows.length })
 }
 
