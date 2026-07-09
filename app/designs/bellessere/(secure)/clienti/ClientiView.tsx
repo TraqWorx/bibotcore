@@ -114,7 +114,7 @@ function TagEditor({ contactId, initialTags }: { contactId: string; initialTags:
 function CustomerPanel({ contact, onClose, onBookAppointment }: {
   contact: Contact; onClose: () => void; onBookAppointment: (contact: Contact) => void
 }) {
-  const [tab, setTab] = useState<'appuntamenti' | 'messaggi'>('appuntamenti')
+  const [tab, setTab] = useState<'info' | 'appuntamenti' | 'messaggi'>('info')
   const [events, setEvents] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [apptSearch, setApptSearch] = useState('')
@@ -174,84 +174,82 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
     <>
       <div className="bs-overlay" onClick={onClose} />
       <div className="bs-panel" style={{ display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <div className="bs-panel-header">
-          <span className="bs-panel-title">Dettagli cliente</span>
-          <button className="bs-panel-close" onClick={onClose}>✕</button>
+        {/* Header — identity stays visible across all tabs */}
+        <div className="bs-panel-header" style={{ gap: 12 }}>
+          <div className="bs-avatar" style={{ width: 42, height: 42, fontSize: 15, flexShrink: 0 }}>{initials(contact)}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="bs-panel-hero-name" style={{ fontSize: 16, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullName(contact)}</div>
+            {memberSince && <div className="bs-panel-hero-meta">Cliente dal {memberSince}</div>}
+          </div>
+          <button className="bs-panel-close" onClick={onClose} style={{ flexShrink: 0 }}>✕</button>
         </div>
 
-        {/* Identity — compact, stays fixed directly above the tabs */}
-        <div className="bs-panel-body" style={{ flex: '0 0 auto', gap: 14, paddingBottom: 16 }}>
-          <div className="bs-panel-hero">
-            <div className="bs-avatar" style={{ width: 50, height: 50, fontSize: 17 }}>{initials(contact)}</div>
-            <div>
-              <div className="bs-panel-hero-name">{fullName(contact)}</div>
-              {memberSince && <div className="bs-panel-hero-meta">Cliente dal {memberSince}</div>}
-            </div>
-          </div>
-
-          <div className="bs-card bs-info-card">
-            {contact.email && (
-              <div className="bs-info-row">
-                <div className="bs-info-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                </div>
-                <div>
-                  <div className="bs-info-label">Email</div>
-                  <div className="bs-info-value">{contact.email}</div>
-                </div>
-              </div>
-            )}
-            {contact.phone && (
-              <div className="bs-info-row">
-                <div className="bs-info-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 10a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.37h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8 9a16 16 0 0 0 6 6l.86-.86a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.73 16c.06.44.06.89 0 1.33z"/></svg>
-                </div>
-                <div>
-                  <div className="bs-info-label">Telefono</div>
-                  <div className="bs-info-value">{contact.phone}</div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="bs-mini-stat-grid">
-            {[
-              { value: events.length, label: 'Prenotazioni' },
-              { value: events.filter(e => e.appointmentStatus === 'showed').length, label: 'Completati' },
-              { value: events.filter(e => e.appointmentStatus === 'cancelled').length, label: 'Cancellati' },
-            ].map((s) => (
-              <div key={s.label} className="bs-mini-stat">
-                <div className="bs-mini-stat-value">{s.value}</div>
-                <div className="bs-mini-stat-label">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Tabs */}
+        {/* Three tabs — Info / Appuntamenti / Messaggi */}
         <div className="bs-panel-tabs">
+          <button className="bs-panel-tab" data-active={tab === 'info' ? 'true' : 'false'} onClick={() => setTab('info')}>
+            Info
+          </button>
           <button className="bs-panel-tab" data-active={tab === 'appuntamenti' ? 'true' : 'false'} onClick={() => setTab('appuntamenti')}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
             Appuntamenti
             {events.length > 0 && <span className="bs-panel-tab-count">{events.length}</span>}
           </button>
           <button className="bs-panel-tab" data-active={tab === 'messaggi' ? 'true' : 'false'} onClick={() => setTab('messaggi')}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
             Messaggi
             {messages.length > 0 && <span className="bs-panel-tab-count">{messages.length}</span>}
           </button>
         </div>
 
         {/* Tab content — scrollable */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {tab === 'info' && (
+            <>
+              <div className="bs-card bs-info-card">
+                {contact.email && (
+                  <div className="bs-info-row">
+                    <div className="bs-info-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    </div>
+                    <div>
+                      <div className="bs-info-label">Email</div>
+                      <div className="bs-info-value">{contact.email}</div>
+                    </div>
+                  </div>
+                )}
+                {contact.phone && (
+                  <div className="bs-info-row">
+                    <div className="bs-info-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 10a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.37h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8 9a16 16 0 0 0 6 6l.86-.86a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.73 16c.06.44.06.89 0 1.33z"/></svg>
+                    </div>
+                    <div>
+                      <div className="bs-info-label">Telefono</div>
+                      <div className="bs-info-value">{contact.phone}</div>
+                    </div>
+                  </div>
+                )}
+                {!contact.email && !contact.phone && (
+                  <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Nessun contatto salvato.</div>
+                )}
+              </div>
+
+              <div className="bs-mini-stat-grid">
+                {[
+                  { value: events.length, label: 'Prenotazioni' },
+                  { value: events.filter(e => e.appointmentStatus === 'showed').length, label: 'Completati' },
+                  { value: events.filter(e => e.appointmentStatus === 'cancelled').length, label: 'Cancellati' },
+                ].map((s) => (
+                  <div key={s.label} className="bs-mini-stat">
+                    <div className="bs-mini-stat-value">{s.value}</div>
+                    <div className="bs-mini-stat-label">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <TagEditor contactId={contact.id} initialTags={contact.tags} />
+            </>
+          )}
+
           {tab === 'appuntamenti' && (
             <>
-              <TagEditor contactId={contact.id} initialTags={contact.tags} />
               <button className="bs-btn-primary" style={{ justifyContent: 'center', width: '100%' }}
                 onClick={() => { onClose(); onBookAppointment(contact) }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

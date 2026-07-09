@@ -1371,9 +1371,9 @@
 
 .bs-panel-tabs {
   display: flex;
-  gap: 6px;
-  padding: 6px;
-  margin: 6px 20px 2px;
+  gap: 5px;
+  padding: 5px;
+  margin: 6px 14px 2px;
   border: 1px solid var(--bs-line);
   border-radius: 14px;
   background: var(--bs-bg);
@@ -1381,18 +1381,19 @@
 
 .bs-panel-tab {
   flex: 1;
-  min-height: 46px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 7px;
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
   color: var(--bs-text-muted);
   cursor: pointer;
-  font-size: 14.5px;
+  font-size: 13px;
   font-weight: 750;
+  white-space: nowrap;
   transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
