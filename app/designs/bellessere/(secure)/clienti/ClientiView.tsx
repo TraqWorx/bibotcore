@@ -180,10 +180,10 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
           <button className="bs-panel-close" onClick={onClose}>✕</button>
         </div>
 
-        {/* Scrollable top section: avatar, contact info, stats, tags */}
-        <div className="bs-panel-body" style={{ flex: '0 0 auto' }}>
+        {/* Identity — compact, stays fixed directly above the tabs */}
+        <div className="bs-panel-body" style={{ flex: '0 0 auto', gap: 14, paddingBottom: 16 }}>
           <div className="bs-panel-hero">
-            <div className="bs-avatar" style={{ width: 60, height: 60, fontSize: 20 }}>{initials(contact)}</div>
+            <div className="bs-avatar" style={{ width: 50, height: 50, fontSize: 17 }}>{initials(contact)}</div>
             <div>
               <div className="bs-panel-hero-name">{fullName(contact)}</div>
               {memberSince && <div className="bs-panel-hero-meta">Cliente dal {memberSince}</div>}
@@ -227,8 +227,6 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
               </div>
             ))}
           </div>
-
-          <TagEditor contactId={contact.id} initialTags={contact.tags} />
         </div>
 
         {/* Tabs */}
@@ -253,6 +251,7 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {tab === 'appuntamenti' && (
             <>
+              <TagEditor contactId={contact.id} initialTags={contact.tags} />
               <button className="bs-btn-primary" style={{ justifyContent: 'center', width: '100%' }}
                 onClick={() => { onClose(); onBookAppointment(contact) }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
