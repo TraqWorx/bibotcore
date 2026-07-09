@@ -1372,30 +1372,58 @@
 .bs-panel-tabs {
   display: flex;
   gap: 6px;
-  padding: 8px 20px;
-  border-top: 1px solid var(--bs-line);
-  border-bottom: 1px solid var(--bs-line);
-  background: rgba(247,249,252,0.78);
+  padding: 6px;
+  margin: 6px 20px 2px;
+  border: 1px solid var(--bs-line);
+  border-radius: 14px;
+  background: var(--bs-bg);
 }
 
 .bs-panel-tab {
   flex: 1;
-  min-height: 36px;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
   color: var(--bs-text-muted);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 750;
   transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
 }
+
+.bs-panel-tab:hover { color: var(--bs-text); }
 
 .bs-panel-tab[data-active='true'] {
   background: white;
   border-color: var(--bs-line-strong);
   color: var(--bs-text);
-  box-shadow: var(--bs-shadow-xs);
+  box-shadow: var(--bs-shadow-sm);
+}
+
+.bs-panel-tab svg { flex-shrink: 0; opacity: 0.85; }
+
+.bs-panel-tab-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 100px;
+  font-size: 11.5px;
+  font-weight: 800;
+  background: var(--bs-line);
+  color: var(--bs-text-muted);
+}
+
+.bs-panel-tab[data-active='true'] .bs-panel-tab-count {
+  background: var(--bs-gold-tint);
+  color: var(--bs-gold-strong);
 }
 
 .bs-compact-card {
@@ -1472,6 +1500,27 @@
 .bs-conversation-row[data-active='true'] {
   background: linear-gradient(90deg, rgba(210,171,75,0.17), rgba(255,255,255,0.78));
   box-shadow: inset 3px 0 0 var(--bs-gold);
+}
+
+.bs-conversation-row[data-unreplied='true'] {
+  background: rgba(217,119,6,0.05);
+  box-shadow: inset 3px 0 0 var(--bs-warning);
+}
+
+.bs-conversation-row[data-unreplied='true'] .bs-conversation-name { color: var(--bs-text); }
+
+.bs-reply-pill {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgba(217,119,6,0.14);
+  color: var(--bs-warning);
+  white-space: nowrap;
 }
 
 .bs-conversation-main {

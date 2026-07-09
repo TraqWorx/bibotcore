@@ -531,7 +531,17 @@ function groupByDate(appts: Appointment[]) {
     if (!groups[key]) groups[key] = []
     groups[key].push(a)
   }
-  return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b))
+  // Upcoming first: today + future ascending (soonest at top), then past dates
+  // with the most recent just below the divide. Undated ('z') goes last.
+  const today = new Date().toISOString().slice(0, 10)
+  return Object.entries(groups).sort(([a], [b]) => {
+    if (a === 'z') return 1
+    if (b === 'z') return -1
+    const aUpcoming = a >= today
+    const bUpcoming = b >= today
+    if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1
+    return aUpcoming ? a.localeCompare(b) : b.localeCompare(a)
+  })
 }
 
 function formatGroupDate(d: string) {

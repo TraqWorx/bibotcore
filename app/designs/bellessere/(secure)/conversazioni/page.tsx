@@ -52,6 +52,7 @@ export default function ConversazioniPage() {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [search, setSearch] = useState('')
+  const [convFilter, setConvFilter] = useState<'all' | 'unreplied'>('all')
   const [refreshKey, setRefreshKey] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -103,12 +104,19 @@ export default function ConversazioniPage() {
     } catch { setDraft(body) } finally { setSending(false) }
   }
 
+  // A conversation needs a reply when the customer's message is the most recent one.
+  const needsReply = (c: ConversationItem) => c.lastMessageDirection === 'inbound'
+  const unrepliedCount = conversations.filter(needsReply).length
+
   // Always show newest last-message first (belt-and-suspenders over the API order)
   const parseTs = (s: string) => { const n = Number(s); return Number.isFinite(n) && s.length >= 10 ? n : Date.parse(s) || 0 }
-  const filtered = (search
-    ? conversations.filter(c => c.contactName.toLowerCase().includes(search.toLowerCase()) || c.lastMessageBody.toLowerCase().includes(search.toLowerCase()))
-    : conversations
-  ).slice().sort((a, b) => parseTs(b.lastMessageDate) - parseTs(a.lastMessageDate))
+  const filtered = conversations
+    .filter(c => convFilter === 'all' || needsReply(c))
+    .filter(c => !search
+      || c.contactName.toLowerCase().includes(search.toLowerCase())
+      || c.lastMessageBody.toLowerCase().includes(search.toLowerCase()))
+    .slice()
+    .sort((a, b) => parseTs(b.lastMessageDate) - parseTs(a.lastMessageDate))
 
   return (
     <div className="bs-page-stack-tight" style={{ flex: 1, minHeight: 0 }}>
@@ -135,6 +143,14 @@ export default function ConversazioniPage() {
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
+            <div className="bs-filter-tabs" style={{ marginTop: 10 }}>
+              <button className="bs-filter-tab" data-active={convFilter === 'all' ? 'true' : 'false'} onClick={() => setConvFilter('all')}>
+                Tutte
+              </button>
+              <button className="bs-filter-tab" data-active={convFilter === 'unreplied' ? 'true' : 'false'} onClick={() => setConvFilter('unreplied')}>
+                Da rispondere{unrepliedCount > 0 ? ` · ${unrepliedCount}` : ''}
+              </button>
+            </div>
           </div>
 
           <div className="bs-conversation-scroll">
@@ -148,13 +164,17 @@ export default function ConversazioniPage() {
                   key={conv.id}
                   className="bs-conversation-row"
                   data-active={selected?.id === conv.id ? 'true' : 'false'}
+                  data-unreplied={needsReply(conv) && selected?.id !== conv.id ? 'true' : 'false'}
                   onClick={() => setSelected(conv)}
                 >
                   <div className="bs-avatar" style={{ flexShrink: 0 }}>{initials(conv.contactName)}</div>
                   <div className="bs-conversation-main">
                     <div className="bs-conversation-topline">
                       <span className="bs-conversation-name">{conv.contactName}</span>
-                      <span className="bs-conversation-time">{timeAgo(conv.lastMessageDate)}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                        {needsReply(conv) && <span className="bs-reply-pill">Da rispondere</span>}
+                        <span className="bs-conversation-time">{timeAgo(conv.lastMessageDate)}</span>
+                      </span>
                     </div>
                     <div className="bs-conversation-preview">
                       <span className="bs-channel-pill">{TYPE_LABEL[conv.type] ?? 'Chat'}</span>
