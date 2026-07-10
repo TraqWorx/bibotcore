@@ -11,7 +11,7 @@ export default async function RedirectPage() {
   const supabase = createAdminClient()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, agency_id')
+    .select('role, agency_id, location_id')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -24,7 +24,10 @@ export default async function RedirectPage() {
     // send them straight to its dashboard instead of the generic agency view.
     const { data: memberLocs } = await supabase
       .from('profile_locations').select('location_id').eq('user_id', user.id)
-    const locIds = [...new Set((memberLocs ?? []).map((r) => r.location_id))]
+    const locIds = [...new Set([
+      ...(memberLocs ?? []).map((r) => r.location_id),
+      ...(profile.location_id ? [profile.location_id] : []),
+    ])]
     if (locIds.length > 0) {
       const { data: designInstalls } = await supabase
         .from('installs').select('design_slug').in('location_id', locIds).not('design_slug', 'is', null)
