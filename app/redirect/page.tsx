@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { designSlugToFolder } from '@/lib/designs/slugMap'
 
 export default async function RedirectPage() {
   const authClient = await createAuthClient()
@@ -18,7 +19,19 @@ export default async function RedirectPage() {
   if (profile) {
     if (profile.role === 'super_admin') redirect('/platform')
     if (profile.role === 'admin') redirect('/admin')
-    if (profile.role === 'agency') redirect('/agency')
+
+    // Design members (e.g. salon staff) belong to a single installed design —
+    // send them straight to its dashboard instead of the generic agency view.
+    const { data: memberLocs } = await supabase
+      .from('profile_locations').select('location_id').eq('user_id', user.id)
+    const locIds = [...new Set((memberLocs ?? []).map((r) => r.location_id))]
+    if (locIds.length > 0) {
+      const { data: designInstalls } = await supabase
+        .from('installs').select('design_slug').in('location_id', locIds).not('design_slug', 'is', null)
+      const slugs = [...new Set((designInstalls ?? []).map((i) => i.design_slug).filter(Boolean))]
+      if (slugs.length === 1) redirect(`/designs/${designSlugToFolder(slugs[0] as string)}`)
+    }
+
     redirect('/agency')
   }
 

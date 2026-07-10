@@ -26,7 +26,7 @@ export default function LoginPage() {
   const [isError, setIsError] = useState(false)
   const [loading, setLoading] = useState(false)
   const [urlError, setUrlError] = useState<string | null>(() => getInitialUrlError())
-  const [next, setNext] = useState('/')
+  const [next, setNext] = useState('/redirect')
   const emailRef = useRef<HTMLInputElement>(null)
 
   const [supabase] = useState(() =>
