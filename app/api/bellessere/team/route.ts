@@ -4,6 +4,40 @@ import { getLocationAccessFast } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 import { validateNewUser, buildCreateUserPayload } from '@/lib/bellessere/query'
+import { ghlRoleToLocationRole } from '@/lib/auth/designOwner'
+
+/**
+ * Provision the Supabase login for ONE new member — lightweight + awaited so they
+ * can sign in immediately, without the heavy full-location sync (which slowed the
+ * add and could momentarily starve the roster read → a false "Nessun membro").
+ */
+async function provisionMemberLogin(email: string, ghlRole: string | null | undefined) {
+  const e = email.trim().toLowerCase()
+  if (!e) return
+  const sb = createAdminClient()
+  const { data: prof } = await sb.from('profiles').select('id, role').eq('email', e).maybeSingle()
+  let profileId = prof?.id as string | undefined
+  if (!profileId) {
+    const { data: created } = await sb.auth.admin.createUser({ email: e, email_confirm: true })
+    if (created?.user) profileId = created.user.id
+    else {
+      // Auth user already exists (drift) — resolve its id from the user list.
+      const { data } = await sb.auth.admin.listUsers({ perPage: 1000 })
+      profileId = data?.users?.find(u => u.email?.toLowerCase() === e)?.id
+    }
+  }
+  if (!profileId || prof?.role === 'super_admin') return
+  if (!prof) {
+    await sb.from('profiles').upsert(
+      { id: profileId, email: e, role: 'agency', location_id: BELLESSERE_LOCATION_ID },
+      { onConflict: 'id' },
+    )
+  }
+  await sb.from('profile_locations').upsert(
+    { user_id: profileId, location_id: BELLESSERE_LOCATION_ID, role: ghlRoleToLocationRole(ghlRole) },
+    { onConflict: 'user_id,location_id' },
+  )
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -90,11 +124,10 @@ export async function POST(req: NextRequest) {
   await import('@/lib/bellessere/sync').then(m => m.syncBellessere('users')).catch(() => {})
   import('@/lib/bellessere/sync').then(m => m.syncBellessere('all')).catch(() => {})
 
-  // Provision the Supabase login (auth user + profile + profile_locations) NOW so
-  // the new member can sign in immediately. Otherwise access depends on the GHL
-  // UserCreate webhook firing, or the hourly sync-users cron — leaving a window
-  // where the invite-only gate rejects them (the "no profile" drift we hit).
-  await import('@/lib/sync/syncAllUsers').then(m => m.syncAllLocationUsers(BELLESSERE_LOCATION_ID)).catch(() => {})
+  // Provision the new member's login immediately (auth user + profile +
+  // profile_locations) so they never hit the invite-only gate while waiting for
+  // the GHL webhook / hourly cron. Targeted + fast — not a full-location sync.
+  await provisionMemberLogin(input.email, 'user').catch(() => {})
 
   return NextResponse.json({ id: newId, ok: true })
 }
