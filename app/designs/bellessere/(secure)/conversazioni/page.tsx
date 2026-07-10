@@ -66,6 +66,19 @@ export default function ConversazioniPage() {
       .finally(() => setLoading(false))
   }, [refreshKey])
 
+  // Auto-refresh the inbox so new/updated messages appear without a manual
+  // reload (the cache itself is kept live by the GHL webhook). Silent — no
+  // loading flash.
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetch('/api/bellessere/conversations')
+        .then(r => r.json())
+        .then(d => setConversations(d.conversations ?? []))
+        .catch(() => {})
+    }, 20000)
+    return () => clearInterval(id)
+  }, [])
+
   const loadMessages = useCallback(async (conv: ConversationItem) => {
     setMsgsLoading(true)
     setMessages([])

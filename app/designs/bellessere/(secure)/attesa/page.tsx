@@ -56,6 +56,13 @@ export default function ListaAttesaPage() {
     ]).finally(() => setLoading(false))
   }, [load])
 
+  // Auto-refresh so new sign-ups and status changes (invited → booked) appear
+  // without a manual reload. Silent — reuses load() which only sets entries.
+  useEffect(() => {
+    const id = setInterval(() => { load() }, 20000)
+    return () => clearInterval(id)
+  }, [load])
+
   async function invite(id: string) {
     setBusy(p => ({ ...p, [id]: true })); setError('')
     try {
