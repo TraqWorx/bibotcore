@@ -39,6 +39,24 @@ async function provisionMemberLogin(email: string, ghlRole: string | null | unde
   )
 }
 
+/**
+ * Revoke a removed member's dashboard login. Drops their Bellessere membership,
+ * and if they belong to no other location, deletes their profile + auth user so
+ * they can't sign back in. Never touches super_admin / admin accounts.
+ */
+async function revokeMemberLogin(email: string) {
+  const e = email.trim().toLowerCase()
+  if (!e) return
+  const sb = createAdminClient()
+  const { data: prof } = await sb.from('profiles').select('id, role').eq('email', e).maybeSingle()
+  if (!prof || prof.role === 'super_admin' || prof.role === 'admin') return
+  await sb.from('profile_locations').delete().eq('user_id', prof.id).eq('location_id', BELLESSERE_LOCATION_ID)
+  const { count } = await sb.from('profile_locations').select('user_id', { count: 'exact', head: true }).eq('user_id', prof.id)
+  if ((count ?? 0) > 0) return // still a member of another location — keep their login
+  await sb.from('profiles').delete().eq('id', prof.id)
+  await sb.auth.admin.deleteUser(prof.id).catch(() => {})
+}
+
 export const dynamic = 'force-dynamic'
 
 const GHL = 'https://services.leadconnectorhq.com'
@@ -152,8 +170,12 @@ export async function DELETE(req: NextRequest) {
   }
 
   const sb = createAdminClient()
+  // Capture the member's email BEFORE dropping the roster row, so we can revoke
+  // their dashboard login too — removing from the team = can no longer sign in.
+  const { data: removed } = await sb.from('bellessere_users').select('email').eq('id', userId).maybeSingle()
   await sb.from('bellessere_users').delete().eq('location_id', BELLESSERE_LOCATION_ID).eq('id', userId)
   await sb.from('bellessere_schedules').delete().eq('location_id', BELLESSERE_LOCATION_ID).eq('user_id', userId)
+  if (removed?.email) await revokeMemberLogin(removed.email).catch(() => {})
 
   return NextResponse.json({ ok: true })
 }

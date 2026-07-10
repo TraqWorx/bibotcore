@@ -171,7 +171,7 @@ export async function POST(req: Request) {
 
   // ── Handle user removed from location ────────────────────────────────────
   // GHL fires UserDeleted (or user.deleted) when a staff member is removed
-  const USER_DELETED_EVENTS = ['UserDeleted', 'user.deleted', 'UserRemoved', 'user.removed']
+  const USER_DELETED_EVENTS = ['UserDelete', 'UserDeleted', 'user.deleted', 'UserRemove', 'UserRemoved', 'user.removed']
   if (USER_DELETED_EVENTS.includes(eventType)) {
     // Email may be at body.email, body.data.email, or body.user.email
     const email = (
@@ -193,11 +193,15 @@ export async function POST(req: Request) {
         // Check if user has any other locations
         const { count } = await supabase.from('profile_locations').select('user_id', { count: 'exact', head: true }).eq('user_id', profile.id)
         if ((count ?? 0) === 0) {
-          // No locations left — remove user entirely
-          await supabase.auth.admin.deleteUser(profile.id)
-          console.log(`[ghl-webhook] UserDeleted → removed ${email} from platform (no locations left)`)
+          // No locations left — fully revoke the dashboard login. Deleting only
+          // the auth user isn't enough: the profile still passes the invite-only
+          // gate and a fresh auth user would be minted on the next OTP. Remove
+          // both so "removed from the team = can no longer sign in".
+          await supabase.from('profiles').delete().eq('id', profile.id)
+          await supabase.auth.admin.deleteUser(profile.id).catch(() => {})
+          console.log(`[ghl-webhook] ${eventType} → revoked login for ${email} (no locations left)`)
         } else {
-          console.log(`[ghl-webhook] UserDeleted → unlinked ${email} from ${locationId}`)
+          console.log(`[ghl-webhook] ${eventType} → unlinked ${email} from ${locationId}`)
         }
       }
     }
