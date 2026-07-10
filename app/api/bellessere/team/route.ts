@@ -90,6 +90,12 @@ export async function POST(req: NextRequest) {
   await import('@/lib/bellessere/sync').then(m => m.syncBellessere('users')).catch(() => {})
   import('@/lib/bellessere/sync').then(m => m.syncBellessere('all')).catch(() => {})
 
+  // Provision the Supabase login (auth user + profile + profile_locations) NOW so
+  // the new member can sign in immediately. Otherwise access depends on the GHL
+  // UserCreate webhook firing, or the hourly sync-users cron — leaving a window
+  // where the invite-only gate rejects them (the "no profile" drift we hit).
+  await import('@/lib/sync/syncAllUsers').then(m => m.syncAllLocationUsers(BELLESSERE_LOCATION_ID)).catch(() => {})
+
   return NextResponse.json({ id: newId, ok: true })
 }
 
