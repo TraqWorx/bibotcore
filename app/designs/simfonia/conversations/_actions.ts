@@ -71,6 +71,7 @@ export async function getConversationMessages(
   locationId: string,
   conversationId: string
 ): Promise<ConversationMessage[]> {
+  try { await assertUserOwnsLocation(locationId) } catch { return [] }
   const sb = createAdminClient()
 
   // Try GHL first for real-time messages, cache them, fall back to cache if GHL is down
@@ -213,6 +214,7 @@ export async function getContactNotes(
   contactId: string
 ): Promise<NoteItem[]> {
   try {
+    await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
     const [data, authorData] = await Promise.all([
       ghl.notes.list(contactId),
@@ -321,6 +323,7 @@ export async function getLocationUsers(
   locationId: string
 ): Promise<LocationUser[]> {
   try {
+    await assertUserOwnsLocation(locationId)
     const token = await getGhlTokenForLocation(locationId)
     const res = await fetch(`${BASE_URL}/users/?locationId=${locationId}`, {
       headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' },

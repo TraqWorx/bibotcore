@@ -26,6 +26,7 @@ export async function getContactDetail(
   contactId: string
 ): Promise<ContactDetail | null> {
   try {
+    await assertUserOwnsLocation(locationId)
     const { getContact, getContactCustomFields } = await import('@/lib/data/contacts')
     const { getOpportunitiesByContact } = await import('@/lib/data/opportunities')
     const { listPipelines } = await import('@/lib/data/pipelines')
@@ -102,6 +103,7 @@ export async function sendMessageToContact(
   type: 'SMS' | 'Email' | 'WhatsApp'
 ): Promise<{ error?: string }> {
   try {
+    await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
 
     // First get or create a conversation
@@ -167,6 +169,7 @@ export async function getConversationMessages(
   locationId: string,
   contactId: string
 ): Promise<{ conversationId: string | null; type: string | null; messages: ConversationMessage[] }> {
+  try { await assertUserOwnsLocation(locationId) } catch { return { conversationId: null, type: null, messages: [] } }
   const sb = createAdminClient()
 
   // Find conversation for this contact from cache
@@ -314,6 +317,7 @@ export async function checkUniqueFieldDuplicates(
   excludeContactId?: string
 ): Promise<Record<string, string>> {
   const errors: Record<string, string> = {}
+  try { await assertUserOwnsLocation(locationId) } catch { return errors }
 
   // Get configured unique fields
   const uniqueFieldIds = await getUniqueFields(locationId)

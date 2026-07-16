@@ -1,8 +1,10 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase-server'
+import { assertUserOwnsLocation } from '@/lib/location/getActiveLocation'
 
 export async function getUniqueFields(locationId: string): Promise<string[]> {
+  try { await assertUserOwnsLocation(locationId) } catch { return [] }
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('location_settings')
@@ -15,6 +17,7 @@ export async function getUniqueFields(locationId: string): Promise<string[]> {
 
 export async function getCategoryTags(locationId: string): Promise<Record<string, string[]>> {
   try {
+    await assertUserOwnsLocation(locationId)
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('location_settings')
@@ -31,6 +34,7 @@ export async function getCategoryTags(locationId: string): Promise<Record<string
 
 export async function ensureCategorySwitchOutFields(locationId: string): Promise<number | null> {
   try {
+    await assertUserOwnsLocation(locationId)
     const { getGhlClient } = await import('@/lib/ghl/ghlClient')
     const { discoverCategories } = await import('@/lib/utils/categoryFields')
     const ghl = await getGhlClient(locationId)

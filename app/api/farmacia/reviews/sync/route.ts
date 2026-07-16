@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (!user) return new Response('Unauthorized', { status: 401 })
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
-  const isOwner = profile?.role === 'super_admin' || profile?.role === 'admin' || (!!profile?.agency_id && isBibotAgency(profile.agency_id))
+  const isOwner = profile?.role === 'super_admin' || (!!profile?.agency_id && isBibotAgency(profile.agency_id))
   if (!isOwner) return new Response('Forbidden', { status: 403 })
 
   try {

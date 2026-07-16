@@ -40,7 +40,7 @@ export default function LoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const nx = params.get('next')
-    if (nx && nx.startsWith('/') && !nx.startsWith('//')) setNext(nx)
+    if (nx && nx.startsWith('/') && !nx.startsWith('//') && !/[\\\t\r\n]/.test(nx)) setNext(nx)
     const msg = params.get('message')
     if (msg) {
       setUrlError(msg)

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccessFast } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+import { assertBellessereWrite } from '@/lib/bellessere/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +65,9 @@ export async function POST(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
+  const werr = await assertBellessereWrite()
+  if (werr) return werr
+
   const { userId, userName, rules, timezone } = await req.json() as {
     userId: string; userName: string; rules: ScheduleRule[]; timezone?: string
   }
@@ -107,6 +111,9 @@ export async function PUT(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
+  const werr = await assertBellessereWrite()
+  if (werr) return werr
+
   const { scheduleId, rules, timezone } = await req.json() as {
     scheduleId: string; rules: ScheduleRule[]; timezone?: string
   }
@@ -137,6 +144,9 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
+
+  const werr = await assertBellessereWrite()
+  if (werr) return werr
 
   const { scheduleId } = await req.json() as { scheduleId: string }
   if (!scheduleId) return NextResponse.json({ error: 'scheduleId required' }, { status: 400 })

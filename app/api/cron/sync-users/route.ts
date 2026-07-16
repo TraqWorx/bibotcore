@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { syncAllLocationUsers } from '@/lib/sync/syncAllUsers'
 import { reconcileBibotUsers } from '@/lib/sync/reconcileBibotUsers'
+import { isCronAuthorized } from '@/lib/auth/cronAuth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -11,9 +12,8 @@ export const maxDuration = 120
  * 2. reconcileBibotUsers — map GHL role type → platform role, prune phantom
  *    Bibot 'agency' profiles, flag orphan admins (safety-gated, Bibot-scoped).
  */
-export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+export async function GET(request: NextRequest) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -64,7 +64,7 @@ export async function activateInstall(
     const supabase = createAdminClient()
 
     await Promise.all([
-      supabase.from('installs').update({ status: 'active' }).eq('id', installId),
+      supabase.from('installs').update({ status: 'active' }).eq('id', installId).eq('location_id', locationId),
       supabase.from('ghl_connections').update({ status: 'active' }).eq('location_id', locationId),
     ])
 

@@ -53,6 +53,7 @@ export async function saveLocationSettings(
 // ─── Contact Filters ────────────────────────────────────────────────────────
 
 export async function getContactFilters(locationId: string): Promise<string[]> {
+  try { await assertUserOwnsLocation(locationId) } catch { return [] }
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('location_settings')
@@ -89,6 +90,7 @@ export interface ContactColumn {
 }
 
 export async function getContactColumns(locationId: string, categoryKey?: string | null): Promise<ContactColumn[]> {
+  try { await assertUserOwnsLocation(locationId) } catch { return [] }
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('location_settings')
@@ -158,6 +160,7 @@ export interface ProvvigioneRow {
 }
 
 export async function getProvvigioni(locationId: string): Promise<ProvvigioneRow[]> {
+  try { await assertUserOwnsLocation(locationId) } catch { return [] }
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('provvigioni')
@@ -208,6 +211,7 @@ export interface AvailabilitySlot {
 }
 
 export async function getUserAvailability(locationId: string): Promise<AvailabilitySlot[]> {
+  try { await assertUserOwnsLocation(locationId) } catch { return [] }
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('user_availability')
@@ -248,6 +252,7 @@ export async function saveUserAvailability(
 // ─── Hidden Tags ────────────────────────────────────────────────────────────
 
 export async function getHiddenTags(locationId: string): Promise<string[]> {
+  try { await assertUserOwnsLocation(locationId) } catch { return [] }
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('location_settings')
@@ -279,6 +284,7 @@ export async function saveHiddenTags(
 
 export async function getCategoryTags(locationId: string): Promise<Record<string, string[]>> {
   try {
+    await assertUserOwnsLocation(locationId)
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('location_settings')
@@ -327,6 +333,7 @@ export async function getGareMensili(
   locationId: string,
   month: string // 'YYYY-MM-01'
 ): Promise<GaraRow[]> {
+  try { await assertUserOwnsLocation(locationId) } catch { return [] }
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('gare_mensili')
@@ -378,6 +385,7 @@ export async function saveGareMensili(
 // ─── Closed Days ────────────────────────────────────────────────────────────
 
 export async function getClosedDays(locationId: string): Promise<string[]> {
+  try { await assertUserOwnsLocation(locationId) } catch { return [] }
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('location_settings')
@@ -408,6 +416,7 @@ export async function saveClosedDays(
 // ─── Unique Fields ──────────────────────────────────────────────────────────
 
 export async function getUniqueFields(locationId: string): Promise<string[]> {
+  try { await assertUserOwnsLocation(locationId) } catch { return [] }
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('location_settings')
@@ -439,6 +448,7 @@ export async function saveUniqueFields(
 
 export async function ensureCategorySwitchOutFields(locationId: string): Promise<number | null> {
   try {
+    await assertUserOwnsLocation(locationId)
     const ghl = await getGhlClient(locationId)
     const data = await ghl.customFields.list()
     const rawFields = (data?.customFields ?? []) as { id: string; name: string; dataType: string; fieldKey?: string; placeholder?: string; picklistOptions?: string[] }[]
@@ -478,6 +488,7 @@ export interface GhlTag {
 
 export async function getLocationTags(locationId: string): Promise<GhlTag[]> {
   try {
+    await assertUserOwnsLocation(locationId)
     // Read from cache first
     const sb = createAdminClient()
     const { data: cached } = await sb

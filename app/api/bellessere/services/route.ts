@@ -4,6 +4,7 @@ import { getLocationAccessFast } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 import { ensureFresh } from '@/lib/bellessere/sync'
+import { assertBellessereWrite } from '@/lib/bellessere/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,6 +91,9 @@ export async function POST(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
+  const werr = await assertBellessereWrite()
+  if (werr) return werr
+
   const { name, description, duration, price, teamMembers = [], color = '#1B2E4A', groupId, slotInterval, slotBuffer, preBuffer } = await req.json()
   if (!name || !duration) return NextResponse.json({ error: 'name and duration required' }, { status: 400 })
 
@@ -145,6 +149,9 @@ export async function PUT(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
+  const werr = await assertBellessereWrite()
+  if (werr) return werr
+
   const { calendarId, name, description, duration, price, teamMembers, color, groupId, slotInterval, slotBuffer, preBuffer } = await req.json()
   if (!calendarId) return NextResponse.json({ error: 'calendarId required' }, { status: 400 })
 
@@ -194,6 +201,9 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
+
+  const werr = await assertBellessereWrite()
+  if (werr) return werr
 
   const { calendarId } = await req.json()
   if (!calendarId) return NextResponse.json({ error: 'calendarId required' }, { status: 400 })

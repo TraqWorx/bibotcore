@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { bulkSyncLocation } from '@/lib/sync/bulkSync'
 import { syncAllLocationUsers } from '@/lib/sync/syncAllUsers'
+import { isCronAuthorized } from '@/lib/auth/cronAuth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -11,9 +12,8 @@ export const maxDuration = 300
  * Add to vercel.json:
  *   { "crons": [{ "path": "/api/cron/sync-ghl-cache", "schedule": "0 4 * * *" }] }
  */
-export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+export async function GET(request: NextRequest) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

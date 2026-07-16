@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccessFast } from '@/lib/auth/assertLocationAccess'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
+import { assertBellessereWrite } from '@/lib/bellessere/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,9 @@ export async function PUT(req: NextRequest) {
   if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  const werr = await assertBellessereWrite()
+  if (werr) return werr
+
   const { inviteText, joinText } = await req.json().catch(() => ({})) as { inviteText?: string; joinText?: string }
   const patch: Record<string, unknown> = { location_id: BELLESSERE_LOCATION_ID, updated_at: new Date().toISOString() }
   if (inviteText !== undefined) patch.invite_text = (inviteText ?? '').slice(0, 1000)
@@ -45,6 +49,9 @@ export async function POST(req: NextRequest) {
   const access = await getLocationAccessFast(req, BELLESSERE_LOCATION_ID)
   if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const werr = await assertBellessereWrite()
+  if (werr) return werr
 
   const { teamSchedule } = await req.json()
 

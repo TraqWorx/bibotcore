@@ -28,16 +28,16 @@ function authClientFor(req: NextRequest) {
 }
 
 /**
- * Fast variant: reads the user from the (already middleware-validated) session
- * cookie locally instead of a getUser() round-trip to the auth server. Same
- * location-access DB checks. Use on read-heavy routes behind the auth middleware.
+ * Verifies the caller against the auth server before running the location
+ * checks. `getSession()` only decodes the cookie JWT (no signature check) and
+ * the middleware matcher excludes `/api`, so a forged cookie would otherwise
+ * pass on API routes — always use `getUser()` here.
  */
 export async function getLocationAccessFast(
   req: NextRequest,
   locationId: string,
 ): Promise<LocationAccessResult> {
-  const { data: { session } } = await authClientFor(req).auth.getSession()
-  const user = session?.user
+  const { data: { user } } = await authClientFor(req).auth.getUser()
   if (!user) return { status: 'unauthenticated' }
   return resolveLocationAccess(user.id, user.email ?? '', locationId)
 }

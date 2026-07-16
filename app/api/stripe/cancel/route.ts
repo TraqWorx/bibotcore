@@ -11,8 +11,10 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const sb = createAdminClient()
-  const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
+  const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
   if (!profile?.agency_id) return NextResponse.json({ error: 'No agency' }, { status: 403 })
+  if (profile.role !== 'admin' && profile.role !== 'super_admin')
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Find the subscription
   const { data: sub } = await sb

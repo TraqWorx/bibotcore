@@ -9,8 +9,10 @@ async function assertSuperAdmin() {
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
   const supabase = createAdminClient()
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'super_admin' && profile?.role !== 'admin') throw new Error('Not authorized')
+  const { data: profile } = await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
+  if (profile?.role === 'super_admin') return
+  const { isBibotAgency } = await import('@/lib/isBibotAgency')
+  if (!isBibotAgency(profile?.agency_id)) throw new Error('Not authorized')
 }
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
@@ -22,7 +24,7 @@ export async function saveDesignDefaults(
   modules: DesignModules,
   priceMonthly: number | null = null
 ): Promise<{ error?: string }> {
-  await assertSuperAdmin()
+  try { await assertSuperAdmin() } catch { return { error: 'Accesso negato' } }
 
   if (!name.trim()) return { error: 'Nome design richiesto' }
   if (!HEX_RE.test(theme.primaryColor)) return { error: 'Colore primario non valido (usa formato #RRGGBB)' }

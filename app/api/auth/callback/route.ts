@@ -11,7 +11,10 @@ export async function GET(req: NextRequest) {
   // Build redirect response first so we can attach cookies to it. Only allow
   // same-origin relative paths to prevent an open redirect to external sites.
   const rawRedirect = searchParams.get('redirectTo')
-  const safeRedirect = rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')
+  const safeRedirect = rawRedirect
+    && rawRedirect.startsWith('/')
+    && !rawRedirect.startsWith('//')
+    && !/[\\\t\r\n]/.test(rawRedirect)
     ? rawRedirect
     : '/redirect'
   const redirectUrl = new URL(safeRedirect, req.url)

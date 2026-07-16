@@ -5,6 +5,7 @@ import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 import { validateNewUser, buildCreateUserPayload } from '@/lib/bellessere/query'
 import { ghlRoleToLocationRole } from '@/lib/auth/designOwner'
+import { assertBellessereWrite } from '@/lib/bellessere/auth'
 
 /**
  * Provision the Supabase login for ONE new member — lightweight + awaited so they
@@ -104,6 +105,9 @@ export async function POST(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
 
+  const werr = await assertBellessereWrite()
+  if (werr) return werr
+
   const input = await req.json().catch(() => ({}))
   const validationError = validateNewUser(input)
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
@@ -154,6 +158,9 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const err = await authCheck(req)
   if (err) return err
+
+  const werr = await assertBellessereWrite()
+  if (werr) return werr
 
   const { userId } = await req.json().catch(() => ({})) as { userId?: string }
   if (!userId) return NextResponse.json({ error: 'userId obbligatorio' }, { status: 400 })

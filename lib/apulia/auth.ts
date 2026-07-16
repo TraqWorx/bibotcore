@@ -77,7 +77,7 @@ export const getApuliaSession = cache(async (): Promise<ApuliaSession> => {
   // Amministratore: search Apulia contacts where email matches.
   const { data: conn } = await sb.from('ghl_connections').select('access_token').eq('location_id', APULIA_LOCATION_ID).single()
   if (!conn) {
-    return { email: user.email, userId: user.id, role: 'amministratore' }
+    redirect('/login?error=not_authorized&email=' + encodeURIComponent(user.email))
   }
 
   const r = await fetch('https://services.leadconnectorhq.com/contacts/search', {
