@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import { getStripe } from '@/lib/stripe/stripe'
-import { PLAN } from '@/lib/stripe/plans'
+import { DEFAULT_PLAN } from '@/lib/stripe/plans'
 import { requireSuperAdmin } from '@/lib/auth/requireSuperAdmin'
 
 export const dynamic = 'force-dynamic'
@@ -58,9 +58,9 @@ export default async function PlatformAgencyDetailPage({
     await sb.from('agency_subscriptions').upsert({
       agency_id: agencyId,
       location_id: locationId,
-      plan: PLAN.id,
+      plan: DEFAULT_PLAN.id,
       status: 'active',
-      price_cents: PLAN.priceCents,
+      price_cents: DEFAULT_PLAN.priceCents,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }, { onConflict: 'agency_id,location_id' })

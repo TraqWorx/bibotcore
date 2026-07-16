@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripe } from '@/lib/stripe/stripe'
 import { createAdminClient } from '@/lib/supabase-server'
-import { PLAN } from '@/lib/stripe/plans'
+import { getPlan, DEFAULT_PLAN } from '@/lib/stripe/plans'
 import type Stripe from 'stripe'
 
 /**
@@ -55,17 +55,17 @@ export async function POST(req: NextRequest) {
       const session = event.data.object as Stripe.Checkout.Session
       const agencyId = session.metadata?.agency_id
       const locationId = session.metadata?.location_id
-      const plan = session.metadata?.plan ?? PLAN.id
+      const resolvedPlan = getPlan(session.metadata?.plan) ?? DEFAULT_PLAN
       const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id
 
       if (agencyId && locationId && subscriptionId) {
         await sb.from('agency_subscriptions').upsert({
           agency_id: agencyId,
           location_id: locationId,
-          plan,
+          plan: resolvedPlan.id,
           status: 'active',
           stripe_subscription_id: subscriptionId,
-          price_cents: PLAN.priceCents,
+          price_cents: resolvedPlan.priceCents,
           current_period_start: new Date().toISOString(),
         }, { onConflict: 'agency_id,location_id' })
 

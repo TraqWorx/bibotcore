@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { stripe } from '@/lib/stripe/stripe'
-import { PLAN } from '@/lib/stripe/plans'
+import { getPlan, DEFAULT_PLAN } from '@/lib/stripe/plans'
 
 export async function POST(req: NextRequest) {
-  const { locationId } = await req.json() as { locationId: string }
+  const { locationId, plan: planId } = await req.json() as { locationId: string; plan?: string }
 
   if (!locationId) {
     return NextResponse.json({ error: 'locationId required' }, { status: 400 })
+  }
+
+  const plan = getPlan(planId) ?? DEFAULT_PLAN
+  if (!plan.priceId) {
+    return NextResponse.json({ error: 'Selected plan is not configured' }, { status: 500 })
   }
 
   const authClient = await createAuthClient()
@@ -46,19 +51,19 @@ export async function POST(req: NextRequest) {
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
-    line_items: [{ price: PLAN.priceId, quantity: 1 }],
+    line_items: [{ price: plan.priceId, quantity: 1 }],
     success_url: `${appUrl}/admin/locations/${locationId}?subscribed=true`,
     cancel_url: `${appUrl}/admin/locations`,
     metadata: {
       agency_id: profile.agency_id,
       location_id: locationId,
-      plan: PLAN.id,
+      plan: plan.id,
     },
     subscription_data: {
       metadata: {
         agency_id: profile.agency_id,
         location_id: locationId,
-        plan: PLAN.id,
+        plan: plan.id,
       },
     },
   })

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { PLAN } from '@/lib/stripe/plans'
+import { DEFAULT_PLAN } from '@/lib/stripe/plans'
 
 export async function POST(req: NextRequest) {
   const { locationId } = await req.json()
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   await sb.from('agency_subscriptions').upsert({
     agency_id: profile.agency_id,
     location_id: locationId,
-    plan: PLAN.id,
+    plan: DEFAULT_PLAN.id,
     status: 'active',
     price_cents: 0,
     created_at: new Date().toISOString(),
