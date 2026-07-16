@@ -78,19 +78,36 @@ export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
         continue
       }
 
-      // Fetch GHL users for this location
-      const res = await fetch(
-        `${GHL_BASE}/users/search?companyId=${conn?.company_id ?? companyId}&locationId=${loc.location_id}&limit=100`,
-        { headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' }, cache: 'no-store' },
-      )
-
-      if (!res.ok) {
-        errors.push(`${loc.location_id}: GHL users fetch HTTP ${res.status}`)
-        continue
+      // Fetch ALL GHL users for this location, paging until exhausted. Capping
+      // at a single 100-user page silently dropped everyone past the first page
+      // and then the prune step below removed them from the location.
+      type GhlUser = { id?: string; email?: string; name?: string; firstName?: string; lastName?: string; roles?: { role?: string } }
+      const PAGE = 100
+      const ghlUsers: GhlUser[] = []
+      let skip = 0
+      let rosterComplete = true
+      while (true) {
+        const res = await fetch(
+          `${GHL_BASE}/users/search?companyId=${conn?.company_id ?? companyId}&locationId=${loc.location_id}&limit=${PAGE}&skip=${skip}`,
+          { headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28' }, cache: 'no-store' },
+        )
+        if (!res.ok) {
+          errors.push(`${loc.location_id}: GHL users fetch HTTP ${res.status} (skip=${skip})`)
+          rosterComplete = false
+          break
+        }
+        const data = await res.json()
+        const page = (data?.users ?? []) as GhlUser[]
+        ghlUsers.push(...page)
+        if (page.length < PAGE) break
+        skip += PAGE
+        if (skip > 5000) { rosterComplete = false; break } // safety cap
       }
 
-      const data = await res.json()
-      const ghlUsers = (data?.users ?? []) as { id?: string; email?: string; name?: string; firstName?: string; lastName?: string; roles?: { role?: string } }[]
+      // If we never got a usable roster, skip this location entirely rather than
+      // treating "no users fetched" as "remove everyone".
+      if (!rosterComplete && ghlUsers.length === 0) continue
+
       const ghlEmails = new Set(ghlUsers.map((u) => u.email?.toLowerCase()).filter(Boolean) as string[])
 
       // Sync each GHL user into Supabase
@@ -166,11 +183,12 @@ export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
         usersLinked++
       }
 
-      // Remove users from profile_locations that are no longer in GHL for this location
-      const { data: currentMembers } = await sb
-        .from('profile_locations')
-        .select('user_id')
-        .eq('location_id', loc.location_id)
+      // Remove users from profile_locations that are no longer in GHL for this
+      // location — but ONLY when we fetched the complete roster. A partial fetch
+      // must never trigger removals (that's how real staff lost access).
+      const { data: currentMembers } = rosterComplete
+        ? await sb.from('profile_locations').select('user_id').eq('location_id', loc.location_id)
+        : { data: [] as { user_id: string }[] }
 
       for (const member of currentMembers ?? []) {
         const { data: memberProfile } = await sb.from('profiles').select('email, role').eq('id', member.user_id).maybeSingle()

@@ -4,6 +4,35 @@ import { createAdminClient } from '@/lib/supabase-server'
 import { PLAN } from '@/lib/stripe/plans'
 import type Stripe from 'stripe'
 
+/**
+ * The Stripe "basil" API (SDK v22) moved invoice.subscription to
+ * invoice.parent.subscription_details.subscription. Read both so the handler
+ * works regardless of the endpoint's configured API version.
+ */
+function invoiceSubscriptionId(invoice: Record<string, unknown>): string | null {
+  const legacy = invoice.subscription
+  if (typeof legacy === 'string') return legacy
+  const parent = invoice.parent as { subscription_details?: { subscription?: unknown } } | undefined
+  const sub = parent?.subscription_details?.subscription
+  return typeof sub === 'string' ? sub : null
+}
+
+/** Period dates moved from the Subscription root to its items in basil. */
+function subscriptionPeriod(sub: Record<string, unknown>): { start: string | null; end: string | null } {
+  let start = typeof sub.current_period_start === 'number' ? sub.current_period_start : null
+  let end = typeof sub.current_period_end === 'number' ? sub.current_period_end : null
+  if (start === null || end === null) {
+    const items = (sub.items as { data?: { current_period_start?: number; current_period_end?: number }[] } | undefined)?.data
+    const item = items?.[0]
+    if (start === null && typeof item?.current_period_start === 'number') start = item.current_period_start
+    if (end === null && typeof item?.current_period_end === 'number') end = item.current_period_end
+  }
+  return {
+    start: start !== null ? new Date(start * 1000).toISOString() : null,
+    end: end !== null ? new Date(end * 1000).toISOString() : null,
+  }
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.text()
   const sig = req.headers.get('stripe-signature')
@@ -62,8 +91,10 @@ export async function POST(req: NextRequest) {
         : 'canceled'
 
       const raw = subscription as unknown as Record<string, unknown>
-      const periodStart = typeof raw.current_period_start === 'number' ? new Date(raw.current_period_start * 1000).toISOString() : null
-      const periodEnd = typeof raw.current_period_end === 'number' ? new Date(raw.current_period_end * 1000).toISOString() : null
+      const { start: periodStart, end: periodEnd } = subscriptionPeriod(raw)
+      // A pending cancellation (cancel_at_period_end) still reports status
+      // 'active' here — keep it active so access continues until the period
+      // actually ends and Stripe sends customer.subscription.deleted.
 
       await sb.from('agency_subscriptions')
         .update({
@@ -86,8 +117,7 @@ export async function POST(req: NextRequest) {
 
     case 'invoice.payment_failed': {
       const invoice = event.data.object as unknown as Record<string, unknown>
-      const rawSub = invoice.subscription
-      const subscriptionId = typeof rawSub === 'string' ? rawSub : null
+      const subscriptionId = invoiceSubscriptionId(invoice)
       if (subscriptionId) {
         await sb.from('agency_subscriptions')
           .update({ status: 'past_due', updated_at: new Date().toISOString() })
@@ -103,7 +133,7 @@ export async function POST(req: NextRequest) {
       if (invoiceId) {
         try {
           const invoice = await stripe.invoices.retrieve(invoiceId) as unknown as Record<string, unknown>
-          const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null
+          const subscriptionId = invoiceSubscriptionId(invoice)
           if (subscriptionId) {
             // Only act if we actually track this subscription. charge.amount_refunded
             // is the cumulative refunded total for the charge, so store it

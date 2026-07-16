@@ -371,6 +371,14 @@ export async function GET(req: NextRequest) {
       )
 
       const { data: { user } } = await authClient.auth.getUser()
+      // If the state was bound to an initiating user, only that same user may
+      // complete the bind — a captured callback URL opened by anyone else is
+      // refused so it can't repoint a victim's profile at this location.
+      if (state.uid && user?.id !== state.uid) {
+        const errorUrl = new URL('/admin/locations', req.url)
+        errorUrl.searchParams.set('error', 'This install link is tied to a different account. Please restart the connection from your dashboard.')
+        return NextResponse.redirect(errorUrl)
+      }
       if (user) {
         await Promise.all([
           supabase

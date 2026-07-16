@@ -30,17 +30,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Cancel at period end (they keep access until the billing period ends)
+    // Cancel at period end — they keep access until the billing period ends.
+    // Do NOT flip the DB to 'canceled' here: that would revoke access
+    // immediately (paywalls require status 'active') and race the
+    // customer.subscription.updated webhook, which reports the sub as still
+    // active. Stripe fires customer.subscription.deleted at the actual period
+    // end, and that handler sets 'canceled' then.
     const stripe = getStripe()
     await stripe.subscriptions.update(sub.stripe_subscription_id, {
       cancel_at_period_end: true,
     })
-
-    // Update status in DB
-    await sb.from('agency_subscriptions')
-      .update({ status: 'canceled' })
-      .eq('agency_id', profile.agency_id)
-      .eq('location_id', locationId)
 
     return NextResponse.json({ ok: true })
   } catch (err) {

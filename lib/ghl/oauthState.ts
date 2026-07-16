@@ -3,9 +3,9 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 const STATE_TTL_MS = 10 * 60 * 1000
 
 export type OAuthStatePayload =
-  | { flow: 'package_install'; packageSlug: string; nonce: string; iat: number; exp: number }
-  | { flow: 'admin_design_install'; designSlug: string; nonce: string; iat: number; exp: number }
-  | { flow: 'connect_location'; locationId?: string; nonce: string; iat: number; exp: number }
+  | { flow: 'package_install'; packageSlug: string; uid?: string; nonce: string; iat: number; exp: number }
+  | { flow: 'admin_design_install'; designSlug: string; uid?: string; nonce: string; iat: number; exp: number }
+  | { flow: 'connect_location'; locationId?: string; uid?: string; nonce: string; iat: number; exp: number }
 
 function getOAuthStateSecret() {
   const secret = process.env.GHL_OAUTH_STATE_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -35,17 +35,17 @@ function constantTimeEqual(a: string, b: string) {
 
 export function createOAuthState(
   input:
-    | { flow: 'package_install'; packageSlug: string }
-    | { flow: 'admin_design_install'; designSlug: string }
-    | { flow: 'connect_location'; locationId?: string },
+    | { flow: 'package_install'; packageSlug: string; uid?: string }
+    | { flow: 'admin_design_install'; designSlug: string; uid?: string }
+    | { flow: 'connect_location'; locationId?: string; uid?: string },
 ) {
   const now = Date.now()
   const base = { nonce: randomUUID(), iat: now, exp: now + STATE_TTL_MS }
   const payload: OAuthStatePayload = input.flow === 'package_install'
-    ? { flow: input.flow, packageSlug: input.packageSlug, ...base }
+    ? { flow: input.flow, packageSlug: input.packageSlug, uid: input.uid, ...base }
     : input.flow === 'admin_design_install'
-    ? { flow: input.flow, designSlug: input.designSlug, ...base }
-    : { flow: input.flow, locationId: input.locationId, ...base }
+    ? { flow: input.flow, designSlug: input.designSlug, uid: input.uid, ...base }
+    : { flow: input.flow, locationId: input.locationId, uid: input.uid, ...base }
 
   const encodedPayload = toBase64Url(JSON.stringify(payload))
   const signature = sign(encodedPayload)
@@ -64,6 +64,7 @@ export function verifyOAuthState(state: string): OAuthStatePayload | null {
     if (!payload || typeof payload !== 'object') return null
     if (typeof payload.nonce !== 'string' || typeof payload.iat !== 'number' || typeof payload.exp !== 'number') return null
     if (payload.exp < Date.now()) return null
+    if ('uid' in payload && payload.uid !== undefined && typeof payload.uid !== 'string') return null
     if (payload.flow === 'package_install' && typeof payload.packageSlug === 'string') {
       return payload as OAuthStatePayload
     }
