@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import { useMemo } from 'react'
 import { resolveSimfoniaShell } from '@/lib/simfonia/shellTheme'
+import { safeHexColor } from '@/lib/theme/sanitizeColor'
 import { DEFAULT_THEME } from '@/lib/types/design'
 import type { WidgetConfig, DashboardColors } from '@/lib/widgets/types'
 import WidgetGrid from '@/lib/widgets/WidgetGrid'
@@ -30,8 +31,8 @@ export default function DashboardPreviewPage() {
 
   const theme = useMemo(() => ({
     ...DEFAULT_THEME,
-    primaryColor: colors.primaryColor ?? DEFAULT_THEME.primaryColor,
-    secondaryColor: colors.secondaryColor ?? DEFAULT_THEME.secondaryColor,
+    primaryColor: safeHexColor(colors.primaryColor, DEFAULT_THEME.primaryColor),
+    secondaryColor: safeHexColor(colors.secondaryColor, DEFAULT_THEME.secondaryColor),
   }), [colors])
 
   const shell = useMemo(() => resolveSimfoniaShell(theme), [theme])

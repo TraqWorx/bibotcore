@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 
-const LOCATION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+// GHL location ids are ~20-char alphanumeric; also accept UUIDs. Restricting to
+// [A-Za-z0-9-] keeps the value safe to interpolate into start_url.
+const LOCATION_ID_PATTERN = /^[A-Za-z0-9-]{15,40}$/
 
 /**
  * GET /api/portal/manifest?locationId=xxx

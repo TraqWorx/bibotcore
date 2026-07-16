@@ -84,10 +84,16 @@ export async function drainQueue(): Promise<DrainResult> {
     .eq('status', 'pending')
     .select('id, contact_id, ghl_id, action, payload, attempts')
 
-  const ops = (claimed ?? []) as QueueRow[]
-  if (!ops.length) return { claimed: 0, completed: 0, failed: 0, rateLimited: false }
+  const claimedRows = (claimed ?? []) as QueueRow[]
+  if (!claimedRows.length) return { claimed: 0, completed: 0, failed: 0, rateLimited: false }
 
-  // 3. Group by contact_id; preserve queue order within group.
+  // 3. Restore queue order — the UPDATE ... RETURNING result order is unspecified,
+  // so re-sort by the candidate order (selected by created_at) before grouping,
+  // otherwise ops within one contact can execute out of order.
+  const order = new Map(candidates.map((c, i) => [c.id, i]))
+  const ops = claimedRows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+
+  // Group by contact_id; queue order within group now preserved.
   const groups = new Map<string, QueueRow[]>()
   for (const op of ops) {
     const key = op.contact_id ?? op.id

@@ -1,14 +1,9 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 import ContactCombobox from '../_components/ContactCombobox'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 interface CalEvent {
   id: string

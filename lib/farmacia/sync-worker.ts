@@ -69,8 +69,14 @@ export async function drainQueue(): Promise<DrainResult> {
     .in('id', candidates.map((c) => c.id))
     .eq('status', 'pending')
     .select('id, contact_id, ghl_id, action, payload, attempts')
-  const ops = (claimed ?? []) as QueueRow[]
-  if (!ops.length) return { claimed: 0, completed: 0, failed: 0, rateLimited: false }
+  const claimedRows = (claimed ?? []) as QueueRow[]
+  if (!claimedRows.length) return { claimed: 0, completed: 0, failed: 0, rateLimited: false }
+
+  // The UPDATE ... RETURNING result comes back in unspecified order; restore the
+  // queue order (candidates were selected by created_at) so within one contact
+  // set_field(old) can't run after set_field(new), or remove_tag before add_tag.
+  const order = new Map(candidates.map((c, i) => [c.id, i]))
+  const ops = claimedRows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
 
   const groups = new Map<string, QueueRow[]>()
   for (const op of ops) {
