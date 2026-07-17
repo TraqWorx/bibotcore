@@ -91,7 +91,7 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
           <Link href="/login" className="rounded-xl px-6 py-3 text-sm font-semibold text-white" style={{ background: 'linear-gradient(90deg,#5B2BFF,#00D6E8)', boxShadow: '0 8px 28px rgba(91,43,255,0.45)' }}>
             Log in
           </Link>
-          <p className="text-xs text-white/35">Invite-only · <a href="mailto:info@espressotranslations.com" className="text-cyan-300 hover:underline">contact us</a> to get set up.</p>
+          <p className="text-xs text-white/35">Invite-only · <a href="mailto:info@lumaxdigital.co.uk" className="text-cyan-300 hover:underline">contact us</a> to get set up.</p>
         </section>
       </div>
     </div>

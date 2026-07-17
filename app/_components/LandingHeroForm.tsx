@@ -73,7 +73,7 @@ export default function LandingHeroForm() {
           {message}
         </p>
       )}
-      <p className="mt-3 text-xs text-white/35">Invite-only · we&apos;ll email you a secure login link. Need access? <a href="mailto:info@espressotranslations.com" className="text-cyan-300 hover:underline">Contact us</a>.</p>
+      <p className="mt-3 text-xs text-white/35">Invite-only · we&apos;ll email you a secure login link. Need access? <a href="mailto:info@lumaxdigital.co.uk" className="text-cyan-300 hover:underline">Contact us</a>.</p>
     </div>
   )
 }

@@ -31,7 +31,7 @@
 - **Server actions return `{ error: string } | undefined`** — never throw (Next.js client components can't catch thrown server action errors)
 - **Bibot agency bypasses all paywalls** — use `isBibotAgency()` before any paywall check
 - **Role hierarchy**: `super_admin` > `admin` > `agency` > `user`
-  - `super_admin`: platform owner (info@espressotranslations.com) → `/platform`
+  - `super_admin`: platform owner (info@lumaxdigital.co.uk) → `/platform`
   - `admin`: agency owner who buys subscription → `/admin`
   - `agency`: GHL team member assigned to locations → `/agency`
   - `user`: portal contact → `/portal`
