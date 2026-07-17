@@ -1,7 +1,7 @@
 -- ============================================================
 -- 062: Role hierarchy — super_admin / admin / agency / user
 --
--- super_admin  → platform owner (info@espressotranslations.com)
+-- super_admin  → platform owner (info@lumaxdigital.co.uk)
 -- admin        → agency owners who buy subscription, see all their locations
 -- agency       → GHL team members assigned to specific locations
 -- user         → contacts / portal users
