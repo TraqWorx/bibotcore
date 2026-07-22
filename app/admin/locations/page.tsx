@@ -117,10 +117,16 @@ export default async function LocationsPage({
       locationIds.length ? supabase.from('profile_locations').select('location_id').in('location_id', locationIds) : Promise.resolve({ data: [] }),
       supabase.from('ghl_plans').select('ghl_plan_id, name, price_monthly').order('name'),
       locationIds.length ? supabase.from('dashboard_configs').select('location_id, embed_token, config').in('location_id', locationIds) : Promise.resolve({ data: [] }),
-      locationIds.length ? supabase.from('agency_subscriptions').select('location_id, status').eq('agency_id', agencyId).eq('status', 'active').in('location_id', locationIds) : Promise.resolve({ data: [] }),
+      locationIds.length ? supabase.from('agency_subscriptions').select('location_id, status, plan, stripe_subscription_id').eq('agency_id', agencyId).eq('status', 'active').in('location_id', locationIds) : Promise.resolve({ data: [] }),
     ])
 
   const subscribedIds = new Set((subscriptions ?? []).map((s) => s.location_id))
+  // Paid Stripe plan per location (manual/free activations have no Stripe sub).
+  const stripePlanByLocation: Record<string, string> = {}
+  for (const s of subscriptions ?? []) {
+    const r = s as { location_id: string; plan?: string | null; stripe_subscription_id?: string | null }
+    if (r.stripe_subscription_id && r.plan) stripePlanByLocation[r.location_id] = r.plan
+  }
 
   // Plan assignments from locations table
   const { data: locationPlanRows } = locationIds.length
@@ -182,6 +188,7 @@ export default async function LocationsPage({
       name: l.name,
       connected: connectedIds.has(l.id),
       subscribed: isBibot || subscribedIds.has(l.id),
+      stripePlan: stripePlanByLocation[l.id] ?? null,
       users: userCountByLocation[l.id] ?? 0,
       design: designByLocation[l.id] ?? null,
       dashboard: dashboardByLocation[l.id] ?? null,

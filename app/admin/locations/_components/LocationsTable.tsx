@@ -18,6 +18,7 @@ import ReauthorizeButton from './ReauthorizeButton'
 import SubscribeButton from './SubscribeButton'
 import ConnectLocationButton from './ConnectLocationButton'
 import CancelSubscriptionButton from './CancelSubscriptionButton'
+import ChangePlanButton from './ChangePlanButton'
 import ActivateButton from './ActivateButton'
 
 interface LocationRow {
@@ -25,6 +26,7 @@ interface LocationRow {
   name: string
   connected: boolean
   subscribed: boolean
+  stripePlan: string | null
   users: number
   design: string | null
   dashboard: { token: string; widgetCount: number } | null
@@ -390,7 +392,10 @@ export default function LocationsTable({ rows, designs, unconnectedLocations, pl
                             {!row.connected && <ConnectButton designs={designs} unconnectedLocations={unconnectedLocations} preselectedId={row.id} />}
                           </div>
                         ) : row.subscribed ? (
-                          <CancelSubscriptionButton locationId={row.id} />
+                          <div className="flex items-center gap-1.5">
+                            {row.stripePlan && <ChangePlanButton locationId={row.id} currentPlan={row.stripePlan} />}
+                            <CancelSubscriptionButton locationId={row.id} />
+                          </div>
                         ) : null}
                       </div>
                     </td>
