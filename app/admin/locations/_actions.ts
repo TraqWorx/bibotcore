@@ -94,6 +94,43 @@ export async function disconnectLocation(
   }
 }
 
+/**
+ * Remove a location from the dashboard entirely (e.g. one added by ID by
+ * mistake). Deletes the local rows only — it does NOT touch anything in GHL.
+ * Refuses while a live subscription exists so billing can't be orphaned; the
+ * owner cancels first.
+ */
+export async function removeLocation(
+  locationId: string
+): Promise<{ error: string } | undefined> {
+  try {
+    await requireLocationOwner(locationId)
+    const supabase = createAdminClient()
+
+    const { data: sub } = await supabase
+      .from('agency_subscriptions')
+      .select('status')
+      .eq('location_id', locationId)
+      .maybeSingle()
+    if (sub && ['active', 'trialing', 'past_due'].includes(sub.status)) {
+      return { error: 'Cancel the subscription before removing this location.' }
+    }
+
+    // Children first (FK order), then the location row.
+    await Promise.all([
+      supabase.from('ghl_connections').delete().eq('location_id', locationId),
+      supabase.from('installs').delete().eq('location_id', locationId),
+      supabase.from('dashboard_configs').delete().eq('location_id', locationId),
+      supabase.from('agency_subscriptions').delete().eq('location_id', locationId),
+      supabase.from('profile_locations').delete().eq('location_id', locationId),
+    ])
+    await supabase.from('locations').delete().eq('location_id', locationId)
+    revalidatePath('/admin/locations')
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to remove location' }
+  }
+}
+
 export async function getGhlOAuthUrl(
   designSlug: string
 ): Promise<{ url: string } | { error: string }> {

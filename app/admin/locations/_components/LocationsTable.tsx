@@ -19,6 +19,7 @@ import SubscribeButton from './SubscribeButton'
 import ConnectLocationButton from './ConnectLocationButton'
 import CancelSubscriptionButton from './CancelSubscriptionButton'
 import ChangePlanButton from './ChangePlanButton'
+import RemoveLocationButton from './RemoveLocationButton'
 import ActivateButton from './ActivateButton'
 
 interface LocationRow {
@@ -396,7 +397,9 @@ export default function LocationsTable({ rows, designs, unconnectedLocations, pl
                             {row.stripePlan && <ChangePlanButton locationId={row.id} currentPlan={row.stripePlan} />}
                             <CancelSubscriptionButton locationId={row.id} />
                           </div>
-                        ) : null}
+                        ) : (
+                          <RemoveLocationButton locationId={row.id} name={row.name} />
+                        )}
                       </div>
                     </td>
                   </tr>
