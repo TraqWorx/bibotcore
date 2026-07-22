@@ -1,5 +1,6 @@
-import { notFound } from 'next/navigation'
-import { createAdminClient } from '@/lib/supabase-server'
+import { notFound, redirect } from 'next/navigation'
+import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { isBibotAgency } from '@/lib/isBibotAgency'
 import { DEFAULT_THEME, DEFAULT_MODULES, type DesignTheme, type DesignModules } from '@/lib/types/design'
 import DesignDefaultsForm from './_components/DesignDefaultsForm'
 
@@ -9,7 +10,13 @@ export default async function DesignSettingsPage({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) redirect('/login')
+
   const supabase = createAdminClient()
+  const { data: profile } = await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin' && !isBibotAgency(profile?.agency_id)) redirect('/admin')
 
   const { data: design } = await supabase
     .from('designs')

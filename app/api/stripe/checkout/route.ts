@@ -37,15 +37,20 @@ export async function POST(req: NextRequest) {
   }
 
   // Guard against a double-charge: never start a second subscription for a
-  // location that already has an active one (double-click, second tab, retry).
+  // location whose current one is still live in Stripe. past_due counts — its
+  // card retries can later succeed, and a second sub would double-bill while
+  // the old one's webhooks no longer match any row.
   const { data: existingSub } = await sb
     .from('agency_subscriptions')
     .select('status')
     .eq('agency_id', agencyId)
     .eq('location_id', locationId)
     .maybeSingle()
-  if (existingSub?.status === 'active') {
+  if (existingSub?.status === 'active' || existingSub?.status === 'trialing') {
     return NextResponse.json({ error: 'This location already has an active subscription' }, { status: 409 })
+  }
+  if (existingSub?.status === 'past_due') {
+    return NextResponse.json({ error: 'This location has a past-due subscription — update the payment method in the billing portal instead of resubscribing' }, { status: 409 })
   }
 
   const { data: agency } = await sb.from('agencies').select('stripe_customer_id, email, name').eq('id', agencyId).single()
@@ -112,6 +117,10 @@ export async function POST(req: NextRequest) {
       default_payment_method: savedCard.id,
       payment_behavior: 'error_if_incomplete', // fail atomically if it can't pay now
       metadata: { agency_id: agencyId, location_id: locationId, plan: plan.id },
+    }, {
+      // Dedupe concurrent confirms (double-click / second tab) within a minute
+      // without blocking a genuine retry after a decline.
+      idempotencyKey: `sub-${agencyId}-${locationId}-${plan.id}-${Math.floor(Date.now() / 60000)}`,
     })
 
     if (subscription.status !== 'active' && subscription.status !== 'trialing') {

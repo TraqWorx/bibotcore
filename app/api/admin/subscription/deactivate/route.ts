@@ -26,7 +26,14 @@ export async function POST(req: NextRequest) {
     try {
       await getStripe().subscriptions.cancel(sub.stripe_subscription_id)
     } catch (err) {
-      console.error('[subscription/deactivate] Stripe cancel failed:', err)
+      // Don't flip the DB when Stripe still bills — the next renewal webhook
+      // would just resurrect the row and the admin would think it's off.
+      const msg = err instanceof Error ? err.message : 'unknown error'
+      const alreadyDead = msg.includes('canceled') || msg.includes('No such subscription')
+      if (!alreadyDead) {
+        console.error('[subscription/deactivate] Stripe cancel failed:', err)
+        return NextResponse.json({ error: `Stripe cancellation failed: ${msg}` }, { status: 502 })
+      }
     }
   }
 

@@ -76,12 +76,12 @@ export default async function AccountPage() {
               <tr key={`${sub.location_id}-${sub.created_at}`}>
                 <td className="px-5 py-3.5 font-medium text-gray-900">{locationMap.get(sub.location_id) ?? sub.location_id}</td>
                 <td className="px-5 py-3.5">
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase ${sub.plan === 'pro' ? 'bg-brand/10 text-brand' : 'bg-gray-100 text-gray-600'}`}>{sub.plan}</span>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase ${['pro', 'launch', 'growth'].includes(sub.plan) ? 'bg-brand/10 text-brand' : 'bg-gray-100 text-gray-600'}`}>{sub.plan}</span>
                 </td>
                 <td className="px-5 py-3.5">
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${sub.status === 'active' ? 'bg-emerald-50 text-emerald-700' : sub.status === 'canceled' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700'}`}>{sub.status}</span>
                 </td>
-                <td className="px-5 py-3.5 text-right font-semibold tabular-nums">${(sub.price_cents / 100).toFixed(0)}/mo</td>
+                <td className="px-5 py-3.5 text-right font-semibold tabular-nums">£{(sub.price_cents / 100).toFixed(0)}/mo</td>
                 <td className="px-5 py-3.5 text-gray-400">{new Date(sub.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
               </tr>
             ))}

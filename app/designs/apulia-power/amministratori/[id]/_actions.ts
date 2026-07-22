@@ -7,6 +7,7 @@ import { canWriteBibotDesign } from '@/lib/auth/designOwner'
 import { APULIA_FIELD, APULIA_TAG } from '@/lib/apulia/fields'
 import { APULIA_IMPERSONATE_COOKIE, APULIA_LOCATION_ID } from '@/lib/apulia/auth'
 import { enqueueOp } from '@/lib/apulia/sync-queue'
+import { PROOFS_BUCKET, proofObjectPath, signProofUrl } from '@/lib/apulia/proofs'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
   const auth = await createAuthClient()
@@ -226,32 +227,32 @@ export async function attachPaymentProof(
   if (bytes.length > 10 * 1024 * 1024) return { error: 'File troppo grande (max 10MB)' }
 
   const sb = createAdminClient()
-  // Ensure the bucket exists (idempotent).
-  await sb.storage.createBucket('apulia-payment-proofs', { public: true }).catch(() => null)
+  // Ensure the bucket exists and is PRIVATE — proofs are financial documents,
+  // served via signed URLs only (updateBucket flips a pre-existing public one).
+  await sb.storage.createBucket(PROOFS_BUCKET, { public: false }).catch(() => null)
+  await sb.storage.updateBucket(PROOFS_BUCKET, { public: false }).catch(() => null)
 
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
   const path = `${paymentId}/${Date.now()}-${safeName}`
   const { error: upErr } = await sb.storage
-    .from('apulia-payment-proofs')
+    .from(PROOFS_BUCKET)
     .upload(path, bytes, { contentType, upsert: true })
   if (upErr) return { error: `Upload fallito: ${upErr.message}` }
-
-  const { data: pub } = sb.storage.from('apulia-payment-proofs').getPublicUrl(path)
-  const publicUrl = pub.publicUrl
 
   const { error: dbErr } = await sb
     .from('apulia_payments')
     .update({
-      proof_url: publicUrl,
+      proof_url: path,
       proof_name: fileName,
       proof_uploaded_at: new Date().toISOString(),
     })
     .eq('id', paymentId)
-  if (dbErr) return { error: dbErr.message, url: publicUrl }
+  const signed = await signProofUrl(sb, path)
+  if (dbErr) return { error: dbErr.message, url: signed ?? undefined }
 
   revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
   revalidatePath('/designs/apulia-power/pagamenti')
-  return { url: publicUrl }
+  return { url: signed ?? undefined }
 }
 
 /** Remove the proof attachment from a payment. Best-effort storage delete. */
@@ -261,12 +262,7 @@ export async function removePaymentProof(paymentId: string, adminContactId: stri
   const sb = createAdminClient()
   const { data: row } = await sb.from('apulia_payments').select('proof_url').eq('id', paymentId).maybeSingle()
   if (row?.proof_url) {
-    const u = row.proof_url as string
-    const i = u.indexOf('/apulia-payment-proofs/')
-    if (i >= 0) {
-      const objectPath = u.slice(i + '/apulia-payment-proofs/'.length).split('?')[0]
-      await sb.storage.from('apulia-payment-proofs').remove([objectPath]).catch(() => null)
-    }
+    await sb.storage.from(PROOFS_BUCKET).remove([proofObjectPath(row.proof_url as string)]).catch(() => null)
   }
   const { error } = await sb
     .from('apulia_payments')

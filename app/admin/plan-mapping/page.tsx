@@ -1,11 +1,19 @@
-import { createAdminClient } from '@/lib/supabase-server'
+import { redirect } from 'next/navigation'
+import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { isBibotAgency } from '@/lib/isBibotAgency'
 import { deletePlanMapping } from './_actions'
 import AddMappingForm from './_components/AddMappingForm'
 import SyncPlansButton from './_components/SyncPlansButton'
 import { ad } from '@/lib/admin/ui'
 
 export default async function AdminPlanMappingPage() {
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) redirect('/login')
+
   const supabase = createAdminClient()
+  const { data: profile } = await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin' && !isBibotAgency(profile?.agency_id)) redirect('/admin')
 
   const [
     { data: plans },

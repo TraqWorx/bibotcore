@@ -1,6 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { createAdminClient } from '@/lib/supabase-server'
+import { redirect } from 'next/navigation'
+import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { isBibotAgency } from '@/lib/isBibotAgency'
 import DesignsTable from './_components/DesignsTable'
 import CreateDesignButton from './_components/CreateDesignButton'
 import { ad } from '@/lib/admin/ui'
@@ -60,7 +62,14 @@ async function autoRegisterDesigns(supabase: ReturnType<typeof createAdminClient
 }
 
 export default async function AdminDesignsPage() {
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) redirect('/login')
+
   const supabase = createAdminClient()
+  const { data: profile } = await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin' && !isBibotAgency(profile?.agency_id)) redirect('/admin')
+
   await autoRegisterDesigns(supabase)
   const { data: designs, error } = await supabase
     .from('designs')

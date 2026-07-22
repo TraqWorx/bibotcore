@@ -10,6 +10,7 @@ import ImpersonateButton from './_components/ImpersonateButton'
 import AdminFullEditor from './_components/AdminFullEditor'
 import PaymentRuleField from './_components/PaymentRuleField'
 import { listDistinctTags } from '@/lib/apulia/tags'
+import { signProofUrl } from '@/lib/apulia/proofs'
 import { getDefaultPaymentOffset } from '@/lib/apulia/payment-cycle'
 import DeleteContactButton from '../../_components/DeleteContactButton'
 import SettingsTabs from '../../settings/_components/SettingsTabs'
@@ -45,6 +46,14 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     fetchApuliaFieldGroups(),
     listDistinctTags(),
   ])
+  // Proofs live in a private bucket — swap stored references for signed URLs.
+  const signedPayments = await Promise.all(
+    (payments ?? []).map(async (p) => ({
+      ...p,
+      proof_url: p.proof_url ? await signProofUrl(sb, p.proof_url as string) : null,
+    }))
+  )
+
   const defaultOffset = await getDefaultPaymentOffset()
   const customFields = (contactRow?.custom_fields ?? {}) as Record<string, string>
   const tags: string[] = (contactRow?.tags ?? []) as string[]
@@ -180,8 +189,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                     </tr>
                   </thead>
                   <tbody>
-                    {(payments ?? []).length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessun pagamento registrato.</td></tr>}
-                    {(payments ?? []).map((p) => {
+                    {signedPayments.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--ap-text-faint)' }}>Nessun pagamento registrato.</td></tr>}
+                    {signedPayments.map((p) => {
                       const r = p as { id: string; period: string; amount_cents: number; paid_at: string; paid_by: string | null; note: string | null; pod_contact_id: string | null; proof_url: string | null; proof_name: string | null }
                       const podLabel = r.pod_contact_id ? (podLabelMap.get(r.pod_contact_id) ?? null) : null
                       return (
