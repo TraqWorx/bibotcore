@@ -110,6 +110,7 @@ export default function TeamPage() {
   const [memberForm, setMemberForm] = useState({ firstName: '', lastName: '', email: '', phone: '' })
   const [addingMember, setAddingMember] = useState(false)
   const [removingMember, setRemovingMember] = useState<Record<string, boolean>>({})
+  const [canWrite, setCanWrite] = useState(true)
 
   function loadTeam(initial = false) {
     return Promise.all([
@@ -118,6 +119,7 @@ export default function TeamPage() {
     ]).then(([svc, avail]) => {
       const fetchedUsers: GhlUser[] = svc.users ?? []
       const map: Record<string, UserSchedule> = avail.scheduleMap ?? {}
+      setCanWrite(svc.canWrite !== false)
       setUsers(fetchedUsers)
       setScheduleMap(map)
       setEdits(prev => {
@@ -254,10 +256,12 @@ export default function TeamPage() {
           <button className="bs-btn-ghost" onClick={syncRoster} disabled={refreshing} style={{ fontSize: 13 }}>
             {refreshing ? 'Aggiornamento...' : 'Aggiorna'}
           </button>
+          {canWrite && (
           <button className="bs-btn-primary" onClick={() => setShowAddMember(v => !v)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Aggiungi membro
           </button>
+          )}
         </div>
       </div>
 
@@ -319,7 +323,7 @@ export default function TeamPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {savedMsg[u.id] && <span style={{ fontSize: 12.5, color: '#16a34a' }}>{savedMsg[u.id]}</span>}
                     {!hasSched && <span style={{ fontSize: 11.5, color: 'var(--bs-text-faint)', fontStyle: 'italic' }}>nessuno schedule</span>}
-                    {hasSched && (
+                    {canWrite && hasSched && (
                       <button
                         onClick={() => deleteSchedule(u.id)}
                         disabled={saving[u.id]}
@@ -329,6 +333,7 @@ export default function TeamPage() {
                         🗑
                       </button>
                     )}
+                    {canWrite && <>
                     <button
                       className="bs-btn-primary"
                       style={{ fontSize: 13 }}
@@ -345,6 +350,7 @@ export default function TeamPage() {
                     >
                       {removingMember[u.id] ? '...' : 'Rimuovi'}
                     </button>
+                    </>}
                   </div>
                 </div>
                 <UserScheduleEditor

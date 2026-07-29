@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccessFast } from '@/lib/auth/assertLocationAccess'
-import { getConversationMessages, sendMessage } from '@/app/designs/simfonia/conversations/_actions'
+import { getConversationMessages } from '@/app/designs/simfonia/conversations/_actions'
+import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 
 export const dynamic = 'force-dynamic'
+
+const GHL = 'https://services.leadconnectorhq.com'
+
+async function getToken(): Promise<string> {
+  const sb = createAdminClient()
+  const { data: conn } = await sb
+    .from('ghl_connections')
+    .select('access_token, refresh_token, expires_at, company_id')
+    .eq('location_id', BELLESSERE_LOCATION_ID)
+    .single()
+  if (!conn) throw new Error('No GHL connection for Bellessere')
+  return refreshIfNeeded(BELLESSERE_LOCATION_ID, conn)
+}
 
 export async function GET(req: NextRequest) {
   const access = await getLocationAccessFast(req, BELLESSERE_LOCATION_ID)
@@ -22,12 +37,23 @@ export async function POST(req: NextRequest) {
   if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { conversationId, contactId, message, type } = await req.json()
-  if (!conversationId || !contactId || !message?.trim()) {
+  const { contactId, message, type } = await req.json()
+  if (!contactId || !message?.trim()) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
 
-  const result = await sendMessage(BELLESSERE_LOCATION_ID, conversationId, contactId, message, type ?? 'TYPE_PHONE')
-  if (result.error) return NextResponse.json({ error: result.error }, { status: 500 })
+  // Send by contactId — GHL finds or creates the conversation, so this works
+  // even for a client who has never been messaged (e.g. a just-added in-salon
+  // booking). A conversationId is no longer required.
+  const token = await getToken()
+  const res = await fetch(`${GHL}/conversations/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: type === 'SMS' || type === 'Email' || type === 'WhatsApp' ? type : 'SMS', contactId, message: message.trim() }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { message?: string }
+    return NextResponse.json({ error: err.message ?? 'Invio fallito' }, { status: res.status })
+  }
   return NextResponse.json({ ok: true })
 }

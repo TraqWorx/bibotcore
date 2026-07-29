@@ -5,6 +5,7 @@ import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 import { normalizePhone } from '@/lib/bellessere/query'
 import { inviteEntry, reconcileWaitlistBookings } from '@/lib/bellessere/waitlistActions'
+import { assertBellessereWrite } from '@/lib/bellessere/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -128,6 +129,8 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const err = await requireAuth(req)
   if (err) return err
+  const werr = await assertBellessereWrite()
+  if (werr) return werr
 
   const { id, action } = await req.json().catch(() => ({})) as { id?: string; action?: string }
   if (!id) return NextResponse.json({ error: 'id obbligatorio' }, { status: 400 })
@@ -150,6 +153,8 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const err = await requireAuth(req)
   if (err) return err
+  const werr = await assertBellessereWrite()
+  if (werr) return werr
 
   const { id } = await req.json().catch(() => ({})) as { id?: string }
   if (!id) return NextResponse.json({ error: 'id obbligatorio' }, { status: 400 })

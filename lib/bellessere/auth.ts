@@ -8,6 +8,8 @@ import { BELLESSERE_LOCATION_ID } from './constants'
 export interface BellessereSession {
   email: string
   userId: string
+  /** true for super_admin / Bibot admin / location_admin — may edit config. */
+  canWrite: boolean
 }
 
 export const getBellessereSession = cache(async (): Promise<BellessereSession> => {
@@ -25,8 +27,23 @@ export const getBellessereSession = cache(async (): Promise<BellessereSession> =
 
   if (!(await canAccessBibotDesign(user.id, profile, BELLESSERE_LOCATION_ID))) redirect(dest)
 
-  return { email: user.email, userId: user.id }
+  const canWrite = await canWriteBibotDesign(user.id, profile, BELLESSERE_LOCATION_ID)
+  return { email: user.email, userId: user.id, canWrite }
 })
+
+/** Boolean form of the write gate — for GET handlers that expose canWrite to the UI. */
+export async function bellessereCanWrite(): Promise<boolean> {
+  const auth = await createAuthClient()
+  const { data: { user } } = await auth.auth.getUser()
+  if (!user) return false
+  const sb = createAdminClient()
+  const { data: profile } = await sb
+    .from('profiles')
+    .select('role, agency_id, location_id')
+    .eq('id', user.id)
+    .single()
+  return canWriteBibotDesign(user.id, profile, BELLESSERE_LOCATION_ID)
+}
 
 /**
  * Guard for mutating Bellessere API handlers. Returns a 401/403 response when the

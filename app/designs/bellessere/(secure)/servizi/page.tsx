@@ -165,6 +165,7 @@ export default function ServiziPage() {
   const [groups, setGroups] = useState<GhlGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [activeGroup, setActiveGroup] = useState<string>('all')
+  const [canWrite, setCanWrite] = useState(true)
   const [editTarget, setEditTarget] = useState<CalendarService | null | 'new'>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -176,6 +177,7 @@ export default function ServiziPage() {
         const grps: GhlGroup[] = d.groups ?? []
         setGroups(grps)
         setUsers(d.users ?? [])
+        setCanWrite(d.canWrite !== false)
         const grpMap: Record<string, string> = {}
         grps.forEach(g => { grpMap[g.id] = g.name })
         const parsed: ParsedService[] = (d.calendars ?? []).map((svc: CalendarService) => ({
@@ -225,12 +227,14 @@ export default function ServiziPage() {
           <div className="bs-page-subtitle">Catalogo servizi con categorie, durata, prezzo e operatori assegnati.</div>
         </div>
         <div className="bs-page-actions">
+        {canWrite && (
         <button className="bs-btn-primary" onClick={() => setEditTarget('new')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           Aggiungi servizio
         </button>
+        )}
         </div>
       </div>
 
@@ -313,6 +317,7 @@ export default function ServiziPage() {
                     </div>
 
                     {/* Actions */}
+                    {canWrite && (
                     <div className="bs-service-list-actions">
                       <button className="bs-icon-btn" onClick={() => setEditTarget(svc)} title="Modifica">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -329,6 +334,7 @@ export default function ServiziPage() {
                         </svg>
                       </button>
                     </div>
+                    )}
                   </div>
                 )
               })}

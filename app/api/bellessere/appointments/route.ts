@@ -113,11 +113,15 @@ export async function POST(req: NextRequest) {
   if (err) return err
 
   const body = await req.json()
+  // GHL assigns the operator via `assignedUserId`; the booking UI sends `userId`
+  // (which GHL ignores on write), so map it or the appointment lands unassigned
+  // / on GHL's default and never reaches the chosen operator's calendar.
+  const { userId, ...rest } = body
   const token = await getToken()
   const res = await fetch(`${GHL}/calendars/events/appointments`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, Version: V, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...body, locationId: BELLESSERE_LOCATION_ID }),
+    body: JSON.stringify({ ...rest, locationId: BELLESSERE_LOCATION_ID, ...(userId ? { assignedUserId: userId } : {}) }),
   })
   const text = await res.text()
   let data: Record<string, unknown> = {}
@@ -136,7 +140,7 @@ export async function POST(req: NextRequest) {
       location_id: BELLESSERE_LOCATION_ID,
       calendar_id: body.calendarId ?? null,
       contact_ghl_id: body.contactId ?? null,
-      user_id: (data.userId as string | null) ?? body.userId ?? null,
+      user_id: (data.assignedUserId as string | null) ?? (data.userId as string | null) ?? userId ?? null,
       title: body.title ?? null,
       start_time: body.startTime ?? null,
       end_time: body.endTime ?? null,
@@ -154,12 +158,14 @@ export async function PUT(req: NextRequest) {
   if (err) return err
 
   const body = await req.json()
-  const { eventId, ...payload } = body
+  const { eventId, userId, ...payload } = body
   if (!eventId) return NextResponse.json({ error: 'eventId required' }, { status: 400 })
 
   // Reschedule (moving the time) — bypass GHL's slot re-validation, which
   // otherwise 400s with "The slot you have selected is no longer available".
   if (payload.startTime) payload.ignoreDateRange = true
+  // Operator reassignment goes through assignedUserId (see POST).
+  if (userId) payload.assignedUserId = userId
 
   const token = await getToken()
   const res = await fetch(`${GHL}/calendars/events/appointments/${eventId}`, {
@@ -176,13 +182,14 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: res.status })
   }
 
-  // Mirror the change (status and/or new time) to cache immediately
-  if (payload.appointmentStatus || payload.startTime) {
+  // Mirror the change (status, new time, and/or operator) to cache immediately
+  if (payload.appointmentStatus || payload.startTime || userId) {
     const sb = createAdminClient()
     const patch: Record<string, unknown> = { synced_at: new Date().toISOString() }
     if (payload.appointmentStatus) patch.appointment_status = payload.appointmentStatus
     if (payload.startTime) patch.start_time = payload.startTime
     if (payload.endTime) patch.end_time = payload.endTime
+    if (userId) patch.user_id = userId
     await sb.from('cached_calendar_events')
       .update(patch)
       .eq('location_id', BELLESSERE_LOCATION_ID)

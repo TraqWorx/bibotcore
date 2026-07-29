@@ -6,12 +6,10 @@ import { BELLESSERE_BOOKING_LINK } from '@/lib/bellessere/constants'
 const QR_URL = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=10&data=${encodeURIComponent(BELLESSERE_BOOKING_LINK)}`
 
 export default function ImpostazioniPage() {
-  const [reminderTemplate, setReminderTemplate] = useState(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem('bellessere_reminder_template') ?? ''
-    return ''
-  })
+  const [reminderTemplate, setReminderTemplate] = useState('')
   const [reminderSaved, setReminderSaved] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [canWrite, setCanWrite] = useState(true)
 
   function copyLink() {
     navigator.clipboard?.writeText(BELLESSERE_BOOKING_LINK).then(() => {
@@ -41,7 +39,7 @@ export default function ImpostazioniPage() {
 
   useEffect(() => {
     fetch('/api/bellessere/settings').then(r => r.json()).then(d => {
-      setInviteText(d.inviteText ?? ''); setJoinText(d.joinText ?? '')
+      setInviteText(d.inviteText ?? ''); setJoinText(d.joinText ?? ''); setReminderTemplate(d.reminderText ?? ''); setCanWrite(d.canWrite !== false)
     }).catch(() => {})
   }, [])
 
@@ -51,8 +49,8 @@ export default function ImpostazioniPage() {
     setTimeout(() => setJoinSaved(false), 2000)
   }
 
-  function saveReminderTemplate() {
-    localStorage.setItem('bellessere_reminder_template', reminderTemplate)
+  async function saveReminderTemplate() {
+    await fetch('/api/bellessere/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reminderText: reminderTemplate }) }).catch(() => {})
     setReminderSaved(true)
     setTimeout(() => setReminderSaved(false), 2000)
   }
@@ -68,6 +66,12 @@ export default function ImpostazioniPage() {
       <div>
         <h1 className="bs-page-title">Impostazioni</h1>
       </div>
+
+      {!canWrite && (
+        <div className="bs-card" style={{ padding: '12px 18px', fontSize: 13, color: 'var(--bs-text-muted)', background: 'var(--bs-bg)' }}>
+          Solo gli amministratori (utenti admin su GHL) possono modificare le impostazioni. Puoi consultarle in sola lettura.
+        </div>
+      )}
 
       {/* Booking link + QR to print */}
       <div className="bs-card" style={{ padding: '22px 24px', display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -110,16 +114,18 @@ export default function ImpostazioniPage() {
           value={reminderTemplate}
           onChange={e => setReminderTemplate(e.target.value)}
         />
+        {canWrite && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
           <button className="bs-btn-primary" onClick={saveReminderTemplate}>
             {reminderSaved ? 'Salvato ✓' : 'Salva'}
           </button>
           {reminderTemplate && (
-            <button className="bs-btn-ghost" onClick={() => { setReminderTemplate(''); localStorage.removeItem('bellessere_reminder_template') }} style={{ fontSize: 12.5 }}>
+            <button className="bs-btn-ghost" onClick={() => setReminderTemplate('')} style={{ fontSize: 12.5 }}>
               Ripristina default
             </button>
           )}
         </div>
+        )}
       </div>
 
       {/* Waiting-list join confirmation text */}
@@ -136,12 +142,14 @@ export default function ImpostazioniPage() {
           value={joinText}
           onChange={e => setJoinText(e.target.value)}
         />
+        {canWrite && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
           <button className="bs-btn-primary" onClick={saveJoinText}>{joinSaved ? 'Salvato ✓' : 'Salva'}</button>
           {joinText && (
             <button className="bs-btn-ghost" onClick={() => { setJoinText(''); saveJoinText() }} style={{ fontSize: 12.5 }}>Ripristina default</button>
           )}
         </div>
+        )}
       </div>
 
       {/* Waiting-list invite text */}
@@ -158,6 +166,7 @@ export default function ImpostazioniPage() {
           value={inviteText}
           onChange={e => setInviteText(e.target.value)}
         />
+        {canWrite && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
           <button className="bs-btn-primary" onClick={saveInviteText}>
             {inviteSaved ? 'Salvato ✓' : 'Salva'}
@@ -168,6 +177,7 @@ export default function ImpostazioniPage() {
             </button>
           )}
         </div>
+        )}
       </div>
 
       {/* Stripe */}

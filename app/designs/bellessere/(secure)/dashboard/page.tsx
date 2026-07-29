@@ -80,12 +80,25 @@ function toEvent(r: CacheRow) {
 export default async function Dashboard() {
   const sb = createAdminClient()
   const today = new Date()
-  const todayStr = today.toISOString().slice(0, 10)
+  // Day/month windows in Europe/Rome (not server UTC) so today/tomorrow/this-month
+  // counts don't drift by a day around Rome midnight or DST. All bounds are UTC
+  // ISO strings covering the Rome-local day.
+  const romeDate = (d: Date) => new Intl.DateTimeFormat('sv', { timeZone: 'Europe/Rome' }).format(d)
+  const romeOffset = (dateStr: string) =>
+    (new Intl.DateTimeFormat('en', { timeZone: 'Europe/Rome', timeZoneName: 'longOffset' })
+      .formatToParts(new Date(`${dateStr}T12:00:00Z`)).find(p => p.type === 'timeZoneName')?.value ?? 'GMT+02:00').replace('GMT', '')
+  const dayStart = (dateStr: string) => new Date(`${dateStr}T00:00:00${romeOffset(dateStr)}`).toISOString()
+  const dayEnd = (dateStr: string) => new Date(`${dateStr}T23:59:59.999${romeOffset(dateStr)}`).toISOString()
 
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59)
-  const tomorrowStart = new Date(today); tomorrowStart.setDate(today.getDate() + 1); tomorrowStart.setHours(0, 0, 0, 0)
-  const tomorrowEnd = new Date(tomorrowStart); tomorrowEnd.setHours(23, 59, 59, 999)
+  const romeToday = romeDate(today)
+  const romeTomorrow = romeDate(new Date(new Date(`${romeToday}T12:00:00Z`).getTime() + 86400000))
+  const todayStart = dayStart(romeToday)
+  const todayEnd = dayEnd(romeToday)
+  const tomorrowStart = dayStart(romeTomorrow)
+  const tomorrowEnd = dayEnd(romeTomorrow)
+  const lastDayOfMonth = new Date(Number(romeToday.slice(0, 4)), Number(romeToday.slice(5, 7)), 0).getDate()
+  const monthStart = dayStart(`${romeToday.slice(0, 7)}-01`)
+  const monthEnd = dayEnd(`${romeToday.slice(0, 7)}-${String(lastDayOfMonth).padStart(2, '0')}`)
 
   // Fully cache-first (no GHL calls on render → fast). The cache is kept fresh
   // by the appointments sync triggered from the calendar/appointments pages.
@@ -100,20 +113,20 @@ export default async function Dashboard() {
     sb.from('cached_calendar_events')
       .select('ghl_id, title, start_time, end_time, appointment_status, contact_ghl_id, user_id, calendar_id')
       .eq('location_id', BELLESSERE_LOCATION_ID)
-      .gte('start_time', `${todayStr}T00:00:00.000Z`)
-      .lte('start_time', `${todayStr}T23:59:59.999Z`)
+      .gte('start_time', todayStart)
+      .lte('start_time', todayEnd)
       .order('start_time', { ascending: true }),
     sb.from('cached_calendar_events')
       .select('ghl_id, title, start_time, end_time, appointment_status, contact_ghl_id, user_id, calendar_id')
       .eq('location_id', BELLESSERE_LOCATION_ID)
-      .gte('start_time', tomorrowStart.toISOString())
-      .lte('start_time', tomorrowEnd.toISOString())
+      .gte('start_time', tomorrowStart)
+      .lte('start_time', tomorrowEnd)
       .order('start_time', { ascending: true }),
     sb.from('cached_calendar_events')
       .select('ghl_id, title, start_time, end_time, appointment_status, contact_ghl_id, user_id, calendar_id')
       .eq('location_id', BELLESSERE_LOCATION_ID)
-      .gte('start_time', monthStart.toISOString())
-      .lte('start_time', monthEnd.toISOString()),
+      .gte('start_time', monthStart)
+      .lte('start_time', monthEnd),
     sb.from('cached_contacts')
       .select('ghl_id, first_name, last_name, date_added')
       .eq('location_id', BELLESSERE_LOCATION_ID),
@@ -140,7 +153,7 @@ export default async function Dashboard() {
   // Stats
   const todayTotal = tEvents.length
   const todayPending = tEvents.filter(e => !e.appointmentStatus || e.appointmentStatus === 'new' || e.appointmentStatus === 'pending').length
-  const newClientsThisMonth = allContacts.filter(c => c.date_added && c.date_added >= monthStart.toISOString()).length
+  const newClientsThisMonth = allContacts.filter(c => c.date_added && c.date_added >= monthStart).length
   const totalClients = allContacts.length
 
   // Performance (month)

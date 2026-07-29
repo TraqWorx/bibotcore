@@ -4,7 +4,7 @@ import { getLocationAccessFast } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 import { ensureFresh } from '@/lib/bellessere/sync'
-import { assertBellessereWrite } from '@/lib/bellessere/auth'
+import { assertBellessereWrite, bellessereCanWrite } from '@/lib/bellessere/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
       const payload = { calendars: (cals.calendars ?? []).filter((c: Record<string, unknown>) => c.calendarType !== 'personal'), users: usersGhl.users ?? [], groups: groups.groups ?? [] }
       // Populate DB in background for next time
       import('@/lib/bellessere/sync').then(m => m.syncBellessere('all')).catch(() => {})
-      return NextResponse.json(payload, { headers: { 'Cache-Control': 'private, max-age=60' } })
+      return NextResponse.json({ ...payload, canWrite: await bellessereCanWrite() }, { headers: { 'Cache-Control': 'private, max-age=60' } })
     } catch (e) {
       return NextResponse.json({ error: 'Failed to load services', calendars: [], users: [], groups: [] }, { status: 500 })
     }
@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
   const users = (usersRes.data ?? []).map(u => ({ id: u.id, name: u.name, email: u.email }))
   const groups = (groupsRes.data ?? []).map(g => ({ id: g.id, name: g.name }))
 
-  return NextResponse.json({ calendars, users, groups }, {
+  return NextResponse.json({ calendars, users, groups, canWrite: await bellessereCanWrite() }, {
     headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=300' },
   })
 }

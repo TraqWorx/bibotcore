@@ -81,7 +81,7 @@ function RescheduleModal({ appt, calendars, users, onClose, onDone }: {
       const res = await fetch('/api/bellessere/appointments', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId: appt.id, startTime: start.toISOString(), endTime: end.toISOString() }),
+        body: JSON.stringify({ eventId: appt.id, startTime: start.toISOString(), endTime: end.toISOString(), userId: userId || undefined }),
       })
       const data = await res.json().catch(() => ({})) as { error?: string; message?: string }
       if (!res.ok) { setError(data.message ?? data.error ?? 'Errore'); return }
@@ -143,31 +143,40 @@ function RescheduleModal({ appt, calendars, users, onClose, onDone }: {
 // ── Reminder modal ─────────────────────────────────────────────────────────
 function ReminderModal({ appt, onClose }: { appt: Appointment; onClose: () => void }) {
   const dt = appt.startTime ? new Date(appt.startTime) : null
-  const savedTemplate = typeof window !== 'undefined' ? localStorage.getItem('bellessere_reminder_template') : ''
-  const builtMsg = savedTemplate
-    ? savedTemplate
-        .replace('{{nome}}', appt.contactName ?? '')
-        .replace('{{servizio}}', appt.title ?? '')
-        .replace('{{data}}', dt ? dt.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }) : '')
-        .replace('{{ora}}', dt ? dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '')
-    : `Ciao ${appt.contactName ?? ''}, ti ricordiamo il tuo appuntamento${appt.title ? ` per ${appt.title}` : ''}${dt ? ` il ${dt.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} alle ${dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` : ''}.\nPer modifiche contattaci. Bellessere`
+  const defaultMsg = `Ciao ${appt.contactName ?? ''}, ti ricordiamo il tuo appuntamento${appt.title ? ` per ${appt.title}` : ''}${dt ? ` il ${dt.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} alle ${dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` : ''}.\nPer modifiche contattaci. Bellessere`
 
-  const [msg, setMsg] = useState(builtMsg)
+  const [msg, setMsg] = useState(defaultMsg)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
+
+  // Load the shared reminder template (DB-backed, same across staff/devices).
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/bellessere/settings').then(r => r.json()).then(d => {
+      if (cancelled) return
+      const t = (d.reminderText ?? '').trim()
+      if (!t) return
+      setMsg(t
+        .replace('{{nome}}', appt.contactName ?? '')
+        .replace('{{servizio}}', appt.title ?? '')
+        .replace('{{data}}', dt ? dt.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }) : '')
+        .replace('{{ora}}', dt ? dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : ''))
+    }).catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function send(e: React.FormEvent) {
     e.preventDefault()
     if (!appt.contactId) { setError('Nessun contatto associato'); return }
     setSending(true); setError('')
     try {
-      const convRes = await fetch(`/api/bellessere/contact-conversation?contactId=${appt.contactId}`)
-      const convData = await convRes.json().catch(() => ({})) as { conversationId?: string }
+      // GHL finds/creates the conversation from contactId — no lookup needed.
       const res = await fetch('/api/bellessere/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId: convData.conversationId, contactId: appt.contactId, message: msg.trim(), type: 'SMS' }),
+        body: JSON.stringify({ contactId: appt.contactId, message: msg.trim(), type: 'SMS' }),
       })
       if (!res.ok) { setError('Errore invio'); return }
       setSent(true)

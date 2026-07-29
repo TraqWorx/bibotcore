@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccessFast } from '@/lib/auth/assertLocationAccess'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
-import { assertBellessereWrite } from '@/lib/bellessere/auth'
+import { assertBellessereWrite, bellessereCanWrite } from '@/lib/bellessere/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const sb = createAdminClient()
   const [{ data }, { data: settings }] = await Promise.all([
     sb.from('dashboard_configs').select('theme').eq('location_id', BELLESSERE_LOCATION_ID).single(),
-    sb.from('bellessere_settings').select('invite_text, join_text').eq('location_id', BELLESSERE_LOCATION_ID).maybeSingle(),
+    sb.from('bellessere_settings').select('invite_text, join_text, reminder_text').eq('location_id', BELLESSERE_LOCATION_ID).maybeSingle(),
   ])
 
   const theme = (data?.theme as Record<string, unknown>) ?? {}
@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
     teamSchedule: theme.teamSchedule ?? {},
     inviteText: settings?.invite_text ?? '',
     joinText: settings?.join_text ?? '',
+    reminderText: settings?.reminder_text ?? '',
+    canWrite: await bellessereCanWrite(),
   })
 }
 
@@ -34,10 +36,11 @@ export async function PUT(req: NextRequest) {
   const werr = await assertBellessereWrite()
   if (werr) return werr
 
-  const { inviteText, joinText } = await req.json().catch(() => ({})) as { inviteText?: string; joinText?: string }
+  const { inviteText, joinText, reminderText } = await req.json().catch(() => ({})) as { inviteText?: string; joinText?: string; reminderText?: string }
   const patch: Record<string, unknown> = { location_id: BELLESSERE_LOCATION_ID, updated_at: new Date().toISOString() }
   if (inviteText !== undefined) patch.invite_text = (inviteText ?? '').slice(0, 1000)
   if (joinText !== undefined) patch.join_text = (joinText ?? '').slice(0, 1000)
+  if (reminderText !== undefined) patch.reminder_text = (reminderText ?? '').slice(0, 1000)
   const sb = createAdminClient()
   const { error } = await sb.from('bellessere_settings').upsert(patch, { onConflict: 'location_id' })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -5,7 +5,7 @@ import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 import { validateNewUser, buildCreateUserPayload } from '@/lib/bellessere/query'
 import { ghlRoleToLocationRole } from '@/lib/auth/designOwner'
-import { assertBellessereWrite } from '@/lib/bellessere/auth'
+import { assertBellessereWrite, bellessereCanWrite } from '@/lib/bellessere/auth'
 
 /**
  * Provision the Supabase login for ONE new member — lightweight + awaited so they
@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
     id: u.id, name: u.name, email: u.email ?? '', phone: u.phone ?? '',
     scheduleId: schedByUser.get(u.id) ?? null,
   }))
-  return NextResponse.json({ members })
+  return NextResponse.json({ members, canWrite: await bellessereCanWrite() })
 }
 
 // POST — create a GHL user, assign to the location, then re-sync the roster

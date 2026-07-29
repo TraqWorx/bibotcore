@@ -179,7 +179,7 @@ function RescheduleModal({ event, calendars, users, onClose, onDone }: {
       const res = await fetch('/api/bellessere/appointments', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId: event.id, startTime: start.toISOString(), endTime: end.toISOString() }),
+        body: JSON.stringify({ eventId: event.id, startTime: start.toISOString(), endTime: end.toISOString(), userId: userId || undefined }),
       })
       const data = await res.json().catch(() => ({})) as { error?: string; message?: string }
       if (!res.ok) { setError(data.message ?? data.error ?? 'Errore'); return }
