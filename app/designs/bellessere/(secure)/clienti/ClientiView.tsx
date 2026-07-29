@@ -593,7 +593,7 @@ export default function ClientiView({ initial }: { initial?: InitialClienti }) {
     const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) })
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (offset === 0) params.set('stats', '1')
-    const ct = await fetch(`/api/bellessere/contacts?${params}`).then(r => r.json()).catch(() => ({ contacts: [] }))
+    const ct = await fetch(`/api/bellessere/contacts?${params}`, { cache: 'no-store' }).then(r => r.json()).catch(() => ({ contacts: [] }))
     const page: Contact[] = ct.contacts ?? []
     setContacts(prev => append ? [...prev, ...page] : page)
     setHasMore(Boolean(ct.hasMore))

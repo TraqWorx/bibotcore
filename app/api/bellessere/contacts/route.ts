@@ -4,6 +4,7 @@ import { getLocationAccessFast } from '@/lib/auth/assertLocationAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import { BELLESSERE_LOCATION_ID } from '@/lib/bellessere/constants'
 import { parsePageParams, sanitizeSearch, contactSearchOr } from '@/lib/bellessere/query'
+import { writeThroughContact } from '@/lib/sync/writeThrough'
 
 export const dynamic = 'force-dynamic'
 
@@ -108,6 +109,10 @@ export async function PUT(req: NextRequest) {
     body: JSON.stringify(fields),
   })
   const data = await res.json()
+  // Keep the cache (what the Clienti list reads) in step with GHL immediately.
+  if (res.ok) {
+    await writeThroughContact(BELLESSERE_LOCATION_ID, (data.contact ?? { id: contactId, ...fields }) as Record<string, unknown>)
+  }
   return NextResponse.json(data, { status: res.status })
 }
 
@@ -137,5 +142,10 @@ export async function POST(req: NextRequest) {
     }),
   })
   const data = await res.json()
+  // Write the new contact straight into cached_contacts so the Clienti list
+  // (which reads only the cache) shows it immediately — no waiting for a sync.
+  if (res.ok) {
+    await writeThroughContact(BELLESSERE_LOCATION_ID, (data.contact ?? data) as Record<string, unknown>)
+  }
   return NextResponse.json(data, { status: res.status })
 }
