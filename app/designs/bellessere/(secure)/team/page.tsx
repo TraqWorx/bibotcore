@@ -23,41 +23,55 @@ const DAY_LABELS_IT: Record<string, string> = {
   wednesday: 'Mer', thursday: 'Gio', friday: 'Ven', saturday: 'Sab',
 }
 
-type EditDay = { open: boolean; start: string; end: string }
+type Interval = { start: string; end: string }
+type EditDay = { open: boolean; intervals: Interval[] }
 type EditSchedule = Record<string, EditDay>
 
 function rulesToEdit(rules: ScheduleRule[]): EditSchedule {
   const edit: EditSchedule = {}
-  for (const k of DAY_KEYS) edit[k] = { open: false, start: '09:00', end: '18:00' }
+  for (const k of DAY_KEYS) edit[k] = { open: false, intervals: [{ start: '09:00', end: '18:00' }] }
   for (const rule of rules) {
-    if (rule.type !== 'wday' || !rule.day || !rule.intervals?.[0]) continue
-    edit[rule.day] = { open: true, start: rule.intervals[0].from, end: rule.intervals[0].to }
+    if (rule.type !== 'wday' || !rule.day || !rule.intervals?.length) continue
+    edit[rule.day] = { open: true, intervals: rule.intervals.map(i => ({ start: i.from, end: i.to })) }
   }
   return edit
 }
 
 function editToRules(edit: EditSchedule): ScheduleRule[] {
   return DAY_KEYS
-    .filter(k => edit[k]?.open)
-    .map(k => ({ type: 'wday' as const, day: k, intervals: [{ from: edit[k].start, to: edit[k].end }] }))
+    .filter(k => edit[k]?.open && edit[k].intervals.length > 0)
+    .map(k => ({ type: 'wday' as const, day: k, intervals: edit[k].intervals.map(i => ({ from: i.start, to: i.end })) }))
 }
 
-function UserScheduleEditor({ schedule, onChange }: { schedule: EditSchedule; onChange: (s: EditSchedule) => void }) {
+function UserScheduleEditor({ schedule, onChange, canWrite }: { schedule: EditSchedule; onChange: (s: EditSchedule) => void; canWrite: boolean }) {
   function toggle(key: string) {
     onChange({ ...schedule, [key]: { ...schedule[key], open: !schedule[key]?.open } })
   }
-  function setTime(key: string, field: 'start' | 'end', val: string) {
-    onChange({ ...schedule, [key]: { ...schedule[key], [field]: val } })
+  function setTime(key: string, idx: number, field: 'start' | 'end', val: string) {
+    const day = schedule[key]
+    const intervals = day.intervals.map((iv, i) => i === idx ? { ...iv, [field]: val } : iv)
+    onChange({ ...schedule, [key]: { ...day, intervals } })
   }
+  function addInterval(key: string) {
+    const day = schedule[key]
+    // Sensible split default: afternoon shift after the morning one.
+    onChange({ ...schedule, [key]: { ...day, intervals: [...day.intervals, { start: '15:00', end: '19:00' }] } })
+  }
+  function removeInterval(key: string, idx: number) {
+    const day = schedule[key]
+    onChange({ ...schedule, [key]: { ...day, intervals: day.intervals.filter((_, i) => i !== idx) } })
+  }
+
+  const timeStyle = { border: '1.5px solid var(--bs-line)', borderRadius: 8, padding: '4px 8px', fontSize: 13, fontFamily: 'inherit', color: 'var(--bs-text)' } as const
 
   return (
     <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
       {DAY_KEYS.map(key => {
-        const day = schedule[key] ?? { open: false, start: '09:00', end: '18:00' }
+        const day = schedule[key] ?? { open: false, intervals: [{ start: '09:00', end: '18:00' }] }
         return (
-          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button onClick={() => toggle(key)} style={{
-              width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', flexShrink: 0,
+          <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <button onClick={() => canWrite && toggle(key)} disabled={!canWrite} style={{
+              width: 36, height: 20, borderRadius: 10, border: 'none', cursor: canWrite ? 'pointer' : 'default', flexShrink: 0, marginTop: 4,
               background: day.open ? 'var(--bs-black)' : 'var(--bs-line)', position: 'relative', transition: 'background 0.2s',
             }}>
               <span style={{
@@ -65,19 +79,31 @@ function UserScheduleEditor({ schedule, onChange }: { schedule: EditSchedule; on
                 transition: 'left 0.2s', left: day.open ? 18 : 2,
               }} />
             </button>
-            <span style={{ width: 34, fontSize: 13, fontWeight: 700, color: day.open ? 'var(--bs-text)' : 'var(--bs-text-faint)' }}>
+            <span style={{ width: 34, fontSize: 13, fontWeight: 700, marginTop: 6, color: day.open ? 'var(--bs-text)' : 'var(--bs-text-faint)' }}>
               {DAY_LABELS_IT[key]}
             </span>
             {day.open ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="time" value={day.start} onChange={e => setTime(key, 'start', e.target.value)}
-                  style={{ border: '1.5px solid var(--bs-line)', borderRadius: 8, padding: '4px 8px', fontSize: 13, fontFamily: 'inherit', color: 'var(--bs-text)' }} />
-                <span style={{ color: 'var(--bs-text-faint)', fontSize: 12 }}>→</span>
-                <input type="time" value={day.end} onChange={e => setTime(key, 'end', e.target.value)}
-                  style={{ border: '1.5px solid var(--bs-line)', borderRadius: 8, padding: '4px 8px', fontSize: 13, fontFamily: 'inherit', color: 'var(--bs-text)' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {day.intervals.map((iv, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="time" value={iv.start} disabled={!canWrite} onChange={e => setTime(key, idx, 'start', e.target.value)} style={timeStyle} />
+                    <span style={{ color: 'var(--bs-text-faint)', fontSize: 12 }}>→</span>
+                    <input type="time" value={iv.end} disabled={!canWrite} onChange={e => setTime(key, idx, 'end', e.target.value)} style={timeStyle} />
+                    {canWrite && idx > 0 && (
+                      <button onClick={() => removeInterval(key, idx)} title="Rimuovi fascia"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--bs-text-faint)', fontSize: 15, padding: '0 4px' }}>×</button>
+                    )}
+                    {canWrite && idx === day.intervals.length - 1 && day.intervals.length < 3 && (
+                      <button onClick={() => addInterval(key)}
+                        style={{ background: 'none', border: '1px dashed var(--bs-line)', borderRadius: 7, cursor: 'pointer', color: 'var(--bs-text-muted)', fontSize: 11.5, padding: '3px 8px', whiteSpace: 'nowrap' }}>
+                        + Pausa
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             ) : (
-              <span style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Chiuso</span>
+              <span style={{ fontSize: 12.5, color: 'var(--bs-text-faint)', marginTop: 6 }}>Chiuso</span>
             )}
           </div>
         )
@@ -86,14 +112,87 @@ function UserScheduleEditor({ schedule, onChange }: { schedule: EditSchedule; on
   )
 }
 
-const DEFAULT_EDIT: EditSchedule = {
-  sunday:    { open: false, start: '09:00', end: '18:00' },
-  monday:    { open: false, start: '09:00', end: '18:00' },
-  tuesday:   { open: false, start: '09:00', end: '18:00' },
-  wednesday: { open: false, start: '09:00', end: '18:00' },
-  thursday:  { open: false, start: '09:00', end: '18:00' },
-  friday:    { open: false, start: '09:00', end: '18:00' },
-  saturday:  { open: false, start: '09:00', end: '18:00' },
+function defaultEdit(): EditSchedule {
+  const e: EditSchedule = {}
+  for (const k of DAY_KEYS) e[k] = { open: false, intervals: [{ start: '09:00', end: '18:00' }] }
+  return e
+}
+const DEFAULT_EDIT: EditSchedule = defaultEdit()
+
+interface Absence { id: string; userId: string | null; title: string | null; startTime: string; endTime: string }
+
+function fmtAbsence(a: Absence): string {
+  const s = new Date(a.startTime); const e = new Date(a.endTime)
+  const day = s.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Rome' })
+  const sh = s.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' })
+  const eh = e.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' })
+  const wholeDay = sh === '00:00' && (eh === '23:59' || eh === '00:00')
+  return wholeDay ? `${day} — giornata intera` : `${day} · ${sh}–${eh}`
+}
+
+function AbsenceSection({ userId, canWrite, absences, onAdd, onDelete }: {
+  userId: string
+  canWrite: boolean
+  absences: Absence[]
+  onAdd: (date: string, from?: string, to?: string) => Promise<boolean>
+  onDelete: (eventId: string) => void
+}) {
+  const [date, setDate] = useState('')
+  const [partial, setPartial] = useState(false)
+  const [from, setFrom] = useState('09:00')
+  const [to, setTo] = useState('13:00')
+  const [saving, setSaving] = useState(false)
+
+  const upcoming = absences.filter(a => new Date(a.endTime).getTime() > Date.now())
+    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+
+  if (!canWrite && upcoming.length === 0) return null
+
+  async function submit() {
+    if (!date) return
+    setSaving(true)
+    const ok = await onAdd(date, partial ? from : undefined, partial ? to : undefined)
+    setSaving(false)
+    if (ok) { setDate(''); setPartial(false) }
+  }
+
+  const timeStyle = { border: '1.5px solid var(--bs-line)', borderRadius: 8, padding: '4px 8px', fontSize: 12.5, fontFamily: 'inherit', color: 'var(--bs-text)' } as const
+
+  return (
+    <div style={{ padding: '12px 20px', borderTop: '1px solid var(--bs-line)' }}>
+      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--bs-text-muted)', marginBottom: 8 }}>Assenze</div>
+      {upcoming.length === 0 && <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)', marginBottom: canWrite ? 10 : 0 }}>Nessuna assenza programmata</div>}
+      {upcoming.map(a => (
+        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, padding: '3px 0' }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--bs-gold)', flexShrink: 0 }} />
+          <span>{fmtAbsence(a)}</span>
+          {canWrite && (
+            <button onClick={() => onDelete(a.id)} title="Annulla assenza"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--bs-text-faint)', fontSize: 14, padding: '0 4px' }}>×</button>
+          )}
+        </div>
+      ))}
+      {canWrite && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <input type="date" value={date} min={new Date().toISOString().slice(0, 10)} onChange={e => setDate(e.target.value)} style={timeStyle} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: 'var(--bs-text-muted)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={partial} onChange={e => setPartial(e.target.checked)} />
+            Solo una fascia
+          </label>
+          {partial && (
+            <>
+              <input type="time" value={from} onChange={e => setFrom(e.target.value)} style={timeStyle} />
+              <span style={{ color: 'var(--bs-text-faint)', fontSize: 12 }}>→</span>
+              <input type="time" value={to} onChange={e => setTo(e.target.value)} style={timeStyle} />
+            </>
+          )}
+          <button className="bs-btn-ghost" onClick={submit} disabled={!date || saving} style={{ fontSize: 12.5 }}>
+            {saving ? 'Salvataggio…' : 'Aggiungi assenza'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function TeamPage() {
@@ -111,6 +210,7 @@ export default function TeamPage() {
   const [addingMember, setAddingMember] = useState(false)
   const [removingMember, setRemovingMember] = useState<Record<string, boolean>>({})
   const [canWrite, setCanWrite] = useState(true)
+  const [absences, setAbsences] = useState<Record<string, Absence[]>>({})
 
   function loadTeam(initial = false) {
     return Promise.all([
@@ -141,11 +241,50 @@ export default function TeamPage() {
     }).then(() => loadTeam()).catch(() => {}).finally(() => setRefreshing(false))
   }
 
+  function loadAbsences() {
+    return fetch('/api/bellessere/absences').then(r => r.json()).then(d => {
+      const byUser: Record<string, Absence[]> = {}
+      for (const a of (d.absences ?? []) as Absence[]) {
+        if (!a.userId) continue
+        ;(byUser[a.userId] ??= []).push(a)
+      }
+      setAbsences(byUser)
+    }).catch(() => {})
+  }
+
+  async function addAbsence(userId: string, date: string, from?: string, to?: string) {
+    const res = await fetch('/api/bellessere/absences', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, date, from, to }),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      setError(d.error ?? 'Errore durante il salvataggio dell\'assenza')
+      return false
+    }
+    await loadAbsences()
+    return true
+  }
+
+  async function deleteAbsence(userId: string, eventId: string) {
+    const res = await fetch('/api/bellessere/absences', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId }),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      setError(d.error ?? 'Errore durante l\'eliminazione dell\'assenza')
+      return
+    }
+    setAbsences(p => ({ ...p, [userId]: (p[userId] ?? []).filter(a => a.id !== eventId) }))
+  }
+
   useEffect(() => {
     loadTeam(true)
       .then(() => syncRoster()) // catch members added directly in GHL
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
+    loadAbsences()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -189,7 +328,10 @@ export default function TeamPage() {
     setError('')
 
     const sched = scheduleMap[u.id]
-    const rules = editToRules(edit)
+    // Preserve any non-weekday rules (e.g. date-specific overrides set in GHL)
+    // instead of erasing them on every save.
+    const extraRules = (sched?.rules ?? []).filter(r => r.type !== 'wday')
+    const rules = [...editToRules(edit), ...extraRules]
     let res: Response
 
     if (sched) {
@@ -356,6 +498,14 @@ export default function TeamPage() {
                 <UserScheduleEditor
                   schedule={edit ?? DEFAULT_EDIT}
                   onChange={s => setEdits(p => ({ ...p, [u.id]: s }))}
+                  canWrite={canWrite}
+                />
+                <AbsenceSection
+                  userId={u.id}
+                  canWrite={canWrite}
+                  absences={absences[u.id] ?? []}
+                  onAdd={(date, from, to) => addAbsence(u.id, date, from, to)}
+                  onDelete={id => deleteAbsence(u.id, id)}
                 />
               </div>
             )
