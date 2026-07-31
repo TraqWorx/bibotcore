@@ -123,6 +123,7 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [msgText, setMsgText] = useState('')
+  const [sendError, setSendError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
 
   useEffect(() => {
@@ -144,18 +145,23 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault()
     if (!msgText.trim()) return
-    setSending(true)
+    setSending(true); setSendError(null)
     try {
+      // GHL finds/creates the conversation from contactId — works even for a
+      // client who's never been messaged, so no conversationId is needed.
       const res = await fetch('/api/bellessere/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId, contactId: contact.id, message: msgText.trim(), type: 'SMS' }),
+        body: JSON.stringify({ contactId: contact.id, message: msgText.trim(), type: 'SMS' }),
       })
       if (res.ok) {
         setMessages(prev => [...prev, { id: Date.now().toString(), body: msgText.trim(), direction: 'outbound', dateAdded: new Date().toISOString() }])
         setMsgText('')
+      } else {
+        const d = await res.json().catch(() => ({})) as { error?: string }
+        setSendError(d.error ?? 'Invio non riuscito')
       }
-    } catch { /* ignore */ } finally { setSending(false) }
+    } catch { setSendError('Errore di rete') } finally { setSending(false) }
   }
 
   const memberSince = contact.dateAdded
@@ -314,15 +320,11 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
 
           {tab === 'messaggi' && (
             <>
-              {!conversationId && !loading ? (
-                <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)', textAlign: 'center', padding: '20px 0' }}>
-                  Nessuna conversazione con questo cliente.
-                </div>
-              ) : loading ? (
+              {loading ? (
                 <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)' }}>Caricamento...</div>
               ) : messages.length === 0 ? (
                 <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)', textAlign: 'center', padding: '20px 0' }}>
-                  Nessun messaggio con questo cliente.
+                  Nessun messaggio ancora. Scrivi qui sotto per iniziare.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -341,17 +343,20 @@ function CustomerPanel({ contact, onClose, onBookAppointment }: {
                   ))}
                 </div>
               )}
-              {conversationId && (
+              {sendError && (
+                <div style={{ fontSize: 12, color: '#DC2626', textAlign: 'center', padding: '6px 0' }}>{sendError}</div>
+              )}
+              {!loading && (
                 <form onSubmit={sendMessage} style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 8 }}>
                   <input
                     className="bs-input"
                     style={{ flex: 1, fontSize: 13 }}
-                    placeholder="Scrivi un messaggio..."
+                    placeholder={contact.phone ? 'Scrivi un messaggio...' : 'Aggiungi un telefono per inviare SMS'}
                     value={msgText}
                     onChange={e => setMsgText(e.target.value)}
-                    disabled={sending}
+                    disabled={sending || !contact.phone}
                   />
-                  <button type="submit" className="bs-btn-primary" style={{ padding: '0 14px', flexShrink: 0 }} disabled={sending || !msgText.trim()}>
+                  <button type="submit" className="bs-btn-primary" style={{ padding: '0 14px', flexShrink: 0 }} disabled={sending || !msgText.trim() || !contact.phone}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
                     </svg>
