@@ -1,0 +1,228 @@
+/* =======================================================
+   BELLESSERE — booking widget theme (matches dashboard)
+   Palette: gold #D2AB4B · ink #0B0907 · cream #F6F8FB
+   Loaded by the GHL widget custom code via <link>.
+======================================================= */
+
+.cal_servicemenu_widgets-xl {
+    background:
+        radial-gradient(circle at 18% 0%, rgba(210,171,75,0.10), transparent 34%),
+        linear-gradient(135deg, #F9FAFC 0%, #F3F5F8 60%, #E9EDF3 100%) !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif !important;
+    color: #121417 !important;
+    -webkit-font-smoothing: antialiased !important;
+    padding: 22px 18px 40px !important;
+}
+.cal_servicemenu_widgets-xl,
+.cal_servicemenu_widgets--services,
+.cal_servicemenu_widgets--service-event--card {
+    height: auto !important;
+    overflow: visible !important;
+}
+
+.cal_servicemenu_widgets-xl::before {
+    content: '' !important;
+    display: block !important;
+    width: 180px !important;
+    height: 180px !important;
+    flex: none !important;
+    align-self: center !important;
+    margin: 4px auto 20px !important;
+    background: url('https://ghlcustomdash.com/bellessere-logo.png') center / contain no-repeat !important;
+}
+
+.cal_servicemenu_widgets-xl input[placeholder="Cerca"] {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 8px 4px !important;
+    font-size: 14px !important;
+    color: #121417 !important;
+}
+.cal_servicemenu_widgets-xl input[placeholder="Cerca"]:focus {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.calendars-service-menu-tab {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: #5F6876 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1.5px !important;
+    background: transparent !important;
+    border: none !important;
+    opacity: 1 !important;
+    cursor: pointer !important;
+    padding: 8px 2px !important;
+    margin-right: 26px !important;
+    position: relative !important;
+    transition: color 0.18s ease !important;
+}
+.calendars-service-menu-tab:hover { color: #0B0907 !important; }
+.calendars-selected-service-menu-tab { color: #0B0907 !important; }
+.calendars-selected-service-menu-tab::after {
+    content: '' !important;
+    position: absolute !important;
+    left: 0; right: 0; bottom: -2px !important;
+    height: 3px !important;
+    border-radius: 3px !important;
+    background: linear-gradient(90deg, #D2AB4B, #B88D2F) !important;
+}
+
+.calendars-service-menu-group-name {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    color: #B88D2F !important;
+    margin: 30px 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+.calendars-service-menu-group-name::after {
+    content: '' !important;
+    flex: 1 !important;
+    height: 1px !important;
+    background: linear-gradient(90deg, rgba(210,171,75,0.55), rgba(221,227,236,0)) !important;
+}
+
+.cal_servicemenu_widgets--services { display: block !important; }
+.cal_servicemenu_widgets--services > div { flex: none !important; width: 100% !important; }
+
+.appointment_widgets--revamp--service-event--card {
+    width: 100% !important;
+    max-width: 100% !important;
+    background: linear-gradient(180deg, #FFFFFF, #FBFCFE) !important;
+    border: 1px solid #DDE3EC !important;
+    border-radius: 14px !important;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.06), 0 8px 22px rgba(15,23,42,0.06) !important;
+    padding: 16px 18px !important;
+    margin: 0 0 12px 0 !important;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease !important;
+}
+.appointment_widgets--revamp--service-event--card:hover {
+    transform: translateY(-2px) !important;
+    border-color: #D2AB4B !important;
+    box-shadow: 0 10px 30px rgba(15,23,42,0.10), 0 2px 6px rgba(15,23,42,0.06) !important;
+}
+.card-inner-container {
+    border-bottom: none !important;
+    padding: 0 !important;
+    position: relative !important;
+}
+
+.name {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.3px !important;
+    text-transform: uppercase !important;
+    color: #121417 !important;
+    margin-bottom: 4px !important;
+}
+.service-description {
+    font-size: 12.5px !important;
+    line-height: 1.5 !important;
+    color: #5F6876 !important;
+    margin-bottom: 12px !important;
+}
+
+.price-duration-container {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    gap: 12px !important;
+}
+.duration {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    color: #5F6876 !important;
+}
+.duration::before {
+    content: '' !important;
+    width: 6px !important; height: 6px !important;
+    border-radius: 50% !important;
+    background: #D2AB4B !important;
+}
+.price {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    color: #0B0907 !important;
+}
+
+.calendars-service-action-container {
+    background: linear-gradient(180deg, #1A1713, #0B0907) !important;
+    color: #fff !important;
+    font-size: 12.5px !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1.2px !important;
+    padding: 11px 20px !important;
+    border-radius: 10px !important;
+    border: 1px solid #0B0907 !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: auto !important;
+    min-height: unset !important;
+    box-shadow: 0 6px 16px rgba(11,9,7,0.18) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease !important;
+}
+.calendars-service-action-container *,
+.calendars-service-action-container span { color: #fff !important; }
+.calendars-service-action-container:hover {
+    background: linear-gradient(180deg, #241F19, #16110C) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 10px 24px rgba(11,9,7,0.26) !important;
+}
+
+.service-menu-widget-action-container .continue-button-container,
+.service-menu-widget-action-container .continue-button-container-disabled {
+    background: linear-gradient(180deg, #1A1713, #0B0907) !important;
+    border: 1px solid #0B0907 !important;
+    color: #fff !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1.2px !important;
+    border-radius: 10px !important;
+    box-shadow: 0 6px 16px rgba(11,9,7,0.18) !important;
+}
+.service-menu-widget-action-container .continue-button-container *,
+.service-menu-widget-action-container .continue-button-container-disabled * { color: #fff !important; }
+.service-menu-widget-action-container .continue-button-container:hover {
+    background: linear-gradient(180deg, #241F19, #16110C) !important;
+    border-color: #16110C !important;
+}
+.service-menu-widget-action-container .continue-button-container-disabled {
+    opacity: 0.45 !important;
+    box-shadow: none !important;
+    cursor: not-allowed !important;
+}
+
+input[type="text"]:not([placeholder="Cerca"]), input[type="email"],
+input[type="tel"], input[type="number"], textarea, select {
+    border: 1px solid #C4CCD8 !important;
+    border-radius: 10px !important;
+    padding: 11px 13px !important;
+    font-size: 14px !important;
+    color: #121417 !important;
+    background: #fff !important;
+    box-shadow: inset 0 1px 2px rgba(15,23,42,0.04) !important;
+}
+input[type="text"]:not([placeholder="Cerca"]):focus, input[type="email"]:focus,
+input[type="tel"]:focus, textarea:focus, select:focus {
+    outline: none !important;
+    border-color: #D2AB4B !important;
+    box-shadow: 0 0 0 4px rgba(210,171,75,0.16) !important;
+}
+label { font-size: 12.5px !important; font-weight: 700 !important; color: #5F6876 !important; }
+
+/* Phone: leave room for the country flag (intl-tel-input) */
+.iti { width: 100% !important; }
+input[type="tel"] { padding-left: 64px !important; }
