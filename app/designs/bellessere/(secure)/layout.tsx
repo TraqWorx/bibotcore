@@ -3,7 +3,12 @@ import Sidebar from './_components/Sidebar'
 import './shell.css'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Bellessere' }
+export const metadata = {
+  title: 'Bellessere',
+  manifest: '/bellessere-manifest.json',
+  appleWebApp: { capable: true, title: 'Bellessere', statusBarStyle: 'black-translucent' as const },
+  icons: { apple: '/bellessere-icon-180.png' },
+}
 
 export default async function BellessereLayout({ children }: { children: React.ReactNode }) {
   const session = await getBellessereSession()
