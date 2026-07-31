@@ -84,15 +84,24 @@ export async function POST(req: NextRequest) {
   const werr = await assertBellessereWrite()
   if (werr) return werr
 
-  const { userId, date, from, to, title } = await req.json().catch(() => ({})) as {
-    userId?: string; date?: string; from?: string; to?: string; title?: string
+  const { userId, date, endDate, from, to, title } = await req.json().catch(() => ({})) as {
+    userId?: string; date?: string; endDate?: string; from?: string; to?: string; title?: string
   }
   if (!userId || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ error: 'userId e data (YYYY-MM-DD) obbligatori' }, { status: 400 })
   }
-  const offset = romeOffset(date)
-  const startTime = new Date(`${date}T${from ?? '00:00'}:00${offset}`).toISOString()
-  const endTime = new Date(`${date}T${to ?? '23:59'}:59${offset}`).toISOString()
+  // Multi-day range: one block spanning from `date` 00:00 to `endDate` 23:59
+  // (whole days only — time ranges apply to single-day absences).
+  const lastDay = endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate) && endDate !== date ? endDate : null
+  if (lastDay && lastDay < date) {
+    return NextResponse.json({ error: 'La data finale precede quella iniziale' }, { status: 400 })
+  }
+  if (lastDay && (new Date(lastDay).getTime() - new Date(date).getTime()) > 60 * 24 * 3600_000) {
+    return NextResponse.json({ error: 'Intervallo troppo lungo (max 60 giorni)' }, { status: 400 })
+  }
+  const startTime = new Date(`${date}T${lastDay ? '00:00' : (from ?? '00:00')}:00${romeOffset(date)}`).toISOString()
+  const endDay = lastDay ?? date
+  const endTime = new Date(`${endDay}T${lastDay ? '23:59' : (to ?? '23:59')}:59${romeOffset(endDay)}`).toISOString()
   if (new Date(startTime) >= new Date(endTime)) {
     return NextResponse.json({ error: 'Orario non valido' }, { status: 400 })
   }

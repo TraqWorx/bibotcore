@@ -123,25 +123,33 @@ interface Absence { id: string; userId: string | null; title: string | null; sta
 
 function fmtAbsence(a: Absence): string {
   const s = new Date(a.startTime); const e = new Date(a.endTime)
-  const day = s.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Rome' })
+  const fmtDay = (d: Date) => d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Rome' })
+  const isoDay = (d: Date) => new Intl.DateTimeFormat('sv', { timeZone: 'Europe/Rome' }).format(d)
+  if (isoDay(s) !== isoDay(e)) {
+    return `${fmtDay(s)} → ${fmtDay(e)} — giornata intera`
+  }
   const sh = s.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' })
   const eh = e.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' })
   const wholeDay = sh === '00:00' && (eh === '23:59' || eh === '00:00')
-  return wholeDay ? `${day} — giornata intera` : `${day} · ${sh}–${eh}`
+  return wholeDay ? `${fmtDay(s)} — giornata intera` : `${fmtDay(s)} · ${sh}–${eh}`
 }
 
 function AbsenceSection({ userId, canWrite, absences, onAdd, onDelete }: {
   userId: string
   canWrite: boolean
   absences: Absence[]
-  onAdd: (date: string, from?: string, to?: string) => Promise<boolean>
+  onAdd: (date: string, endDate?: string, from?: string, to?: string) => Promise<boolean>
   onDelete: (eventId: string) => void
 }) {
   const [date, setDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [partial, setPartial] = useState(false)
   const [from, setFrom] = useState('09:00')
   const [to, setTo] = useState('13:00')
   const [saving, setSaving] = useState(false)
+
+  // Time ranges only make sense for a single day.
+  const multiDay = !!endDate && endDate !== date
 
   const upcoming = absences.filter(a => new Date(a.endTime).getTime() > Date.now())
     .sort((a, b) => a.startTime.localeCompare(b.startTime))
@@ -151,9 +159,14 @@ function AbsenceSection({ userId, canWrite, absences, onAdd, onDelete }: {
   async function submit() {
     if (!date) return
     setSaving(true)
-    const ok = await onAdd(date, partial ? from : undefined, partial ? to : undefined)
+    const ok = await onAdd(
+      date,
+      multiDay ? endDate : undefined,
+      partial && !multiDay ? from : undefined,
+      partial && !multiDay ? to : undefined,
+    )
     setSaving(false)
-    if (ok) { setDate(''); setPartial(false) }
+    if (ok) { setDate(''); setEndDate(''); setPartial(false) }
   }
 
   const timeStyle = { border: '1.5px solid var(--bs-line)', borderRadius: 8, padding: '4px 8px', fontSize: 12.5, fontFamily: 'inherit', color: 'var(--bs-text)' } as const
@@ -174,12 +187,17 @@ function AbsenceSection({ userId, canWrite, absences, onAdd, onDelete }: {
       ))}
       {canWrite && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12.5, color: 'var(--bs-text-muted)' }}>Dal</span>
           <input type="date" value={date} min={new Date().toISOString().slice(0, 10)} onChange={e => setDate(e.target.value)} style={timeStyle} />
-          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: 'var(--bs-text-muted)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={partial} onChange={e => setPartial(e.target.checked)} />
-            Solo una fascia
-          </label>
-          {partial && (
+          <span style={{ fontSize: 12.5, color: 'var(--bs-text-muted)' }}>al</span>
+          <input type="date" value={endDate} min={date || new Date().toISOString().slice(0, 10)} onChange={e => setEndDate(e.target.value)} style={timeStyle} />
+          {!multiDay && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: 'var(--bs-text-muted)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={partial} onChange={e => setPartial(e.target.checked)} />
+              Solo una fascia
+            </label>
+          )}
+          {partial && !multiDay && (
             <>
               <input type="time" value={from} onChange={e => setFrom(e.target.value)} style={timeStyle} />
               <span style={{ color: 'var(--bs-text-faint)', fontSize: 12 }}>→</span>
@@ -252,10 +270,10 @@ export default function TeamPage() {
     }).catch(() => {})
   }
 
-  async function addAbsence(userId: string, date: string, from?: string, to?: string) {
+  async function addAbsence(userId: string, date: string, endDate?: string, from?: string, to?: string) {
     const res = await fetch('/api/bellessere/absences', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, date, from, to }),
+      body: JSON.stringify({ userId, date, endDate, from, to }),
     })
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
@@ -504,7 +522,7 @@ export default function TeamPage() {
                   userId={u.id}
                   canWrite={canWrite}
                   absences={absences[u.id] ?? []}
-                  onAdd={(date, from, to) => addAbsence(u.id, date, from, to)}
+                  onAdd={(date, endDate, from, to) => addAbsence(u.id, date, endDate, from, to)}
                   onDelete={id => deleteAbsence(u.id, id)}
                 />
               </div>
