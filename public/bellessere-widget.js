@@ -55,9 +55,26 @@
     }
     if (typing) { a.style.display = "none"; return; }
     a.style.display = "inline-flex";
-    // Mobile: centered. Desktop: bottom-left, where the summary column leaves
-    // whitespace — centered it covers the timezone/slot controls.
-    if (window.innerWidth <= 640) {
+
+    var small = window.innerWidth <= 640;
+    var bar = document.querySelector(".service-menu-widget-action-container");
+    var r = bar ? bar.getBoundingClientRect() : null;
+    var barVisible = r && r.height > 0 && r.top > 0 && r.top < window.innerHeight;
+
+    if (!small && barVisible) {
+      // Desktop with the action bar on screen: sit INSIDE the bar, centered in
+      // the empty space between Indietro (left) and Continua (right).
+      a.style.left = Math.round(r.left + r.width / 2) + "px";
+      a.style.transform = "translateX(-50%)";
+      var pillH = a.offsetHeight || 41;
+      var inBar = Math.round((window.innerHeight - r.bottom) + (r.height - pillH) / 2);
+      a.style.bottom = Math.max(0, inBar) + "px";
+      return;
+    }
+
+    // Mobile: centered pill floating above the bar. Desktop without a bar
+    // (service list screen): bottom-left, out of the content's way.
+    if (small) {
       a.style.left = "50%";
       a.style.transform = "translateX(-50%)";
     } else {
@@ -65,13 +82,7 @@
       a.style.transform = "none";
     }
     var lift = 16;
-    var bar = document.querySelector(".service-menu-widget-action-container");
-    if (bar) {
-      var r = bar.getBoundingClientRect();
-      if (r.height > 0 && r.top > 0 && r.top < window.innerHeight) {
-        lift = Math.max(16, Math.round(window.innerHeight - r.top + 12));
-      }
-    }
+    if (barVisible) lift = Math.max(16, Math.round(window.innerHeight - r.top + 12));
     a.style.bottom = "calc(" + lift + "px + env(safe-area-inset-bottom))";
   }
 
