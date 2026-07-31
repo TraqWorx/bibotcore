@@ -7,8 +7,6 @@
   function styleCta(a) {
     var s = a.style;
     s.position = "fixed";
-    s.left = "50%";
-    s.transform = "translateX(-50%)";
     s.zIndex = "99999";
     s.display = "inline-flex";
     s.alignItems = "center";
@@ -57,6 +55,15 @@
     }
     if (typing) { a.style.display = "none"; return; }
     a.style.display = "inline-flex";
+    // Mobile: centered. Desktop: bottom-left, where the summary column leaves
+    // whitespace — centered it covers the timezone/slot controls.
+    if (window.innerWidth <= 640) {
+      a.style.left = "50%";
+      a.style.transform = "translateX(-50%)";
+    } else {
+      a.style.left = "24px";
+      a.style.transform = "none";
+    }
     var lift = 16;
     var bar = document.querySelector(".service-menu-widget-action-container");
     if (bar) {
