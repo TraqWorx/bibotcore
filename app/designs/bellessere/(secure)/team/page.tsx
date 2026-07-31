@@ -120,6 +120,71 @@ function defaultEdit(): EditSchedule {
 const DEFAULT_EDIT: EditSchedule = defaultEdit()
 
 interface Absence { id: string; userId: string | null; title: string | null; startTime: string; endTime: string }
+interface Closure { startTime: string; endTime: string; ids: string[] }
+
+function fmtClosure(c: Closure): string {
+  const s = new Date(c.startTime); const e = new Date(c.endTime)
+  const fmt = (d: Date) => d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' })
+  const isoDay = (d: Date) => new Intl.DateTimeFormat('sv', { timeZone: 'Europe/Rome' }).format(d)
+  return isoDay(s) === isoDay(e) ? fmt(s) : `${fmt(s)} → ${fmt(e)}`
+}
+
+function ClosureSection({ canWrite, closures, onAdd, onDelete }: {
+  canWrite: boolean
+  closures: Closure[]
+  onAdd: (date: string, endDate?: string) => Promise<boolean>
+  onDelete: (ids: string[]) => void
+}) {
+  const [date, setDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const upcoming = closures.filter(c => new Date(c.endTime).getTime() > Date.now())
+    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+  if (!canWrite && upcoming.length === 0) return null
+
+  async function submit() {
+    if (!date) return
+    if (!confirm('Chiudere il salone in queste date? Nessun cliente potrà prenotare alcun servizio nel periodo.')) return
+    setSaving(true)
+    const ok = await onAdd(date, endDate && endDate !== date ? endDate : undefined)
+    setSaving(false)
+    if (ok) { setDate(''); setEndDate('') }
+  }
+
+  const inputStyle = { border: '1.5px solid var(--bs-line)', borderRadius: 8, padding: '5px 9px', fontSize: 12.5, fontFamily: 'inherit', color: 'var(--bs-text)' } as const
+
+  return (
+    <div className="bs-card" style={{ padding: '16px 20px' }}>
+      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>Chiusure salone</div>
+      <div style={{ fontSize: 12.5, color: 'var(--bs-text-muted)', marginBottom: 12 }}>
+        Chiudi tutto il salone per festività o giorni speciali — blocca le prenotazioni per tutti gli operatori in una volta.
+      </div>
+      {upcoming.length === 0 && <div style={{ fontSize: 12.5, color: 'var(--bs-text-faint)', marginBottom: canWrite ? 12 : 0 }}>Nessuna chiusura programmata</div>}
+      {upcoming.map(c => (
+        <div key={c.ids[0]} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, padding: '4px 0' }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--bs-black)', flexShrink: 0 }} />
+          <span style={{ fontWeight: 600 }}>{fmtClosure(c)}</span>
+          {canWrite && (
+            <button onClick={() => { if (confirm('Riaprire il salone in queste date?')) onDelete(c.ids) }} title="Annulla chiusura"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--bs-text-faint)', fontSize: 15, padding: '0 4px' }}>×</button>
+          )}
+        </div>
+      ))}
+      {canWrite && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12.5, color: 'var(--bs-text-muted)' }}>Dal</span>
+          <input type="date" value={date} min={new Date().toISOString().slice(0, 10)} onChange={e => setDate(e.target.value)} style={inputStyle} />
+          <span style={{ fontSize: 12.5, color: 'var(--bs-text-muted)' }}>al</span>
+          <input type="date" value={endDate} min={date || new Date().toISOString().slice(0, 10)} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
+          <button className="bs-btn-primary" onClick={submit} disabled={!date || saving} style={{ fontSize: 12.5 }}>
+            {saving ? 'Chiusura…' : 'Chiudi salone'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function fmtAbsence(a: Absence): string {
   const s = new Date(a.startTime); const e = new Date(a.endTime)
@@ -229,6 +294,7 @@ export default function TeamPage() {
   const [removingMember, setRemovingMember] = useState<Record<string, boolean>>({})
   const [canWrite, setCanWrite] = useState(true)
   const [absences, setAbsences] = useState<Record<string, Absence[]>>({})
+  const [closures, setClosures] = useState<Closure[]>([])
 
   function loadTeam(initial = false) {
     return Promise.all([
@@ -267,7 +333,35 @@ export default function TeamPage() {
         ;(byUser[a.userId] ??= []).push(a)
       }
       setAbsences(byUser)
+      setClosures((d.closures ?? []) as Closure[])
     }).catch(() => {})
+  }
+
+  async function addClosure(date: string, endDate?: string) {
+    const res = await fetch('/api/bellessere/absences', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope: 'closure', date, endDate }),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      setError(d.error ?? 'Errore durante la chiusura')
+      return false
+    }
+    await loadAbsences()
+    return true
+  }
+
+  async function deleteClosure(ids: string[]) {
+    const res = await fetch('/api/bellessere/absences', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventIds: ids }),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      setError(d.error ?? 'Errore durante la rimozione della chiusura')
+      return
+    }
+    setClosures(prev => prev.filter(c => c.ids[0] !== ids[0]))
   }
 
   async function addAbsence(userId: string, date: string, endDate?: string, from?: string, to?: string) {
@@ -430,6 +524,8 @@ export default function TeamPage() {
           {error}
         </div>
       )}
+
+      {!loading && <ClosureSection canWrite={canWrite} closures={closures} onAdd={addClosure} onDelete={deleteClosure} />}
 
       {showAddMember && (
         <form onSubmit={addMember} className="bs-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
