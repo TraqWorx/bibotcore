@@ -13,7 +13,7 @@ vi.mock('@/lib/supabase-server', () => ({
 // Chainable query builder whose terminal awaited value is `result`.
 function query(result: unknown) {
   const builder: Record<string, unknown> = {}
-  for (const method of ['select', 'eq', 'not', 'limit']) {
+  for (const method of ['select', 'eq', 'not', 'limit', 'ilike', 'maybeSingle']) {
     builder[method] = () => builder
   }
   // Awaiting the builder resolves to the result (Supabase builders are thenable).
@@ -73,12 +73,25 @@ describe('checkLoginAllowed', () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === 'profiles') return query({ data: [] })
       if (table === 'ghl_connections') return query({ data: [] })
+      if (table === 'apulia_contacts') return query({ data: [] })
       throw new Error(`unexpected table ${table}`)
     })
 
     const { checkLoginAllowed } = await import('@/app/login/_actions')
     const res = await checkLoginAllowed('stranger@nowhere.com')
     expect(res).toEqual({ error: expect.stringContaining('invite-only') })
+  })
+
+  it('allows an Apulia amministratore, who is a GHL contact and not a GHL user', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'profiles') return query({ data: [] })
+      if (table === 'ghl_connections') return query({ data: [] })
+      if (table === 'apulia_contacts') return query({ data: [{ id: 'c1' }] })
+      throw new Error(`unexpected table ${table}`)
+    })
+
+    const { checkLoginAllowed } = await import('@/app/login/_actions')
+    expect(await checkLoginAllowed('adele.manfredi1965@gmail.com')).toEqual({ allowed: true })
   })
 
   it('requires an email', async () => {

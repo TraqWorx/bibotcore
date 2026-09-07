@@ -50,6 +50,19 @@ export default async function RedirectPage() {
     redirect('/agency')
   }
 
+  // Apulia amministratori are GHL contacts, so they never get a profile row.
+  // Without this they fall through to the invite-only wall below and can never
+  // reach the design that exists specifically for them.
+  if (user.email) {
+    const { data: ammin } = await supabase
+      .from('apulia_contacts')
+      .select('id')
+      .eq('is_amministratore', true)
+      .ilike('email', user.email.toLowerCase())
+      .limit(1)
+    if (ammin?.[0]) redirect('/designs/apulia-power')
+  }
+
   // No profile under this auth id, but a profile already exists for this email
   // (id drifted from the auth user). This is a real account, not an uninvited
   // one — never show the invite-only wall or auto-provision a second agency.

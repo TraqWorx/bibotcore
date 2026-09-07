@@ -43,3 +43,4 @@ supabase/.temp/
 
 # local data dumps (customer PII)
 /backups/
+.env*.local

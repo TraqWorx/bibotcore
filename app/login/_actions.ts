@@ -87,6 +87,17 @@ export async function checkLoginAllowed(email: string): Promise<LoginCheck> {
     } catch { continue }
   }
 
+  // Step 3: Apulia amministratori are GHL *contacts*, not GHL users, so neither
+  // users/search above can ever match them. They have a real scoped view in the
+  // design (getApuliaSession → role 'amministratore'), so let them request a code.
+  const { data: ammin } = await supabaseAdmin
+    .from('apulia_contacts')
+    .select('id')
+    .eq('is_amministratore', true)
+    .ilike('email', emailLower)
+    .limit(1)
+  if (ammin?.[0]) return { allowed: true }
+
   // Invite-only: unknown emails cannot self-register. Existing admins/agency
   // members (matched above) pass; new agencies are onboarded via an invite.
   return { error: 'No account found for this email. GHL Custom Dash is invite-only — contact us to get set up.' }
