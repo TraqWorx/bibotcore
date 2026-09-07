@@ -35,6 +35,15 @@ export default async function RedirectPage() {
       if (slugs.length === 1) redirect(`/designs/${designSlugToFolder(slugs[0] as string)}`)
     }
 
+    // Portal contacts are rejected by the agency layout, which used to bounce
+    // them back here — an infinite /redirect ↔ /agency loop.
+    if (profile.role === 'user') {
+      if (locIds.length > 0) redirect(`/portal/${locIds[0]}`)
+      redirect('/login?message=' + encodeURIComponent(
+        'Your account is not linked to a location yet. Please contact your administrator.'
+      ))
+    }
+
     redirect('/agency')
   }
 

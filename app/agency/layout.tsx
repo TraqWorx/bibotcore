@@ -14,7 +14,13 @@ export default async function AgencyLayout({ children }: { children: React.React
   // Portal contacts (role 'user') must not — send them to their portal.
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
-  if (!['agency', 'admin', 'super_admin'].includes(profile?.role ?? '')) redirect('/redirect')
+  // Never bounce to /redirect — /redirect routes non-agency roles back here,
+  // which loops until the browser gives up with ERR_TOO_MANY_REDIRECTS.
+  if (!['agency', 'admin', 'super_admin'].includes(profile?.role ?? '')) {
+    redirect('/login?message=' + encodeURIComponent(
+      'This account does not have access to the agency view.'
+    ))
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f5f8]">
