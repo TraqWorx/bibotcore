@@ -35,18 +35,6 @@ export default async function RedirectPage() {
       if (slugs.length === 1) redirect(`/designs/${designSlugToFolder(slugs[0] as string)}`)
     }
 
-    // Portal contacts are rejected by the agency layout, which used to bounce
-    // them back here — an infinite /redirect ↔ /agency loop. 'client' is a
-    // legacy value for the same thing; it matches no guard in the app, so
-    // without this it falls through to /agency and dead-ends.
-    if (profile.role === 'user' || profile.role === 'client') {
-      const portalLoc = profile.location_id ?? locIds[0]
-      if (portalLoc) redirect(`/portal/${portalLoc}`)
-      redirect('/login?message=' + encodeURIComponent(
-        'Your account is not linked to a location yet. Please contact your administrator.'
-      ))
-    }
-
     redirect('/agency')
   }
 

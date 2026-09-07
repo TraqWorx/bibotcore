@@ -30,11 +30,18 @@
 - **CRM data is ALWAYS from GHL API — never stored in Supabase** (except cached sync tables)
 - **Server actions return `{ error: string } | undefined`** — never throw (Next.js client components can't catch thrown server action errors)
 - **Bibot agency bypasses all paywalls** — use `isBibotAgency()` before any paywall check
-- **Role hierarchy**: `super_admin` > `admin` > `agency` > `user`
+- **Role hierarchy**: `super_admin` > `admin` > `agency` — those three, nothing else
+  (enforced by a CHECK constraint, migration 137)
   - `super_admin`: platform owner (info@lumaxdigital.co.uk) → `/platform`
   - `admin`: agency owner who buys subscription → `/admin`
   - `agency`: GHL team member assigned to locations → `/agency`
-  - `user`: portal contact → `/portal`
+- **What an agency member may DO comes from GHL, not from `profiles.role`.** GHL's
+  per-user admin/user setting maps to `profile_locations.role` via `ghlRoleToLocationRole()`:
+  `location_admin` = view + edit, `team_member` = view only. Enforce with
+  `canWriteBibotDesign()`. Never add a platform role to express per-location rights.
+- **Portal contacts have no profile role at all** — `/portal` keys off `portal_users` +
+  `cached_contacts`. Apulia amministratori likewise resolve from `apulia_contacts` by email
+  (`getApuliaSession`), not from `profiles`.
 - **Single plan**: £120/mo per location (GBP). No Basic/Pro split.
 - **Two Stripe accounts**:
   - SaaS Stripe (`STRIPE_SECRET_KEY`) — handles £120/mo dashboard subscriptions
@@ -43,7 +50,7 @@
 - **OAuth URL**: Use v1 (`/oauth/chooselocation`) — v2 shows "Update" prompt for existing installs. New scopes (affiliate, etc.) are granted via `version_id`, not URL scope param.
 - **Anti-patterns to avoid**:
   - Don't use `owner_user_id` lookups — use `profile.role === 'admin'` instead
-  - Don't insert `role: 'client'` — use `'agency'` for GHL users, `'user'` for contacts
+  - Don't invent platform roles — `profiles.role` is only super_admin/admin/agency; contacts get no role
   - Don't query all data without agency scope — always filter by `agency_id`
   - Don't initialize Anthropic/Stripe SDKs at module level — use lazy init
   - GHL API: `/opportunities/search` uses `location_id` (snake_case), NOT `locationId`
@@ -110,7 +117,7 @@
 
 ## Key Tables
 
-- `profiles` — user profiles with role (super_admin, admin, agency, user) and agency_id
+- `profiles` — user profiles with role (super_admin, admin, agency) and agency_id
 - `agencies` — agency accounts with billing fields, custom_templates, Stripe customer ID
 - `locations` — GHL locations with agency_id, plan, dates
 - `ghl_connections` — OAuth tokens per location (access_token, refresh_token, company_id)
