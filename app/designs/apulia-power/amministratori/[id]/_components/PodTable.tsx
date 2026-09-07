@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { setPodOverride, markPodsPaid, unmarkPodPaid } from '../_actions'
+import { setPodOverride, markPodsPaid, unmarkPodPaid, setPodsPaidDate } from '../_actions'
 import { setSwitchOutDate } from '../../../condomini/[id]/_actions'
 
 interface PodRow {
@@ -37,6 +37,13 @@ function fmtDate(iso?: string): string {
   return new Date(iso).toLocaleDateString('it-IT')
 }
 
+/** Local calendar day as YYYY-MM-DD — toISOString() would shift it in Rome. */
+function todayInput(): string {
+  const d = new Date()
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
 export default function PodTable({ pods, defaultAmount, adminContactId, payable = true }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [pending, startTransition] = useTransition()
@@ -44,6 +51,7 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
   const [addedFrom, setAddedFrom] = useState('')
   const [addedTo, setAddedTo] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'due' | 'paid'>('all')
+  const [payDate, setPayDate] = useState(todayInput())
 
   const visiblePods = useMemo(() => {
     // Active tab filters on "added" (cached_at); switch-out tab on the real
@@ -64,7 +72,14 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
 
   const dueRows = useMemo(() => visiblePods.filter((p) => p.paymentStatus === 'due'), [visiblePods])
   const selectedRows = useMemo(() => pods.filter((p) => selected.has(p.contactId)), [pods, selected])
-  const selectedTotal = selectedRows.reduce((s, r) => s + r.amount, 0)
+  // Paying applies to the unpaid rows in the selection; re-dating applies to
+  // the already-paid ones. A selection can hold both.
+  const selectedDue = useMemo(() => selectedRows.filter((p) => p.paymentStatus === 'due'), [selectedRows])
+  const selectedPaid = useMemo(
+    () => selectedRows.filter((p) => p.paymentStatus === 'paid' && (p.paidCount ?? 0) > 0),
+    [selectedRows],
+  )
+  const selectedTotal = selectedDue.reduce((s, r) => s + r.amount, 0)
   const allDueSelected = dueRows.length > 0 && dueRows.every((r) => selected.has(r.contactId))
 
   function toggle(id: string) {
@@ -80,12 +95,24 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
   function clearSel() { setSelected(new Set()) }
 
   function payNow() {
-    if (selectedRows.length === 0) return
-    if (!confirm(`Confermi il pagamento di ${selectedRows.length} POD per ${fmtEur(selectedTotal)}?`)) return
+    if (selectedDue.length === 0) return
+    if (!confirm(`Confermi il pagamento di ${selectedDue.length} POD per ${fmtEur(selectedTotal)} con data ${fmtDate(payDate)}?`)) return
     startTransition(async () => {
-      const r = await markPodsPaid(adminContactId, selectedRows.map((p) => p.contactId))
+      const r = await markPodsPaid(adminContactId, selectedDue.map((p) => p.contactId), undefined, undefined, payDate)
       if (r?.error) setFlash(`Errore: ${r.error}`)
       else setFlash(`Pagati ${r?.paid ?? 0} POD per ${fmtEur(selectedTotal)}.`)
+      setSelected(new Set())
+      setTimeout(() => setFlash(null), 4000)
+    })
+  }
+
+  function applyPaidDate() {
+    if (selectedPaid.length === 0) return
+    if (!confirm(`Impostare "Pagato il" = ${fmtDate(payDate)} su ${selectedPaid.length} POD già pagati?`)) return
+    startTransition(async () => {
+      const r = await setPodsPaidDate(adminContactId, selectedPaid.map((p) => p.contactId), payDate)
+      if (r.error) setFlash(`Errore: ${r.error}`)
+      else setFlash(`Aggiornata la data di ${r.updated} pagamenti.`)
       setSelected(new Set())
       setTimeout(() => setFlash(null), 4000)
     })
@@ -147,11 +174,36 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
       {payable && selected.size > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--ap-line)', flexWrap: 'wrap', background: 'color-mix(in srgb, var(--ap-blue-soft) 50%, white)' }}>
           <span style={{ fontWeight: 700, fontSize: 13 }}>
-            {selected.size} selezionati · {fmtEur(selectedTotal)}
+            {selected.size} selezionati
+            {selectedDue.length > 0 && <> · {fmtEur(selectedTotal)} da pagare</>}
+            {selectedPaid.length > 0 && <> · {selectedPaid.length} già pagati</>}
           </span>
-          <button className="ap-btn ap-btn-primary" onClick={payNow} disabled={pending}>
-            {pending ? 'Pago…' : `💸 Paga ${fmtEur(selectedTotal)}`}
-          </button>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ap-text-muted)' }}>
+            Pagato il
+            <input
+              type="date"
+              value={payDate}
+              onChange={(e) => setPayDate(e.target.value)}
+              disabled={pending}
+              className="ap-input"
+              style={{ height: 30, width: 150, fontSize: 12 }}
+            />
+          </label>
+          {selectedDue.length > 0 && (
+            <button className="ap-btn ap-btn-primary" onClick={payNow} disabled={pending || !payDate}>
+              {pending ? 'Pago…' : `💸 Paga ${fmtEur(selectedTotal)}`}
+            </button>
+          )}
+          {selectedPaid.length > 0 && (
+            <button
+              className="ap-btn ap-btn-ghost"
+              onClick={applyPaidDate}
+              disabled={pending || !payDate}
+              title="Aggiorna la data dell'ultimo pagamento dei POD selezionati"
+            >
+              {pending ? 'Aggiorno…' : `📅 Aggiorna data (${selectedPaid.length})`}
+            </button>
+          )}
           <button className="ap-btn ap-btn-ghost" onClick={clearSel} disabled={pending}>Annulla selezione</button>
           {flash && (
             <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: flash.startsWith('Errore') ? 'var(--ap-danger)' : 'var(--ap-success)' }}>
@@ -251,6 +303,8 @@ function Row({
   const effective = override === '' ? defaultAmount : (Number(override.replace(',', '.')) || defaultAmount)
   const isDue = pod.paymentStatus === 'due'
   const isPaid = pod.paymentStatus === 'paid'
+  // "Programmato" rows read as paid but have no payment row to re-date.
+  const hasPayment = isPaid && (pod.paidCount ?? 0) > 0
   const rowBg = payable && isSelected ? 'color-mix(in srgb, var(--ap-blue-soft) 30%, transparent)' : undefined
 
   return (
@@ -261,8 +315,8 @@ function Row({
             type="checkbox"
             checked={isSelected}
             onChange={onToggle}
-            disabled={!isDue}
-            title={isDue ? 'Seleziona per il pagamento' : 'Già pagato — non selezionabile'}
+            disabled={!isDue && !hasPayment}
+            title={isDue ? 'Seleziona per il pagamento' : hasPayment ? 'Seleziona per modificare la data di pagamento' : 'Nessun pagamento registrato'}
             aria-label={`Seleziona ${pod.pod}`}
           />
         </td>

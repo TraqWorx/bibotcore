@@ -98,6 +98,21 @@ export async function setPodOverride(podContactId: string, amount: number, admin
 }
 
 /**
+ * Turn a YYYY-MM-DD from the date picker into a timestamp. Noon UTC, so the
+ * stored day still reads as the chosen day in Europe/Rome.
+ *
+ * paid_at is a record of when money moved — the 6-month cycle is anchored to
+ * the POD's first_payment_at/cached_at, so editing this never shifts a due date.
+ */
+function resolvePaidAt(paidAt?: string): string | { error: string } {
+  if (!paidAt) return new Date().toISOString()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paidAt)) return { error: 'Data non valida' }
+  const d = new Date(`${paidAt}T12:00:00.000Z`)
+  if (Number.isNaN(d.getTime())) return { error: 'Data non valida' }
+  return d.toISOString()
+}
+
+/**
  * Mark a set of PODs as paid in one go. Each POD gets its own row in
  * apulia_payments (pod_contact_id NOT NULL) and starts a fresh 6-month
  * cycle anchored to paid_at. Amount per POD = override > 0 ? override
@@ -111,9 +126,12 @@ export async function markPodsPaid(
   podContactIds: string[],
   customAmounts?: Record<string, number>,
   note?: string,
+  paidAt?: string,
 ): Promise<{ paid: number; error?: string } | undefined> {
   const guard = await ensureOwner()
   if ('error' in guard) return { paid: 0, error: guard.error }
+  const paidAtIso = resolvePaidAt(paidAt)
+  if (typeof paidAtIso !== 'string') return { paid: 0, error: paidAtIso.error }
   // Dedup the POD list so the same POD can't be paid twice in one submission.
   podContactIds = [...new Set(podContactIds)]
   if (podContactIds.length === 0) return { paid: 0 }
@@ -148,17 +166,21 @@ export async function markPodsPaid(
   // client retry): skip any POD this admin already paid in the last 15s. A
   // deliberate re-pay later is unaffected. Prevents duplicate payment rows and
   // double-advancing the 6-month cycle.
+  // Guards on created_at, not paid_at: a backdated payment would otherwise
+  // fall outside the window and slip past the check.
   const sinceIso = new Date(Date.now() - 15_000).toISOString()
   const { data: recent } = await sb
     .from('apulia_payments')
     .select('pod_contact_id')
     .eq('contact_id', adminContactId)
-    .gte('paid_at', sinceIso)
+    .gte('created_at', sinceIso)
     .in('pod_contact_id', podContactIds)
   const recentlyPaid = new Set((recent ?? []).map((r) => r.pod_contact_id))
   const toPay = podContactIds.filter((id) => !recentlyPaid.has(id))
   if (toPay.length === 0) return { paid: 0 }
 
+  // period must stay unique even when several payments share a backdated
+  // paid_at, so it keys off the real clock.
   const nowIso = new Date().toISOString()
   const rows = toPay.map((podId) => {
     const pod = podMap.get(podId)
@@ -169,7 +191,7 @@ export async function markPodsPaid(
       pod_contact_id: podId,
       period: `pod-${podId}-${nowIso}`,
       amount_cents: cents,
-      paid_at: nowIso,
+      paid_at: paidAtIso,
       paid_by: guard.email,
       note: note ?? null,
     }
@@ -183,6 +205,51 @@ export async function markPodsPaid(
   revalidatePath('/designs/apulia-power/pagamenti')
   revalidatePath('/designs/apulia-power/dashboard')
   return { paid: rows.length }
+}
+
+/**
+ * Bulk-edit the "Pagato il" date of already-paid PODs. Only each POD's most
+ * recent payment moves — older ones are history and stay put.
+ */
+export async function setPodsPaidDate(
+  adminContactId: string,
+  podContactIds: string[],
+  paidAt: string,
+): Promise<{ updated: number; error?: string }> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return { updated: 0, error: guard.error }
+  const paidAtIso = resolvePaidAt(paidAt)
+  if (typeof paidAtIso !== 'string') return { updated: 0, error: paidAtIso.error }
+
+  const ids = [...new Set(podContactIds)]
+  if (ids.length === 0) return { updated: 0 }
+
+  const sb = createAdminClient()
+  const { data: rows, error: readErr } = await sb
+    .from('apulia_payments')
+    .select('id, pod_contact_id, paid_at')
+    .eq('contact_id', adminContactId)
+    .in('pod_contact_id', ids)
+    .order('paid_at', { ascending: false })
+  if (readErr) return { updated: 0, error: readErr.message }
+
+  const latestPerPod = new Map<string, string>()
+  for (const r of rows ?? []) {
+    if (r.pod_contact_id && !latestPerPod.has(r.pod_contact_id)) latestPerPod.set(r.pod_contact_id, r.id)
+  }
+  if (latestPerPod.size === 0) return { updated: 0, error: 'Nessun pagamento da aggiornare per i POD selezionati' }
+
+  const { error } = await sb
+    .from('apulia_payments')
+    .update({ paid_at: paidAtIso })
+    .in('id', [...latestPerPod.values()])
+  if (error) return { updated: 0, error: error.message }
+
+  revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
+  revalidatePath('/designs/apulia-power/amministratori')
+  revalidatePath('/designs/apulia-power/pagamenti')
+  revalidatePath('/designs/apulia-power/dashboard')
+  return { updated: latestPerPod.size }
 }
 
 /**
