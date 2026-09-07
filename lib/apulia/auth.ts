@@ -74,38 +74,26 @@ export const getApuliaSession = cache(async (): Promise<ApuliaSession> => {
     return { email: user.email, userId: user.id, role: 'owner' }
   }
 
-  // Amministratore: search Apulia contacts where email matches.
-  const { data: conn } = await sb.from('ghl_connections').select('access_token').eq('location_id', APULIA_LOCATION_ID).single()
-  if (!conn) {
+  // Amministratore: resolved from apulia_contacts, which is the source of truth
+  // for this design. The GHL 'amministratore' tag is NOT reliable — most admin
+  // records carry the flag in the DB but no tag in GHL, and gating on the tag
+  // locked the majority of them out.
+  const { data: ammin } = await sb
+    .from('apulia_contacts')
+    .select('id, codice_amministratore')
+    .eq('is_amministratore', true)
+    .ilike('email', user.email)
+    .limit(1)
+  const contact = ammin?.[0]
+  if (!contact) {
     redirect('/login?error=not_authorized&email=' + encodeURIComponent(user.email))
   }
 
-  const r = await fetch('https://services.leadconnectorhq.com/contacts/search', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${conn.access_token}`, Version: '2021-07-28', 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      locationId: APULIA_LOCATION_ID,
-      filters: [{ field: 'email', operator: 'eq', value: user.email }],
-      pageLimit: 1,
-    }),
-    cache: 'no-store',
-  })
-  let contact: { id: string; tags?: string[]; customFields?: { id: string; value?: string }[] } | undefined
-  if (r.ok) {
-    const j = (await r.json()) as { contacts?: typeof contact[] }
-    contact = j.contacts?.[0]
-  }
-  const isAmministratore = contact?.tags?.includes('amministratore')
-  if (!isAmministratore) {
-    redirect('/login?error=not_authorized&email=' + encodeURIComponent(user.email))
-  }
-
-  const codice = contact?.customFields?.find((f) => f.id === '3VwwjdaKH8oQgUO1Vwih')?.value
   return {
     email: user.email,
     userId: user.id,
     role: 'amministratore',
-    codiceAmministratore: codice ? String(codice) : undefined,
-    contactId: contact?.id,
+    codiceAmministratore: contact.codice_amministratore ? String(contact.codice_amministratore) : undefined,
+    contactId: contact.id,
   }
 })
