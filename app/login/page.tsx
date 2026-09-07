@@ -28,6 +28,7 @@ export default function LoginPage() {
   const [urlError, setUrlError] = useState<string | null>(() => getInitialUrlError())
   const [next, setNext] = useState('/redirect')
   const emailRef = useRef<HTMLInputElement>(null)
+  const verifying = useRef(false)
 
   const [supabase] = useState(() =>
     createBrowserClient(
@@ -95,21 +96,32 @@ export default function LoginPage() {
 
   // Step 2 — verify the 6-digit code (works on any device; scanners can't consume it)
   const verifyCode = async () => {
+    // A second click while the first is still in flight would re-send a token
+    // the first click already consumed, showing "invalid code" to someone who
+    // is in fact being signed in. The ref guards re-entry within the same tick,
+    // which `loading` state cannot.
+    if (verifying.current) return
     const c = code.replace(/\D/g, '')
     if (c.length < 6) {
       setIsError(true)
       setMessage('Enter the code from the email')
       return
     }
+    verifying.current = true
     setLoading(true)
     setMessage('')
     const { error } = await supabase.auth.verifyOtp({ email, token: c, type: 'email' })
-    setLoading(false)
     if (error) {
+      verifying.current = false
+      setLoading(false)
       setIsError(true)
       setMessage('Invalid or expired code. Use the latest email, or resend below.')
       return
     }
+    // Stay in the loading state: the redirect below can take a couple of seconds,
+    // and re-enabling the button here is what invited the double click.
+    setIsError(false)
+    setMessage('Signed in — taking you to your dashboard…')
     window.location.href = next
   }
 
