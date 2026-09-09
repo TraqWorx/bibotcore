@@ -253,6 +253,29 @@ export async function setPodsPaidDate(
 }
 
 /**
+ * Correct the recorded amount of a payment already in the ledger. Editing the
+ * POD's Override only changes what FUTURE payments cost, so this is the only
+ * way to fix a payment entered at the wrong figure.
+ */
+export async function updatePaymentAmount(
+  paymentId: string,
+  amountCents: number,
+  adminContactId: string,
+): Promise<{ error: string } | undefined> {
+  const guard = await ensureOwner()
+  if ('error' in guard) return guard
+  if (!Number.isInteger(amountCents) || amountCents < 0) return { error: 'Importo non valido' }
+
+  const sb = createAdminClient()
+  const { error } = await sb.from('apulia_payments').update({ amount_cents: amountCents }).eq('id', paymentId)
+  if (error) return { error: error.message }
+
+  revalidatePath(`/designs/apulia-power/amministratori/${adminContactId}`)
+  revalidatePath('/designs/apulia-power/pagamenti')
+  revalidatePath('/designs/apulia-power/dashboard')
+}
+
+/**
  * Update a payment's `note` inline. Stamps note_edited_at so the UI
  * can show "modificata il …". Trims and treats empty as NULL.
  */

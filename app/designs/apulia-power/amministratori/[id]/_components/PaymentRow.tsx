@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { updatePaymentNote, attachPaymentProof, removePaymentProof } from '../_actions'
+import { updatePaymentNote, attachPaymentProof, removePaymentProof, updatePaymentAmount } from '../_actions'
 
 export interface PaymentRowData {
   id: string
@@ -13,10 +13,6 @@ export interface PaymentRowData {
   pod_contact_id: string | null
   proof_url: string | null
   proof_name: string | null
-}
-
-function fmtEur(n: number): string {
-  return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -39,6 +35,8 @@ export default function PaymentRow({
 }) {
   const [note, setNote] = useState(payment.note ?? '')
   const [editing, setEditing] = useState(false)
+  const [amount, setAmount] = useState(String(payment.amount_cents / 100).replace('.', ','))
+  const [amountSaved, setAmountSaved] = useState(false)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
@@ -55,6 +53,27 @@ export default function PaymentRow({
         setEditing(false)
         setFlash('Nota salvata')
         setTimeout(() => setFlash(null), 1500)
+        router.refresh()
+      }
+    })
+  }
+
+  function saveAmount() {
+    const num = Number(amount.replace(',', '.'))
+    if (!Number.isFinite(num) || num < 0) {
+      setError('Importo non valido')
+      setAmount(String(payment.amount_cents / 100).replace('.', ','))
+      return
+    }
+    const cents = Math.round(num * 100)
+    if (cents === payment.amount_cents) return
+    setError(null)
+    startTransition(async () => {
+      const r = await updatePaymentAmount(payment.id, cents, adminContactId)
+      if (r?.error) setError(r.error)
+      else {
+        setAmountSaved(true)
+        setTimeout(() => setAmountSaved(false), 1200)
         router.refresh()
       }
     })
@@ -102,8 +121,20 @@ export default function PaymentRow({
       <td style={{ fontFamily: payment.pod_contact_id ? 'monospace' : undefined, fontSize: 12 }}>
         {podLabel ?? <span style={{ color: 'var(--ap-text-muted)', fontStyle: 'italic' }}>tutto l&apos;amministratore</span>}
       </td>
-      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
-        {fmtEur(payment.amount_cents / 100)}
+      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, whiteSpace: 'nowrap' }}>
+        <input
+          className="ap-input"
+          type="text"
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          onBlur={saveAmount}
+          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          disabled={pending}
+          title="Importo effettivamente pagato — modificabile"
+          style={{ height: 28, width: 90, textAlign: 'right', fontWeight: 600, color: amountSaved ? 'var(--ap-success)' : undefined }}
+        />
+        <span style={{ marginLeft: 4, color: 'var(--ap-text-muted)' }}>€</span>
       </td>
       <td style={{ color: 'var(--ap-text-muted)', fontSize: 12 }}>{payment.paid_by ?? '—'}</td>
       <td style={{ minWidth: 200, maxWidth: 320 }}>

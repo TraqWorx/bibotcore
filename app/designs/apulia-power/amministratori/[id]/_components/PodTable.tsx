@@ -75,10 +75,9 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
   // Paying applies to the unpaid rows in the selection; re-dating applies to
   // the already-paid ones. A selection can hold both.
   const selectedDue = useMemo(() => selectedRows.filter((p) => p.paymentStatus === 'due'), [selectedRows])
-  const selectedPaid = useMemo(
-    () => selectedRows.filter((p) => p.paymentStatus === 'paid' && (p.paidCount ?? 0) > 0),
-    [selectedRows],
-  )
+  // Anything with a payment on record can be re-dated, including a row that is
+  // due again after an earlier cycle.
+  const selectedPaid = useMemo(() => selectedRows.filter((p) => (p.paidCount ?? 0) > 0), [selectedRows])
   const selectedTotal = selectedDue.reduce((s, r) => s + r.amount, 0)
   const allDueSelected = dueRows.length > 0 && dueRows.every((r) => selected.has(r.contactId))
 
@@ -304,7 +303,7 @@ function Row({
   const isDue = pod.paymentStatus === 'due'
   const isPaid = pod.paymentStatus === 'paid'
   // "Programmato" rows read as paid but have no payment row to re-date.
-  const hasPayment = isPaid && (pod.paidCount ?? 0) > 0
+  const hasPayment = (pod.paidCount ?? 0) > 0
   const rowBg = payable && isSelected ? 'color-mix(in srgb, var(--ap-blue-soft) 30%, transparent)' : undefined
 
   return (
@@ -315,7 +314,6 @@ function Row({
             type="checkbox"
             checked={isSelected}
             onChange={onToggle}
-            disabled={!isDue && !hasPayment}
             title={isDue ? 'Seleziona per il pagamento' : hasPayment ? 'Seleziona per modificare la data di pagamento' : 'Nessun pagamento registrato'}
             aria-label={`Seleziona ${pod.pod}`}
           />
