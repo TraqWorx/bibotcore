@@ -70,11 +70,13 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
     return out
   }, [pods, addedFrom, addedTo, statusFilter, payable])
 
-  const dueRows = useMemo(() => visiblePods.filter((p) => p.paymentStatus === 'due'), [visiblePods])
+  // "Pagabili" = never paid yet: Da Pagare plus Programmato.
+  const dueRows = useMemo(() => visiblePods.filter((p) => (p.paidCount ?? 0) === 0), [visiblePods])
   const selectedRows = useMemo(() => pods.filter((p) => selected.has(p.contactId)), [pods, selected])
-  // Paying applies to the unpaid rows in the selection; re-dating applies to
-  // the already-paid ones. A selection can hold both.
-  const selectedDue = useMemo(() => selectedRows.filter((p) => p.paymentStatus === 'due'), [selectedRows])
+  // Paying applies to every row without a payment yet — "Da Pagare" and
+  // "Programmato" alike, so a cycle can be settled in advance. Re-dating
+  // applies to the already-paid ones. A selection can hold both.
+  const selectedDue = useMemo(() => selectedRows.filter((p) => (p.paidCount ?? 0) === 0), [selectedRows])
   // Anything with a payment on record can be re-dated, including a row that is
   // due again after an earlier cycle.
   const selectedPaid = useMemo(() => selectedRows.filter((p) => (p.paidCount ?? 0) > 0), [selectedRows])
@@ -160,7 +162,7 @@ export default function PodTable({ pods, defaultAmount, adminContactId, payable 
           </span>
           {payable && dueRows.length > 0 && (
             <button type="button" onClick={selectAllDue} className="ap-btn ap-btn-ghost" style={{ marginLeft: 'auto', height: 32, fontSize: 12, color: 'var(--ap-blue)', fontWeight: 700, flex: '0 0 auto' }}>
-              ☑ {filtersActive ? `Seleziona ${dueRows.length} filtrati` : `Seleziona tutti i ${dueRows.length} da pagare`}
+              ☑ {filtersActive ? `Seleziona ${dueRows.length} filtrati` : `Seleziona tutti i ${dueRows.length} pagabili`}
             </button>
           )}
           {flash && (
@@ -314,7 +316,7 @@ function Row({
             type="checkbox"
             checked={isSelected}
             onChange={onToggle}
-            title={isDue ? 'Seleziona per il pagamento' : hasPayment ? 'Seleziona per modificare la data di pagamento' : 'Nessun pagamento registrato'}
+            title={hasPayment ? 'Seleziona per modificare la data di pagamento' : 'Seleziona per il pagamento'}
             aria-label={`Seleziona ${pod.pod}`}
           />
         </td>
