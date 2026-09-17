@@ -3,8 +3,9 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import useSWR from 'swr'
 import type { DashboardData } from './types'
+import { embedTokenHeaders } from './embedToken'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+const fetcher = (url: string) => fetch(url, { headers: embedTokenHeaders() }).then((r) => r.json())
 
 interface DashboardContextValue {
   data: DashboardData | null

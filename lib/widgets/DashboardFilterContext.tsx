@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { embedTokenHeaders } from './embedToken'
 
 export interface DashboardFilters {
   userId?: string
@@ -38,7 +39,7 @@ export function DashboardFilterProvider({
   useEffect(() => {
     fetch('/api/widgets/data', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...embedTokenHeaders() },
       body: JSON.stringify({ locationId, dataSource: 'users' }),
     })
       .then((r) => r.json())

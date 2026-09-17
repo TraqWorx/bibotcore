@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
+import { getEmbedTokenGrant } from '@/lib/auth/embedTokenAccess'
 import { createAdminClient } from '@/lib/supabase-server'
 import {
   discoverCategories,
@@ -23,7 +24,9 @@ export async function GET(req: NextRequest) {
   if (!locationId) return NextResponse.json({ error: 'locationId required' }, { status: 400 })
 
   const access = await getLocationAccess(req, locationId)
-  if (access.status === 'unauthenticated') {
+  // No session: a public embed link may still read its own location's stats
+  const viaEmbedToken = access.status === 'unauthenticated' && !!(await getEmbedTokenGrant(req, locationId))
+  if (access.status === 'unauthenticated' && !viaEmbedToken) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   if (access.status === 'forbidden') {
@@ -71,10 +74,12 @@ export async function GET(req: NextRequest) {
       .order('start_time', { ascending: true }),
   ])
 
-  const isSuperAdmin = access.isSuperAdmin
-  const currentGhlUser = (ghlUsers ?? []).find((u) => u.email?.toLowerCase() === access.email.toLowerCase())
+  // An embed link is the location's own dashboard, so it sees what an admin preview sees
+  const isSuperAdmin = access.status === 'authorized' && access.isSuperAdmin
+  const callerEmail = access.status === 'authorized' ? access.email.toLowerCase() : ''
+  const currentGhlUser = callerEmail ? (ghlUsers ?? []).find((u) => u.email?.toLowerCase() === callerEmail) : undefined
   const isGhlAdmin = currentGhlUser?.role === 'admin'
-  const isAdmin = isSuperAdmin || isGhlAdmin
+  const isAdmin = viaEmbedToken || isSuperAdmin || isGhlAdmin
 
   // Build cfMap
   const cfMap = new Map<string, Map<string, string>>()

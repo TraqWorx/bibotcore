@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
+import { getEmbedTokenGrant } from '@/lib/auth/embedTokenAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import type { CustomDataSource } from '@/lib/widgets/types'
 
@@ -52,7 +53,12 @@ export async function POST(req: NextRequest) {
 
   // Auth: must have access to this location (was: any logged-in user, any location).
   const access = await getLocationAccess(req, locationId)
-  if (access.status === 'unauthenticated') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (access.status === 'unauthenticated') {
+    // No session: a public embed link may fetch only the data its saved dashboard uses
+    const grant = await getEmbedTokenGrant(req, locationId)
+    if (!grant) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!grant.dataSources.has(dataSource)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
   if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Static/computed widgets don't need GHL

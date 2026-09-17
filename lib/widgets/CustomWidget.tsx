@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CustomWidgetConfig, CustomDataSource } from './types'
 import { useDashboardFilters } from './DashboardFilterContext'
 import WidgetShell from './WidgetShell'
+import { embedTokenHeaders } from './embedToken'
 
 interface Props {
   title?: string
@@ -27,7 +28,7 @@ function useWidgetData(locationId: string, config: CustomWidgetConfig, globalFil
     const load = () => {
       fetch('/api/widgets/data', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...embedTokenHeaders() },
         body: JSON.stringify({
           locationId,
           dataSource: config.dataSource,
