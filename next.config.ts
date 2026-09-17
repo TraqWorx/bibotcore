@@ -18,10 +18,6 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
   async redirects() {
-    // Loaded by the Bellessere GHL service menu's custom code. Never remove.
-    const widget = ['/bellessere-widget.js', '/bellessere-widget.css'].map((source) => ({
-      source, destination: `${BIBOT}${source}`, permanent: true,
-    }))
     const perLocation = BIBOT_LOCATION_IDS.flatMap((id) => [
       { source: `/embed/${id}`, destination: `${BIBOT}/embed/${id}`, permanent: false },
       { source: `/editor/${id}`, destination: `${BIBOT}/editor/${id}`, permanent: false },
@@ -35,7 +31,7 @@ const nextConfig: NextConfig = {
       '/bellessere-logo.png', '/bellessere-manifest.json',
       '/bellessere-icon-180.png', '/bellessere-icon-192.png', '/bellessere-icon-512.png',
     ].map((source) => ({ source, destination: `${BIBOT}${source}`, permanent: false }))
-    return [...widget, ...perLocation, ...bibotOnly]
+    return [...perLocation, ...bibotOnly]
   },
 }
 
