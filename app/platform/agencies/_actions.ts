@@ -87,25 +87,36 @@ export async function deleteAgency(agencyId: string): Promise<{ error?: string; 
       await sb.from('ghl_connections').delete().in('location_id', locIds)
       await sb.from('installs').delete().in('location_id', locIds)
       await sb.from('sync_status').delete().in('location_id', locIds)
+      await sb.from('ai_usage').delete().in('location_id', locIds)
+      await sb.from('bulk_action_jobs').delete().in('location_id', locIds)
+      await sb.from('appointment_queue').delete().in('location_id', locIds)
     }
-    // 2. Membership rows keyed by user
-    if (userIds.length) await sb.from('profile_locations').delete().in('user_id', userIds)
+    // 2. Rows keyed by user. These FKs to auth.users don't cascade and block deleteUser.
+    if (userIds.length) {
+      await sb.from('profile_locations').delete().in('user_id', userIds)
+      await sb.from('ai_usage').delete().in('user_id', userIds)
+      await sb.from('bulk_action_jobs').delete().in('created_by', userIds)
+      await sb.from('appointment_queue').delete().in('created_by', userIds)
+    }
     // 3. Rows keyed by agency
     await sb.from('agency_subscriptions').delete().eq('agency_id', agencyId)
     await sb.from('agency_costs').delete().eq('agency_id', agencyId)
     await sb.from('vat_quarter_status').delete().eq('agency_id', agencyId)
     await sb.from('dashboard_configs').delete().eq('agency_id', agencyId)
     await sb.from('locations').delete().eq('agency_id', agencyId)
-    // 4. User accounts (profile + auth)
-    for (const id of userIds) {
-      await sb.from('profiles').delete().eq('id', id)
-      await sb.auth.admin.deleteUser(id).catch(() => {})
-    }
-    // 5. The agency itself
+    // 4. Profiles, then the agency itself
+    if (userIds.length) await sb.from('profiles').delete().in('id', userIds)
     const { error } = await sb.from('agencies').delete().eq('id', agencyId)
     if (error) return { error: error.message }
-
     revalidatePath('/platform/agencies')
+
+    // 5. Auth accounts last, so a leftover FK can't strand a half-deleted agency
+    const failed: string[] = []
+    for (const id of userIds) {
+      const { error: authError } = await sb.auth.admin.deleteUser(id)
+      if (authError) failed.push(`${id}: ${authError.message}`)
+    }
+    if (failed.length) return { error: `Agency deleted, but ${failed.length} login(s) could not be removed: ${failed.join('; ')}` }
     return { ok: true }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to delete agency' }

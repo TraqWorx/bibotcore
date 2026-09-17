@@ -19,7 +19,7 @@ export default function DeleteAgencyButton({ agencyId, agencyName, disabled }: {
     start(async () => {
       const r = await deleteAgency(agencyId)
       if (r.error) window.alert('Error: ' + r.error)
-      else router.refresh()
+      router.refresh()
     })
   }
 
