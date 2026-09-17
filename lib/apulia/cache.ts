@@ -126,7 +126,8 @@ export const toCacheRow = cacheRowFromGhlContact
 export async function fullSyncCache(): Promise<{ total: number; deleted: number; updated: number; inserted: number; skipped: number }> {
   const sb = createAdminClient()
   const all = await fetchAllContacts()
-  const incoming = all.map(cacheRowFromGhlContact)
+  // GHL paging can return the same contact twice; keep one row per ghl_id
+  const incoming = [...new Map(all.map(cacheRowFromGhlContact).map((r) => [r.ghl_id, r])).values()]
 
   // Pull existing rows we might match on (ghl_id-keyed map). Paginate
   // because PostgREST caps a single select at 1000 rows; without this
@@ -139,6 +140,9 @@ export async function fullSyncCache(): Promise<{ total: number; deleted: number;
       .from('apulia_contacts')
       .select('id, ghl_id, sync_status')
       .not('ghl_id', 'is', null)
+      // Without a stable order, pages overlap and skip rows; a skipped row
+      // then looks new and its INSERT hits apulia_contacts_ghl_id_unique.
+      .order('id')
       .range(from, from + 999)
     if (!data || data.length === 0) break
     existingRaw.push(...(data as ExistingRow[]))
@@ -180,7 +184,16 @@ export async function fullSyncCache(): Promise<{ total: number; deleted: number;
   for (let i = 0; i < insertRows.length; i += CHUNK) {
     const slice = insertRows.slice(i, i + CHUNK)
     const { error } = await sb.from('apulia_contacts').insert(slice)
-    if (error) throw new Error(`fullSyncCache insert chunk ${i}: ${error.message}`)
+    if (!error) continue
+    // A webhook can create the same contact between the read above and here.
+    // ghl_id's unique index is partial, so ON CONFLICT can't target it: retry
+    // row by row and skip rows that already exist.
+    if (error.code !== '23505') throw new Error(`fullSyncCache insert chunk ${i}: ${error.message}`)
+    for (const row of slice) {
+      const { error: rowError } = await sb.from('apulia_contacts').insert(row)
+      if (rowError?.code === '23505') { inserted--; skipped++; continue }
+      if (rowError) throw new Error(`fullSyncCache insert ${row.ghl_id}: ${rowError.message}`)
+    }
   }
 
   // Stale detection: rows with ghl_id set but no longer present in GHL.

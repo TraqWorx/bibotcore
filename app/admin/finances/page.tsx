@@ -163,18 +163,14 @@ export default async function FinancesPage() {
   let affiliateTotalOwed = 0
   try {
     const { refreshIfNeeded } = await import('@/lib/ghl/refreshIfNeeded')
-    const { data: conns } = await sb.from('ghl_connections').select('location_id, access_token, refresh_token, expires_at, company_id').not('refresh_token', 'is', null).limit(5)
+    const { data: agencyLocs } = await sb.from('locations').select('location_id').eq('agency_id', agencyId)
+    const { data: conns } = await sb.from('ghl_connections').select('location_id, access_token, refresh_token, expires_at, company_id')
+      .in('location_id', (agencyLocs ?? []).map((l) => l.location_id))
+      .not('refresh_token', 'is', null)
     for (const conn of conns ?? []) {
-      const token = await refreshIfNeeded(conn.location_id, conn)
-      // Get location token for affiliate API
-      const cid = conn.company_id ?? process.env.GHL_COMPANY_ID ?? ''
-      const ltRes = await fetch('https://services.leadconnectorhq.com/oauth/locationToken', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Bearer ${conn.access_token}`, Version: '2021-07-28' },
-        body: new URLSearchParams({ companyId: cid, locationId: conn.location_id }),
-      })
-      if (!ltRes.ok) continue
-      const { access_token: affToken } = await ltRes.json()
+      // The refreshed token is already location-scoped; exchanging it again via
+      // /oauth/locationToken only works for company tokens and silently failed here.
+      const affToken = await refreshIfNeeded(conn.location_id, conn)
       if (!affToken) continue
 
       const affRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/affiliates`, {

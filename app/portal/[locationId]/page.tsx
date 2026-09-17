@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { getPortalUser } from '@/lib/portal/portalUser'
 
 /**
  * Portal home page — shows the customer's profile, deals, and recent activity.
@@ -18,14 +19,9 @@ export default async function PortalHomePage({
   const sb = createAdminClient()
 
   // Get portal user mapping
-  const { data: portalUser } = await sb
-    .from('portal_users')
-    .select('contact_ghl_id')
-    .eq('auth_user_id', user.id)
-    .eq('location_id', locationId)
-    .single()
-
-  if (!portalUser) redirect(`/portal/login?locationId=${locationId}`)
+  const portal = await getPortalUser(user.id, user.email, locationId)
+  if (portal.status !== 'ok') redirect(`/portal/login?locationId=${locationId}`)
+  const portalUser = { contact_ghl_id: portal.contactGhlId }
 
   const contactGhlId = portalUser.contact_ghl_id
 

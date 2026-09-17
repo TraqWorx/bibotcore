@@ -302,7 +302,8 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
 export async function adminWithPods(adminContactId: string): Promise<{ admin: AdminRow | null; activePods: PodRow[]; switchedPods: PodRow[] }> {
   const sb = createAdminClient()
   const { data: a } = await sb.from('apulia_contacts').select('*').eq('id', adminContactId).neq('sync_status', 'pending_delete').maybeSingle()
-  if (!a) return { admin: null, activePods: [], switchedPods: [] }
+  // A condominio (POD) id must not open as an administrator
+  if (!a || !a.is_amministratore) return { admin: null, activePods: [], switchedPods: [] }
   const code = a.codice_amministratore as string | null
   const compenso = Number(a.compenso_per_pod) || 0
   const defaultOffset = await getDefaultPaymentOffset()

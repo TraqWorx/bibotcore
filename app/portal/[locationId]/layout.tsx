@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
+import { getPortalUser } from '@/lib/portal/portalUser'
 
 /**
  * Portal layout — authenticates the portal user and ensures the
@@ -40,15 +41,10 @@ export default async function PortalLayout({
     )
   }
 
-  // Check if portal_users mapping exists for THIS location
-  let { data: portalUser } = await sb
-    .from('portal_users')
-    .select('contact_ghl_id, location_id')
-    .eq('auth_user_id', user.id)
-    .single()
+  const portalUser = await getPortalUser(user.id, email, locationId)
 
   // If mapping exists but for a different location, deny access
-  if (portalUser && portalUser.location_id !== locationId) {
+  if (portalUser.status === 'other_location') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="max-w-sm rounded-2xl border border-red-200 bg-white p-8 text-center">
@@ -60,30 +56,7 @@ export default async function PortalLayout({
     )
   }
 
-  // If not, try to create the mapping from cached contacts
-  if (!portalUser && email) {
-    const { data: contact } = await sb
-      .from('cached_contacts')
-      .select('ghl_id')
-      .eq('location_id', locationId)
-      .ilike('email', email)
-      .limit(1)
-      .single()
-
-    if (contact) {
-      await sb.from('portal_users').upsert(
-        {
-          auth_user_id: user.id,
-          location_id: locationId,
-          contact_ghl_id: contact.ghl_id,
-        },
-        { onConflict: 'auth_user_id' },
-      )
-      portalUser = { contact_ghl_id: contact.ghl_id, location_id: locationId }
-    }
-  }
-
-  if (!portalUser) {
+  if (portalUser.status !== 'ok') {
     // User authenticated but no matching contact — show error
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">

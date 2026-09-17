@@ -602,12 +602,9 @@ export default function DashboardClient({
           {categoryData.map((cat) => {
             const style = CATEGORY_STYLES[cat.slug] ?? { border: 'border-gray-200', accent: 'text-gray-700', bg: 'bg-gray-50' }
             const pctOfTotal = totalContacts > 0 ? (cat.total / totalContacts) * 100 : 0
-            return (
-              <Link
-                key={cat.slug}
-                href={`/designs/simfonia/contacts${q}&category=${cat.slug}`}
-                className={`group rounded-[28px] border-2 ${style.border} bg-[var(--shell-surface)] p-5 shadow-[0_14px_28px_-24px_rgba(23,21,18,0.2)] transition hover:border-brand/25 hover:shadow-md`}
-              >
+            const cardClass = `group rounded-[28px] border-2 ${style.border} bg-[var(--shell-surface)] p-5 shadow-[0_14px_28px_-24px_rgba(23,21,18,0.2)] transition hover:border-brand/25 hover:shadow-md`
+            const cardBody = (
+              <>
                 <p className={`text-[11px] font-bold uppercase tracking-wider ${style.accent}`}>{cat.label}</p>
                 <div className="mt-3 flex items-baseline gap-1.5">
                   <span className={`text-3xl font-black tabular-nums ${style.accent}`}>{formatInt(cat.total)}</span>
@@ -628,6 +625,14 @@ export default function DashboardClient({
                     {cat.providers.length > 6 && <p className="text-[10px] text-[var(--shell-muted)]">+{cat.providers.length - 6} altri</p>}
                   </div>
                 )}
+              </>
+            )
+            // The demo has no contacts page to open, like the other demo links
+            return demoMode ? (
+              <div key={cat.slug} className={cardClass}>{cardBody}</div>
+            ) : (
+              <Link key={cat.slug} href={`/designs/simfonia/contacts?locationId=${locationId}&category=${cat.slug}`} className={cardClass}>
+                {cardBody}
               </Link>
             )
           })}
@@ -641,9 +646,13 @@ export default function DashboardClient({
             <h2 className={sf.sectionLabel}>
               Gare — {now.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
             </h2>
-            <Link href={`/designs/simfonia/settings${q}`} className="text-xs font-bold text-brand underline-offset-4 hover:underline">
-              Modifica obiettivi
-            </Link>
+            {demoMode ? (
+              <span className="text-xs font-bold text-brand">Modifica obiettivi</span>
+            ) : (
+              <Link href={`/designs/simfonia/settings${q}`} className="text-xs font-bold text-brand underline-offset-4 hover:underline">
+                Modifica obiettivi
+              </Link>
+            )}
           </div>
 
           {gareRows.length === 0 ? (
