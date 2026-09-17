@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase-server'
+import { isBibotAdmin } from '@/lib/auth/designOwner'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,8 +20,7 @@ export async function GET() {
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('role, agency_id').eq('id', user.id).single()
   // Global sync status — super_admin or Bibot only.
-  const { isBibotAgency } = await import('@/lib/isBibotAgency')
-  if (profile?.role !== 'super_admin' && !isBibotAgency(profile?.agency_id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!isBibotAdmin(profile)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Get all connected locations
   const { data: connections } = await sb

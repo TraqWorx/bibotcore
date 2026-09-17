@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 import { fetchGhlPlans } from '@/lib/ghl/getGhlPlans'
+import { isBibotAdmin } from '@/lib/auth/designOwner'
 
 /**
  * GET /api/admin/sync-ghl-plans
@@ -25,8 +26,7 @@ export async function GET() {
     .eq('id', user.id)
     .single()
 
-  const { isBibotAgency } = await import('@/lib/isBibotAgency')
-  if (profile?.role !== 'super_admin' && !isBibotAgency(profile?.agency_id)) {
+  if (!isBibotAdmin(profile)) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 

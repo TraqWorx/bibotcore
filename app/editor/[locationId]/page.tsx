@@ -7,8 +7,30 @@ import DashboardEditor from './_components/DashboardEditor'
 
 export const dynamic = 'force-dynamic'
 
-async function saveConfig(locationId: string, agencyId: string, layout: DashboardLayout, colors: DashboardColors, templates?: WidgetConfig[]): Promise<{ error: string } | undefined> {
+// Server actions are callable directly, so each one re-checks the caller the
+// same way the page does. Returns the location's agency id, or null if denied.
+async function editorAgencyFor(locationId: string): Promise<string | null> {
+  const authClient = await createAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) return null
+  const sb = createAdminClient()
+  const [{ data: profile }, { data: location }] = await Promise.all([
+    sb.from('profiles').select('agency_id, role').eq('id', user.id).single(),
+    sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle(),
+  ])
+  if (!location?.agency_id) return null
+  if (profile?.role === 'super_admin') return location.agency_id
+  if (profile?.role !== 'admin' || location.agency_id !== profile.agency_id) return null
+  if (isBibotAgency(profile.agency_id)) return location.agency_id
+  const { data: subscription } = await sb.from('agency_subscriptions').select('status')
+    .eq('agency_id', profile.agency_id).eq('location_id', locationId).eq('status', 'active').maybeSingle()
+  return subscription ? location.agency_id : null
+}
+
+async function saveConfig(locationId: string, layout: DashboardLayout, colors: DashboardColors, templates?: WidgetConfig[]): Promise<{ error: string } | undefined> {
   'use server'
+  const agencyId = await editorAgencyFor(locationId)
+  if (!agencyId) return { error: 'Not authorized' }
   const sb = createAdminClient()
   const { error } = await sb.from('dashboard_configs').upsert(
     { location_id: locationId, agency_id: agencyId, config: layout.widgets, theme: colors, updated_at: new Date().toISOString() },
@@ -24,6 +46,7 @@ async function saveConfig(locationId: string, agencyId: string, layout: Dashboar
 
 async function clearConfig(locationId: string): Promise<{ error: string } | undefined> {
   'use server'
+  if (!(await editorAgencyFor(locationId))) return { error: 'Not authorized' }
   const sb = createAdminClient()
   const { error } = await sb.from('dashboard_configs').delete().eq('location_id', locationId)
   if (error) return { error: error.message }
@@ -50,8 +73,8 @@ export default async function EditorPage({ params }: { params: Promise<{ locatio
     sb.from('agencies').select('custom_templates').eq('id', profile.agency_id).single(),
   ])
 
-  // Ownership: the location must belong to the caller's agency (super_admin bypasses).
-  if (!isSuperAdmin && location?.agency_id !== profile.agency_id) redirect('/admin')
+  // Editing is for admins of the agency that owns the location (super_admin bypasses)
+  if (!isSuperAdmin && (profile.role !== 'admin' || location?.agency_id !== profile.agency_id)) redirect('/admin')
   // Paywall: own location but no active subscription (Bibot is free).
   if (!isBibot && !isSuperAdmin && !subscription) redirect(`/admin/locations/${locationId}`)
 
@@ -59,8 +82,6 @@ export default async function EditorPage({ params }: { params: Promise<{ locatio
     ? { columns: 12, widgets: config.config } : null
   const currentColors = config?.theme && typeof config.theme === 'object' ? config.theme as DashboardColors : null
   const savedTemplates: WidgetConfig[] = Array.isArray(agency?.custom_templates) ? agency.custom_templates : []
-  const agencyId = profile.agency_id
-
   return (
     <div className="min-h-screen bg-[#f5f5f8]">
       <DashboardEditor
@@ -71,7 +92,7 @@ export default async function EditorPage({ params }: { params: Promise<{ locatio
         initialTemplates={savedTemplates}
         onSave={async (layout, colors, templates) => {
           'use server'
-          return saveConfig(locationId, agencyId, layout, colors, templates)
+          return saveConfig(locationId, layout, colors, templates)
         }}
         onClear={async () => {
           'use server'

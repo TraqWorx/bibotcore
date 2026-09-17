@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { createAdminClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
+import { isBibotAdmin } from '@/lib/auth/designOwner'
 
 async function getAuthenticatedAdmin() {
   const cookieStore = await cookies()
@@ -27,10 +28,8 @@ async function getAuthenticatedAdmin() {
     .single()
 
   // Global package/connection status — super_admin or Bibot only.
-  if (profile?.role === 'super_admin') return user
-  const { isBibotAgency } = await import('@/lib/isBibotAgency')
-  if (isBibotAgency(profile?.agency_id)) return user
-  return null
+  // Bibot agency members who aren't admins must not see this
+  return isBibotAdmin(profile) ? user : null
 }
 
 export async function GET() {

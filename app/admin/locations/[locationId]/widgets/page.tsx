@@ -2,40 +2,10 @@ import Link from 'next/link'
 export const dynamic = 'force-dynamic'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
-import { revalidatePath } from 'next/cache'
-import type { DashboardLayout, DashboardColors, WidgetConfig } from '@/lib/widgets/types'
+import type { DashboardLayout, DashboardColors } from '@/lib/widgets/types'
 import { isBibotAgency } from '@/lib/isBibotAgency'
 import DashboardBuilder from './_components/DashboardBuilder'
 import SubscribeBanner from './_components/SubscribeBanner'
-
-async function saveConfig(locationId: string, agencyId: string, layout: DashboardLayout, colors: DashboardColors, templates?: WidgetConfig[]): Promise<{ error: string } | undefined> {
-  'use server'
-  const sb = createAdminClient()
-  const { error } = await sb.from('dashboard_configs').upsert(
-    {
-      location_id: locationId,
-      agency_id: agencyId,
-      config: layout.widgets,
-      theme: colors,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'location_id' },
-  )
-  if (error) return { error: error.message }
-  // Save custom templates to agency (shared across locations)
-  if (templates) {
-    await sb.from('agencies').update({ custom_templates: templates }).eq('id', agencyId)
-  }
-  revalidatePath(`/admin/locations/${locationId}/widgets`)
-}
-
-async function clearConfig(locationId: string): Promise<{ error: string } | undefined> {
-  'use server'
-  const sb = createAdminClient()
-  const { error } = await sb.from('dashboard_configs').delete().eq('location_id', locationId)
-  if (error) return { error: error.message }
-  revalidatePath(`/admin/locations/${locationId}/widgets`)
-}
 
 export default async function WidgetEditorPage({
   params,
@@ -51,11 +21,10 @@ export default async function WidgetEditorPage({
   const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
   if (!profile?.agency_id) redirect('/login')
 
-  const [{ data: subscription }, { data: config }, { data: location }, { data: agency }] = await Promise.all([
+  const [{ data: subscription }, { data: config }, { data: location }] = await Promise.all([
     sb.from('agency_subscriptions').select('plan, status').eq('agency_id', profile.agency_id).eq('location_id', locationId).maybeSingle(),
     sb.from('dashboard_configs').select('config, theme').eq('location_id', locationId).maybeSingle(),
     sb.from('locations').select('name, agency_id').eq('location_id', locationId).single(),
-    sb.from('agencies').select('custom_templates').eq('id', profile.agency_id).single(),
   ])
 
   // Ownership: location must be in the caller's agency (super_admin bypasses).
@@ -73,9 +42,6 @@ export default async function WidgetEditorPage({
   const currentColors: DashboardColors | null = config?.theme && typeof config.theme === 'object'
     ? config.theme as DashboardColors
     : null
-  const savedTemplates: WidgetConfig[] = Array.isArray(agency?.custom_templates) ? agency.custom_templates : []
-
-  const agencyId = profile.agency_id
 
   return (
     <div className="space-y-8">

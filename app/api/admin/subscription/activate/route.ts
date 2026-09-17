@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { DEFAULT_PLAN } from '@/lib/stripe/plans'
+import { isBibotAdmin } from '@/lib/auth/designOwner'
 
 export async function POST(req: NextRequest) {
   const { locationId } = await req.json()
@@ -18,8 +19,7 @@ export async function POST(req: NextRequest) {
   // paid editor/embed — so it is a manual-activation tool restricted to the
   // platform owner or Bibot. A regular agency admin must NOT self-activate for
   // free (that would bypass the £120/mo paywall).
-  const { isBibotAgency } = await import('@/lib/isBibotAgency')
-  if (profile.role !== 'super_admin' && !isBibotAgency(profile.agency_id)) {
+  if (!isBibotAdmin(profile)) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
