@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
-import { getEmbedTokenGrant } from '@/lib/auth/embedTokenAccess'
+import { embedFiltersAllowed, getEmbedTokenGrant } from '@/lib/auth/embedTokenAccess'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import type { CustomDataSource } from '@/lib/widgets/types'
 
@@ -57,7 +57,9 @@ export async function POST(req: NextRequest) {
     // No session: a public embed link may fetch only the data its saved dashboard uses
     const grant = await getEmbedTokenGrant(req, locationId)
     if (!grant) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!grant.dataSources.has(dataSource)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!grant.dataSources.has(dataSource) || !embedFiltersAllowed(grant, dataSource, filters)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
   }
   if (access.status === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 

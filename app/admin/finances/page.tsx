@@ -200,18 +200,27 @@ export default async function FinancesPage() {
           if (custRes.ok) {
             const custData2 = await custRes.json()
             for (const c of custData2.customers ?? []) {
+              // Dropped customers no longer pay, so they earn no commission
+              if (c.type === 'dropped') continue
               const email = (c.email as string | undefined)?.toLowerCase()
+              let price: number | null = null
               if (email) {
                 // Match to location plan
-                const { data: prof } = await sb.from('profiles').select('location_id').eq('email', email).maybeSingle()
+                const { data: prof } = await sb.from('profiles').select('location_id').eq('email', email).limit(1).maybeSingle()
                 if (prof?.location_id) {
                   const { data: loc } = await sb.from('locations').select('ghl_plan_id').eq('location_id', prof.location_id).single()
                   if (loc?.ghl_plan_id) {
                     const { data: plan } = await sb.from('ghl_plans').select('price_monthly').eq('ghl_plan_id', loc.ghl_plan_id).single()
-                    if (plan?.price_monthly) affiliateMonthlyCost += Number(plan.price_monthly) * commRate
+                    if (plan?.price_monthly) price = Number(plan.price_monthly)
                   }
                 }
               }
+              // No profile for this customer yet: fall back to the plan name GHL reports
+              if (price == null && typeof c.planName === 'string') {
+                const { data: plan } = await sb.from('ghl_plans').select('price_monthly').eq('name', c.planName).limit(1).maybeSingle()
+                if (plan?.price_monthly) price = Number(plan.price_monthly)
+              }
+              if (price != null) affiliateMonthlyCost += price * commRate
             }
           }
         }

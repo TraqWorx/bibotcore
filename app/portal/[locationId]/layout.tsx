@@ -24,14 +24,9 @@ export default async function PortalLayout({
   const sb = createAdminClient()
   const email = user.email?.toLowerCase()
 
-  // Check if portal is enabled for this location
-  const { data: moduleSettings } = await sb
-    .from('location_design_settings')
-    .select('module_overrides')
-    .eq('location_id', locationId)
-    .maybeSingle()
-  const overrides = (moduleSettings?.module_overrides ?? {}) as Record<string, { enabled?: boolean }>
-  if (overrides.portal?.enabled === false) {
+  const portalUser = await getPortalUser(user.id, email, locationId)
+
+  if (portalUser.status === 'disabled') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="max-w-sm rounded-2xl border border-gray-200 bg-white p-8 text-center">
@@ -40,8 +35,6 @@ export default async function PortalLayout({
       </div>
     )
   }
-
-  const portalUser = await getPortalUser(user.id, email, locationId)
 
   // If mapping exists but for a different location, deny access
   if (portalUser.status === 'other_location') {

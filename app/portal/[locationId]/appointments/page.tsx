@@ -14,7 +14,7 @@ export default async function PortalAppointmentsPage({
   if (!user) redirect(`/portal/login?locationId=${locationId}`)
 
   const sb = createAdminClient()
-  const portal = await getPortalUser(user.id, user.email, locationId)
+  const portal = await getPortalUser(user.id, user.email?.toLowerCase(), locationId)
   if (portal.status !== 'ok') redirect(`/portal/login?locationId=${locationId}`)
   const portalUser = { contact_ghl_id: portal.contactGhlId }
 

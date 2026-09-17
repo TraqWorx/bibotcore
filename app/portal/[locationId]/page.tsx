@@ -19,7 +19,7 @@ export default async function PortalHomePage({
   const sb = createAdminClient()
 
   // Get portal user mapping
-  const portal = await getPortalUser(user.id, user.email, locationId)
+  const portal = await getPortalUser(user.id, user.email?.toLowerCase(), locationId)
   if (portal.status !== 'ok') redirect(`/portal/login?locationId=${locationId}`)
   const portalUser = { contact_ghl_id: portal.contactGhlId }
 

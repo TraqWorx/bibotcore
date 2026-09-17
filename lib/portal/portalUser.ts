@@ -5,6 +5,7 @@ export type PortalUserResult =
   | { status: 'ok'; contactGhlId: string }
   | { status: 'other_location' }
   | { status: 'no_contact' }
+  | { status: 'disabled' }
 
 /**
  * Finds the portal user's contact for this location, creating the mapping from
@@ -13,6 +14,16 @@ export type PortalUserResult =
  */
 export const getPortalUser = cache(async (authUserId: string, email: string | undefined, locationId: string): Promise<PortalUserResult> => {
   const sb = createAdminClient()
+
+  // Pages render even when the layout blocks them, so never create a mapping here
+  const { data: moduleSettings } = await sb
+    .from('location_design_settings')
+    .select('module_overrides')
+    .eq('location_id', locationId)
+    .maybeSingle()
+  const overrides = (moduleSettings?.module_overrides ?? {}) as Record<string, { enabled?: boolean }>
+  if (overrides.portal?.enabled === false) return { status: 'disabled' }
+
   const { data: existing } = await sb
     .from('portal_users')
     .select('contact_ghl_id, location_id')
