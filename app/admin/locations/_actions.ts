@@ -194,16 +194,16 @@ export async function getConnectLocationUrl(locationId: string): Promise<{ url: 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('role, agency_id').eq('id', user.id).single()
   if (profile?.role !== 'admin' && profile?.role !== 'super_admin') return { error: 'Not authorized' }
-  if (profile.role !== 'super_admin') {
-    if (!profile.agency_id) return { error: 'No agency' }
-    const { data: loc } = await sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
-    if (!loc || loc.agency_id !== profile.agency_id) return { error: 'Location not in your agency' }
+  const { data: loc } = await sb.from('locations').select('agency_id').eq('location_id', locationId).maybeSingle()
+  if (!loc?.agency_id) return { error: 'Location not found' }
+  if (profile.role !== 'super_admin' && loc.agency_id !== profile.agency_id) {
+    return { error: 'Location not in your agency' }
   }
 
-  // Check subscription (Bibot bypasses)
+  // Billing follows the agency that owns the location, not the caller
   const { getAgencyCapabilities } = await import('@/lib/agency/capabilities')
-  if (!(await getAgencyCapabilities(profile?.agency_id)).billingExempt) {
-    const { data: sub } = await sb.from('agency_subscriptions').select('status').eq('agency_id', profile!.agency_id!).eq('location_id', locationId).eq('status', 'active').maybeSingle()
+  if (!(await getAgencyCapabilities(loc.agency_id)).billingExempt) {
+    const { data: sub } = await sb.from('agency_subscriptions').select('status').eq('agency_id', loc.agency_id).eq('location_id', locationId).eq('status', 'active').maybeSingle()
     if (!sub) return { error: 'Subscribe to this location before connecting GHL' }
   }
 
