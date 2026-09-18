@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import AccountForm from './_components/AccountForm'
 import { ad } from '@/lib/admin/ui'
+import { getAdminContext } from '@/lib/admin/viewAsAgency'
 
 export default async function AccountPage() {
   const authClient = await createAuthClient()
@@ -11,9 +12,12 @@ export default async function AccountPage() {
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
-  if (!profile?.agency_id) redirect('/login')
+  // A super admin viewing another agency sees that agency's data
+  const adminCtx = await getAdminContext()
+  const profileScoped = { ...profile, agency_id: adminCtx?.agencyId ?? profile?.agency_id }
+  if (!profileScoped.agency_id) redirect('/login')
 
-  const agencyId = profile.agency_id
+  const agencyId = profileScoped.agency_id
 
   const [{ data: agency }, { data: subscriptions }, { data: locations }] = await Promise.all([
     sb.from('agencies')

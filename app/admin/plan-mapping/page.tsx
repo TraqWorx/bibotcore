@@ -5,6 +5,7 @@ import { deletePlanMapping } from './_actions'
 import AddMappingForm from './_components/AddMappingForm'
 import SyncPlansButton from './_components/SyncPlansButton'
 import { ad } from '@/lib/admin/ui'
+import { getAdminContext } from '@/lib/admin/viewAsAgency'
 
 export default async function AdminPlanMappingPage() {
   const authClient = await createAuthClient()
@@ -13,7 +14,10 @@ export default async function AdminPlanMappingPage() {
 
   const supabase = createAdminClient()
   const { data: profile } = await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
-  if (profile?.role !== 'super_admin' && !(await getAgencyCapabilities(profile?.agency_id)).agencyMode) redirect('/admin')
+  // A super admin viewing another agency sees that agency's data
+  const adminCtx = await getAdminContext()
+  const profileScoped = { ...profile, agency_id: adminCtx?.agencyId ?? profile?.agency_id }
+  if (profile?.role !== 'super_admin' && !(await getAgencyCapabilities(profileScoped.agency_id)).agencyMode) redirect('/admin')
 
   const [
     { data: plans },

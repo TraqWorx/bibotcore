@@ -101,6 +101,13 @@ export default async function PlatformAgenciesPage() {
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-3">
+                      <a
+                        href={`/api/platform/view-as?agencyId=${agency.id}`}
+                        className="text-xs font-semibold text-gray-500 hover:text-brand"
+                        title="Open this agency's admin panel as they see it"
+                      >
+                        Open admin
+                      </a>
                       <AgencyActiveToggle agencyId={agency.id} agencyName={agency.name} deactivated={deactivated} disabled={isBibot} />
                       <DeleteAgencyButton agencyId={agency.id} agencyName={agency.name} disabled={isBibot} />
                     </div>

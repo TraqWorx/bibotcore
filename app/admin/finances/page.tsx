@@ -2,6 +2,7 @@ import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import FinancesClient from './_components/FinancesClient'
 import { ad } from '@/lib/admin/ui'
+import { getAdminContext } from '@/lib/admin/viewAsAgency'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,12 +13,15 @@ export default async function FinancesPage() {
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
-  if (!profile?.agency_id) redirect('/admin')
-  const { data: agencyRow } = await sb.from('agencies').select('ghl_stripe_secret_key').eq('id', profile.agency_id).maybeSingle()
+  // A super admin viewing another agency sees that agency's data
+  const adminCtx = await getAdminContext()
+  const profileScoped = { ...profile, agency_id: adminCtx?.agencyId ?? profile?.agency_id }
+  if (!profileScoped.agency_id) redirect('/admin')
+  const { data: agencyRow } = await sb.from('agencies').select('ghl_stripe_secret_key').eq('id', profileScoped.agency_id).maybeSingle()
   const agencyStripeKey = agencyRow?.ghl_stripe_secret_key ?? null
   if (!agencyStripeKey) redirect('/admin')
 
-  const agencyId = profile.agency_id
+  const agencyId = profileScoped.agency_id
 
   // Get MRR from locations with plans
   const [{ data: locations }, { data: ghlPlans }, { data: costs }, { data: vatPayments }, { data: allLocations }, { data: vatStatuses }] = await Promise.all([

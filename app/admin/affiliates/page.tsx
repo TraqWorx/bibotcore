@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { refreshIfNeeded } from '@/lib/ghl/refreshIfNeeded'
 import AffiliatesTable from './_components/AffiliatesTable'
 import { ad } from '@/lib/admin/ui'
+import { getAdminContext } from '@/lib/admin/viewAsAgency'
 
 export const dynamic = 'force-dynamic'
 
@@ -178,12 +179,15 @@ export default async function AffiliatesPage() {
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
-  if (!profile?.agency_id) redirect('/admin')
+  // A super admin viewing another agency sees that agency's data
+  const adminCtx = await getAdminContext()
+  const profileScoped = { ...profile, agency_id: adminCtx?.agencyId ?? profile?.agency_id }
+  if (!profileScoped.agency_id) redirect('/admin')
 
   // Fetch affiliates from the agency's OWN connected locations only.
   const { getAgencyGhlContext } = await import('@/lib/agency/capabilities')
-  const companyId = (await getAgencyGhlContext(profile.agency_id)).companyId ?? ''
-  const { data: locations } = await sb.from('locations').select('location_id, name, ghl_plan_id').eq('agency_id', profile.agency_id)
+  const companyId = (await getAgencyGhlContext(profileScoped.agency_id)).companyId ?? ''
+  const { data: locations } = await sb.from('locations').select('location_id, name, ghl_plan_id').eq('agency_id', profileScoped.agency_id)
   const nameMap = new Map((locations ?? []).map((l) => [l.location_id, l.name]))
   const agencyLocIds = (locations ?? []).map((l) => l.location_id)
 
@@ -203,7 +207,7 @@ export default async function AffiliatesPage() {
     if (p.price_monthly != null) planById[p.ghl_plan_id] = { name: p.name, price: Number(p.price_monthly) }
   }
 
-  const { data: profiles } = await sb.from('profiles').select('email, location_id').eq('agency_id', profile.agency_id)
+  const { data: profiles } = await sb.from('profiles').select('email, location_id').eq('agency_id', profileScoped.agency_id)
   const emailToPlan = new Map<string, { planName: string; planPrice: number; locationName: string }>()
   for (const p of profiles ?? []) {
     if (p.email && p.location_id) {

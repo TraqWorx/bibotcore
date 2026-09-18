@@ -4,6 +4,7 @@ import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
 import { getAgencyCapabilities } from '@/lib/agency/capabilities'
 import { ad } from '@/lib/admin/ui'
 import RefreshButton from './_components/RefreshButton'
+import { getAdminContext } from '@/lib/admin/viewAsAgency'
 
 export const dynamic = 'force-dynamic'
 
@@ -171,7 +172,10 @@ export default async function DiagnosticsPage() {
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
-  if (!profile?.agency_id || !(await getAgencyCapabilities(profile.agency_id)).agencyMode) redirect('/admin')
+  // A super admin viewing another agency sees that agency's data
+  const adminCtx = await getAdminContext()
+  const profileScoped = { ...profile, agency_id: adminCtx?.agencyId ?? profile?.agency_id }
+  if (!profileScoped.agency_id || !(await getAgencyCapabilities(profileScoped.agency_id)).agencyMode) redirect('/admin')
 
   const { data: cronJobs } = await sb.rpc('get_cron_health') as { data: CronHealthRow[] | null }
 
@@ -187,7 +191,7 @@ export default async function DiagnosticsPage() {
   const { data: locations } = await sb
     .from('locations')
     .select('location_id, name')
-    .eq('agency_id', profile.agency_id)
+    .eq('agency_id', profileScoped.agency_id)
     .order('name', { ascending: true })
 
   const locationIds = (locations ?? []).map((l) => l.location_id)

@@ -7,6 +7,7 @@ import LocationsTable from './_components/LocationsTable'
 import SyncSubscriptionsButton from './_components/SyncSubscriptionsButton'
 import AddLocationForm from './_components/AddLocationForm'
 import { ad } from '@/lib/admin/ui'
+import { getAdminContext } from '@/lib/admin/viewAsAgency'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
@@ -67,9 +68,12 @@ export default async function LocationsPage({
 
   const supabase = createAdminClient()
   const { data: profile } = await supabase.from('profiles').select('agency_id').eq('id', user.id).single()
-  if (!profile?.agency_id) redirect('/login')
+  // A super admin viewing another agency sees that agency's data
+  const adminCtx = await getAdminContext()
+  const profileScoped = { ...profile, agency_id: adminCtx?.agencyId ?? profile?.agency_id }
+  if (!profileScoped.agency_id) redirect('/login')
 
-  const agencyId = profile.agency_id
+  const agencyId = profileScoped.agency_id
   const caps = await getAgencyCapabilities(agencyId)
 
   // ── Fetch locations ──

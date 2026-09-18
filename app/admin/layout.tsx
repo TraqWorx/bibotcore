@@ -2,22 +2,20 @@ import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { getAgencyCapabilities } from '@/lib/agency/capabilities'
+import { getAdminContext } from '@/lib/admin/viewAsAgency'
 import AdminNavClient from './_components/AdminNavClient'
 import LogoutButton from './_components/LogoutButton'
 import { ad } from '@/lib/admin/ui'
 
 const getAdminData = cache(async () => {
-  const supabase = await createAuthClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+  const ctx = await getAdminContext()
+  if (!ctx) return null
 
   const admin = createAdminClient()
-  const { data: profile } = await admin.from('profiles').select('role, agency_id').eq('id', user.id).single()
+  // Admins see their own agency; a super admin may open someone else's
+  if (!ctx.agencyId || (ctx.role !== 'admin' && ctx.role !== 'super_admin')) return null
 
-  // Only admin role can access /admin
-  if (profile?.role !== 'admin' || !profile.agency_id) return null
-
-  const agencyId = profile.agency_id
+  const agencyId = ctx.agencyId
   const { data: agency } = await admin.from('agencies').select('name').eq('id', agencyId).single()
   if (!agency) return null
 
@@ -64,7 +62,7 @@ const getAdminData = cache(async () => {
     bottomLinks.push({ href: '/admin/diagnostics', label: 'Diagnostics' })
   }
 
-  return { navLinks, bottomLinks, agencyName, agencyId, initials: agencyName.slice(0, 2).toUpperCase(), email: user.email ?? '' }
+  return { navLinks, bottomLinks, agencyName, agencyId, initials: agencyName.slice(0, 2).toUpperCase(), email: ctx.role === 'super_admin' ? `${agencyName} (viewing as)` : '', viewingAsName: ctx.viewingAsName }
 })
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -73,6 +71,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div id="admin-layout" className="min-h-screen bg-[#f5f5f8]">
+      {data.viewingAsName && (
+        <div className="flex items-center justify-center gap-3 bg-amber-100 px-4 py-2 text-xs font-semibold text-amber-900">
+          Viewing {data.viewingAsName} as their admin
+          <a href="/api/platform/view-as" className="rounded-lg bg-amber-900 px-2.5 py-1 text-[11px] font-bold text-amber-50">Stop</a>
+        </div>
+      )}
       <div className="mx-auto flex min-h-screen w-full max-w-[96rem] gap-6 px-4 py-6 sm:px-6 lg:px-8">
         <aside id="admin-sidebar" className="hidden w-72 shrink-0 lg:block">
           <div className="sticky top-6 space-y-4">

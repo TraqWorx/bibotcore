@@ -6,6 +6,7 @@ import AddLocationForm from './locations/_components/AddLocationForm'
 import LogoutButton from './_components/LogoutButton'
 import LocationChart from './_components/LocationChart'
 import { ad } from '@/lib/admin/ui'
+import { getAdminContext } from '@/lib/admin/viewAsAgency'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
@@ -59,7 +60,10 @@ export default async function AdminPage() {
 
   const supabase = createAdminClient()
   const { data: profile } = await supabase.from('profiles').select('agency_id').eq('id', user.id).single()
-  const agencyId = profile?.agency_id
+  // A super admin viewing another agency sees that agency's data
+  const adminCtx = await getAdminContext()
+  const profileScoped = { ...profile, agency_id: adminCtx?.agencyId ?? profile?.agency_id }
+  const agencyId = profileScoped.agency_id
   const caps = await getAgencyCapabilities(agencyId)
   const ghl = await getAgencyGhlContext(agencyId)
 
