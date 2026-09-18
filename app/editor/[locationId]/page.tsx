@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import type { DashboardLayout, DashboardColors, WidgetConfig } from '@/lib/widgets/types'
 import { isBillingExempt } from '@/lib/agency/capabilities'
 import DashboardEditor from './_components/DashboardEditor'
+import { getAdminContext } from '@/lib/admin/viewAsAgency'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,19 +63,21 @@ export default async function EditorPage({ params }: { params: Promise<{ locatio
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
-  if (!profile?.agency_id) redirect('/login')
+  const ctx = await getAdminContext()
+  const callerAgencyId = ctx?.agencyId ?? profile?.agency_id ?? null
+  if (!callerAgencyId && profile?.role !== 'super_admin') redirect('/login')
 
-  const isBibot = await isBillingExempt(profile.agency_id)
-  const isSuperAdmin = profile.role === 'super_admin'
+  const isBibot = await isBillingExempt(callerAgencyId)
+  const isSuperAdmin = profile?.role === 'super_admin'
   const [{ data: subscription }, { data: config }, { data: location }, { data: agency }] = await Promise.all([
-    sb.from('agency_subscriptions').select('status').eq('agency_id', profile.agency_id).eq('location_id', locationId).eq('status', 'active').maybeSingle(),
+    sb.from('agency_subscriptions').select('status').eq('agency_id', callerAgencyId ?? '').eq('location_id', locationId).eq('status', 'active').maybeSingle(),
     sb.from('dashboard_configs').select('config, theme').eq('location_id', locationId).maybeSingle(),
     sb.from('locations').select('name, agency_id').eq('location_id', locationId).single(),
-    sb.from('agencies').select('custom_templates').eq('id', profile.agency_id).single(),
+    sb.from('agencies').select('custom_templates').eq('id', callerAgencyId ?? '').maybeSingle(),
   ])
 
   // Editing is for admins of the agency that owns the location (super_admin bypasses)
-  if (!isSuperAdmin && (profile.role !== 'admin' || location?.agency_id !== profile.agency_id)) redirect('/admin')
+  if (!isSuperAdmin && (profile?.role !== 'admin' || location?.agency_id !== callerAgencyId)) redirect('/admin')
   // Paywall: own location but no active subscription (Bibot is free).
   if (!isBibot && !isSuperAdmin && !subscription) redirect(`/admin/locations/${locationId}`)
 

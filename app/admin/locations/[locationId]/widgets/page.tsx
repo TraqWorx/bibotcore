@@ -6,6 +6,7 @@ import type { DashboardLayout, DashboardColors } from '@/lib/widgets/types'
 import { isBillingExempt } from '@/lib/agency/capabilities'
 import DashboardBuilder from './_components/DashboardBuilder'
 import SubscribeBanner from './_components/SubscribeBanner'
+import { getAdminContext } from '@/lib/admin/viewAsAgency'
 
 export default async function WidgetEditorPage({
   params,
@@ -19,18 +20,21 @@ export default async function WidgetEditorPage({
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
-  if (!profile?.agency_id) redirect('/login')
+  // A super admin has no agency of their own; fall back to the one being viewed
+  const ctx = await getAdminContext()
+  const callerAgencyId = ctx?.agencyId ?? profile?.agency_id ?? null
+  if (!callerAgencyId && profile?.role !== 'super_admin') redirect('/login')
 
   const [{ data: subscription }, { data: config }, { data: location }] = await Promise.all([
-    sb.from('agency_subscriptions').select('plan, status').eq('agency_id', profile.agency_id).eq('location_id', locationId).maybeSingle(),
+    sb.from('agency_subscriptions').select('plan, status').eq('agency_id', callerAgencyId ?? '').eq('location_id', locationId).maybeSingle(),
     sb.from('dashboard_configs').select('config, theme').eq('location_id', locationId).maybeSingle(),
     sb.from('locations').select('name, agency_id').eq('location_id', locationId).single(),
   ])
 
   // Ownership: location must be in the caller's agency (super_admin bypasses).
-  if (profile.role !== 'super_admin' && location?.agency_id !== profile.agency_id) redirect('/admin')
+  if (profile?.role !== 'super_admin' && location?.agency_id !== callerAgencyId) redirect('/admin')
 
-  const isBibot = await isBillingExempt(profile.agency_id)
+  const isBibot = await isBillingExempt(location?.agency_id ?? callerAgencyId)
   const isSubscribed = isBibot || subscription?.status === 'active'
 
   // Non-Bibot without subscription → redirect to location page with paywall
