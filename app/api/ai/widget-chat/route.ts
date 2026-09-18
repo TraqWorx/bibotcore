@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { isBillingExempt } from '@/lib/agency/capabilities'
 import { getLocationAccess } from '@/lib/auth/assertLocationAccess'
 import type Anthropic from '@anthropic-ai/sdk'
 import { PRESET_WIDGETS } from '@/lib/widgets/registry'
@@ -261,7 +261,7 @@ export async function GET(req: NextRequest) {
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', access.userId).single()
   const cap = Number(process.env.AI_MONTHLY_CAP || 300)
-  if (access.isSuperAdmin || isBibotAgency(profile?.agency_id)) return NextResponse.json({ cap, used: 0, remaining: null, unlimited: true })
+  if (access.isSuperAdmin || await isBillingExempt(profile?.agency_id)) return NextResponse.json({ cap, used: 0, remaining: null, unlimited: true })
   const period = new Date().toISOString().slice(0, 7)
   const { data: usage } = await sb.from('ai_usage').select('count').eq('location_id', locationId).eq('period', period).maybeSingle()
   const used = usage?.count ?? 0
@@ -284,7 +284,7 @@ export async function POST(req: NextRequest) {
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', access.userId).single()
-  const platformBypass = access.isSuperAdmin || isBibotAgency(profile?.agency_id)
+  const platformBypass = access.isSuperAdmin || await isBillingExempt(profile?.agency_id)
   const agencyId = profile?.agency_id
   if (!platformBypass && !agencyId) return NextResponse.json({ error: 'No agency' }, { status: 403 })
 

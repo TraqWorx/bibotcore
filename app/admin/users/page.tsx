@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 export const dynamic = 'force-dynamic'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { getAgencyCapabilities } from '@/lib/agency/capabilities'
 import SyncUsersButton from './_components/SyncUsersButton'
 import UsersTable from './_components/UsersTable'
 import { ad } from '@/lib/admin/ui'
@@ -16,7 +16,7 @@ export default async function AdminUsersPage() {
   if (!profile?.agency_id) redirect('/login')
 
   const agencyId = profile.agency_id
-  const isBibot = isBibotAgency(agencyId)
+  const isBibot = (await getAgencyCapabilities(agencyId)).agencyMode
 
   // Scope profiles to this agency
   const { data: profiles } = await supabase

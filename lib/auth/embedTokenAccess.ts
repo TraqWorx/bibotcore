@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { isBillingExempt } from '@/lib/agency/capabilities'
 import { verifyEmbedToken } from '@/lib/auth/verifyEmbedToken'
 import { EMBED_TOKEN_HEADER } from '@/lib/widgets/embedToken'
 
@@ -55,7 +55,7 @@ export async function getEmbedTokenGrant(req: NextRequest, locationId: string): 
   const config = await verifyEmbedToken(locationId, token)
   if (!config) return null
 
-  if (!isBibotAgency(config.agency_id)) {
+  if (!(await isBillingExempt(config.agency_id))) {
     const { data: subscription } = await createAdminClient()
       .from('agency_subscriptions').select('status')
       .eq('agency_id', config.agency_id).eq('location_id', locationId).eq('status', 'active')

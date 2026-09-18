@@ -1,5 +1,5 @@
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { isBillingExempt } from '@/lib/agency/capabilities'
 import { verifyEmbedToken } from '@/lib/auth/verifyEmbedToken'
 import { TEMPLATE_LAYOUTS } from '@/lib/widgets/types'
 import WidgetGrid from '@/lib/widgets/WidgetGrid'
@@ -60,7 +60,7 @@ export default async function EmbedDashboardPage({
   }
 
   // Check subscription (Bibot bypasses)
-  if (!isBibotAgency(config.agency_id)) {
+  if (!(await isBillingExempt(config.agency_id))) {
     const { data: subscription } = await sb
       .from('agency_subscriptions')
       .select('status')

@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import type { DashboardLayout, DashboardColors } from '@/lib/widgets/types'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { isBillingExempt } from '@/lib/agency/capabilities'
 import DashboardBuilder from './_components/DashboardBuilder'
 import SubscribeBanner from './_components/SubscribeBanner'
 
@@ -30,7 +30,7 @@ export default async function WidgetEditorPage({
   // Ownership: location must be in the caller's agency (super_admin bypasses).
   if (profile.role !== 'super_admin' && location?.agency_id !== profile.agency_id) redirect('/admin')
 
-  const isBibot = isBibotAgency(profile.agency_id)
+  const isBibot = await isBillingExempt(profile.agency_id)
   const isSubscribed = isBibot || subscription?.status === 'active'
 
   // Non-Bibot without subscription → redirect to location page with paywall

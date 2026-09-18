@@ -5,18 +5,18 @@ import { syncLocationUsers } from '@/lib/ghl/provisionLocation'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
 
-export async function syncSubscriptionsCore(): Promise<{ synced: number; error?: string }> {
+export async function syncSubscriptionsCore(agencyId?: string | null): Promise<{ synced: number; error?: string }> {
   const supabase = createAdminClient()
-  const token = process.env.GHL_AGENCY_TOKEN
-  const companyId = process.env.GHL_COMPANY_ID
+  const { getAgencyGhlContext } = await import('@/lib/agency/capabilities')
+  const { token, companyId } = await getAgencyGhlContext(agencyId)
   // The subscriptionId below comes from GHL saasSettings — it lives in the
   // GHL-connected Stripe account, so look it up with that account's key (fall
   // back to the SaaS key only if the GHL key isn't configured).
   const stripeKey = process.env.STRIPE_GHL_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY
-  if (!token) return { synced: 0, error: 'GHL_AGENCY_TOKEN not set' }
+  if (!token) return { synced: 0, error: 'No agency token stored' }
 
   // Step 1: Sync plan prices from GHL into ghl_plans table
-  const { plans } = await fetchGhlPlans(token, companyId)
+  const { plans } = await fetchGhlPlans(token, companyId ?? undefined)
   for (const plan of plans) {
     const row: Record<string, unknown> = { ghl_plan_id: plan.id, name: plan.name }
     if (plan.priceMonthly != null) row.price_monthly = plan.priceMonthly

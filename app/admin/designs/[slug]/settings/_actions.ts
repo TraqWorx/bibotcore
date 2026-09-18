@@ -11,8 +11,10 @@ async function assertSuperAdmin() {
   const supabase = createAdminClient()
   const { data: profile } = await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
   if (profile?.role === 'super_admin') return
-  const { isBibotAgency } = await import('@/lib/isBibotAgency')
-  if (!isBibotAgency(profile?.agency_id)) throw new Error('Not authorized')
+  // Any agency that manages its own GHL sub-accounts (has an agency token)
+  const { getAgencyCapabilities } = await import('@/lib/agency/capabilities')
+  const caps = await getAgencyCapabilities(profile?.agency_id)
+  if (profile?.role !== 'admin' || !caps.agencyMode) throw new Error('Not authorized')
 }
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/

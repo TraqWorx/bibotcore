@@ -1,7 +1,7 @@
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { getAgencyCapabilities, getAgencyGhlContext } from '@/lib/agency/capabilities'
 import AddLocationForm from './locations/_components/AddLocationForm'
 import LogoutButton from './_components/LogoutButton'
 import LocationChart from './_components/LocationChart'
@@ -30,9 +30,7 @@ interface GhlLocation {
   dateAdded: string | null
 }
 
-async function fetchGhlLocations(): Promise<GhlLocation[]> {
-  const token = process.env.GHL_AGENCY_TOKEN
-  const companyId = process.env.GHL_COMPANY_ID
+async function fetchGhlLocations(token: string | null, companyId: string | null): Promise<GhlLocation[]> {
   if (!token) return []
   try {
     const params = new URLSearchParams({ limit: '100' })
@@ -62,10 +60,11 @@ export default async function AdminPage() {
   const supabase = createAdminClient()
   const { data: profile } = await supabase.from('profiles').select('agency_id').eq('id', user.id).single()
   const agencyId = profile?.agency_id
-  const isBibot = isBibotAgency(agencyId)
+  const caps = await getAgencyCapabilities(agencyId)
+  const ghl = await getAgencyGhlContext(agencyId)
 
-  // Non-Bibot: simple agency dashboard
-  if (!isBibot && agencyId) {
+  // No agency token: the simple dashboard
+  if (!caps.agencyMode && agencyId) {
     const [{ count: locationCount }, { count: activeSubCount }, { data: subs }] = await Promise.all([
       supabase.from('locations').select('location_id', { count: 'exact', head: true }).eq('agency_id', agencyId),
       supabase.from('agency_subscriptions').select('id', { count: 'exact', head: true }).eq('agency_id', agencyId).eq('status', 'active'),
@@ -105,7 +104,7 @@ export default async function AdminPage() {
     )
   }
 
-  // Bibot: full platform analytics
+  // Agency mode: full analytics across the agency's sub-accounts
   const now = new Date()
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
   const todayStr = now.toISOString().split('T')[0]
@@ -124,7 +123,7 @@ export default async function AdminPage() {
     { count: churnedCount },
     { count: everSubscribedCount },
   ] = await Promise.all([
-    fetchGhlLocations(),
+    fetchGhlLocations(ghl.token, ghl.companyId),
     supabase.from('profiles').select('id', { count: 'exact', head: true }).neq('role', 'super_admin'),
     supabase.from('installs').select('id', { count: 'exact', head: true }),
     supabase.from('installs').select('id', { count: 'exact', head: true }).gte('installed_at', todayStr),
@@ -219,7 +218,7 @@ export default async function AdminPage() {
   try {
     const { refreshIfNeeded } = await import('@/lib/ghl/refreshIfNeeded')
     const { data: affConns } = await supabase.from('ghl_connections').select('location_id, access_token, refresh_token, expires_at, company_id').not('refresh_token', 'is', null).limit(5)
-    const ghlCompanyId = process.env.GHL_COMPANY_ID ?? ''
+    const ghlCompanyId = ghl.companyId ?? ''
     for (const conn of affConns ?? []) {
       const token = await refreshIfNeeded(conn.location_id, conn)
       const cid = conn.company_id ?? ghlCompanyId

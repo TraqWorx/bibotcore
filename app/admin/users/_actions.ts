@@ -17,8 +17,8 @@ async function requireAuth(): Promise<{ role: string; agencyId: string | null }>
 async function requirePlatform(): Promise<void> {
   const { role, agencyId } = await requireAuth()
   if (role === 'super_admin') return
-  const { isBibotAgency } = await import('@/lib/isBibotAgency')
-  if (!isBibotAgency(agencyId)) throw new Error('Not authorized')
+  const { getAgencyCapabilities } = await import('@/lib/agency/capabilities')
+  if (!(await getAgencyCapabilities(agencyId)).agencyMode) throw new Error('Not authorized')
 }
 
 /** Target user must be in the caller's agency and not an admin/super_admin. super_admin bypasses. */
@@ -45,10 +45,11 @@ export async function syncGhlUsers(): Promise<{ synced: number; removed: number;
   try {
     await requirePlatform()
     const supabase = createAdminClient()
-    const agencyToken = process.env.GHL_AGENCY_TOKEN
-    const companyId = process.env.GHL_COMPANY_ID
+    const { agencyId } = await requireAuth()
+    const { getAgencyGhlContext } = await import('@/lib/agency/capabilities')
+    const { token: agencyToken, companyId } = await getAgencyGhlContext(agencyId)
 
-    if (!agencyToken) return { synced: 0, removed: 0, debug: ['No GHL_AGENCY_TOKEN set'], error: 'Missing agency token' }
+    if (!agencyToken) return { synced: 0, removed: 0, debug: ['No agency token stored'], error: 'Missing agency token' }
 
     let synced = 0
     let removed = 0

@@ -1,6 +1,5 @@
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
-import { isBibotAgency } from '@/lib/isBibotAgency'
 import FinancesClient from './_components/FinancesClient'
 import { ad } from '@/lib/admin/ui'
 
@@ -13,7 +12,10 @@ export default async function FinancesPage() {
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
-  if (!profile?.agency_id || !isBibotAgency(profile.agency_id)) redirect('/admin')
+  if (!profile?.agency_id) redirect('/admin')
+  const { data: agencyRow } = await sb.from('agencies').select('ghl_stripe_secret_key').eq('id', profile.agency_id).maybeSingle()
+  const agencyStripeKey = agencyRow?.ghl_stripe_secret_key ?? null
+  if (!agencyStripeKey) redirect('/admin')
 
   const agencyId = profile.agency_id
 
@@ -101,7 +103,7 @@ export default async function FinancesPage() {
   const allCharges: { amount: number; created: number }[] = []
   try {
     const Stripe = (await import('stripe')).default
-    const ghlStripeKey = process.env.STRIPE_GHL_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY
+    const ghlStripeKey = agencyStripeKey
     if (ghlStripeKey) {
       const stripe = new Stripe(ghlStripeKey)
       const oldestStart = Math.floor(new Date(currentYear - 1, 0, 1).getTime() / 1000)

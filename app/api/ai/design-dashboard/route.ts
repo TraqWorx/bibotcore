@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', access.userId).single()
 
   // Verify subscription
-  const { isBibotAgency } = await import('@/lib/isBibotAgency')
-  const platformBypass = access.isSuperAdmin || isBibotAgency(profile?.agency_id)
+  const { isBillingExempt } = await import('@/lib/agency/capabilities')
+  const platformBypass = access.isSuperAdmin || await isBillingExempt(profile?.agency_id)
   const agencyId = profile?.agency_id
   if (!platformBypass && !agencyId) return NextResponse.json({ error: 'No agency' }, { status: 403 })
   if (!platformBypass) {

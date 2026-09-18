@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { getAgencyCapabilities } from '@/lib/agency/capabilities'
 import { refreshGhlToken } from '@/lib/ghl/refreshGhlToken'
 
 async function ensureBibot(): Promise<{ error: string } | undefined> {
@@ -11,7 +11,7 @@ async function ensureBibot(): Promise<{ error: string } | undefined> {
   if (!user) return { error: 'Not signed in' }
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
-  if (!profile?.agency_id || !isBibotAgency(profile.agency_id)) return { error: 'Forbidden' }
+  if (!profile?.agency_id || !(await getAgencyCapabilities(profile.agency_id)).agencyMode) return { error: 'Forbidden' }
 }
 
 export async function refreshConnection(locationId: string): Promise<{ error: string } | undefined> {

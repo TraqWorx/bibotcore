@@ -39,8 +39,8 @@ export async function POST(request: Request) {
     }
   } else {
     // Sync ALL locations — platform only (super_admin or Bibot).
-    const { isBibotAgency } = await import('@/lib/isBibotAgency')
-    if (admin.role !== 'super_admin' && !isBibotAgency(admin.agencyId)) {
+    const { getAgencyCapabilities } = await import('@/lib/agency/capabilities')
+    if (admin.role !== 'super_admin' && !(await getAgencyCapabilities(admin.agencyId)).agencyMode) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
   }

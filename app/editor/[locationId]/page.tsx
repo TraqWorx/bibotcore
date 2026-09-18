@@ -2,7 +2,7 @@ import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import type { DashboardLayout, DashboardColors, WidgetConfig } from '@/lib/widgets/types'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { isBillingExempt } from '@/lib/agency/capabilities'
 import DashboardEditor from './_components/DashboardEditor'
 
 export const dynamic = 'force-dynamic'
@@ -21,7 +21,7 @@ async function editorAgencyFor(locationId: string): Promise<string | null> {
   if (!location?.agency_id) return null
   if (profile?.role === 'super_admin') return location.agency_id
   if (profile?.role !== 'admin' || location.agency_id !== profile.agency_id) return null
-  if (isBibotAgency(profile.agency_id)) return location.agency_id
+  if (await isBillingExempt(profile.agency_id)) return location.agency_id
   const { data: subscription } = await sb.from('agency_subscriptions').select('status')
     .eq('agency_id', profile.agency_id).eq('location_id', locationId).eq('status', 'active').maybeSingle()
   return subscription ? location.agency_id : null
@@ -64,7 +64,7 @@ export default async function EditorPage({ params }: { params: Promise<{ locatio
   const { data: profile } = await sb.from('profiles').select('agency_id, role').eq('id', user.id).single()
   if (!profile?.agency_id) redirect('/login')
 
-  const isBibot = isBibotAgency(profile.agency_id)
+  const isBibot = await isBillingExempt(profile.agency_id)
   const isSuperAdmin = profile.role === 'super_admin'
   const [{ data: subscription }, { data: config }, { data: location }, { data: agency }] = await Promise.all([
     sb.from('agency_subscriptions').select('status').eq('agency_id', profile.agency_id).eq('location_id', locationId).eq('status', 'active').maybeSingle(),

@@ -18,8 +18,8 @@ async function assertSuperAdmin() {
     .single()
 
   if (profile?.role === 'super_admin') return
-  const { isBibotAgency } = await import('@/lib/isBibotAgency')
-  if (!isBibotAgency(profile?.agency_id)) throw new Error('Not authorized')
+  const { getAgencyCapabilities } = await import('@/lib/agency/capabilities')
+  if (!(await getAgencyCapabilities(profile?.agency_id)).agencyMode) throw new Error('Not authorized')
 }
 
 // Slugify: lowercase, replace spaces/special chars with hyphens

@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { getAgencyCapabilities } from '@/lib/agency/capabilities'
 import SubscribeBanner from './widgets/_components/SubscribeBanner'
 import ConnectLocationButton from '../_components/ConnectLocationButton'
 import SyncStatus from './_components/SyncStatus'
@@ -37,7 +37,7 @@ export default async function LocationDetailPage({
     const { data: prof } = await supabase.from('profiles').select('agency_id, role').eq('id', user.id).single()
     agencyId = prof?.agency_id ?? null
     role = prof?.role ?? null
-    isBibot = isBibotAgency(agencyId)
+    isBibot = (await getAgencyCapabilities(agencyId)).agencyMode
   }
 
   // Ownership: a non-super_admin may only view locations in their own agency.

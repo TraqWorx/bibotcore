@@ -29,8 +29,8 @@ async function requireLocationOwner(locationId: string): Promise<void> {
 async function requirePlatform(): Promise<void> {
   const { role, agencyId } = await requireAuth()
   if (role === 'super_admin') return
-  const { isBibotAgency } = await import('@/lib/isBibotAgency')
-  if (!isBibotAgency(agencyId)) throw new Error('Not authorized')
+  const { getAgencyCapabilities } = await import('@/lib/agency/capabilities')
+  if (!(await getAgencyCapabilities(agencyId)).agencyMode) throw new Error('Not authorized')
 }
 
 export async function connectLocations(
@@ -43,9 +43,10 @@ export async function connectLocations(
     if (!locationIds.length) return { error: 'Select at least one location' }
     if (!designSlug) return { error: 'Select a design' }
 
-    if (!process.env.GHL_AGENCY_TOKEN || !process.env.GHL_COMPANY_ID) {
-      return { error: 'Agency token not configured' }
-    }
+    const { agencyId } = await requireAuth()
+    const { getAgencyGhlContext } = await import('@/lib/agency/capabilities')
+    const { token: agencyTokenCheck } = await getAgencyGhlContext(agencyId)
+    if (!agencyTokenCheck) return { error: 'Agency token not configured' }
 
     for (const locationId of locationIds) {
       await provisionLocation(locationId, designSlug)
@@ -200,8 +201,8 @@ export async function getConnectLocationUrl(locationId: string): Promise<{ url: 
   }
 
   // Check subscription (Bibot bypasses)
-  const { isBibotAgency } = await import('@/lib/isBibotAgency')
-  if (!isBibotAgency(profile?.agency_id)) {
+  const { getAgencyCapabilities } = await import('@/lib/agency/capabilities')
+  if (!(await getAgencyCapabilities(profile?.agency_id)).billingExempt) {
     const { data: sub } = await sb.from('agency_subscriptions').select('status').eq('agency_id', profile!.agency_id!).eq('location_id', locationId).eq('status', 'active').maybeSingle()
     if (!sub) return { error: 'Subscribe to this location before connecting GHL' }
   }

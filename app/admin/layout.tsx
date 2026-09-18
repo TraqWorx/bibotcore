@@ -1,7 +1,7 @@
 import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { getAgencyCapabilities } from '@/lib/agency/capabilities'
 import AdminNavClient from './_components/AdminNavClient'
 import LogoutButton from './_components/LogoutButton'
 import { ad } from '@/lib/admin/ui'
@@ -22,6 +22,7 @@ const getAdminData = cache(async () => {
   if (!agency) return null
 
   const agencyName = agency.name
+  const caps = await getAgencyCapabilities(agencyId)
 
   // Count data scoped to the agency
   const [{ count: userCount }, { count: locationCount }] = await Promise.all([
@@ -37,8 +38,8 @@ const getAdminData = cache(async () => {
   // Affiliates — every agency sees its own connected-location affiliate data.
   navLinks.push({ href: '/admin/affiliates', label: 'Affiliates' })
 
-  // Finances — Bibot-only (pulls the GHL Stripe account + bespoke Italian VAT).
-  if (isBibotAgency(agencyId)) {
+  // Finances needs the agency's own GHL-connected Stripe account
+  if (caps.financesEnabled) {
     navLinks.push({ href: '/admin/finances', label: 'Finances' })
   }
 
@@ -59,7 +60,7 @@ const getAdminData = cache(async () => {
     { href: '/admin/users', label: 'Users', count: userCount ?? 0 },
     { href: '/admin/account', label: 'Account & Billing' },
   ]
-  if (isBibotAgency(agencyId)) {
+  if (caps.agencyMode) {
     bottomLinks.push({ href: '/admin/diagnostics', label: 'Diagnostics' })
   }
 

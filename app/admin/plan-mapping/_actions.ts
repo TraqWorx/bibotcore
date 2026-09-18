@@ -17,8 +17,10 @@ async function assertSuperAdmin() {
     .single()
 
   if (profile?.role === 'super_admin') return
-  const { isBibotAgency } = await import('@/lib/isBibotAgency')
-  if (!isBibotAgency(profile?.agency_id)) throw new Error('Not authorized')
+  // Any agency that manages its own GHL sub-accounts (has an agency token)
+  const { getAgencyCapabilities } = await import('@/lib/agency/capabilities')
+  const caps = await getAgencyCapabilities(profile?.agency_id)
+  if (profile?.role !== 'admin' || !caps.agencyMode) throw new Error('Not authorized')
 }
 
 export async function createPlanMapping(

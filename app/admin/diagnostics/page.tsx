@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createAdminClient, createAuthClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { getAgencyCapabilities } from '@/lib/agency/capabilities'
 import { ad } from '@/lib/admin/ui'
 import RefreshButton from './_components/RefreshButton'
 
@@ -171,7 +171,7 @@ export default async function DiagnosticsPage() {
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
-  if (!profile?.agency_id || !isBibotAgency(profile.agency_id)) redirect('/admin')
+  if (!profile?.agency_id || !(await getAgencyCapabilities(profile.agency_id)).agencyMode) redirect('/admin')
 
   const { data: cronJobs } = await sb.rpc('get_cron_health') as { data: CronHealthRow[] | null }
 

@@ -181,7 +181,8 @@ export default async function AffiliatesPage() {
   if (!profile?.agency_id) redirect('/admin')
 
   // Fetch affiliates from the agency's OWN connected locations only.
-  const companyId = process.env.GHL_COMPANY_ID ?? ''
+  const { getAgencyGhlContext } = await import('@/lib/agency/capabilities')
+  const companyId = (await getAgencyGhlContext(profile.agency_id)).companyId ?? ''
   const { data: locations } = await sb.from('locations').select('location_id, name, ghl_plan_id').eq('agency_id', profile.agency_id)
   const nameMap = new Map((locations ?? []).map((l) => [l.location_id, l.name]))
   const agencyLocIds = (locations ?? []).map((l) => l.location_id)

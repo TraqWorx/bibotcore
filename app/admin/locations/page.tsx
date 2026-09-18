@@ -1,7 +1,7 @@
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { getAgencyCapabilities, getAgencyGhlContext } from '@/lib/agency/capabilities'
 import BulkConnectButton from './_components/BulkConnectButton'
 import LocationsTable from './_components/LocationsTable'
 import SyncSubscriptionsButton from './_components/SyncSubscriptionsButton'
@@ -70,17 +70,16 @@ export default async function LocationsPage({
   if (!profile?.agency_id) redirect('/login')
 
   const agencyId = profile.agency_id
-  const isBibot = isBibotAgency(agencyId)
+  const caps = await getAgencyCapabilities(agencyId)
 
   // ── Fetch locations ──
   let ghlLocations: GhlLocation[] = []
 
-  if (isBibot) {
-    // Bibot: fetch all from GHL agency token
-    const envToken = process.env.GHL_AGENCY_TOKEN
-    const envCompanyId = process.env.GHL_COMPANY_ID
-    if (envToken) {
-      ghlLocations = await fetchAllGhlLocations(envToken, envCompanyId)
+  if (caps.agencyMode) {
+    // Agency token stored: list every sub-account straight from GHL
+    const { token, companyId } = await getAgencyGhlContext(agencyId)
+    if (token) {
+      ghlLocations = await fetchAllGhlLocations(token, companyId ?? undefined)
     }
     // Backfill location names
     if (ghlLocations.length > 0) {
@@ -187,7 +186,7 @@ export default async function LocationsPage({
       id: l.id,
       name: l.name,
       connected: connectedIds.has(l.id),
-      subscribed: isBibot || subscribedIds.has(l.id),
+      subscribed: caps.billingExempt || subscribedIds.has(l.id),
       stripePlan: stripePlanByLocation[l.id] ?? null,
       users: userCountByLocation[l.id] ?? 0,
       design: designByLocation[l.id] ?? null,
@@ -218,8 +217,8 @@ export default async function LocationsPage({
           <p className={ad.pageSubtitle}>{ghlLocations.length} total</p>
         </div>
         <div className="flex items-center gap-3">
-          {isBibot && <SyncSubscriptionsButton />}
-          {isBibot ? (
+          {caps.agencyMode && <SyncSubscriptionsButton />}
+          {caps.agencyMode ? (
             <BulkConnectButton designs={designsList} unconnectedLocations={unconnectedLocations} />
           ) : (
             <AddLocationForm />

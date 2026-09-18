@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { redirect } from 'next/navigation'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
-import { isBibotAgency } from '@/lib/isBibotAgency'
+import { getAgencyCapabilities } from '@/lib/agency/capabilities'
 import DesignsTable from './_components/DesignsTable'
 import CreateDesignButton from './_components/CreateDesignButton'
 import { ad } from '@/lib/admin/ui'
@@ -68,7 +68,7 @@ export default async function AdminDesignsPage() {
 
   const supabase = createAdminClient()
   const { data: profile } = await supabase.from('profiles').select('role, agency_id').eq('id', user.id).single()
-  if (profile?.role !== 'super_admin' && !isBibotAgency(profile?.agency_id)) redirect('/admin')
+  if (profile?.role !== 'super_admin' && !(await getAgencyCapabilities(profile?.agency_id)).agencyMode) redirect('/admin')
 
   await autoRegisterDesigns(supabase)
   const { data: designs, error } = await supabase

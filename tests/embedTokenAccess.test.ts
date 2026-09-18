@@ -19,9 +19,13 @@ vi.mock('@/lib/supabase-server', () => ({
   },
 }))
 
+vi.mock('@/lib/agency/capabilities', () => ({
+  isBillingExempt: (agencyId: string) => Promise.resolve(agencyId === EXEMPT_AGENCY),
+}))
+
 import { embedFiltersAllowed, getEmbedTokenGrant } from '@/lib/auth/embedTokenAccess'
 
-const BIBOT = 'e7b3d0d8-5682-44d5-87c1-c449e6814f15'
+const EXEMPT_AGENCY = 'agency-without-billing'
 
 function request(token?: string) {
   return new NextRequest('https://example.com/api/widgets/data', {
@@ -52,13 +56,13 @@ describe('getEmbedTokenGrant', () => {
   })
 
   it('limits a valid token to the data sources its dashboard uses, without the team list', async () => {
-    mockVerify.mockResolvedValue({ agency_id: BIBOT, config: dashboard })
+    mockVerify.mockResolvedValue({ agency_id: EXEMPT_AGENCY, config: dashboard })
     const grant = await getEmbedTokenGrant(request('good'), 'loc_1')
     expect([...grant!.dataSources].sort()).toEqual(['contacts', 'none', 'opportunities'])
     expect(grant!.dataSources.has('users')).toBe(false)
   })
 
-  it('refuses tokens for non-Bibot locations without an active subscription', async () => {
+  it('refuses tokens for billed agencies without an active subscription', async () => {
     mockVerify.mockResolvedValue({ agency_id: 'other', config: dashboard })
     mockSubscription.mockReturnValue(null)
     expect(await getEmbedTokenGrant(request('good'), 'loc_1')).toBeNull()
@@ -69,7 +73,7 @@ describe('getEmbedTokenGrant', () => {
 
 describe('embedFiltersAllowed', () => {
   it('accepts only the filters a saved widget uses', async () => {
-    mockVerify.mockResolvedValue({ agency_id: BIBOT, config: dashboard })
+    mockVerify.mockResolvedValue({ agency_id: EXEMPT_AGENCY, config: dashboard })
     const grant = (await getEmbedTokenGrant(request('good'), 'loc_1'))!
     expect(embedFiltersAllowed(grant, 'contacts', { tags: 'vip' })).toBe(true)
     expect(embedFiltersAllowed(grant, 'contacts', { tags: 'vip', query: 'gmail' })).toBe(false)
