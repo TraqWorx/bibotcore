@@ -41,17 +41,16 @@ const getAdminData = cache(async () => {
     navLinks.push({ href: '/admin/finances', label: 'Finances' })
   }
 
-  // Agencies with installed designs get Designs + Plan Mapping
-  if (agencyId) {
+  // Agencies that manage their own sub-accounts get Designs + Plan Mapping,
+  // whether or not anything is installed yet — that's where the first one is made.
+  if (caps.agencyMode) {
     const { count: designCount } = await admin.from('installs').select('id', { count: 'exact', head: true })
       .in('location_id', (await admin.from('locations').select('location_id').eq('agency_id', agencyId)).data?.map(l => l.location_id) ?? [])
       .not('design_slug', 'is', null)
-    if ((designCount ?? 0) > 0) {
-      navLinks.push(
-        { href: '/admin/designs', label: 'Designs', count: designCount ?? 0 },
-        { href: '/admin/plan-mapping', label: 'Plan Mapping', count: 0 },
-      )
-    }
+    navLinks.push(
+      { href: '/admin/designs', label: 'Designs', count: designCount ?? 0 },
+      { href: '/admin/plan-mapping', label: 'Plan Mapping', count: 0 },
+    )
   }
 
   const bottomLinks: { href: string; label: string; count?: number }[] = [
