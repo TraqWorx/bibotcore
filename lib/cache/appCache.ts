@@ -4,9 +4,9 @@ import { createAdminClient } from '@/lib/supabase-server'
  * Read-through cache in `app_cache` (migration 144), for values that are slow
  * because they come from a third party rather than from our own database.
  *
- * Deliberately not Next's unstable_cache: these pages are `force-dynamic` and
- * nothing was being held between requests. A row with a timestamp is also
- * something we can inspect, and expire by hand when we need to.
+ * Chosen over Next's unstable_cache (which does work here — an earlier claim in
+ * this repo's history that it did not was a mismeasurement) because a row with a
+ * timestamp survives a deployment, can be inspected, and can be expired by hand.
  *
  * If `compute` throws and a stale entry exists, the stale value is returned — a
  * Stripe or GHL outage should show the last known figures, not zeroes.

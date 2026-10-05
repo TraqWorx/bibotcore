@@ -1,8 +1,8 @@
 -- A read-through cache for things that are slow because they live in someone
 -- else's API. The Finances page spends five seconds walking Stripe's charge
--- list and several more on GHL affiliate calls; Next's unstable_cache does not
--- hold across requests on these force-dynamic routes, so the cache lives here
--- where its behaviour is visible and testable.
+-- list and several more on GHL affiliate calls. Keeping the cache here rather
+-- than in the framework means it survives a deployment, can be inspected, and
+-- can be expired by hand.
 
 create table if not exists app_cache (
   key        text primary key,
