@@ -35,17 +35,25 @@ export default async function Page() {
     cached_at: string
     first_payment_at: string | null
   }
+  // Count first, then fetch the 1,000-row pages together instead of one after
+  // another. `id` is the tiebreaker: ordering by pod_pdr alone leaves ties and
+  // nulls free to move between pages, which drops or repeats rows.
   const fetchActivePods = async (): Promise<PodLite[]> => {
-    const out: PodLite[] = []
-    for (let from = 0; ; from += 1000) {
-      const { data } = await sb.from('apulia_contacts')
+    const { count } = await sb.from('apulia_contacts')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_amministratore', false).eq('is_switch_out', false).neq('sync_status', 'pending_delete')
+    const pages = Math.max(1, Math.ceil((count ?? 0) / 1000))
+    const results = await Promise.all(Array.from({ length: pages }, (_, i) =>
+      sb.from('apulia_contacts')
         .select('id, pod_pdr, first_name, last_name, cliente, codice_amministratore, amministratore_name, pod_override, cached_at, first_payment_at')
         .eq('is_amministratore', false).eq('is_switch_out', false).neq('sync_status', 'pending_delete')
-        .order('pod_pdr', { nullsFirst: false })
-        .range(from, from + 999)
-      if (!data || data.length === 0) break
-      out.push(...(data as PodLite[]))
-      if (data.length < 1000) break
+        .order('pod_pdr', { nullsFirst: false }).order('id')
+        .range(i * 1000, i * 1000 + 999),
+    ))
+    const out: PodLite[] = []
+    for (const { data, error } of results) {
+      if (error) throw new Error(`read active pods: ${error.message}`)
+      out.push(...((data ?? []) as unknown as PodLite[]))
     }
     return out
   }
@@ -67,26 +75,40 @@ export default async function Page() {
     switched_out_at: string | null
   }
   const fetchSwitchedPods = async (): Promise<SwitchedPodLite[]> => {
-    const out: SwitchedPodLite[] = []
-    for (let from = 0; ; from += 1000) {
-      const { data } = await sb.from('apulia_contacts')
+    const { count } = await sb.from('apulia_contacts')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_amministratore', false).eq('is_switch_out', true).neq('sync_status', 'pending_delete')
+    const pages = Math.max(1, Math.ceil((count ?? 0) / 1000))
+    const results = await Promise.all(Array.from({ length: pages }, (_, i) =>
+      sb.from('apulia_contacts')
         .select('id, pod_pdr, first_name, last_name, cliente, codice_amministratore, amministratore_name, switched_out_at')
         .eq('is_amministratore', false).eq('is_switch_out', true).neq('sync_status', 'pending_delete')
-        .order('switched_out_at', { ascending: false, nullsFirst: false })
-        .range(from, from + 999)
-      if (!data || data.length === 0) break
-      out.push(...(data as SwitchedPodLite[]))
-      if (data.length < 1000) break
+        .order('switched_out_at', { ascending: false, nullsFirst: false }).order('id')
+        .range(i * 1000, i * 1000 + 999),
+    ))
+    const out: SwitchedPodLite[] = []
+    for (const { data, error } of results) {
+      if (error) throw new Error(`read switched pods: ${error.message}`)
+      out.push(...((data ?? []) as unknown as SwitchedPodLite[]))
     }
     return out
   }
 
+  // One wait for everything on this page. These were four sequential stages —
+  // the POD reads, then the default payment offset, then the queue/imports/
+  // workflows batch (which includes a GHL call), then the tag counts — and none
+  // of them needs a result from the one before it.
   const [
     { data: admins },
     { data: podCounts },
     activePods,
     podPaymentCounts,
     switchedPods,
+    defaultOffset,
+    queueStatsResult,
+    syncImportsResult,
+    workflowsResult,
+    { data: tagRows },
   ] = await Promise.all([
     sb.from('apulia_contacts')
       .select('id, first_name, last_name, codice_amministratore, compenso_per_pod, commissione_totale, payment_offset_days')
@@ -96,6 +118,11 @@ export default async function Page() {
     fetchActivePods(),
     fetchPodPaymentCounts(),
     fetchSwitchedPods(),
+    getDefaultPaymentOffset(),
+    getSyncQueueStats(),
+    listSyncImports(),
+    listApuliaWorkflows().catch((e) => ({ error: e instanceof Error ? e.message : 'failed' })),
+    sb.rpc('apulia_tag_counts'),
   ])
 
   const podCountMap = new Map(((podCounts ?? []) as Array<{ codice_amministratore: string; active: number }>).map((r) => [r.codice_amministratore, Number(r.active)]))
@@ -110,8 +137,6 @@ export default async function Page() {
       adminByCode.set(a.codice_amministratore, { id: a.id, name })
     }
   }
-  const defaultOffset = await getDefaultPaymentOffset()
-
   const todayMs = Date.now()
   const podScheduleEntries: PodScheduleEntry[] = activePods.map((p) => {
     const paidCount = podPaymentCounts.get(p.id) ?? 0
@@ -165,11 +190,6 @@ export default async function Page() {
   const noCompensoCount = compensiEntries.filter((a) => a.compensoPerPod === 0).length
   const switchOutNoDateCount = switchOutEntries.filter((p) => !p.switchedOutAt).length
 
-  const [queueStatsResult, syncImportsResult, workflowsResult] = await Promise.all([
-    getSyncQueueStats(),
-    listSyncImports(),
-    listApuliaWorkflows().catch((e) => ({ error: e instanceof Error ? e.message : 'failed' })),
-  ])
   const workflows = Array.isArray(workflowsResult) ? workflowsResult : []
   const workflowsError = !Array.isArray(workflowsResult) && 'error' in workflowsResult ? workflowsResult.error : null
   const queueStats = 'error' in queueStatsResult
@@ -179,7 +199,6 @@ export default async function Page() {
   const queueBadge = queueStats.pending + queueStats.inProgress + queueStats.failed
 
   // Tag usage across the cache — one aggregate RPC (was a full-table scan).
-  const { data: tagRows } = await sb.rpc('apulia_tag_counts')
   const tagUsage = ((tagRows ?? []) as Array<{ tag: string; cnt: number }>)
     .map((r) => ({ tag: r.tag, count: Number(r.cnt) }))
     .sort((a, b) => b.count - a.count)
@@ -221,7 +240,7 @@ export default async function Page() {
                   <h2 style={{ fontSize: 16, fontWeight: 800 }}>Compenso per POD per amministratore</h2>
                   <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
                     Modifica direttamente il compenso per POD di ciascun amministratore. La modifica viene scritta sul custom field
-                    in GHL Custom Dash e la commissione totale viene ricalcolata su tutti i POD attivi.
+                    in Bibot e la commissione totale viene ricalcolata su tutti i POD attivi.
                   </p>
                 </header>
                 <div style={{ padding: '16px 20px' }}>
@@ -258,7 +277,7 @@ export default async function Page() {
                 <header style={{ padding: '16px 20px', borderBottom: '1px solid var(--ap-line)' }}>
                   <h2 style={{ fontSize: 16, fontWeight: 800 }}>Coda di sincronizzazione</h2>
                   <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
-                    Operazioni in attesa di essere sincronizzate. GHL Custom Dash è la fonte di verità;
+                    Operazioni in attesa di essere sincronizzate. Bibot è la fonte di verità;
                     le modifiche sono già applicate in locale e vengono propagate in background.
                   </p>
                 </header>
@@ -278,7 +297,7 @@ export default async function Page() {
                 <header style={{ padding: '16px 20px', borderBottom: '1px solid var(--ap-line)' }}>
                   <h2 style={{ fontSize: 16, fontWeight: 800 }}>Gestione tag</h2>
                   <p style={{ fontSize: 12, color: 'var(--ap-text-muted)', marginTop: 4 }}>
-                    Tutti i tag usati nei contatti Apulia (condomini + amministratori). Eliminandoli vengono rimossi anche da GHL Custom Dash.
+                    Tutti i tag usati nei contatti Apulia (condomini + amministratori). Eliminandoli vengono rimossi anche da Bibot.
                   </p>
                 </header>
                 <div style={{ padding: '16px 20px' }}>

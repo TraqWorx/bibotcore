@@ -18,6 +18,9 @@ export interface PodScheduleEntry {
   amount: number
 }
 
+/** How many rows to draw at once; the rest arrive on request. */
+const PAGE = 150
+
 function fmtEur(n: number): string {
   return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })
 }
@@ -30,6 +33,10 @@ export default function PodPaymentSchedule({ pods }: { pods: PodScheduleEntry[] 
   const [bulkPending, startBulkTransition] = useTransition()
   const [bulkFlash, setBulkFlash] = useState<string | null>(null)
   const [bulkError, setBulkError] = useState<string | null>(null)
+  // Rendering all ~4,400 rows, each with its own date input, made this page a
+  // 5.6MB document. Filtering, the counts and "seleziona tutti" still work on
+  // the whole set — only how many rows are drawn is capped.
+  const [shown, setShown] = useState(PAGE)
   const router = useRouter()
 
   const filtered = useMemo(() => {
@@ -53,6 +60,7 @@ export default function PodPaymentSchedule({ pods }: { pods: PodScheduleEntry[] 
     due: pods.filter((p) => p.isDueNow).length,
   }), [pods])
 
+  const visible = useMemo(() => filtered.slice(0, shown), [filtered, shown])
   const filteredIds = useMemo(() => filtered.map((p) => p.contactId), [filtered])
   const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selected.has(id))
   const someFilteredSelected = filteredIds.some((id) => selected.has(id)) && !allFilteredSelected
@@ -103,14 +111,14 @@ export default function PodPaymentSchedule({ pods }: { pods: PodScheduleEntry[] 
     <div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => setFilter('all')} className="ap-pill" data-tone={filter === 'all' ? 'blue' : 'gray'} style={{ border: 'none', cursor: 'pointer' }}>Tutti ({counts.all})</button>
-          <button onClick={() => setFilter('unset')} className="ap-pill" data-tone={filter === 'unset' ? 'amber' : 'gray'} style={{ border: 'none', cursor: 'pointer' }}>Senza data ({counts.unset})</button>
-          <button onClick={() => setFilter('due')} className="ap-pill" data-tone={filter === 'due' ? 'red' : 'gray'} style={{ border: 'none', cursor: 'pointer' }}>Da pagare oggi ({counts.due})</button>
+          <button onClick={() => { setFilter('all'); setShown(PAGE) }} className="ap-pill" data-tone={filter === 'all' ? 'blue' : 'gray'} style={{ border: 'none', cursor: 'pointer' }}>Tutti ({counts.all})</button>
+          <button onClick={() => { setFilter('unset'); setShown(PAGE) }} className="ap-pill" data-tone={filter === 'unset' ? 'amber' : 'gray'} style={{ border: 'none', cursor: 'pointer' }}>Senza data ({counts.unset})</button>
+          <button onClick={() => { setFilter('due'); setShown(PAGE) }} className="ap-pill" data-tone={filter === 'due' ? 'red' : 'gray'} style={{ border: 'none', cursor: 'pointer' }}>Da pagare oggi ({counts.due})</button>
         </div>
         <input
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setShown(PAGE) }}
           placeholder="Cerca per POD, cliente, amministratore…"
           className="ap-input"
           style={{ flex: '1 1 240px', minWidth: 200, height: 32, fontSize: 12 }}
@@ -181,12 +189,24 @@ export default function PodPaymentSchedule({ pods }: { pods: PodScheduleEntry[] 
           </thead>
           <tbody>
             {filtered.length === 0 && <tr><td colSpan={9} style={{ textAlign: 'center', padding: 28, color: 'var(--ap-text-faint)' }}>Nessun POD.</td></tr>}
-            {filtered.map((p) => (
+            {visible.map((p) => (
               <Row key={p.contactId} pod={p} selected={selected.has(p.contactId)} onToggle={() => toggleOne(p.contactId)} />
             ))}
           </tbody>
         </table>
       </div>
+
+      {filtered.length > visible.length && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 2px', fontSize: 12, color: 'var(--ap-text-muted)' }}>
+          <span>Mostrati {visible.length} di {filtered.length}.</span>
+          <button type="button" onClick={() => setShown((n) => n + PAGE)} className="ap-btn ap-btn-ghost" style={{ height: 28, fontSize: 12 }}>
+            Mostra altri {Math.min(PAGE, filtered.length - visible.length)}
+          </button>
+          <button type="button" onClick={() => setShown(filtered.length)} className="ap-btn ap-btn-ghost" style={{ height: 28, fontSize: 12 }}>
+            Mostra tutti
+          </button>
+        </div>
+      )}
     </div>
   )
 }
