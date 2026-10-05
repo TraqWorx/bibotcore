@@ -119,21 +119,53 @@ export async function loadSnapshot(): Promise<ApuliaSnapshot> {
   }
 }
 
-async function computePodDueStats(sb: ReturnType<typeof createAdminClient>): Promise<{ podsDueNow: number; dueAmount: number }> {
-  // Pull active PODs + admin compensi to roll up "Da pagare oggi" anchored
-  // on each POD's first_payment_at (or cached_at fallback). Paginate to
-  // dodge the PostgREST 1000-row cap.
-  type PodLite = { id: string; codice_amministratore: string | null; pod_override: number | null; cached_at: string; first_payment_at: string | null }
-  const pods: PodLite[] = []
-  for (let from = 0; ; from += 1000) {
-    const { data } = await sb.from('apulia_contacts')
-      .select('id, codice_amministratore, pod_override, cached_at, first_payment_at')
-      .eq('is_amministratore', false).eq('is_switch_out', false).neq('sync_status', 'pending_delete')
-      .range(from, from + 999)
-    if (!data || data.length === 0) break
-    pods.push(...(data as PodLite[]))
-    if (data.length < 1000) break
+/** The active-POD columns both rollups need. */
+type PodLite = { id: string; codice_amministratore: string | null; pod_override: number | null; cached_at: string; first_payment_at: string | null }
+
+/**
+ * Every active POD, read in parallel pages.
+ *
+ * PostgREST hands over 1,000 rows at a time and there are ~4,400, so this used
+ * to be five sequential round-trips — most of what the dashboard and the
+ * Amministratori page waited for. The ORDER BY matters as much as the speed:
+ * paging without one lets pages overlap or skip rows, and these rows decide
+ * what each administrator is owed.
+ */
+async function fetchActivePodsLite(sb: ReturnType<typeof createAdminClient>): Promise<PodLite[]> {
+  const { count, error: countError } = await sb
+    .from('apulia_contacts')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_amministratore', false)
+    .eq('is_switch_out', false)
+    .neq('sync_status', 'pending_delete')
+  if (countError) throw new Error(`count active pods: ${countError.message}`)
+
+  const PAGE = 1000
+  const pages = Math.max(1, Math.ceil((count ?? 0) / PAGE))
+  const results = await Promise.all(
+    Array.from({ length: pages }, (_, i) =>
+      sb
+        .from('apulia_contacts')
+        .select('id, codice_amministratore, pod_override, cached_at, first_payment_at')
+        .eq('is_amministratore', false)
+        .eq('is_switch_out', false)
+        .neq('sync_status', 'pending_delete')
+        .order('id')
+        .range(i * PAGE, i * PAGE + PAGE - 1),
+    ),
+  )
+  const out: PodLite[] = []
+  for (const { data, error } of results) {
+    if (error) throw new Error(`read active pods: ${error.message}`)
+    out.push(...((data ?? []) as unknown as PodLite[]))
   }
+  return out
+}
+
+async function computePodDueStats(sb: ReturnType<typeof createAdminClient>): Promise<{ podsDueNow: number; dueAmount: number }> {
+  // Active PODs + admin compensi, rolled up into "Da pagare oggi", anchored on
+  // each POD's first_payment_at (or cached_at fallback).
+  const pods = await fetchActivePodsLite(sb)
   const codes = Array.from(new Set(pods.map((p) => p.codice_amministratore).filter((x): x is string => !!x)))
   const compensoByCode = new Map<string, number>()
   const offsetByCode = new Map<string, number | null>()
@@ -180,22 +212,6 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
   // Pull admins + per-admin pod counts + the active POD list (need each
   // POD's id, codice_amministratore, override, cached_at, first_payment_at
   // to reconstruct per-POD paid/due status rolled up to the admin level).
-  type PodLite = { id: string; codice_amministratore: string | null; pod_override: number | null; cached_at: string; first_payment_at: string | null }
-  const fetchActivePods = async (): Promise<PodLite[]> => {
-    const out: PodLite[] = []
-    for (let from = 0; ; from += 1000) {
-      const { data } = await sb
-        .from('apulia_contacts')
-        .select('id, codice_amministratore, pod_override, cached_at, first_payment_at')
-        .eq('is_amministratore', false).eq('is_switch_out', false)
-        .neq('sync_status', 'pending_delete')
-        .range(from, from + 999)
-      if (!data || data.length === 0) break
-      out.push(...(data as PodLite[]))
-      if (data.length < 1000) break
-    }
-    return out
-  }
   const fetchPodPayments = async (): Promise<Map<string, { lastPaidAt: string; count: number }>> => {
     const map = new Map<string, { lastPaidAt: string; count: number }>()
     const { data } = await sb.rpc('apulia_pod_payment_stats')
@@ -209,7 +225,7 @@ export async function listAdminsWithStats(): Promise<AdminRow[]> {
     sb.from('apulia_contacts').select('id, first_name, last_name, email, phone, codice_amministratore, compenso_per_pod, commissione_totale, sync_status, sync_error, cached_at, payment_offset_days').eq('is_amministratore', true).neq('sync_status', 'pending_delete'),
     sb.rpc('apulia_admin_pod_counts'),
     sb.from('apulia_payments').select('contact_id, paid_at').order('paid_at', { ascending: false }),
-    fetchActivePods(),
+    fetchActivePodsLite(sb),
     fetchPodPayments(),
   ])
 
