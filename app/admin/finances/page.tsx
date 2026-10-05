@@ -1,8 +1,10 @@
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
+import { isBibotAgency } from '@/lib/isBibotAgency'
 import FinancesClient from './_components/FinancesClient'
 import { ad } from '@/lib/admin/ui'
-import { getAdminContext } from '@/lib/admin/viewAsAgency'
+import { getStripeChargesForVat } from '@/lib/finances/stripeCharges'
+import { getAffiliateCost } from '@/lib/finances/affiliateCost'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,15 +15,9 @@ export default async function FinancesPage() {
 
   const sb = createAdminClient()
   const { data: profile } = await sb.from('profiles').select('agency_id').eq('id', user.id).single()
-  // A super admin viewing another agency sees that agency's data
-  const adminCtx = await getAdminContext()
-  const profileScoped = { ...profile, agency_id: adminCtx?.agencyId ?? profile?.agency_id }
-  if (!profileScoped.agency_id) redirect('/admin')
-  const { data: agencyRow } = await sb.from('agencies').select('ghl_stripe_secret_key').eq('id', profileScoped.agency_id).maybeSingle()
-  const agencyStripeKey = agencyRow?.ghl_stripe_secret_key ?? null
-  if (!agencyStripeKey) redirect('/admin')
+  if (!profile?.agency_id || !isBibotAgency(profile.agency_id)) redirect('/admin')
 
-  const agencyId = profileScoped.agency_id
+  const agencyId = profile.agency_id
 
   // Get MRR from locations with plans
   const [{ data: locations }, { data: ghlPlans }, { data: costs }, { data: vatPayments }, { data: allLocations }, { data: vatStatuses }] = await Promise.all([
@@ -103,32 +99,7 @@ export default async function FinancesPage() {
   const currentYear = new Date().getFullYear()
   const years = [currentYear - 1, currentYear]
 
-  // Fetch all Stripe charges for VAT calculation
-  const allCharges: { amount: number; created: number }[] = []
-  try {
-    const Stripe = (await import('stripe')).default
-    const ghlStripeKey = agencyStripeKey
-    if (ghlStripeKey) {
-      const stripe = new Stripe(ghlStripeKey)
-      const oldestStart = Math.floor(new Date(currentYear - 1, 0, 1).getTime() / 1000)
-      let hasMore = true
-      let startingAfter: string | undefined
-      while (hasMore) {
-        const page = await stripe.charges.list({
-          created: { gte: oldestStart },
-          limit: 100,
-          ...(startingAfter ? { starting_after: startingAfter } : {}),
-        })
-        for (const c of page.data) {
-          if (c.status === 'succeeded' && c.amount > 500) { // exclude test charges
-            allCharges.push({ amount: c.amount, created: c.created })
-          }
-        }
-        hasMore = page.has_more
-        if (page.data.length > 0) startingAfter = page.data[page.data.length - 1].id
-      }
-    }
-  } catch { /* ignore Stripe errors */ }
+  const allCharges = await getStripeChargesForVat(currentYear - 1)
 
   const vatQuarters: VatQuarter[] = []
   let totalVatOwed = 0
@@ -164,75 +135,7 @@ export default async function FinancesPage() {
   const q4PrevYear = vatQuarters.find((v) => v.year === currentYear - 1 && v.q === 4)
   const accontoIva = q4PrevYear ? q4PrevYear.vatAmount * 0.88 : 0
 
-  // Fetch affiliate monthly cost (owed ÷ months active)
-  let affiliateMonthlyCost = 0
-  let affiliateTotalOwed = 0
-  try {
-    const { refreshIfNeeded } = await import('@/lib/ghl/refreshIfNeeded')
-    const { data: agencyLocs } = await sb.from('locations').select('location_id').eq('agency_id', agencyId)
-    const { data: conns } = await sb.from('ghl_connections').select('location_id, access_token, refresh_token, expires_at, company_id')
-      .in('location_id', (agencyLocs ?? []).map((l) => l.location_id))
-      .not('refresh_token', 'is', null)
-    for (const conn of conns ?? []) {
-      // The refreshed token is already location-scoped; exchanging it again via
-      // /oauth/locationToken only works for company tokens and silently failed here.
-      const affToken = await refreshIfNeeded(conn.location_id, conn)
-      if (!affToken) continue
-
-      const affRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/affiliates`, {
-        headers: { Authorization: `Bearer ${affToken}`, Version: '2021-07-28' },
-      })
-      if (!affRes.ok) continue
-      const affData = await affRes.json()
-      // Get campaign commission rates
-      for (const a of (affData.affiliates ?? []) as { _id?: string; owned?: number; campaignIds?: string[]; customer?: number }[]) {
-        affiliateTotalOwed += a.owned ?? 0
-        // Get commission rate from campaign
-        let commRate = 0
-        if (a.campaignIds?.[0]) {
-          const campRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/campaigns/${a.campaignIds[0]}`, {
-            headers: { Authorization: `Bearer ${affToken}`, Version: '2021-07-28' },
-          })
-          if (campRes.ok) {
-            const camp = await campRes.json()
-            commRate = (camp.commissionV2?.[0]?.defaultCommission?.commission ?? 0) / 100
-          }
-        }
-        // Get customer plan prices
-        if (commRate > 0 && a._id) {
-          const custRes = await fetch(`https://services.leadconnectorhq.com/affiliate-manager/${conn.location_id}/affiliates/${a._id}/customers`, {
-            headers: { Authorization: `Bearer ${affToken}`, Version: '2021-07-28' },
-          })
-          if (custRes.ok) {
-            const custData2 = await custRes.json()
-            for (const c of custData2.customers ?? []) {
-              // Dropped customers no longer pay, so they earn no commission
-              if (c.type === 'dropped') continue
-              const email = (c.email as string | undefined)?.toLowerCase()
-              let price: number | null = null
-              if (email) {
-                // Match to location plan
-                const { data: prof } = await sb.from('profiles').select('location_id').eq('email', email).limit(1).maybeSingle()
-                if (prof?.location_id) {
-                  const { data: loc } = await sb.from('locations').select('ghl_plan_id').eq('location_id', prof.location_id).single()
-                  if (loc?.ghl_plan_id) {
-                    const { data: plan } = await sb.from('ghl_plans').select('price_monthly').eq('ghl_plan_id', loc.ghl_plan_id).single()
-                    if (plan?.price_monthly) price = Number(plan.price_monthly)
-                  }
-                }
-              }
-              // No profile for this customer yet: fall back to the plan name GHL reports
-              if (price == null && typeof c.planName === 'string') {
-                const { data: plan } = await sb.from('ghl_plans').select('price_monthly').eq('name', c.planName).limit(1).maybeSingle()
-                if (plan?.price_monthly) price = Number(plan.price_monthly)
-              }
-              if (price != null) affiliateMonthlyCost += price * commRate
-            }
-          }
-        }
-      }
-    }
-  } catch { /* ignore */ }
+  const { monthlyCost: affiliateMonthlyCost, totalOwed: affiliateTotalOwed } = await getAffiliateCost(agencyId)
 
   const typedCosts = (costs ?? []).map((c) => ({
     id: c.id as string,
