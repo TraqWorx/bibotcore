@@ -11,7 +11,7 @@ interface Props {
    * and three queries, on a page that is already rendered and correct.
    */
   ageMinutes: number
-  /** Trigger a sync if age >= this OR drift is detected. Default 30. */
+  /** Trigger a sync if age >= this OR drift is detected. Default 90. */
   staleMinutes?: number
 }
 
@@ -26,7 +26,7 @@ interface Props {
  * where the cache is fresh, drift waits for the next reconciliation rather
  * than being caught on that visit. The hourly cron is the backstop.
  */
-export default function StaleSyncTrigger({ ageMinutes, staleMinutes = 30 }: Props) {
+export default function StaleSyncTrigger({ ageMinutes, staleMinutes = 90 }: Props) {
   const router = useRouter()
   const fired = useRef(false)
   // Fresh cache: nothing to show, not even for the moment before the effect

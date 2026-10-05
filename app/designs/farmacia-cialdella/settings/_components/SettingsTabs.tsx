@@ -59,7 +59,7 @@ export default function SettingsTabs({ config, clusters, tags, pending, failed }
           <div className="fc-card" style={{ padding: 16, display: 'flex', gap: 24 }}>
             <div><div style={{ fontSize: 22, fontWeight: 800 }}>{pending}</div><div style={{ fontSize: 12, color: 'var(--fc-text-muted)' }}>In coda</div></div>
             <div><div style={{ fontSize: 22, fontWeight: 800, color: failed > 0 ? 'var(--fc-danger)' : undefined }}>{failed}</div><div style={{ fontSize: 12, color: 'var(--fc-text-muted)' }}>Falliti</div></div>
-            <div style={{ alignSelf: 'center', fontSize: 13, color: 'var(--fc-text-faint)' }}>La coda viene svuotata verso GHL ogni minuto.</div>
+            <div style={{ alignSelf: 'center', fontSize: 13, color: 'var(--fc-text-faint)' }}>La coda viene svuotata verso GHL ogni cinque minuti.</div>
           </div>
         </section>
       )}

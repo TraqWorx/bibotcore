@@ -307,21 +307,40 @@ export interface ApuliaSyncState {
   runningSince: string | null
   /** Minutes since the last completed reconciliation (Infinity if never). */
   ageMinutes: number
+  /** When an opportunities sync was last attempted (see migration 143). */
+  opportunitiesSyncedAt: string | null
+  opportunitiesAgeMinutes: number
 }
 
 export async function getApuliaSyncState(): Promise<ApuliaSyncState> {
   const sb = createAdminClient()
   const { data } = await sb
     .from('apulia_sync_state')
-    .select('last_full_sync_at, running_since')
+    .select('last_full_sync_at, running_since, opportunities_synced_at')
     .eq('id', true)
     .maybeSingle()
   const last = data?.last_full_sync_at ?? null
+  const opps = data?.opportunities_synced_at ?? null
+  const minutesSince = (iso: string | null) =>
+    iso ? (Date.now() - new Date(iso).getTime()) / 60000 : Number.POSITIVE_INFINITY
   return {
     lastFullSyncAt: last,
     runningSince: data?.running_since ?? null,
-    ageMinutes: last ? (Date.now() - new Date(last).getTime()) / 60000 : Number.POSITIVE_INFINITY,
+    ageMinutes: minutesSince(last),
+    opportunitiesSyncedAt: opps,
+    opportunitiesAgeMinutes: minutesSince(opps),
   }
+}
+
+/**
+ * Stamp an opportunities sync ATTEMPT. Deliberately not conditional on the
+ * sync finding anything: a location with no opportunities, or a GHL outage,
+ * must not leave the page bootstrapping on every single view.
+ */
+export async function markOpportunitiesSynced(): Promise<void> {
+  const sb = createAdminClient()
+  await sb.from('apulia_sync_state').upsert({ id: true }, { onConflict: 'id', ignoreDuplicates: true })
+  await sb.from('apulia_sync_state').update({ opportunities_synced_at: new Date().toISOString() }).eq('id', true)
 }
 
 /**

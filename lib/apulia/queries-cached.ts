@@ -461,6 +461,11 @@ export interface CondominiResult {
   amministratori: string[]
 }
 
+/** Escape LIKE wildcards so a value is matched literally. */
+function likeLiteral(v: string): string {
+  return v.replace(/([\\%_])/g, '\\$1')
+}
+
 export async function listCondomini(f: CondominiFilters): Promise<CondominiResult> {
   const sb = createAdminClient()
   const pageSize = f.pageSize ?? 50
@@ -480,8 +485,13 @@ export async function listCondomini(f: CondominiFilters): Promise<CondominiResul
 
   if (f.stato === 'active') q = q.eq('is_switch_out', false)
   else if (f.stato === 'switch_out') q = q.eq('is_switch_out', true)
-  if (f.comune) q = q.ilike('comune', f.comune)
-  if (f.amministratore) q = q.ilike('amministratore_name', `%${f.amministratore}%`)
+  // Both values come from the dropdowns, which list exact names: match the
+  // whole value, and escape LIKE's wildcards so a name containing % or _ (or a
+  // hand-edited URL) cannot widen the match. The amministratore filter used to
+  // be a substring match, which returned DE SIMONE GIOVANNINO's POD to anyone
+  // filtering for SIMONE GIOVANNI.
+  if (f.comune) q = q.ilike('comune', likeLiteral(f.comune))
+  if (f.amministratore) q = q.ilike('amministratore_name', likeLiteral(f.amministratore))
   if (f.store) q = q.eq('store', f.store)
   if (f.q) {
     const term = f.q.replace(/[%_]/g, ' ')

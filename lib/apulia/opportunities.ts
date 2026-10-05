@@ -1,6 +1,7 @@
 import { ghlFetch } from './ghl'
 import { APULIA_LOCATION_ID } from './fields'
 import { createAdminClient } from '@/lib/supabase-server'
+import { markOpportunitiesSynced } from './cache'
 
 export interface PipelineStage {
   id: string
@@ -147,6 +148,10 @@ async function fetchRawPipelines(): Promise<RawPipeline[]> {
  */
 export async function syncOpportunities(): Promise<{ pipelines: number; opportunities: number }> {
   const sb = createAdminClient()
+  // Stamped before the work and regardless of outcome, so callers rate-limit
+  // the attempt rather than the result: this location has no opportunities in
+  // GHL, and gating on "is the cache empty" meant every page view bootstrapped.
+  await markOpportunitiesSynced()
   const [pipelines, opps] = await Promise.all([fetchRawPipelines(), fetchAllRawOpportunities()])
 
   // Upsert pipelines.

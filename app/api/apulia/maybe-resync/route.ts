@@ -11,15 +11,16 @@ export const maxDuration = 300
 
 /**
  * Smart sync trigger called by Apulia list pages. Three triggers:
- *   1. Last full reconciliation older than staleMinutes (default 30)
+ *   1. Last full reconciliation older than staleMinutes (default 90)
  *   2. Drift detected: GHL contact count != cache count
  *   3. force=1 query param (caller forces it)
  *
  * A reconciliation pulls every contact out of GHL and compares ~4,500 cached
  * rows, so the age threshold is deliberately far longer than a page visit:
  * per-contact changes already arrive by webhook, and the hourly cron is the
- * safety net. Age used to be read from max(cached_at) — set only on INSERT —
- * which made this fire on virtually every page load.
+ * safety net. The default threshold sits above that hourly interval, so while
+ * the cron is healthy a visitor never triggers one. Age used to be read from
+ * max(cached_at) — set only on INSERT — which fired this on every page load.
  *
  * Owner / admin / super_admin only.
  */
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
   }
 
   const url = new URL(req.url)
-  const staleMinutes = Number(url.searchParams.get('staleMinutes') ?? '30')
+  const staleMinutes = Number(url.searchParams.get('staleMinutes') ?? '90')
   const force = url.searchParams.get('force') === '1'
 
   const [syncState, { count: cacheCount }, { count: pendingOps }, ghlCountResult] = await Promise.all([
