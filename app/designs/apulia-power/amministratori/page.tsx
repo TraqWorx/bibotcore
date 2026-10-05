@@ -7,6 +7,7 @@ import AddAdminPanel from './_components/AddAdminPanel'
 import { ResyncButton } from '../settings/_components/SettingsForms'
 import StaleSyncTrigger from '../_components/StaleSyncTrigger'
 import { createAdminClient } from '@/lib/supabase-server'
+import { getApuliaSyncState } from '@/lib/apulia/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,14 +31,12 @@ export default async function Page() {
     const { data } = await sb.rpc('apulia_paid_sum_since', { from_iso: monthStart.toISOString() })
     return (Number(data) || 0) / 100
   }
-  const [admins, { data: latestCache }, paidThisMonthTotal] = await Promise.all([
+  const [admins, syncState, paidThisMonthTotal] = await Promise.all([
     listAdminsWithStats(),
-    sb.from('apulia_contacts').select('cached_at').order('cached_at', { ascending: false }).limit(1).maybeSingle(),
+    getApuliaSyncState(),
     fetchPaidThisMonth(),
   ])
-  const cacheAgeMinutes = latestCache?.cached_at
-    ? (Date.now() - new Date(latestCache.cached_at).getTime()) / 60000
-    : Number.POSITIVE_INFINITY
+  const cacheAgeMinutes = syncState.ageMinutes
   const totalDue = admins.reduce((s, a) => s + a.total, 0)
   const dueNowCount = admins.filter((a) => a.isDueNow).length
   const monthLabel = monthStart.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })

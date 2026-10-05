@@ -110,13 +110,24 @@ export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
 
       const ghlEmails = new Set(ghlUsers.map((u) => u.email?.toLowerCase()).filter(Boolean) as string[])
 
+      // Who is linked to this location right now, and with which role. Read
+      // once and reused twice: to skip writes that would store the same role
+      // again (this runs hourly, and rewriting every row every hour was most
+      // of the write traffic on profiles / profile_locations), and to find
+      // members GHL no longer lists.
+      const { data: memberRows } = await sb
+        .from('profile_locations')
+        .select('user_id, role')
+        .eq('location_id', loc.location_id)
+      const memberRoles = new Map<string, string>((memberRows ?? []).map((r) => [r.user_id as string, r.role as string]))
+
       // Sync each GHL user into Supabase
       for (const ghlUser of ghlUsers) {
         const email = ghlUser.email?.toLowerCase()
         if (!email) continue
 
         // Find or create Supabase user
-        const { data: profile } = await sb.from('profiles').select('id, role').eq('email', email).maybeSingle()
+        const { data: profile } = await sb.from('profiles').select('id, role, location_id').eq('email', email).maybeSingle()
         let profileId = profile?.id
 
         if (!profileId) {
@@ -164,18 +175,21 @@ export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
 
         if (!profileId || profile?.role === 'super_admin') continue
 
-        // Update profile email if changed in GHL
-        if (profile && profile.role !== 'super_admin') {
+        // Point the profile at this location, unless it already does.
+        if (profile && profile.role !== 'super_admin' && profile.location_id !== loc.location_id) {
           await sb.from('profiles').update({ location_id: loc.location_id }).eq('id', profileId)
         }
 
         // Ensure profile_locations entry — GHL is the source of truth for role.
         const defaultRole = ghlRoleToLocationRole(ghlUser.roles?.role)
 
-        await sb.from('profile_locations').upsert(
-          { user_id: profileId, location_id: loc.location_id, role: defaultRole },
-          { onConflict: 'user_id,location_id' },
-        )
+        if (memberRoles.get(profileId) !== defaultRole) {
+          await sb.from('profile_locations').upsert(
+            { user_id: profileId, location_id: loc.location_id, role: defaultRole },
+            { onConflict: 'user_id,location_id' },
+          )
+          memberRoles.set(profileId, defaultRole)
+        }
         // Self-heal stale scope: a user who self-signed-up into a junk agency
         // (their own + a Test Location) must be re-scoped to THIS location's
         // agency so they land on the right sub-account, not their junk one.
@@ -186,11 +200,11 @@ export async function syncAllLocationUsers(filterLocationId?: string): Promise<{
       // Remove users from profile_locations that are no longer in GHL for this
       // location — but ONLY when we fetched the complete roster. A partial fetch
       // must never trigger removals (that's how real staff lost access).
-      const { data: currentMembers } = rosterComplete
-        ? await sb.from('profile_locations').select('user_id').eq('location_id', loc.location_id)
-        : { data: [] as { user_id: string }[] }
+      const currentMembers = rosterComplete
+        ? [...memberRoles.keys()].map((user_id) => ({ user_id }))
+        : ([] as { user_id: string }[])
 
-      for (const member of currentMembers ?? []) {
+      for (const member of currentMembers) {
         const { data: memberProfile } = await sb.from('profiles').select('email, role').eq('id', member.user_id).maybeSingle()
         if (!memberProfile || memberProfile.role === 'super_admin') continue
         if (memberProfile.email && !ghlEmails.has(memberProfile.email.toLowerCase())) {

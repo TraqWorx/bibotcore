@@ -50,6 +50,46 @@ export function transformContact(
   }
 }
 
+/** The compare columns of a cached contact: everything but `raw` and `synced_at`. */
+export type CachedContactCompare = Omit<CachedContactRow, 'raw' | 'synced_at' | 'location_id'>
+
+export const CACHED_CONTACT_COMPARE_COLUMNS =
+  'ghl_id, first_name, last_name, email, phone, company_name, address1, city, tags, ' +
+  'assigned_to, date_added, last_activity, ghl_updated_at'
+
+/**
+ * True when GHL's contact matches the cached row, so the bulk sync can leave it
+ * alone. `synced_at` is excluded deliberately — it changes on every run and
+ * would make every row look dirty — and so is `raw`, which would mean reading
+ * every payload back to compare it. GHL moves `updatedAt` when a contact
+ * changes, and that is one of the columns compared, so a change inside `raw`
+ * still shows up here.
+ */
+export function sameCachedContact(
+  existing: Partial<CachedContactCompare> | undefined,
+  incoming: CachedContactRow,
+): boolean {
+  if (!existing) return false
+  const text = (a: unknown, b: unknown) => (a ?? null) === (b ?? null)
+  const tagsA = [...(existing.tags ?? [])].sort()
+  const tagsB = [...(incoming.tags ?? [])].sort()
+  return (
+    text(existing.first_name, incoming.first_name) &&
+    text(existing.last_name, incoming.last_name) &&
+    text(existing.email, incoming.email) &&
+    text(existing.phone, incoming.phone) &&
+    text(existing.company_name, incoming.company_name) &&
+    text(existing.address1, incoming.address1) &&
+    text(existing.city, incoming.city) &&
+    text(existing.assigned_to, incoming.assigned_to) &&
+    text(existing.date_added, incoming.date_added) &&
+    text(existing.last_activity, incoming.last_activity) &&
+    text(existing.ghl_updated_at, incoming.ghl_updated_at) &&
+    tagsA.length === tagsB.length &&
+    tagsA.every((t, i) => t === tagsB[i])
+  )
+}
+
 // ── Contact Custom Fields ────────────────────────────────────
 
 export interface CachedContactCustomFieldRow {

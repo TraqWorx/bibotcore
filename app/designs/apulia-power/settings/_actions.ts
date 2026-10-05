@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { canWriteBibotDesign } from '@/lib/auth/designOwner'
 import { APULIA_LOCATION_ID } from '@/lib/apulia/auth'
-import { fullSyncCache } from '@/lib/apulia/cache'
+import { tryFullSyncCache } from '@/lib/apulia/cache'
 import { enqueueOps } from '@/lib/apulia/sync-queue'
 
 async function ensureOwner(): Promise<{ email: string } | { error: string }> {
@@ -37,7 +37,8 @@ export async function resyncCache(): Promise<{ total: number; deleted: number; e
   const guard = await ensureOwner()
   if ('error' in guard) return { total: 0, deleted: 0, error: guard.error }
   try {
-    const r = await fullSyncCache()
+    const r = await tryFullSyncCache()
+    if (!r) return { total: 0, deleted: 0, error: 'Sincronizzazione già in corso' }
     revalidatePath('/designs/apulia-power/dashboard', 'layout')
     return r
   } catch (err) {

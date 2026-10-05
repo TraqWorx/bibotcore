@@ -9,7 +9,7 @@ import CondominiBulkSelect from './_components/CondominiBulkSelect'
 import { ResyncButton } from '../settings/_components/SettingsForms'
 import StaleSyncTrigger from '../_components/StaleSyncTrigger'
 import SearchableSelect from '../_components/SearchableSelect'
-import { createAdminClient } from '@/lib/supabase-server'
+import { getApuliaSyncState } from '@/lib/apulia/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,8 +30,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   const sp = await searchParams
   const page = Math.max(1, Number(sp.page ?? 1))
 
-  const sb = createAdminClient()
-  const [{ rows, total, comuni, amministratori }, adminOptions, storesList, { data: latestCache }] = await Promise.all([
+  const [{ rows, total, comuni, amministratori }, adminOptions, storesList, syncState] = await Promise.all([
     listCondomini({
       q: sp.q,
       stato: sp.stato,
@@ -43,12 +42,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
     }),
     listAdminPickerOptions(),
     listStores(),
-    sb.from('apulia_contacts').select('cached_at').order('cached_at', { ascending: false }).limit(1).maybeSingle(),
+    getApuliaSyncState(),
   ])
   const storeOptions = storesList.map((s) => ({ slug: s.slug, name: s.name }))
-  const cacheAgeMinutes = latestCache?.cached_at
-    ? (Date.now() - new Date(latestCache.cached_at).getTime()) / 60000
-    : Number.POSITIVE_INFINITY
+  const cacheAgeMinutes = syncState.ageMinutes
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 

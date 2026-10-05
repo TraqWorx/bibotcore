@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAuthClient, createAdminClient } from '@/lib/supabase-server'
 import { canAccessBibotDesign } from '@/lib/auth/designOwner'
-import { fullSyncCache } from '@/lib/apulia/cache'
+import { getApuliaSyncState, tryFullSyncCache } from '@/lib/apulia/cache'
 import { ghlFetch } from '@/lib/apulia/ghl'
 import { APULIA_LOCATION_ID } from '@/lib/apulia/fields'
 
@@ -11,11 +11,16 @@ export const maxDuration = 300
 
 /**
  * Smart sync trigger called by Apulia list pages. Three triggers:
- *   1. Cache age > staleMinutes (default 2)
+ *   1. Last full reconciliation older than staleMinutes (default 30)
  *   2. Drift detected: GHL contact count != cache count
  *   3. force=1 query param (caller forces it)
  *
- * Returning fast when cache is healthy keeps page renders snappy.
+ * A reconciliation pulls every contact out of GHL and compares ~4,500 cached
+ * rows, so the age threshold is deliberately far longer than a page visit:
+ * per-contact changes already arrive by webhook, and the hourly cron is the
+ * safety net. Age used to be read from max(cached_at) — set only on INSERT —
+ * which made this fire on virtually every page load.
+ *
  * Owner / admin / super_admin only.
  */
 export async function POST(req: Request) {
@@ -30,19 +35,18 @@ export async function POST(req: Request) {
   }
 
   const url = new URL(req.url)
-  const staleMinutes = Number(url.searchParams.get('staleMinutes') ?? '2')
+  const staleMinutes = Number(url.searchParams.get('staleMinutes') ?? '30')
   const force = url.searchParams.get('force') === '1'
 
-  const [{ data: latest }, { count: cacheCount }, { count: pendingOps }, ghlCountResult] = await Promise.all([
-    sb.from('apulia_contacts').select('cached_at').order('cached_at', { ascending: false }).limit(1).maybeSingle(),
+  const [syncState, { count: cacheCount }, { count: pendingOps }, ghlCountResult] = await Promise.all([
+    getApuliaSyncState(),
     sb.from('apulia_contacts').select('id', { count: 'exact', head: true }),
     sb.from('apulia_sync_queue').select('id', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
     ghlFetch('/contacts/search', { method: 'POST', body: JSON.stringify({ locationId: APULIA_LOCATION_ID, pageLimit: 1 }) }).then((r) => r.json()).catch(() => ({ total: -1 })),
   ])
 
   const ghlCount = (ghlCountResult as { total?: number }).total ?? -1
-  const ageMs = latest?.cached_at ? Date.now() - new Date(latest.cached_at).getTime() : Number.POSITIVE_INFINITY
-  const ageMinutes = ageMs / 60000
+  const ageMinutes = syncState.ageMinutes
   const drift = ghlCount >= 0 ? ghlCount !== (cacheCount ?? 0) : false
 
   // Bibot is now source of truth — drift while the worker is draining is
@@ -64,7 +68,15 @@ export async function POST(req: Request) {
   }
 
   try {
-    const r = await fullSyncCache()
+    const r = await tryFullSyncCache()
+    if (!r) {
+      return NextResponse.json({
+        skipped: true,
+        reason: 'already-running',
+        runningSince: syncState.runningSince,
+        ageMinutes: Math.round(ageMinutes),
+      })
+    }
     return NextResponse.json({
       synced: true,
       reason: force ? 'forced' : drift ? 'drift' : 'stale',

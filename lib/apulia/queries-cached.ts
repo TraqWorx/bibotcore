@@ -466,9 +466,15 @@ export async function listCondomini(f: CondominiFilters): Promise<CondominiResul
   const pageSize = f.pageSize ?? 50
   const page = Math.max(1, f.page ?? 1)
 
+  // Named columns, not '*': every row carries a custom_fields jsonb blob the
+  // list never shows, and reading 50 of those is most of the query's bytes.
   let q = sb
     .from('apulia_contacts')
-    .select('*', { count: 'exact' })
+    .select(
+      'id, pod_pdr, first_name, last_name, cliente, comune, stato, amministratore_name, ' +
+      'is_switch_out, pod_override, sync_status, sync_error, cached_at, switched_out_at, store',
+      { count: 'exact' },
+    )
     .eq('is_amministratore', false)
     .neq('sync_status', 'pending_delete')
 
@@ -492,17 +498,19 @@ export async function listCondomini(f: CondominiFilters): Promise<CondominiResul
   const to = from + pageSize - 1
   q = q.order('pod_pdr', { ascending: true, nullsFirst: false }).range(from, to)
 
-  const { data: rows, count } = await q
-
-  // Distinct comuni / amministratori for filter dropdowns.
-  const [{ data: comuniRaw }, { data: ammRaw }] = await Promise.all([
-    sb.from('apulia_contacts').select('comune').eq('is_amministratore', false).neq('sync_status', 'pending_delete').not('comune', 'is', null).limit(2000),
-    sb.from('apulia_contacts').select('amministratore_name').eq('is_amministratore', false).neq('sync_status', 'pending_delete').not('amministratore_name', 'is', null).limit(2000),
+  // Distinct comuni / amministratori for the filter dropdowns, de-duplicated
+  // in the database (see migration 140).
+  const [{ data: rows, count }, { data: options }] = await Promise.all([
+    q,
+    sb.rpc('apulia_condomini_filter_options'),
   ])
-  const comuni = [...new Set((comuniRaw ?? []).map((r) => r.comune as string).filter(Boolean))].sort((a, b) => a.localeCompare(b))
-  const amministratori = [...new Set((ammRaw ?? []).map((r) => r.amministratore_name as string).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+  const optionRows = (options ?? []) as Array<{ kind: string; value: string }>
+  const byKind = (kind: string): string[] =>
+    optionRows.filter((o) => o.kind === kind).map((o) => o.value).sort((a, b) => a.localeCompare(b))
+  const comuni = byKind('comune')
+  const amministratori = byKind('amministratore')
 
-  const podRows: PodRow[] = ((rows ?? []) as Array<CachedContactRow & { sync_error?: string | null; cached_at?: string; switched_out_at?: string | null; store?: string | null }>).map((r) => ({
+  const podRows: PodRow[] = ((rows ?? []) as unknown as Array<CachedContactRow & { sync_error?: string | null; cached_at?: string; switched_out_at?: string | null; store?: string | null }>).map((r) => ({
     contactId: r.id,
     pod: r.pod_pdr ?? '—',
     cliente: [r.first_name, r.last_name].filter(Boolean).join(' ') || r.cliente || undefined,

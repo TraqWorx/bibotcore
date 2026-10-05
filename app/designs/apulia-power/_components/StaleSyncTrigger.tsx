@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation'
 
 interface Props {
   /**
-   * Server-rendered cache age in minutes (Infinity if cache is empty).
-   * The server endpoint also decides whether to actually sync — this
-   * is just a hint to skip the round-trip when the cache is clearly
-   * fresh.
+   * Minutes since the last full reconciliation (Infinity if it has never
+   * run), rendered on the server. Below `staleMinutes` this component does
+   * nothing at all: the round-trip itself costs a GHL contact-count call
+   * and three queries, on a page that is already rendered and correct.
    */
   ageMinutes: number
-  /** Trigger a sync if age >= this OR drift is detected. Default 2. */
+  /** Trigger a sync if age >= this OR drift is detected. Default 30. */
   staleMinutes?: number
 }
 
@@ -25,7 +25,7 @@ interface Props {
  * per-contact webhooks) within one page visit instead of waiting
  * for the next hourly cron.
  */
-export default function StaleSyncTrigger({ ageMinutes, staleMinutes = 2 }: Props) {
+export default function StaleSyncTrigger({ ageMinutes, staleMinutes = 30 }: Props) {
   const router = useRouter()
   const fired = useRef(false)
   const [state, setState] = useState<'idle' | 'checking' | 'syncing' | 'done' | 'error'>('checking')
@@ -33,6 +33,7 @@ export default function StaleSyncTrigger({ ageMinutes, staleMinutes = 2 }: Props
   useEffect(() => {
     if (fired.current) return
     fired.current = true
+    if (ageMinutes < staleMinutes) { setState('idle'); return }
     ;(async () => {
       try {
         const r = await fetch(`/api/apulia/maybe-resync?staleMinutes=${staleMinutes}`, { method: 'POST' })

@@ -19,6 +19,9 @@ import {
   transformPipeline,
   transformConversation,
   transformCustomFieldDef,
+  sameCachedContact,
+  CACHED_CONTACT_COMPARE_COLUMNS,
+  type CachedContactCompare,
 } from './transforms'
 
 const GHL_BASE = 'https://services.leadconnectorhq.com'
@@ -112,9 +115,27 @@ async function syncContacts(locationId: string, token: string) {
       if (contacts.length < 100) break
     }
 
+    // Read what we already hold (minus the raw payload) so unchanged contacts
+    // can be left alone: rewriting all of them every run was ~750k row
+    // versions, and the vacuum behind them, for a few hundred real changes.
+    const sbRead = createAdminClient()
+    const existing = new Map<string, CachedContactCompare>()
+    for (let from = 0; ; from += 1000) {
+      const { data } = await sbRead
+        .from('cached_contacts')
+        .select(CACHED_CONTACT_COMPARE_COLUMNS)
+        .eq('location_id', locationId)
+        .order('ghl_id')
+        .range(from, from + 999)
+      const page = (data ?? []) as unknown as CachedContactCompare[]
+      for (const r of page) existing.set(r.ghl_id, r)
+      if (page.length < 1000) break
+    }
+
     // Transform and upsert contacts
     const contactRows = allContacts.map((c) => transformContact(locationId, c))
-    await upsertBatch('cached_contacts', contactRows, 'location_id,ghl_id')
+    const changedRows = contactRows.filter((r) => !sameCachedContact(existing.get(r.ghl_id), r))
+    await upsertBatch('cached_contacts', changedRows, 'location_id,ghl_id')
 
     // Transform and upsert custom field values
     const cfRows = allContacts.flatMap((c) =>
@@ -124,34 +145,34 @@ async function syncContacts(locationId: string, token: string) {
         (c.customFields ?? []) as Array<Record<string, unknown>>,
       ),
     )
-    // Delete custom fields only for contacts we're syncing (avoids race with webhooks)
+    // Write only the fields that actually changed. Deleting and re-inserting
+    // every row on every run was this project's biggest source of Disk IO.
     const sb = createAdminClient()
-    const syncedContactIds = allContacts.map((c) => c.id as string)
-    for (let i = 0; i < syncedContactIds.length; i += BATCH_SIZE) {
-      const batch = syncedContactIds.slice(i, i + BATCH_SIZE)
-      await sb.from('cached_contact_custom_fields').delete()
-        .eq('location_id', locationId)
-        .in('contact_ghl_id', batch)
+    for (let i = 0; i < cfRows.length; i += BATCH_SIZE) {
+      const batch = cfRows.slice(i, i + BATCH_SIZE)
+      const { error } = await sb.rpc('sync_contact_custom_fields_batch', {
+        p_location_id: locationId,
+        p_rows: batch.map((r) => ({
+          contact_ghl_id: r.contact_ghl_id,
+          field_id: r.field_id,
+          field_key: r.field_key ?? null,
+          value: r.value ?? null,
+        })),
+      })
+      if (error) throw new Error(`custom fields sync: ${error.message}`)
     }
-    await upsertBatch('cached_contact_custom_fields', cfRows, 'location_id,contact_ghl_id,field_id')
 
-    // Remove contacts from cache that no longer exist in GHL
+    // Remove contacts from cache that no longer exist in GHL. Reuses the read
+    // above, which — unlike the single unpaginated select this replaced — sees
+    // past the first 1,000 rows.
     const ghlIds = new Set(allContacts.map((c) => c.id as string))
-    const { data: cachedIds } = await sb
-      .from('cached_contacts')
-      .select('ghl_id')
-      .eq('location_id', locationId)
-    if (cachedIds) {
-      const staleIds = cachedIds
-        .map((r) => r.ghl_id)
-        .filter((id) => !ghlIds.has(id))
-      if (staleIds.length > 0) {
-        await sb
-          .from('cached_contacts')
-          .delete()
-          .eq('location_id', locationId)
-          .in('ghl_id', staleIds)
-      }
+    const staleIds = [...existing.keys()].filter((id) => !ghlIds.has(id))
+    for (let i = 0; i < staleIds.length; i += BATCH_SIZE) {
+      await sb
+        .from('cached_contacts')
+        .delete()
+        .eq('location_id', locationId)
+        .in('ghl_id', staleIds.slice(i, i + BATCH_SIZE))
     }
 
     await setSyncStatus(locationId, 'contacts', 'completed')
