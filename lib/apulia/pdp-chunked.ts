@@ -50,21 +50,34 @@ const ADMIN_FIELDS = new Set<string>([
   ...ADMIN_IDENTITY_FIELDS,
 ])
 
-interface StoreLite { slug: string; name: string | null; city: string | null }
+export interface StoreLite { slug: string; name: string | null; city: string | null; aliases?: string[] | null }
 async function loadStores(sb: ReturnType<typeof createAdminClient>): Promise<StoreLite[]> {
-  const { data } = await sb.from('apulia_stores').select('slug, name, city')
+  const { data } = await sb.from('apulia_stores').select('slug, name, city, aliases')
   return (data ?? []) as StoreLite[]
 }
-/** Normalize a PDP "Note" value to a store slug. Strips a "STORE " prefix
- *  and matches against each store's name/city (case-insensitive). Non-store
- *  noise (e.g. "ALTRA SOCIETA") returns null. */
-function normalizeStore(note: string | undefined, stores: StoreLite[]): string | null {
-  const s = String(note ?? '').trim().toUpperCase().replace(/^STORE\s+/, '')
+
+/** Upper-case, collapse runs of whitespace, drop a leading "STORE ". */
+function storeKey(v: string | null | undefined): string {
+  return String(v ?? '').toUpperCase().replace(/\s+/g, ' ').trim().replace(/^STORE /, '')
+}
+
+/**
+ * Resolve a PDP "Note" value to a store or agent slug.
+ *
+ * Matching is an exact comparison against each store's declared spellings (see
+ * apulia_stores.aliases, migration 145) plus its slug, name and city. It used to
+ * ask whether the note CONTAINED the store's name, which is backwards whenever
+ * the name is the longer of the two: "STORE SECONDIGLIANO" never matched
+ * "Napoli Secondigliano 5". A value nobody has declared returns null rather than
+ * being guessed onto the nearest store.
+ */
+export function normalizeStore(note: string | undefined, stores: StoreLite[]): string | null {
+  const s = storeKey(note)
   if (!s) return null
   for (const st of stores) {
-    for (const c of [st.name, st.city]) {
-      const cu = (c ?? '').toUpperCase().trim()
-      if (cu && (s === cu || s.includes(cu))) return st.slug
+    const candidates = [st.slug, st.name, st.city, ...(st.aliases ?? [])]
+    for (const c of candidates) {
+      if (c && storeKey(c) === s) return st.slug
     }
   }
   return null
