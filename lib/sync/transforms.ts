@@ -71,6 +71,16 @@ export function sameCachedContact(
 ): boolean {
   if (!existing) return false
   const text = (a: unknown, b: unknown) => (a ?? null) === (b ?? null)
+  // Postgres hands timestamptz back as '…235+00:00'; GHL sends '…235Z'. Same
+  // instant, different string — compared as text, every row looks changed and
+  // nothing is ever skipped.
+  const instant = (a: unknown, b: unknown) => {
+    if (a == null || b == null) return (a ?? null) === (b ?? null)
+    const ta = Date.parse(String(a))
+    const tb = Date.parse(String(b))
+    if (Number.isNaN(ta) || Number.isNaN(tb)) return String(a) === String(b)
+    return ta === tb
+  }
   const tagsA = [...(existing.tags ?? [])].sort()
   const tagsB = [...(incoming.tags ?? [])].sort()
   return (
@@ -82,9 +92,9 @@ export function sameCachedContact(
     text(existing.address1, incoming.address1) &&
     text(existing.city, incoming.city) &&
     text(existing.assigned_to, incoming.assigned_to) &&
-    text(existing.date_added, incoming.date_added) &&
-    text(existing.last_activity, incoming.last_activity) &&
-    text(existing.ghl_updated_at, incoming.ghl_updated_at) &&
+    instant(existing.date_added, incoming.date_added) &&
+    instant(existing.last_activity, incoming.last_activity) &&
+    instant(existing.ghl_updated_at, incoming.ghl_updated_at) &&
     tagsA.length === tagsB.length &&
     tagsA.every((t, i) => t === tagsB[i])
   )

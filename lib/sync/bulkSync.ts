@@ -121,12 +121,15 @@ async function syncContacts(locationId: string, token: string) {
     const sbRead = createAdminClient()
     const existing = new Map<string, CachedContactCompare>()
     for (let from = 0; ; from += 1000) {
-      const { data } = await sbRead
+      const { data, error } = await sbRead
         .from('cached_contacts')
         .select(CACHED_CONTACT_COMPARE_COLUMNS)
         .eq('location_id', locationId)
         .order('ghl_id')
         .range(from, from + 999)
+      // A failed read would look like an empty cache: every contact "new", and
+      // every cached contact stale and due for deletion.
+      if (error) throw new Error(`read cached_contacts: ${error.message}`)
       const page = (data ?? []) as unknown as CachedContactCompare[]
       for (const r of page) existing.set(r.ghl_id, r)
       if (page.length < 1000) break
@@ -164,15 +167,27 @@ async function syncContacts(locationId: string, token: string) {
 
     // Remove contacts from cache that no longer exist in GHL. Reuses the read
     // above, which — unlike the single unpaginated select this replaced — sees
-    // past the first 1,000 rows.
+    // past the first 1,000 rows. That wider view also means a bad GHL fetch
+    // could now delete the whole cache instead of a thousand rows, so a fetch
+    // that returned nothing, or that would wipe more than a tenth of what we
+    // hold, is treated as a broken fetch rather than as 'GHL is empty now'.
     const ghlIds = new Set(allContacts.map((c) => c.id as string))
     const staleIds = [...existing.keys()].filter((id) => !ghlIds.has(id))
-    for (let i = 0; i < staleIds.length; i += BATCH_SIZE) {
-      await sb
-        .from('cached_contacts')
-        .delete()
-        .eq('location_id', locationId)
-        .in('ghl_id', staleIds.slice(i, i + BATCH_SIZE))
+    const deleteCeiling = Math.max(50, Math.floor(existing.size / 10))
+    if (allContacts.length === 0 && existing.size > 0) {
+      throw new Error(`GHL returned no contacts for ${locationId} while ${existing.size} are cached — refusing to empty the cache`)
+    }
+    if (staleIds.length > deleteCeiling) {
+      console.warn(`[bulkSync] ${locationId}: ${staleIds.length} cached contacts absent from GHL (ceiling ${deleteCeiling}) — skipping deletions, GHL paging likely incomplete`)
+    } else {
+      for (let i = 0; i < staleIds.length; i += BATCH_SIZE) {
+        const { error } = await sb
+          .from('cached_contacts')
+          .delete()
+          .eq('location_id', locationId)
+          .in('ghl_id', staleIds.slice(i, i + BATCH_SIZE))
+        if (error) throw new Error(`delete stale cached_contacts: ${error.message}`)
+      }
     }
 
     await setSyncStatus(locationId, 'contacts', 'completed')

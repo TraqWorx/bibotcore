@@ -40,6 +40,23 @@ describe('sameCachedContact (bulk sync)', () => {
     expect(sameCachedContact(undefined, row)).toBe(false)
   })
 
+  it('reads a Postgres timestamp and a GHL timestamp as the same instant', () => {
+    // PostgREST returns '…235+00:00' where GHL sent '…235Z'. Compared as text,
+    // every contact looks changed and nothing is ever skipped.
+    const stored = {
+      ...row,
+      date_added: '2026-01-02T10:00:00+00:00',
+      last_activity: '2026-09-30T08:00:00+00:00',
+      ghl_updated_at: '2026-09-30T08:00:00+00:00',
+    }
+    expect(sameCachedContact(stored, row)).toBe(true)
+  })
+
+  it('still sees a real difference between two instants', () => {
+    const stored = { ...row, ghl_updated_at: '2026-09-30T08:00:01+00:00' }
+    expect(sameCachedContact(stored, row)).toBe(false)
+  })
+
   it('sees GHL bumping updatedAt', () => {
     const { raw: _raw, synced_at: _synced, location_id: _loc, ...stored } = row
     const changed = transformContact('loc1', { ...ghlContact, updatedAt: '2026-10-01T09:00:00Z' })

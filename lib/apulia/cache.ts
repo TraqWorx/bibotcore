@@ -192,6 +192,18 @@ export async function fullSyncCache(): Promise<{ total: number; deleted: number;
   // GHL paging can return the same contact twice; keep one row per ghl_id
   const incoming = [...new Map(all.map(cacheRowFromGhlContact).map((r) => [r.ghl_id, r])).values()]
 
+  // An empty or truncated GHL response is indistinguishable from "everything
+  // was deleted in GHL", and the stale step below would act on it. Bibot is
+  // the source of truth here, so treat it as a failed fetch: raise, so the
+  // caller records a failure and last_full_sync_at is not stamped.
+  const { count: cachedCount } = await sb
+    .from('apulia_contacts')
+    .select('id', { count: 'exact', head: true })
+    .not('ghl_id', 'is', null)
+  if (incoming.length === 0 && (cachedCount ?? 0) > 0) {
+    throw new Error(`GHL returned no contacts while ${cachedCount} are cached — refusing to empty the cache`)
+  }
+
   // Pull existing rows we might match on (ghl_id-keyed map). Paginate
   // because PostgREST caps a single select at 1000 rows; without this
   // a partial map causes incoming rows to mis-classify as "new" and the
@@ -271,7 +283,13 @@ export async function fullSyncCache(): Promise<{ total: number; deleted: number;
     .filter((r) => !liveIds.has(r.ghl_id) && r.sync_status === 'synced')
     .map((r) => r.id)
   let deleted = 0
-  if (stale.length) {
+  // GHL's contact search pages with searchAfter and has been seen to stop
+  // short; a short walk makes everything it missed look deleted. Deleting a
+  // handful is routine, deleting a tenth of the client's book is not.
+  const deleteCeiling = Math.max(50, Math.floor(existingRaw.length / 10))
+  if (stale.length > deleteCeiling) {
+    console.warn(`[fullSyncCache] ${stale.length} cached contacts absent from GHL (ceiling ${deleteCeiling}) — skipping deletions, GHL paging likely incomplete`)
+  } else if (stale.length) {
     const { error } = await sb.from('apulia_contacts').delete().in('id', stale)
     if (!error) deleted = stale.length
   }
@@ -318,12 +336,21 @@ export async function tryFullSyncCache(): Promise<Awaited<ReturnType<typeof full
   const sb = createAdminClient()
   const now = new Date()
   const staleLock = new Date(now.getTime() - SYNC_LOCK_MINUTES * 60_000).toISOString()
-  const { data: claimed } = await sb
+
+  // The single row is created by migration 139, but a database restored or
+  // seeded without it would leave nothing for the claim to match, and every
+  // reconciliation would report "already running" for ever.
+  await sb.from('apulia_sync_state').upsert({ id: true }, { onConflict: 'id', ignoreDuplicates: true })
+
+  const { data: claimed, error: claimError } = await sb
     .from('apulia_sync_state')
     .update({ running_since: now.toISOString() })
     .eq('id', true)
     .or(`running_since.is.null,running_since.lt.${staleLock}`)
     .select('id')
+  // A failed claim is not the same as a claim someone else holds: raise, so
+  // the caller reports an error instead of a quiet "already running".
+  if (claimError) throw new Error(`claim apulia sync: ${claimError.message}`)
   if (!claimed || claimed.length === 0) return null
 
   try {

@@ -21,14 +21,19 @@ interface Props {
  * than `staleMinutes` OR the cache row count diverges from the live
  * GHL count. The page auto-refreshes once the sync completes.
  *
- * The drift check catches GHL bulk operations (which don't fire
- * per-contact webhooks) within one page visit instead of waiting
- * for the next hourly cron.
+ * The drift check catches GHL bulk operations, which don't fire per-contact
+ * webhooks. It runs when this component calls the endpoint — so on a visit
+ * where the cache is fresh, drift waits for the next reconciliation rather
+ * than being caught on that visit. The hourly cron is the backstop.
  */
 export default function StaleSyncTrigger({ ageMinutes, staleMinutes = 30 }: Props) {
   const router = useRouter()
   const fired = useRef(false)
-  const [state, setState] = useState<'idle' | 'checking' | 'syncing' | 'done' | 'error'>('checking')
+  // Fresh cache: nothing to show, not even for the moment before the effect
+  // runs — this renders on the server too.
+  const [state, setState] = useState<'idle' | 'checking' | 'syncing' | 'done' | 'error'>(
+    ageMinutes < staleMinutes ? 'idle' : 'checking',
+  )
 
   useEffect(() => {
     if (fired.current) return
