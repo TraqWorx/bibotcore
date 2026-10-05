@@ -1,4 +1,4 @@
-import { unstable_cache } from 'next/cache'
+import { cached } from '@/lib/cache/appCache'
 import { createAdminClient } from '@/lib/supabase-server'
 
 export interface AffiliateCost {
@@ -106,14 +106,10 @@ async function computeAffiliateCost(agencyId: string): Promise<AffiliateCost> {
   return { monthlyCost, totalOwed }
 }
 
-export const getAffiliateCost = unstable_cache(
-  async (agencyId: string): Promise<AffiliateCost> => {
-    try {
-      return await computeAffiliateCost(agencyId)
-    } catch {
-      return { monthlyCost: 0, totalOwed: 0 }
-    }
-  },
-  ['affiliate-cost'],
-  { revalidate: 900, tags: ['affiliate-cost'] },
-)
+export async function getAffiliateCost(agencyId: string): Promise<AffiliateCost> {
+  try {
+    return await cached(`affiliate-cost:${agencyId}`, 900, () => computeAffiliateCost(agencyId))
+  } catch {
+    return { monthlyCost: 0, totalOwed: 0 }
+  }
+}

@@ -1,4 +1,4 @@
-import { unstable_cache } from 'next/cache'
+import { cached } from '@/lib/cache/appCache'
 
 export interface ChargeLite {
   amount: number
@@ -38,15 +38,11 @@ async function fetchCharges(fromYear: number): Promise<ChargeLite[]> {
   return out
 }
 
-export const getStripeChargesForVat = unstable_cache(
-  async (fromYear: number): Promise<ChargeLite[]> => {
-    try {
-      return await fetchCharges(fromYear)
-    } catch {
-      // A Stripe outage should leave the rest of the page working, as before.
-      return []
-    }
-  },
-  ['stripe-charges-for-vat'],
-  { revalidate: 900, tags: ['stripe-charges'] },
-)
+export async function getStripeChargesForVat(fromYear: number): Promise<ChargeLite[]> {
+  try {
+    return await cached(`stripe-charges-for-vat:${fromYear}`, 900, () => fetchCharges(fromYear))
+  } catch {
+    // A Stripe outage with nothing cached yet should still render the page.
+    return []
+  }
+}
