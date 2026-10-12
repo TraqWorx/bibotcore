@@ -20,7 +20,6 @@ const NAV: NavItem[] = [
   { href: '/designs/farmacia-cialdella/dashboard', label: 'Dashboard', icon: ICON.dashboard },
   { href: '/designs/farmacia-cialdella/clienti', label: 'Clienti', icon: ICON.contacts },
   { href: '/designs/farmacia-cialdella/ordini', label: 'Ordini', icon: ICON.orders },
-  { href: '/designs/farmacia-cialdella/recensioni', label: 'Recensioni', icon: ICON.star },
   { href: '/designs/farmacia-cialdella/conversazioni', label: 'Conversazioni', icon: ICON.chat },
   { href: '/designs/farmacia-cialdella/imports', label: 'Importazioni', icon: ICON.upload },
 ]

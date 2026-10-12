@@ -119,6 +119,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
 const sectionH: React.CSSProperties = { fontSize: 16, fontWeight: 700, margin: '32px 0 12px' }
 
+
 function TopList({ title, rows, value }: { title: string; rows: TopCustomer[]; value: (c: TopCustomer) => string }) {
   return (
     <div className="fc-card" style={{ padding: 0, overflow: 'hidden' }}>
