@@ -39,6 +39,12 @@ export default async function Page() {
   const cacheAgeMinutes = syncState.ageMinutes
   const totalDue = admins.reduce((s, a) => s + a.total, 0)
   const dueNowCount = admins.filter((a) => a.isDueNow).length
+  // Alphabetical here, so the list can be scanned by name. Sorted on a copy:
+  // listAdminsWithStats orders by amount owed, which the dashboard's
+  // "Top amministratori per commissione" relies on.
+  const adminsByName = [...admins].sort((a, b) =>
+    a.name.localeCompare(b.name, 'it', { sensitivity: 'base', numeric: true }),
+  )
   const monthLabel = monthStart.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
 
   return (
@@ -73,7 +79,7 @@ export default async function Page() {
       </header>
 
       <section className="ap-card">
-        <AdminsTable admins={admins} />
+        <AdminsTable admins={adminsByName} />
       </section>
     </div>
   )
